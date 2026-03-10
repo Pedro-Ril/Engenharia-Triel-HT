@@ -1,65 +1,139 @@
-import Image from "next/image";
+import AppLink from "@/components/AppLink";
+import styles from "./home.module.css";
 
-export default function Home() {
+const atalhos = [
+  {
+    titulo: "Liberação de Projeto",
+    descricao:
+      "Realize o envio automatizado das liberações de projeto com preenchimento estruturado das informações principais.",
+    href: "/liberacao-projeto",
+    tag: "Fluxo ativo",
+  },
+  {
+    titulo: "Consulta Estrutura",
+    descricao:
+      "Consulte estruturas técnicas e prepare a base para análises, integrações e validações de engenharia.",
+    href: "/consulta-estrutura",
+    tag: "Fluxo ativo",
+  },
+];
+
+export default function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className={styles.page}>
+      <section className={styles.hero}>
+        <div className={styles.heroContent}>
+          <span className={styles.badge}>Plataforma Engenharia Triel-HT</span>
+
+          <h1 className={styles.title}>
+            Bem-vindo ao portal de ferramentas da Engenharia
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <p className={styles.description}>
+            Este ambiente foi estruturado para concentrar funcionalidades
+            internas da engenharia em uma interface mais moderna, organizada e
+            preparada para expansão. A proposta é reduzir etapas operacionais,
+            facilitar rotinas do setor e centralizar acessos importantes em um
+            único lugar.
           </p>
+
+          <div className={styles.heroActions}>
+            <AppLink href="/liberacao-projeto" className={styles.primaryButton}>
+              Acessar Liberação de Projeto
+            </AppLink>
+
+            <AppLink href="/consulta-estrutura" className={styles.secondaryButton}>
+              Ir para Consulta Estrutura
+            </AppLink>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <aside className={styles.heroPanel}>
+          <div className={styles.panelCard}>
+            <h2 className={styles.panelTitle}>Mensagem de boas-vindas</h2>
+            <p className={styles.panelText}>
+              Bem-vindo ao ambiente da Engenharia Triel-HT. Utilize o menu
+              lateral para navegar entre os módulos disponíveis e acompanhe a
+              evolução desta plataforma, que servirá como base para novas
+              integrações e automações internas.
+            </p>
+          </div>
+
+          <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Módulos disponíveis</span>
+              <strong className={styles.statValue}>02</strong>
+            </div>
+
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>Status da plataforma</span>
+              <strong className={`${styles.statValue} ${styles.statOperacional}`}>
+                Operacional
+              </strong>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <span className={styles.sectionMiniTitle}>Acessos rápidos</span>
+            <h2 className={styles.sectionTitle}>Módulos principais</h2>
+          </div>
+
+          
+
         </div>
-      </main>
-    </div>
+
+        <div className={styles.cardsGrid}>
+          {atalhos.map((item) => (
+            <AppLink key={item.href} href={item.href} className={styles.moduleCard}>
+              <div className={styles.cardTop}>
+                <span className={styles.cardTag}>{item.tag}</span>
+              </div>
+
+              <h3 className={styles.cardTitle}>{item.titulo}</h3>
+              <p className={styles.cardDescription}>{item.descricao}</p>
+
+              <div className={styles.cardFooter}>
+                <span className={styles.cardLink}>Abrir módulo</span>
+              </div>
+            </AppLink>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.infoGrid}>
+          <div className={styles.infoCard}>
+            <h3 className={styles.infoTitle}>Objetivo da ferramenta</h3>
+            <p className={styles.infoText}>
+              Padronizar acessos, melhorar a experiência de uso e servir como
+              base para futuras rotinas da engenharia, como consultas técnicas,
+              integrações com ERP, estruturas, DXF e automações operacionais.
+            </p>
+          </div>
+
+          <div className={styles.infoCard}>
+            <h3 className={styles.infoTitle}>Estrutura em crescimento</h3>
+            <p className={styles.infoText}>
+              O sistema foi iniciado com os módulos de Liberação de Projeto e
+              Consulta Estrutura, mas já está preparado para receber novas telas
+              e evoluir para um hub completo da área.
+            </p>
+          </div>
+
+          <div className={styles.infoCard}>
+            <h3 className={styles.infoTitle}>Navegação simplificada</h3>
+            <p className={styles.infoText}>
+              O menu lateral foi pensado para facilitar o acesso rápido aos
+              módulos. A home funciona como ponto central da plataforma e resumo
+              inicial do ambiente.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -1,0 +1,216 @@
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  background:
+    linear-gradient(180deg, #b71c1c 0%, #9f1717 55%, #861313 100%);
+  color: #fff;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 8px 0 28px rgba(40, 10, 10, 0.18);
+  transition: width 0.28s ease;
+  overflow: hidden;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.open {
+  width: 260px;
+}
+
+.closed {
+  width: 78px;
+}
+
+.topArea {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 18px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: white;
+}
+
+.brandMark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.brandText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.brandTitle {
+  font-size: 1rem;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.brandSubtitle {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.76);
+  margin-top: 2px;
+}
+
+.toggleButton {
+  position: absolute;
+  right: -12px;
+  top: 22px;
+
+  width: 28px;
+  height: 28px;
+
+  border-radius: 8px;
+  border: none;
+
+  background: #ffffff;
+  color: #b71c1c;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+
+.toggleButton:hover {
+  transform: scale(1.05);
+}
+
+.sectionLabel {
+  padding: 16px 18px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.menuItem {
+  position: relative;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.9);
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease,
+    color 0.2s ease;
+}
+
+.menuItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.menuIcon {
+  width: 20px;
+  min-width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  background: #ffffff;
+}
+
+.bottomArea {
+  margin-top: auto;
+  padding: 14px 12px 16px;
+}
+
+.welcomeCard {
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.welcomeMini {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 6px;
+}
+
+.welcomeTitle {
+  display: block;
+  font-size: 0.94rem;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.welcomeText {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.collapsedDot {
+  width: 100%;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 900px) {
+  .open {
+    width: 230px;
+  }
+}
