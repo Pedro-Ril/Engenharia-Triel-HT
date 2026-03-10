@@ -78,7 +78,7 @@ Tela para consulta da estrutura de produto em formato de árvore, com navegaçã
 ### API utilizada
 
 ```
-http://proserver.trielht.com.br:1000/api/estrutura/invalida/COD_PAI
+http://proserver.trielht.com.br:1000/api/estrutura/COD_PAI
 ```
 
 ---

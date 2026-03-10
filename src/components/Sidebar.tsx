@@ -75,7 +75,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           className={styles.brand}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={styles.brandMark}>TH</div>
+          <div className={styles.brandMark}>HT</div>
 
           {open && (
             <div className={styles.brandText}>
