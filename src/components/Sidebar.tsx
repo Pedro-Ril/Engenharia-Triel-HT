@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   FolderCheck,
@@ -32,6 +33,11 @@ const menu = [
     name: "Consulta Estrutura",
     path: "/consulta-estrutura",
     icon: Network,
+  },
+  {
+    name: "Dashboard BI",
+    path: "/bi",
+    icon: BarChart3,
   },
 ];
 

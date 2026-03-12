@@ -54,7 +54,7 @@ function criarMapaDescricoes(
   const mapa = new Map<string, string>();
 
   if (codPai) {
-    mapa.set(codPai, descricaoPai || "");
+    mapa.set(normalizar(codPai), normalizar(descricaoPai || ""));
   }
 
   for (const item of data) {
@@ -83,93 +83,74 @@ function criarMapaDescricoes(
   return mapa;
 }
 
-export function montarArvoreEstrutura(
-  codPai: string,
-  descricaoPai: string,
-  data: EstruturaApiItem[]
-): EstruturaTreeNode {
-  const mapaDescricoes = criarMapaDescricoes(codPai, descricaoPai, data);
+function criarIdNode(item: EstruturaApiItem, indice: number): string {
+  return [
+    normalizar(item.ORDEM_HIERARQUICA),
+    normalizar(item.COD_ITEM_PAI),
+    normalizar(item.COD_ITEM_FILHO),
+    String(item.SEQ_ORD ?? ""),
+    normalizar(item.DT_INI),
+    normalizar(item.DT_FIM),
+    normalizar(item.STATUS_VALIDADE),
+    String(indice),
+  ].join("|");
+}
 
-  const root: EstruturaTreeNode = {
-    id: codPai,
-    codigo: codPai,
-    descricao: mapaDescricoes.get(codPai) || descricaoPai || "Item raiz",
-    nivel: 0,
-    caminho: codPai,
-    children: [],
-    registros: [],
-    statusValidade: undefined,
-    parentCode: undefined,
-  };
+function obterOrdemPai(ordem: string): string | null {
+  const valor = normalizar(ordem);
+  if (!valor) return null;
 
-  const nodeMap = new Map<string, EstruturaTreeNode>();
-  nodeMap.set(root.caminho, root);
+  const partes = valor.split(".");
+  if (partes.length <= 1) return null;
 
-  for (const item of data) {
-    const caminho = normalizar(item.CAMINHO_ESTRUTURA);
-    if (!caminho) continue;
+  partes.pop();
+  return partes.join(".");
+}
 
-    const partes = caminho
-      .split("->")
-      .map((parte) => parte.trim())
-      .filter(Boolean);
+function compararOrdemHierarquica(a: string, b: string): number {
+  const pa = normalizar(a)
+    .split(".")
+    .map((n) => Number(n));
 
-    if (partes.length === 0) continue;
+  const pb = normalizar(b)
+    .split(".")
+    .map((n) => Number(n));
 
-    let caminhoAtual = "";
-    let parentNode: EstruturaTreeNode | null = null;
+  const tamanho = Math.max(pa.length, pb.length);
 
-    for (let i = 0; i < partes.length; i++) {
-      const codigoAtual = partes[i];
-      caminhoAtual = i === 0 ? codigoAtual : `${caminhoAtual} -> ${codigoAtual}`;
+  for (let i = 0; i < tamanho; i++) {
+    const va = pa[i] ?? 0;
+    const vb = pb[i] ?? 0;
 
-      let currentNode = nodeMap.get(caminhoAtual);
-
-      if (!currentNode) {
-        currentNode = {
-          id: caminhoAtual,
-          codigo: codigoAtual,
-          descricao: mapaDescricoes.get(codigoAtual) || "",
-          nivel: i,
-          caminho: caminhoAtual,
-          children: [],
-          registros: [],
-          statusValidade: undefined,
-          parentCode: parentNode ? parentNode.codigo : undefined,
-        };
-
-        nodeMap.set(caminhoAtual, currentNode);
-
-        if (parentNode) {
-          const jaExiste = parentNode.children.some(
-            (child) => child.id === currentNode!.id
-          );
-
-          if (!jaExiste) {
-            parentNode.children.push(currentNode);
-          }
-        }
-      }
-
-      if (i === partes.length - 1) {
-        currentNode.registros.push(item);
-        currentNode.statusValidade = item.STATUS_VALIDADE;
-      }
-
-      parentNode = currentNode;
+    if (va !== vb) {
+      return va - vb;
     }
   }
 
-  ordenarArvore(root);
-  return root;
+  return 0;
 }
 
 function ordenarArvore(node: EstruturaTreeNode): void {
   node.children.sort((a, b) => {
+    const aHier = normalizar(a.registros?.[0]?.ORDEM_HIERARQUICA);
+    const bHier = normalizar(b.registros?.[0]?.ORDEM_HIERARQUICA);
+
+    if (aHier && bHier) {
+      const compHier = compararOrdemHierarquica(aHier, bHier);
+      if (compHier !== 0) return compHier;
+    }
+
+    const aSeq = Number(a.registros?.[0]?.SEQ_ORD ?? Number.MAX_SAFE_INTEGER);
+    const bSeq = Number(b.registros?.[0]?.SEQ_ORD ?? Number.MAX_SAFE_INTEGER);
+
+    if (!Number.isNaN(aSeq) && !Number.isNaN(bSeq) && aSeq !== bSeq) {
+      return aSeq - bSeq;
+    }
+
     const aNum = Number(a.codigo);
     const bNum = Number(b.codigo);
 
-    if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+    if (!Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum !== bNum) {
       return aNum - bNum;
     }
 
@@ -179,4 +160,83 @@ function ordenarArvore(node: EstruturaTreeNode): void {
   for (const child of node.children) {
     ordenarArvore(child);
   }
+}
+
+function atualizarStatusNode(node: EstruturaTreeNode, item: EstruturaApiItem): void {
+  const statusAtual = normalizar(node.statusValidade).toUpperCase();
+  const novoStatus = normalizar(item.STATUS_VALIDADE).toUpperCase();
+
+  if (!statusAtual) {
+    node.statusValidade = novoStatus;
+    return;
+  }
+
+  if (novoStatus === "INVALIDO") {
+    node.statusValidade = "INVALIDO";
+  }
+}
+
+export function montarArvoreEstrutura(
+  codPai: string,
+  descricaoPai: string,
+  data: EstruturaApiItem[]
+): EstruturaTreeNode {
+  const codigoRaiz = normalizar(codPai);
+  const descricaoRaiz = normalizar(descricaoPai);
+  const mapaDescricoes = criarMapaDescricoes(codigoRaiz, descricaoRaiz, data);
+
+  const root: EstruturaTreeNode = {
+    id: codigoRaiz,
+    codigo: codigoRaiz,
+    descricao: mapaDescricoes.get(codigoRaiz) || descricaoRaiz || "Item raiz",
+    nivel: 0,
+    caminho: codigoRaiz,
+    children: [],
+    registros: [],
+    statusValidade: undefined,
+    parentCode: undefined,
+  };
+
+  const nodeByOrdem = new Map<string, EstruturaTreeNode>();
+  const rowsOrdenadas = [...data].sort((a, b) =>
+    compararOrdemHierarquica(
+      normalizar(a.ORDEM_HIERARQUICA),
+      normalizar(b.ORDEM_HIERARQUICA)
+    )
+  );
+
+  rowsOrdenadas.forEach((item, indice) => {
+    const ordem = normalizar(item.ORDEM_HIERARQUICA);
+    if (!ordem) return;
+
+    const codigoFilho = normalizar(item.COD_ITEM_FILHO);
+    const codigoPai = normalizar(item.COD_ITEM_PAI);
+
+    const descricaoNode =
+      mapaDescricoes.get(codigoFilho) ||
+      normalizar(item.DESC_TECNICA_FILHO) ||
+      "";
+
+    const parentOrdem = obterOrdemPai(ordem);
+    const parentNode = parentOrdem ? nodeByOrdem.get(parentOrdem) ?? root : root;
+
+    const node: EstruturaTreeNode = {
+      id: criarIdNode(item, indice),
+      codigo: codigoFilho,
+      descricao: descricaoNode,
+      nivel: Number(item.NIVEL ?? ordem.split(".").length),
+      caminho: normalizar(item.CAMINHO_ESTRUTURA) || `${codigoPai} -> ${codigoFilho}`,
+      children: [],
+      registros: [item],
+      statusValidade: normalizar(item.STATUS_VALIDADE) || undefined,
+      parentCode: parentNode.codigo,
+    };
+
+    parentNode.children.push(node);
+    nodeByOrdem.set(ordem, node);
+    atualizarStatusNode(node, item);
+  });
+
+  ordenarArvore(root);
+  return root;
 }
