@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import styles from "./TopRouteLoader.module.css";
 
 type RouteLoadingContextType = {
@@ -28,7 +28,6 @@ export function RouteLoadingProvider({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const [isLoading, setIsLoading] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -66,7 +65,7 @@ export function RouteLoadingProvider({
     if (isLoading) {
       stopLoading();
     }
-  }, [pathname, searchParams, isLoading, stopLoading]);
+  }, [pathname, isLoading, stopLoading]);
 
   const value = useMemo(
     () => ({

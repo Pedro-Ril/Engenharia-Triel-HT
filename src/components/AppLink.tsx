@@ -2,7 +2,7 @@
 
 import Link, { LinkProps } from "next/link";
 import { MouseEvent, ReactNode } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useRouteLoading } from "./RouteLoadingProvider";
 
 type AppLinkProps = LinkProps & {
@@ -21,14 +21,13 @@ export default function AppLink({
 }: AppLinkProps) {
   const { startLoading } = useRouteLoading();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
-  const currentUrl = `${pathname}${
-    searchParams?.toString() ? `?${searchParams.toString()}` : ""
-  }`;
+  const currentUrl = pathname;
 
   const targetUrl =
-    typeof href === "string" ? href : href.pathname?.toString() || "";
+    typeof href === "string"
+      ? href
+      : href.pathname?.toString() || "";
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
