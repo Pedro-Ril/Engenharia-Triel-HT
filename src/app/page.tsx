@@ -16,6 +16,7 @@ const atalhos = [
     href: "/consulta-estrutura",
     tag: "Fluxo ativo",
   },
+  
 ];
 
 export default function HomePage() {
@@ -62,7 +63,7 @@ export default function HomePage() {
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
               <span className={styles.statLabel}>Módulos disponíveis</span>
-              <strong className={styles.statValue}>02</strong>
+              <strong className={styles.statValue}>03</strong>
             </div>
 
             <div className={styles.statCard}>
