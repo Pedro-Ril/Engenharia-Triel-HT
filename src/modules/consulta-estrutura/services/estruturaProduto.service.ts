@@ -197,13 +197,20 @@ export function montarArvoreEstrutura(
     parentCode: undefined,
   };
 
-  const nodeByOrdem = new Map<string, EstruturaTreeNode>();
+  const nodesByOrdem = new Map<string, EstruturaTreeNode[]>();
+
   const rowsOrdenadas = [...data].sort((a, b) =>
     compararOrdemHierarquica(
       normalizar(a.ORDEM_HIERARQUICA),
       normalizar(b.ORDEM_HIERARQUICA)
     )
   );
+
+  const adicionarNodeNaOrdem = (ordem: string, node: EstruturaTreeNode) => {
+    const lista = nodesByOrdem.get(ordem) ?? [];
+    lista.push(node);
+    nodesByOrdem.set(ordem, lista);
+  };
 
   rowsOrdenadas.forEach((item, indice) => {
     const ordem = normalizar(item.ORDEM_HIERARQUICA);
@@ -218,14 +225,24 @@ export function montarArvoreEstrutura(
       "";
 
     const parentOrdem = obterOrdemPai(ordem);
-    const parentNode = parentOrdem ? nodeByOrdem.get(parentOrdem) ?? root : root;
+
+    let parentNode: EstruturaTreeNode = root;
+
+    if (parentOrdem) {
+      const paisPossiveis = nodesByOrdem.get(parentOrdem) ?? [];
+
+      if (paisPossiveis.length > 0) {
+        parentNode = paisPossiveis[paisPossiveis.length - 1];
+      }
+    }
 
     const node: EstruturaTreeNode = {
       id: criarIdNode(item, indice),
       codigo: codigoFilho,
       descricao: descricaoNode,
       nivel: Number(item.NIVEL ?? ordem.split(".").length),
-      caminho: normalizar(item.CAMINHO_ESTRUTURA) || `${codigoPai} -> ${codigoFilho}`,
+      caminho:
+        normalizar(item.CAMINHO_ESTRUTURA) || `${codigoPai} -> ${codigoFilho}`,
       children: [],
       registros: [item],
       statusValidade: normalizar(item.STATUS_VALIDADE) || undefined,
@@ -233,7 +250,7 @@ export function montarArvoreEstrutura(
     };
 
     parentNode.children.push(node);
-    nodeByOrdem.set(ordem, node);
+    adicionarNodeNaOrdem(ordem, node);
     atualizarStatusNode(node, item);
   });
 
