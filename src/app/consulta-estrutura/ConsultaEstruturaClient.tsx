@@ -7,9 +7,12 @@ import EstruturaTree from "@/modules/consulta-estrutura/components/EstruturaTree
 import {
   buscarEstruturaProduto,
   montarArvoreEstrutura,
+  removerItensInvalidosEstruturaLote,
 } from "@/modules/consulta-estrutura/services/estruturaProduto.service";
 import {
+  EstruturaApiItem,
   EstruturaConsultaResultado,
+  EstruturaDeleteInvalidadosLoteGrupoDetalhe,
   EstruturaTreeNode,
 } from "@/modules/consulta-estrutura/types/estruturaProduto.types";
 import {
@@ -33,6 +36,10 @@ function formatarNumero(valor?: number | null) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 4,
   }).format(valor);
+}
+
+function normalizar(valor?: string | null) {
+  return (valor ?? "").trim();
 }
 
 function isNodeInvalid(node: EstruturaTreeNode): boolean {
@@ -73,12 +80,25 @@ function existeNodeNaArvore(
   return node.children.some((child) => existeNodeNaArvore(child, targetId));
 }
 
+type ResultadoExclusaoResumo = {
+  mensagem: string;
+  commit: boolean;
+  rollback: boolean;
+  grupos: number;
+  ids: number;
+  encontrados: number;
+  deletados: number;
+  gruposComSucesso: string[];
+  gruposComFalha: string[];
+};
+
 export default function ConsultaEstruturaClient() {
   const searchParams = useSearchParams();
   const autoSearchDoneRef = useRef(false);
 
   const [codigoPai, setCodigoPai] = useState("");
   const [loading, setLoading] = useState(false);
+  const [removendoInvalidos, setRemovendoInvalidos] = useState(false);
   const [erro, setErro] = useState("");
   const [resultado, setResultado] =
     useState<EstruturaConsultaResultado | null>(null);
@@ -87,6 +107,12 @@ export default function ConsultaEstruturaClient() {
     null
   );
   const [mostrarSomenteInvalidos, setMostrarSomenteInvalidos] = useState(false);
+  const [modalRemocaoOpen, setModalRemocaoOpen] = useState(false);
+  const [modalResultadoOpen, setModalResultadoOpen] = useState(false);
+  const [resultadoExclusaoSucesso, setResultadoExclusaoSucesso] =
+    useState<boolean>(true);
+  const [resultadoExclusaoResumo, setResultadoExclusaoResumo] =
+    useState<ResultadoExclusaoResumo | null>(null);
 
   async function handleBuscar(codigoParam?: string) {
     const codigoConsulta = (codigoParam ?? codigoPai).trim();
@@ -138,13 +164,65 @@ export default function ConsultaEstruturaClient() {
     handleBuscar(itemPai);
   }, [searchParams]);
 
-  const totalInvalidos = useMemo(() => {
+  const totalInvalidosOcorrencias = useMemo(() => {
     return (
       resultado?.data.filter(
         (item) => item.STATUS_VALIDADE?.toUpperCase() === "INVALIDO"
       ).length ?? 0
     );
   }, [resultado]);
+
+  const registrosInvalidos = useMemo(() => {
+    if (!resultado) return [];
+
+    const mapa = new Map<number, EstruturaApiItem>();
+
+    for (const item of resultado.data) {
+      if (
+        item.STATUS_VALIDADE?.toUpperCase() === "INVALIDO" &&
+        typeof item.ID_ESTRUTURA === "number"
+      ) {
+        if (!mapa.has(item.ID_ESTRUTURA)) {
+          mapa.set(item.ID_ESTRUTURA, item);
+        }
+      }
+    }
+
+    return Array.from(mapa.values());
+  }, [resultado]);
+
+  const gruposInvalidosPorPai = useMemo(() => {
+    const grupos = new Map<string, EstruturaApiItem[]>();
+
+    for (const item of registrosInvalidos) {
+      const codPaiDireto = normalizar(item.COD_ITEM_PAI);
+      if (!codPaiDireto) continue;
+
+      const listaAtual = grupos.get(codPaiDireto) ?? [];
+      listaAtual.push(item);
+      grupos.set(codPaiDireto, listaAtual);
+    }
+
+    return Array.from(grupos.entries()).map(([codPaiDireto, itens]) => {
+      const ids = [
+        ...new Set(
+          itens
+            .map((item) => item.ID_ESTRUTURA)
+            .filter((id): id is number => typeof id === "number")
+        ),
+      ];
+
+      return {
+        codPaiDireto,
+        itens,
+        ids,
+      };
+    });
+  }, [registrosInvalidos]);
+
+  const totalIdsInvalidos = useMemo(() => {
+    return registrosInvalidos.length;
+  }, [registrosInvalidos]);
 
   const arvoreFiltrada = useMemo(() => {
     if (!arvore) return null;
@@ -172,6 +250,79 @@ export default function ConsultaEstruturaClient() {
     if (!selectedNode) return false;
     return isNodeInvalid(selectedNode);
   }, [selectedNode]);
+
+  async function handleConfirmarRemocaoInvalidos() {
+    if (!resultado) return;
+    if (gruposInvalidosPorPai.length === 0) return;
+
+    try {
+      setRemovendoInvalidos(true);
+      setErro("");
+
+      const payload = {
+        codItemPaiRaiz: resultado.codItemPai,
+        grupos: gruposInvalidosPorPai.map((grupo) => ({
+          codPaiDireto: grupo.codPaiDireto,
+          ids: grupo.ids,
+        })),
+      };
+
+      const response = await removerItensInvalidosEstruturaLote(payload);
+
+      await handleBuscar(resultado.codItemPai);
+      setModalRemocaoOpen(false);
+
+      const resumo = response?.resumo ?? {};
+      const detalhesGrupos: EstruturaDeleteInvalidadosLoteGrupoDetalhe[] =
+        Array.isArray(response?.detalhesGrupos) ? response.detalhesGrupos : [];
+
+      const gruposComSucesso = detalhesGrupos
+        .filter((grupo) => grupo.status === "sucesso")
+        .map((grupo) => `${grupo.codPaiDireto} (${grupo.totalDeletados ?? 0})`);
+
+      const gruposComFalha = detalhesGrupos
+        .filter((grupo) => grupo.status === "falha_validacao")
+        .map((grupo) => grupo.codPaiDireto);
+
+      setResultadoExclusaoSucesso(true);
+      setResultadoExclusaoResumo({
+        mensagem: response.message || "Exclusão concluída.",
+        commit: !!response.committed,
+        rollback: !!response.rollbackExecutado,
+        grupos: resumo.totalGruposRecebidos ?? detalhesGrupos.length,
+        ids: resumo.totalIdsRecebidos ?? 0,
+        encontrados: resumo.totalEncontrados ?? 0,
+        deletados: resumo.totalDeletados ?? 0,
+        gruposComSucesso,
+        gruposComFalha,
+      });
+      setModalResultadoOpen(true);
+    } catch (error) {
+      console.error(error);
+
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : "Erro ao remover itens inválidos.";
+
+      setErro(mensagem);
+      setResultadoExclusaoSucesso(false);
+      setResultadoExclusaoResumo({
+        mensagem,
+        commit: false,
+        rollback: false,
+        grupos: 0,
+        ids: 0,
+        encontrados: 0,
+        deletados: 0,
+        gruposComSucesso: [],
+        gruposComFalha: [],
+      });
+      setModalResultadoOpen(true);
+    } finally {
+      setRemovendoInvalidos(false);
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -208,7 +359,7 @@ export default function ConsultaEstruturaClient() {
           <button
             type="button"
             onClick={() => handleBuscar()}
-            disabled={loading}
+            disabled={loading || removendoInvalidos}
             className={styles.searchButton}
           >
             {loading ? "Consultando..." : "Consultar"}
@@ -236,8 +387,12 @@ export default function ConsultaEstruturaClient() {
               </div>
 
               <div className={styles.summaryCard}>
-                <span className={styles.summaryLabel}>Itens inativos</span>
-                <strong className={styles.invalidText}>{totalInvalidos}</strong>
+                <span className={styles.summaryLabel}>
+                  Ocorrências inválidas
+                </span>
+                <strong className={styles.invalidText}>
+                  {totalInvalidosOcorrencias}
+                </strong>
               </div>
             </div>
 
@@ -291,6 +446,25 @@ export default function ConsultaEstruturaClient() {
                 }}
               >
                 Exportar PDF
+              </button>
+
+              <button
+                type="button"
+                className={styles.deleteInvalidButton}
+                disabled={
+                  loading ||
+                  removendoInvalidos ||
+                  !resultado ||
+                  gruposInvalidosPorPai.length === 0
+                }
+                onClick={() => {
+                  setErro("");
+                  setModalRemocaoOpen(true);
+                }}
+              >
+                {removendoInvalidos
+                  ? "Removendo..."
+                  : `Remover inválidos (${totalIdsInvalidos})`}
               </button>
             </div>
           </>
@@ -431,6 +605,263 @@ export default function ConsultaEstruturaClient() {
           )}
         </aside>
       </div>
+
+      {modalRemocaoOpen && resultado && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => {
+            if (!removendoInvalidos) {
+              setModalRemocaoOpen(false);
+            }
+          }}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Confirmar exclusão</h3>
+                <p className={styles.modalSubtitle}>
+                  Revise os itens inválidos encontrados em todos os níveis da
+                  estrutura antes de confirmar a exclusão.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                onClick={() => setModalRemocaoOpen(false)}
+                disabled={removendoInvalidos}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.modalSummary}>
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Item pai raiz</span>
+                <strong>{resultado.codItemPai}</strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Descrição do pai</span>
+                <strong>{resultado.descricaoPai || "-"}</strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>
+                  Ocorrências inválidas
+                </span>
+                <strong className={styles.invalidText}>
+                  {totalInvalidosOcorrencias}
+                </strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>
+                  IDs inválidos únicos
+                </span>
+                <strong className={styles.invalidText}>
+                  {registrosInvalidos.length}
+                </strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>
+                  Pais diretos envolvidos
+                </span>
+                <strong>{gruposInvalidosPorPai.length}</strong>
+              </div>
+            </div>
+
+            <div className={styles.modalTableWrapper}>
+              <table className={styles.modalTable}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Qtd.</th>
+                    <th>Nível</th>
+                    <th>Cód. pai</th>
+                    <th>Descrição do pai</th>
+                    <th>Ordem hierárquica</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrosInvalidos.map((item, index) => (
+                    <tr key={`${item.ID_ESTRUTURA}-${index}`}>
+                      <td>{item.ID_ESTRUTURA ?? "-"}</td>
+                      <td>{item.COD_ITEM_FILHO ?? "-"}</td>
+                      <td>{item.DESC_TECNICA_FILHO ?? "-"}</td>
+                      <td>{formatarNumero(item.QTDE_CORRIGIDA ?? item.QTDE)}</td>
+                      <td>{item.NIVEL ?? "-"}</td>
+                      <td>{item.COD_ITEM_PAI ?? "-"}</td>
+                      <td>{item.DESC_TECNICA_PAI ?? "-"}</td>
+                      <td>{item.ORDEM_HIERARQUICA ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalSecondaryButton}
+                onClick={() => setModalRemocaoOpen(false)}
+                disabled={removendoInvalidos}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.modalDangerButton}
+                onClick={handleConfirmarRemocaoInvalidos}
+                disabled={removendoInvalidos || gruposInvalidosPorPai.length === 0}
+              >
+                {removendoInvalidos
+                  ? "Excluindo inválidos..."
+                  : "Confirmar exclusão dos inválidos"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalResultadoOpen && resultadoExclusaoResumo && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setModalResultadoOpen(false)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>
+                  {resultadoExclusaoSucesso
+                    ? "Resultado da exclusão"
+                    : "Erro na exclusão"}
+                </h3>
+                <p className={styles.modalSubtitle}>
+                  {resultadoExclusaoSucesso
+                    ? "Confira o retorno da operação executada."
+                    : "A operação não foi concluída. Confira os detalhes abaixo."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                onClick={() => setModalResultadoOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.modalSummary}>
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Mensagem</span>
+                <strong>{resultadoExclusaoResumo.mensagem}</strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Commit realizado</span>
+                <strong
+                  className={
+                    resultadoExclusaoResumo.commit
+                      ? styles.validText
+                      : styles.invalidText
+                  }
+                >
+                  {resultadoExclusaoResumo.commit ? "Sim" : "Não"}
+                </strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Rollback executado</span>
+                <strong
+                  className={
+                    resultadoExclusaoResumo.rollback
+                      ? styles.invalidText
+                      : styles.validText
+                  }
+                >
+                  {resultadoExclusaoResumo.rollback ? "Sim" : "Não"}
+                </strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Grupos processados</span>
+                <strong>{resultadoExclusaoResumo.grupos}</strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>IDs recebidos</span>
+                <strong>{resultadoExclusaoResumo.ids}</strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Encontrados</span>
+                <strong>{resultadoExclusaoResumo.encontrados}</strong>
+              </div>
+
+              <div className={styles.modalSummaryCard}>
+                <span className={styles.summaryLabel}>Deletados</span>
+                <strong className={styles.validText}>
+                  {resultadoExclusaoResumo.deletados}
+                </strong>
+              </div>
+            </div>
+
+            <div className={styles.modalBody}>
+              {resultadoExclusaoResumo.gruposComSucesso.length > 0 && (
+                <div className={styles.resultSection}>
+                  <h4 className={styles.resultSectionTitle}>
+                    Grupos com sucesso
+                  </h4>
+                  <div className={styles.resultTagList}>
+                    {resultadoExclusaoResumo.gruposComSucesso.map((grupo) => (
+                      <span key={grupo} className={styles.resultTagSuccess}>
+                        {grupo}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {resultadoExclusaoResumo.gruposComFalha.length > 0 && (
+                <div className={styles.resultSection}>
+                  <h4 className={styles.resultSectionTitle}>
+                    Grupos com falha de validação
+                  </h4>
+                  <div className={styles.resultTagList}>
+                    {resultadoExclusaoResumo.gruposComFalha.map((grupo) => (
+                      <span key={grupo} className={styles.resultTagError}>
+                        {grupo}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalSecondaryButton}
+                onClick={() => setModalResultadoOpen(false)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

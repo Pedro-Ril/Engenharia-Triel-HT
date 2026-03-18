@@ -2,6 +2,9 @@ import {
   EstruturaApiItem,
   EstruturaApiResponse,
   EstruturaConsultaResultado,
+  EstruturaDeleteInvalidadosResponse,
+  EstruturaDeleteInvalidadosLoteRequest,
+  EstruturaDeleteInvalidadosLoteResponse,
   EstruturaTreeNode,
 } from "../types/estruturaProduto.types";
 
@@ -24,22 +27,148 @@ export async function buscarEstruturaProduto(
     cache: "no-store",
   });
 
+  const json = await response.json().catch(() => null);
+
   if (!response.ok) {
-    throw new Error(`Erro ao consultar estrutura. HTTP ${response.status}`);
+    throw new Error(
+      json?.message ||
+        json?.error ||
+        `Erro ao consultar estrutura. HTTP ${response.status}`
+    );
   }
 
-  const json: EstruturaApiResponse = await response.json();
-
-  if (!json.success) {
+  if (!json?.success) {
     throw new Error("A API retornou a consulta sem sucesso.");
   }
 
+  const payload = json as EstruturaApiResponse;
+
   return {
-    codItemPai: json.codItemPai,
-    descricaoPai: json.data?.[0]?.DESC_TECNICA_PAI_RAIZ ?? "",
-    total: json.total ?? 0,
-    data: Array.isArray(json.data) ? json.data : [],
+    codItemPai: payload.codItemPai,
+    descricaoPai: payload.data?.[0]?.DESC_TECNICA_PAI_RAIZ ?? "",
+    total: payload.total ?? 0,
+    data: Array.isArray(payload.data) ? payload.data : [],
   };
+}
+
+export async function removerItensInvalidosEstrutura(
+  codPai: string,
+  ids: number[]
+): Promise<EstruturaDeleteInvalidadosResponse> {
+  const codigo = codPai.trim();
+
+  if (!codigo) {
+    throw new Error("Informe o código do item pai.");
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error("Nenhum ID inválido foi informado para remoção.");
+  }
+
+  const idsNormalizados = [
+    ...new Set(
+      ids
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    ),
+  ];
+
+  if (idsNormalizados.length === 0) {
+    throw new Error("Nenhum ID válido foi informado para remoção.");
+  }
+
+  const response = await fetch(
+    `${API_BASE}/${encodeURIComponent(codigo)}/invalidados`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ids: idsNormalizados,
+      }),
+    }
+  );
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        `Erro ao remover itens inválidos. HTTP ${response.status}`
+    );
+  }
+
+  if (!data?.success) {
+    throw new Error(
+      data?.message || "A API retornou a exclusão sem sucesso."
+    );
+  }
+
+  return data as EstruturaDeleteInvalidadosResponse;
+}
+
+export async function removerItensInvalidosEstruturaLote(
+  payload: EstruturaDeleteInvalidadosLoteRequest
+): Promise<EstruturaDeleteInvalidadosLoteResponse> {
+  const codItemPaiRaiz = String(payload?.codItemPaiRaiz ?? "").trim();
+
+  if (!codItemPaiRaiz) {
+    throw new Error("Informe o código do item pai raiz.");
+  }
+
+  if (!Array.isArray(payload?.grupos) || payload.grupos.length === 0) {
+    throw new Error("Nenhum grupo foi informado para remoção em lote.");
+  }
+
+  const gruposNormalizados = payload.grupos
+    .map((grupo) => ({
+      codPaiDireto: String(grupo?.codPaiDireto ?? "").trim(),
+      ids: Array.isArray(grupo?.ids)
+        ? [
+            ...new Set(
+              grupo.ids
+                .map((id) => Number(id))
+                .filter((id) => Number.isInteger(id) && id > 0)
+            ),
+          ]
+        : [],
+    }))
+    .filter((grupo) => grupo.codPaiDireto && grupo.ids.length > 0);
+
+  if (gruposNormalizados.length === 0) {
+    throw new Error("Nenhum grupo válido foi informado para remoção em lote.");
+  }
+
+  const response = await fetch(`${API_BASE}/invalidados/lote`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      codItemPaiRaiz,
+      grupos: gruposNormalizados,
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        `Erro ao remover itens inválidos em lote. HTTP ${response.status}`
+    );
+  }
+
+  if (!data?.success) {
+    throw new Error(
+      data?.message || "A API retornou a exclusão em lote sem sucesso."
+    );
+  }
+
+  return data as EstruturaDeleteInvalidadosLoteResponse;
 }
 
 function normalizar(valor?: string | null): string {
@@ -54,7 +183,7 @@ function criarMapaDescricoes(
   const mapa = new Map<string, string>();
 
   if (codPai) {
-    mapa.set(normalizar(codPai), normalizar(descricaoPai || ""));
+    mapa.set(normalizar(codPai), normalizar(descricaoPai));
   }
 
   for (const item of data) {
@@ -162,12 +291,15 @@ function ordenarArvore(node: EstruturaTreeNode): void {
   }
 }
 
-function atualizarStatusNode(node: EstruturaTreeNode, item: EstruturaApiItem): void {
+function atualizarStatusNode(
+  node: EstruturaTreeNode,
+  item: EstruturaApiItem
+): void {
   const statusAtual = normalizar(node.statusValidade).toUpperCase();
   const novoStatus = normalizar(item.STATUS_VALIDADE).toUpperCase();
 
   if (!statusAtual) {
-    node.statusValidade = novoStatus;
+    node.statusValidade = novoStatus || undefined;
     return;
   }
 
@@ -217,7 +349,7 @@ export function montarArvoreEstrutura(
     if (!ordem) return;
 
     const codigoFilho = normalizar(item.COD_ITEM_FILHO);
-    const codigoPai = normalizar(item.COD_ITEM_PAI);
+    const codigoPaiItem = normalizar(item.COD_ITEM_PAI);
 
     const descricaoNode =
       mapaDescricoes.get(codigoFilho) ||
@@ -242,7 +374,8 @@ export function montarArvoreEstrutura(
       descricao: descricaoNode,
       nivel: Number(item.NIVEL ?? ordem.split(".").length),
       caminho:
-        normalizar(item.CAMINHO_ESTRUTURA) || `${codigoPai} -> ${codigoFilho}`,
+        normalizar(item.CAMINHO_ESTRUTURA) ||
+        `${codigoPaiItem} -> ${codigoFilho}`,
       children: [],
       registros: [item],
       statusValidade: normalizar(item.STATUS_VALIDADE) || undefined,
