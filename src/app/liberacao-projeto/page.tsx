@@ -78,7 +78,7 @@ export default function LiberacaoProjetoPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       window.location.reload();
-    }, 300000);
+    }, 600000);
 
     return () => clearInterval(interval);
   }, []);
