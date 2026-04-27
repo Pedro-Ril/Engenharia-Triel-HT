@@ -10,6 +10,7 @@ import {
   Home,
   Network,
   Download,
+  Megaphone,
 } from "lucide-react";
 import AppLink from "./AppLink";
 import styles from "./Sidebar.module.css";
@@ -19,7 +20,7 @@ type SidebarProps = {
   setOpen: (value: boolean) => void;
 };
 
-const menu = [
+const menuPrincipal = [
   {
     name: "Início",
     path: "/",
@@ -40,10 +41,18 @@ const menu = [
     path: "/bi",
     icon: BarChart3,
   },
+];
+
+const menuRodape = [
   {
     name: "Downloads",
     path: "/downloads",
     icon: Download,
+  },
+  {
+    name: "Atualizações",
+    path: "/atualizacoes",
+    icon: Megaphone,
   },
 ];
 
@@ -114,7 +123,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
       <div className={styles.sectionLabel}>{open ? "Navegação" : "⋯"}</div>
 
       <nav className={styles.menu} onClick={(e) => e.stopPropagation()}>
-        {menu.map((item) => {
+        {menuPrincipal.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.path;
 
@@ -136,6 +145,28 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
       </nav>
 
       <div className={styles.bottomArea} onClick={(e) => e.stopPropagation()}>
+        <nav className={styles.footerMenu}>
+          {menuRodape.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.path;
+
+            return (
+              <AppLink
+                key={item.path}
+                href={item.path}
+                className={`${styles.menuItem} ${active ? styles.active : ""}`}
+                title={item.name}
+              >
+                <span className={styles.menuIcon}>
+                  <Icon size={18} />
+                </span>
+
+                {open && <span className={styles.menuText}>{item.name}</span>}
+              </AppLink>
+            );
+          })}
+        </nav>
+
         {open ? (
           <div className={styles.welcomeCard}>
             <span className={styles.welcomeMini}>Bem-vindo</span>

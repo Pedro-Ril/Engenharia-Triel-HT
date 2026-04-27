@@ -214,3 +214,15 @@
     width: 230px;
   }
 }
+.bottomArea {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.footerMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
