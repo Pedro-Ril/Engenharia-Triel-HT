@@ -19,6 +19,7 @@ const arquivos: ArquivoDownload[] = [
         arquivo: "/downloads/atualizador-ska-connector.zip",
         tag: "Instalador",
         instrucoes: [
+            "Todo o procedimento deve ser feito com o SolidWorks fechado!",
             "Baixe o arquivo compactado utilizando o botão “Baixar arquivo”.",
             "Extraia o conteúdo do arquivo ZIP em uma pasta local do computador.",
             "Para atualização do connector, execute o arquivo “atualizador-ska-connector.bat”.",
