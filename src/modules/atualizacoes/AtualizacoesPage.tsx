@@ -61,6 +61,28 @@ const LEGENDA: { key: Modulo; label: string }[] = [
 const ATUALIZACOES: Atualizacao[] = [
   {
   data: "27/04/2026",
+  versao: "V1.1.6",
+  titulo: "Melhoria no modal de Downloads",
+  modulos: ["downloads"],
+  descricao:
+    "Aprimorado o modal da Central de Downloads para melhorar a apresentação das instruções de instalação, funcionamento e acesso ao arquivo.",
+  itens: [
+    {
+      tipo: "novo",
+      texto: "Adicionado modal de visualização ao clicar nos cards de download, exibindo instruções de instalação e funcionamento.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Organizadas as informações de instalação e funcionamento em cards separados, facilitando a leitura.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Adicionado botão de download diretamente no rodapé do modal.",
+    },
+  ],
+},
+  {
+  data: "27/04/2026",
   versao: "V1.1.5",
   titulo: "Reorganização do menu lateral",
   modulos: ["sistema", "downloads"],
