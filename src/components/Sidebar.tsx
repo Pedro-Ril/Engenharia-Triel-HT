@@ -9,6 +9,7 @@ import {
   FolderCheck,
   Home,
   Network,
+  Download,
 } from "lucide-react";
 import AppLink from "./AppLink";
 import styles from "./Sidebar.module.css";
@@ -38,6 +39,11 @@ const menu = [
     name: "Dashboard BI",
     path: "/bi",
     icon: BarChart3,
+  },
+  {
+    name: "Downloads",
+    path: "/downloads",
+    icon: Download,
   },
 ];
 
