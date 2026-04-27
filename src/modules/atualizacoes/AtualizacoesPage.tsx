@@ -60,6 +60,28 @@ const LEGENDA: { key: Modulo; label: string }[] = [
 
 const ATUALIZACOES: Atualizacao[] = [
   {
+  data: "27/04/2026",
+  versao: "V1.1.5",
+  titulo: "Reorganização do menu lateral",
+  modulos: ["sistema", "downloads"],
+  descricao:
+    "Reorganizado o menu lateral do Portal da Engenharia para melhorar a navegação e separar os módulos principais dos acessos auxiliares.",
+  itens: [
+    {
+      tipo: "melhoria",
+      texto: "Reposicionados os atalhos de Downloads e Atualizações para a área inferior do menu lateral.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Separados os módulos principais dos acessos de apoio, deixando a navegação mais limpa e objetiva.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Mantido o padrão visual do menu com destaque para a rota ativa e comportamento responsivo.",
+    },
+  ],
+},
+  {
     data: "27/04/2026",
     versao: "V1.1.4",
     titulo: "Implementação da aba de Downloads",
