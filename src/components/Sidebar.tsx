@@ -11,6 +11,7 @@ import {
   Network,
   Download,
   Megaphone,
+  Route,
 } from "lucide-react";
 import AppLink from "./AppLink";
 import styles from "./Sidebar.module.css";
@@ -40,6 +41,11 @@ const menuPrincipal = [
     name: "Dashboard BI",
     path: "/bi",
     icon: BarChart3,
+  },
+  {
+    name: "Roteiro de Fabricação",
+    path: "/cadastro-roteiro",
+    icon: Route,
   },
 ];
 

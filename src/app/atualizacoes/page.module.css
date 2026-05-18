@@ -197,6 +197,7 @@
 .dotAgro     { background: #059669; }
 .dotViaturas { background: #2563eb; }
 .dotSistema  { background: #7c3aed; }
+.dotRoteiroFabricacao  { background: #d11121; }
 
 /* ── TIMELINE ─────────────────────────────────────────── */
 .timeline {
@@ -363,6 +364,12 @@
 .moduloSistema {
   background: #f3e8ff;
   color: #6b21a8;
+  border-color: #e9d5ff;
+}
+
+.moduloRoteiroFabricacao {
+  background: #f3e8ff;
+  color: #d11121;
   border-color: #e9d5ff;
 }
 
@@ -622,6 +629,7 @@
 .dotSistema  { background: #7c3aed; }
 .dotDownloads { background: #ea580c; }
 .dotBI        { background: #0891b2; }
+.dotRoteiroFabricacao        { background: #e75662; }
 
 /* ── BADGES (módulo) ──────────────────────────────────── */
 .moduloAgro {
@@ -652,4 +660,9 @@
   background: #cffafe;
   color: #155e75;
   border-color: #a5f3fc;
+}
+.moduloRoteiroFabricacao {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
 }

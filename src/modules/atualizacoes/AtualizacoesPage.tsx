@@ -8,7 +8,8 @@ type Modulo =
   | "consulta-estrutura"
   | "liberacao-projeto"
   | "bi"
-  | "sistema";
+  | "sistema"
+  | "roteiro-fabricacao";
 
 type Atualizacao = {
   data: string;
@@ -48,6 +49,11 @@ const MODULO_CONFIG = {
     className: styles.moduloSistema,
     dotClass: styles.dotSistema,
   },
+  "roteiro-fabricacao": {
+    label: "Roteiro de Fabricação",
+    className: styles.moduloRoteiroFabricacao,
+    dotClass: styles.dotRoteiroFabricacao,
+  },
 };
 
 const LEGENDA: { key: Modulo; label: string }[] = [
@@ -56,9 +62,114 @@ const LEGENDA: { key: Modulo; label: string }[] = [
   { key: "liberacao-projeto", label: "Liberação de Projeto" },
   { key: "bi", label: "Dashboard BI" },
   { key: "sistema", label: "Portal Engenharia" },
+  { key: "roteiro-fabricacao", label: "Roteiro de Fabricação" },
 ];
 
 const ATUALIZACOES: Atualizacao[] = [
+  {
+  data: "17/05/2026",
+  versao: "V1.1.8",
+  titulo: "Validação inteligente de revisões dos roteiros",
+  modulos: ["roteiro-fabricacao"],
+  descricao:
+    "Implementada a nova validação inteligente de revisões entre o 3DEXPERIENCE e o ERP, permitindo identificar automaticamente roteiros desatualizados, sem revisão vinculada ou divergentes da estrutura atual do produto.",
+  itens: [
+    {
+      tipo: "novo",
+      texto: "Adicionada validação automática entre a revisão retornada pelo 3DEXPERIENCE e a revisão cadastrada no roteiro do ERP.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada identificação visual de itens com roteiro desatualizado através de destaque em laranja na estrutura.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada badge de atenção para itens com divergência de revisão entre ERP e estrutura.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado modal informativo ao clicar na badge de atenção, exibindo detalhes da divergência de revisão.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado card de resumo para itens com atenção na estrutura.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado modal listando todos os itens com revisão divergente ou sem revisão no ERP.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado filtro dedicado para exibição apenas de itens com atenção na estrutura.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Mantida a exibição da quantidade de operações do roteiro mesmo em itens sinalizados com atenção.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Melhorada a rastreabilidade visual de revisões desatualizadas durante a navegação da estrutura.",
+    },
+  ],
+},
+  {
+  data: "17/05/2026",
+  versao: "V1.1.7",
+  titulo: "Nova central de gerenciamento de roteiros",
+  modulos: ["roteiro-fabricacao"],
+  descricao:
+    "Implementada a nova central de gerenciamento de roteiros integrada à estrutura do produto, trazendo recursos de cadastro, edição, exclusão, atualização dinâmica e retorno visual das operações enviadas ao ERP.",
+  itens: [
+    {
+      tipo: "novo",
+      texto: "Adicionado cadastro completo de roteiros diretamente pela estrutura do produto.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada visualização de operações já cadastradas no roteiro do item.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada edição de operações existentes diretamente pelos cards do roteiro.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada exclusão individual de operações do roteiro.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada funcionalidade para exclusão completa do roteiro do item.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado modal de retorno do ERP exibindo sucesso, erros e resumo do processamento após o envio.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado fluxo de salvar e adicionar próxima operação sem fechar o modal.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado fluxo de salvar e sair com envio consolidado de todas as operações.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada atualização dinâmica apenas do item alterado na estrutura, reduzindo significativamente o tempo de recarregamento.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionados ícones interativos com tooltips para ações de edição e exclusão.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Padronizado o layout visual dos modais de roteiro seguindo o padrão visual do portal.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Melhorada a experiência de navegação e manutenção de operações dentro da estrutura.",
+    },
+  ],
+},
   {
   data: "27/04/2026",
   versao: "V1.1.6",
