@@ -63,7 +63,7 @@ export default function HomePage() {
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
               <span className={styles.statLabel}>Módulos disponíveis</span>
-              <strong className={styles.statValue}>05</strong>
+              <strong className={styles.statValue}>06</strong>
             </div>
 
             <div className={styles.statCard}>
