@@ -12,7 +12,7 @@ export type Modelo3DPlay = {
     responsavel?: string;
 };
 
-const API_3DX = "http://localhost:3333/api/search";
+const API_3DX = "http://proserver.trielht.com.br:1001/api/search";
 
 const DASHBOARD_3DPLAY_URL =
     "https://dashboard-prd.trielht.com.br/3ddashboard/#dashboard:3ea76c30-e6a4-4288-ab68-1214e947068c/tabId:ALtXQt70g02ipB6XdW0L/app:X3DPLAW_AP/content:X3DContentId=";

@@ -6,7 +6,7 @@ import {
   RoteiroTreeNode,
 } from "../types/cadastroRoteiro.types";
 
-const API_STRUCTURE = "http://localhost:3333/api/search/structure";
+const API_STRUCTURE = "http://proserver.trielht.com.br:1001/api/search/structure";
 const API_ROTEIRO = "http://proserver.trielht.com.br:1000/api/roteiro";
 
 const EMPR_ID_FIXO = 2;
