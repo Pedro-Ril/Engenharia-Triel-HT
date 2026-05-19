@@ -13,6 +13,7 @@ import {
     RoteiroItem,
     RoteiroTreeNode,
 } from "@/modules/cadastro-roteiro/types/cadastroRoteiro.types";
+import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 
 function normalizarTipo(valor?: string | null): string {
     const texto = String(valor ?? "").trim().toLowerCase();
@@ -646,6 +647,12 @@ function TreeNode({
                                 Tipo: {formatarTipo(node.tipoint)}
                             </span>
                         )}
+                        <AbrirPdfItemButton
+                            codigo={node.codigoNormalizado}
+                            onErro={(mensagem) => {
+                                alert(mensagem);
+                            }}
+                        />
                     </div>
 
                     <span className={styles.nodeDescription}>
@@ -662,7 +669,7 @@ function TreeNode({
                         />
                     )}
 
-                    {showDetails && (
+                    {showDetails && tipoItem === "fabricado" && (
                         <button
                             type="button"
                             className={styles.createRouteButton}
