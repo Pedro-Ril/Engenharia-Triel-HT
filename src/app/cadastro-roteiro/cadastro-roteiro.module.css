@@ -1366,3 +1366,100 @@
     width: 22px;
     height: 22px;
 }
+.play3DButton {
+    width: 46px;
+    height: 38px;
+    border: 1px solid #dbeafe;
+    background: #fff;
+    color: #1d4ed8;
+    border-radius: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play3DButton:hover {
+    background: #eff6ff;
+    border-color: #1d4ed8;
+}
+
+.play3DIcon {
+    width: 23px;
+    height: 23px;
+}
+.modelo3DCard {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    margin-bottom: 12px;
+}
+
+.modelo3DCard div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.modelo3DCard strong {
+    color: #111827;
+    font-size: 14px;
+}
+
+.modelo3DCard span {
+    color: #4b5563;
+    font-size: 13px;
+}
+.modelo3DCard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    margin-bottom: 10px;
+}
+
+.modelo3DInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.modelo3DInfo strong {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+.modelo3DInfo span {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.modelo3DOpenButton {
+    height: 38px;
+    min-width: 92px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.modelo3DOpenButton:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+}

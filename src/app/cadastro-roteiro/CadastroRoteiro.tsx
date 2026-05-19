@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import styles from "./cadastro-roteiro.module.css";
 import {
     buscarEstruturaComRoteiros,
@@ -14,6 +14,7 @@ import {
     RoteiroTreeNode,
 } from "@/modules/cadastro-roteiro/types/cadastroRoteiro.types";
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
+import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
 
 function normalizarTipo(valor?: string | null): string {
     const texto = String(valor ?? "").trim().toLowerCase();
@@ -653,6 +654,12 @@ function TreeNode({
                                 alert(mensagem);
                             }}
                         />
+                        <Abrir3DPlayButton
+                            item={node}
+                            onErro={(mensagem) => {
+                                alert(mensagem);
+                            }}
+                        />
                     </div>
 
                     <span className={styles.nodeDescription}>
@@ -704,6 +711,149 @@ function TreeNode({
     );
 }
 
+
+type Toast = {
+    id: number;
+    mensagem: string;
+    tipo: "sucesso" | "erro";
+    retornoErp?: any;
+};
+
+function ToastContainer({
+    toasts,
+    onRemove,
+    onOpenRetorno,
+}: {
+    toasts: Toast[];
+    onRemove: (id: number) => void;
+    onOpenRetorno: (retorno: any) => void;
+}) {
+    return (
+        <div
+            style={{
+                position: "fixed",
+                top: "24px",
+                right: "24px",
+                zIndex: 99999,
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                pointerEvents: "none",
+            }}
+        >
+            {toasts.map((toast) => (
+                <div
+                    key={toast.id}
+                    onClick={() => {
+                        if (toast.retornoErp) onOpenRetorno(toast.retornoErp);
+                    }}
+                    style={{
+                        pointerEvents: "all",
+                        cursor: toast.retornoErp ? "pointer" : "default",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        padding: "14px 16px",
+                        borderRadius: "12px",
+                        minWidth: "300px",
+                        maxWidth: "460px",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        boxShadow: "0 8px 24px rgba(15,23,42,0.18)",
+                        animation: "toastIn 0.25s ease",
+                        ...(toast.tipo === "sucesso"
+                            ? {
+                                background: "#f0fdf4",
+                                color: "#166534",
+                                border: "1px solid #bbf7d0",
+                            }
+                            : {
+                                background: "#fdecec",
+                                color: "#b71c1c",
+                                border: "1px solid #f5c8c8",
+                            }),
+                    }}
+                    title={toast.retornoErp ? "Clique para ver o retorno completo" : ""}
+                >
+                    <span>
+                        {toast.tipo === "sucesso" ? "✓" : "✕"}&nbsp;&nbsp;{toast.mensagem}
+                        {toast.retornoErp && (
+                            <small style={{ display: "block", marginTop: "4px", opacity: 0.75 }}>
+                                Clique para ver o retorno completo
+                            </small>
+                        )}
+                    </span>
+
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onRemove(toast.id);
+                        }}
+                        style={{
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            fontSize: "16px",
+                            lineHeight: 1,
+                            color: "inherit",
+                            opacity: 0.6,
+                            padding: 0,
+                        }}
+                    >
+                        ×
+                    </button>
+                </div>
+            ))}
+
+            <style>{`
+                @keyframes toastIn {
+                    from { opacity: 0; transform: translateY(-12px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+function useToast() {
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    const contadorRef = useRef(0);
+
+    function exibirToast(
+        mensagem: string,
+        tipo: Toast["tipo"],
+        retornoErp?: any,
+        duracao = 7000
+    ) {
+        const id = ++contadorRef.current;
+        setToasts((prev) => [...prev, { id, mensagem, tipo, retornoErp }]);
+        setTimeout(() => removerToast(id), duracao);
+    }
+
+    function removerToast(id: number) {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+    }
+
+    return { toasts, exibirToast, removerToast };
+}
+
+function montarRetornoErro(mensagem: string, error: unknown) {
+    return {
+        success: false,
+        message: mensagem,
+        error:
+            error instanceof Error
+                ? {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                }
+                : error,
+    };
+}
+
 export default function CadastroRoteiro() {
     const [codigoPai, setCodigoPai] = useState("");
     const [loading, setLoading] = useState(false);
@@ -719,6 +869,9 @@ export default function CadastroRoteiro() {
 
     const [itemCadastroOperacao, setItemCadastroOperacao] =
         useState<RoteiroTreeNode | null>(null);
+
+    const { toasts, exibirToast, removerToast } = useToast();
+    const [retornoErpModal, setRetornoErpModal] = useState<any>(null);
 
     const [roteiroEdicao, setRoteiroEdicao] = useState<RoteiroItem | null>(null);
 
@@ -799,6 +952,7 @@ export default function CadastroRoteiro() {
             setRoteiroEdicao(null);
             setRoteiroExclusao(null);
             setRoteiroCompletoExclusao(null);
+            setRetornoErpModal(null);
 
             const dados = await buscarEstruturaComRoteiros(codigo);
             setResultado(dados);
@@ -823,7 +977,7 @@ export default function CadastroRoteiro() {
             setDeletando(true);
             setErro("");
 
-            await deletarOperacaoRoteiro({
+            const retornoExclusaoOperacao = await deletarOperacaoRoteiro({
                 codItem: item.codigoNormalizado,
                 alternativo: alternativoParaNumero(roteiro.ALTERNATIVO),
                 seq: Number(roteiro.SEQ),
@@ -857,14 +1011,29 @@ export default function CadastroRoteiro() {
                 };
             });
 
+            exibirToast(
+                "Operação deletada com sucesso.",
+                "sucesso",
+                retornoExclusaoOperacao ?? {
+                    success: true,
+                    message: "Operação deletada com sucesso.",
+                    item: item.codigoNormalizado,
+                    alternativo: alternativoParaNumero(roteiro.ALTERNATIVO),
+                    seq: Number(roteiro.SEQ),
+                }
+            );
+
             setRoteiroExclusao(null);
         } catch (error) {
             console.error(error);
-            setErro(
+
+            const mensagem =
                 error instanceof Error
                     ? error.message
-                    : "Erro ao deletar operação do roteiro."
-            );
+                    : "Erro ao deletar operação do roteiro.";
+
+            setErro(mensagem);
+            exibirToast(mensagem, "erro", montarRetornoErro(mensagem, error));
         } finally {
             setDeletando(false);
         }
@@ -879,7 +1048,7 @@ export default function CadastroRoteiro() {
             setDeletando(true);
             setErro("");
 
-            await deletarRoteiroCompleto({
+            const retornoExclusaoRoteiroCompleto = await deletarRoteiroCompleto({
                 codItem: item.codigoNormalizado,
             });
 
@@ -902,14 +1071,28 @@ export default function CadastroRoteiro() {
                 };
             });
 
+            exibirToast(
+                "Roteiro completo deletado com sucesso.",
+                "sucesso",
+                retornoExclusaoRoteiroCompleto ?? {
+                    success: true,
+                    message: "Roteiro completo deletado com sucesso.",
+                    item: item.codigoNormalizado,
+                    totalOperacoes: item.roteiros.length,
+                }
+            );
+
             setRoteiroCompletoExclusao(null);
         } catch (error) {
             console.error(error);
-            setErro(
+
+            const mensagem =
                 error instanceof Error
                     ? error.message
-                    : "Erro ao deletar roteiro completo."
-            );
+                    : "Erro ao deletar roteiro completo.";
+
+            setErro(mensagem);
+            exibirToast(mensagem, "erro", montarRetornoErro(mensagem, error));
         } finally {
             setDeletando(false);
         }
@@ -973,6 +1156,71 @@ export default function CadastroRoteiro() {
 
     return (
         <div className={styles.page}>
+            <ToastContainer
+                toasts={toasts}
+                onRemove={removerToast}
+                onOpenRetorno={setRetornoErpModal}
+            />
+
+            {retornoErpModal && (
+                <div
+                    className={styles.modalOverlay}
+                    onClick={() => setRetornoErpModal(null)}
+                >
+                    <div
+                        className={styles.operacaoModalContent}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: "900px" }}
+                    >
+                        <div className={styles.operacaoModalHeader}>
+                            <div>
+                                <h3 className={styles.operacaoModalTitle}>Retorno do ERP</h3>
+                                <p className={styles.operacaoModalSubtitle}>
+                                    Resultado completo da operação executada
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                className={styles.modalCloseButton}
+                                onClick={() => setRetornoErpModal(null)}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className={styles.operacaoModalBody}>
+                            <pre
+                                style={{
+                                    margin: 0,
+                                    padding: "16px",
+                                    background: "#0f172a",
+                                    color: "#e5e7eb",
+                                    borderRadius: "10px",
+                                    fontSize: "13px",
+                                    lineHeight: 1.5,
+                                    maxHeight: "60vh",
+                                    overflow: "auto",
+                                    whiteSpace: "pre-wrap",
+                                    wordBreak: "break-word",
+                                }}
+                            >
+                                {JSON.stringify(retornoErpModal, null, 2)}
+                            </pre>
+                        </div>
+
+                        <div className={styles.operacaoModalFooter}>
+                            <button
+                                type="button"
+                                className={styles.modalSecondaryButton}
+                                onClick={() => setRetornoErpModal(null)}
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className={styles.header}>
                 <div>
                     <h1 className={styles.title}>Roteiro de Fabricação</h1>

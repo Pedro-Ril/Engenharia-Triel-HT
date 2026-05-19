@@ -67,6 +67,98 @@ const LEGENDA: { key: Modulo; label: string }[] = [
 
 const ATUALIZACOES: Atualizacao[] = [
   {
+  data: "19/05/2026",
+  versao: "V1.1.10",
+  titulo: "Melhorias de feedback nas ações de roteiro",
+  modulos: ["roteiro-fabricacao"],
+  descricao:
+    "Implementadas melhorias no retorno visual das ações de roteiro, padronizando as notificações de cadastro, edição e exclusão de operações com exibição detalhada do retorno do sistema.",
+  itens: [
+    {
+      tipo: "melhoria",
+      texto: "Adicionadas notificações visuais para exclusão individual de operações do roteiro.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Adicionadas notificações visuais para exclusão completa do roteiro do item.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Padronizado o feedback das ações de roteiro seguindo o mesmo comportamento utilizado no cadastro de operações.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Adicionada abertura do retorno completo em JSON ao clicar nas notificações de sucesso ou erro.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Melhorada a rastreabilidade das ações de edição e remoção, permitindo visualizar os detalhes técnicos retornados pelo sistema.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Aprimorada a experiência do usuário com mensagens claras para operações concluídas com sucesso ou com falha.",
+    },
+  ],
+},
+  {
+  data: "19/05/2026",
+  versao: "V1.1.9",
+  titulo: "Integração avançada com 3DPlay e visualização de PDFs",
+  modulos: ["roteiro-fabricacao"],
+  descricao:
+    "Implementadas novas funcionalidades de visualização técnica integradas ao 3DEXPERIENCE e ao acervo de desenhos da engenharia, permitindo acesso rápido aos modelos 3D e PDFs diretamente pela estrutura do produto.",
+  itens: [
+    {
+      tipo: "novo",
+      texto: "Adicionado botão para abertura rápida do 3DPlay diretamente na estrutura do produto.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada integração automática com o 3DEXPERIENCE para pesquisa de modelos 3D por código e revisão.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada validação automática da revisão do item antes da abertura do modelo 3D.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado suporte para múltiplas representações 3D do mesmo item, incluindo modelos padrão e FLAT-PATTERN.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado modal de seleção de modelos 3D quando encontrados múltiplos resultados válidos para o item.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado botão para visualização de PDFs de detalhamento diretamente pela estrutura.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada busca automática de PDFs técnicos no diretório central de desenhos da engenharia.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionado suporte para agrupamento automático de múltiplas páginas PDF do mesmo item em um único documento.",
+    },
+    {
+      tipo: "novo",
+      texto: "Adicionada abertura automática dos PDFs consolidados em nova guia do navegador.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Melhorada a experiência visual dos acessos rápidos técnicos utilizando novos botões integrados à estrutura.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Padronizado o visual dos botões técnicos seguindo o mesmo padrão visual do módulo 3D.",
+    },
+    {
+      tipo: "melhoria",
+      texto: "Adicionadas notificações inteligentes para itens sem PDF ou sem modelos 3D encontrados.",
+    },
+  ],
+},
+  {
   data: "17/05/2026",
   versao: "V1.1.8",
   titulo: "Validação inteligente de revisões dos roteiros",
