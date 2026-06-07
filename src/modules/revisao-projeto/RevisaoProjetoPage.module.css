@@ -1,0 +1,413 @@
+.page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #f8f9fb;
+  min-height: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #b71c1c;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: #555;
+  font-size: 14px;
+}
+
+.searchCard,
+.leftPanel,
+.rightPanel {
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+.searchCard {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.searchRow {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+}
+
+.inputGroup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+.input {
+  height: 44px;
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 15px;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.input:focus {
+  border-color: #b71c1c;
+  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+}
+
+.fileInputWrapper {
+  width: 100%;
+}
+
+.fileInputLabel {
+  height: 44px;
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 15px;
+  outline: none;
+  transition: 0.2s ease;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #333;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fileInputLabel:hover {
+  border-color: #b71c1c;
+  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.08);
+}
+
+.hiddenFileInput {
+  display: none;
+}
+
+.searchButton {
+  height: 44px;
+  min-width: 140px;
+  border: none;
+  border-radius: 12px;
+  background: #b71c1c;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.searchButton:hover {
+  filter: brightness(1.05);
+}
+
+.searchButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.errorBox {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fdecec;
+  color: #b71c1c;
+  border: 1px solid #f5c8c8;
+  font-size: 14px;
+}
+
+.toastSuccess {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
+  font-size: 14px;
+  font-weight: 600;
+  animation: toastIn 0.25s ease;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.summaryCard {
+  border: 1px solid #eeeeee;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  color: #777;
+  text-transform: uppercase;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 20px;
+  min-height: 620px;
+}
+
+.leftPanel,
+.rightPanel {
+  padding: 16px;
+  overflow: hidden;
+}
+
+.panelHeader {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eeeeee;
+  margin-bottom: 16px;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #222;
+}
+
+.treeWrapper {
+  overflow: auto;
+  max-height: 760px;
+  padding-right: 4px;
+}
+
+.treeNode {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.treeChildren {
+  margin-left: 18px;
+  border-left: 1px dashed #dddddd;
+  padding-left: 14px;
+}
+
+.treeRow {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.treeRow:hover {
+  background: #f6f6f6;
+}
+
+.treeRowSelected {
+  background: rgba(183, 28, 28, 0.08);
+  border: 1px solid rgba(183, 28, 28, 0.18);
+}
+
+.expandButton {
+  border: none;
+  background: transparent;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  cursor: pointer;
+  color: #444;
+  font-size: 14px;
+}
+
+.nodeStatusDot {
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  border-radius: 50%;
+  margin-right: 2px;
+  background: #bdbdbd;
+}
+
+.treeContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nodeTopLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nodeCode {
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+}
+
+.nodeDescription {
+  font-size: 13px;
+  color: #666;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.nodeBadges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.nodeBadge {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f1f1f1;
+  color: #444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  max-height: 760px;
+  padding-right: 4px;
+}
+
+.detailBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #efefef;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.detailLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #777;
+}
+
+.validText {
+  color: #2e7d32;
+  font-weight: 700;
+}
+
+.emptyState {
+  padding: 30px 20px;
+  text-align: center;
+  color: #777;
+  border: 1px dashed #ddd;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.modalSecondaryButton {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modalSecondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchButton {
+    width: 100%;
+  }
+
+  .toastSuccess {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    min-width: unset;
+    max-width: unset;
+  }
+}

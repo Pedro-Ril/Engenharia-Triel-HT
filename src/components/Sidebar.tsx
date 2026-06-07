@@ -12,6 +12,7 @@ import {
   Download,
   Megaphone,
   Route,
+  GitCompareArrows,
 } from "lucide-react";
 import AppLink from "./AppLink";
 import styles from "./Sidebar.module.css";
@@ -36,6 +37,11 @@ const menuPrincipal = [
     name: "Consulta Estrutura",
     path: "/consulta-estrutura",
     icon: Network,
+  },
+  {
+    name: "Revisão de Projetos",
+    path: "/revisao-projeto",
+    icon: GitCompareArrows,
   },
   {
     name: "Dashboard BI",
