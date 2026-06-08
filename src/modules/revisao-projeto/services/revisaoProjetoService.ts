@@ -1,4 +1,12 @@
-import { AnaliseExcelResponse } from "../types/revisaoProjetoTypes";
+import {
+  AnaliseExcelResponse,
+  ItemFoccoApiItem,
+  ItemFoccoApiResponse,
+  ItemFoccoOpcao,
+  ResultadoItemFocco,
+} from "../types/revisaoProjetoTypes";
+
+const ERP_ITEM_API_BASE = "http://proserver.trielht.com.br:1000/api/item";
 
 export async function analisarEstruturaExcel(
   arquivo: File
@@ -66,4 +74,129 @@ export async function analisarEstruturaExcel(
   }
 
   return data;
+}
+
+function normalizarStatus(valor: string | null | undefined) {
+  return String(valor || "").trim().toUpperCase();
+}
+
+function itemFoccoEstaAtivo(item: ItemFoccoApiItem) {
+  return (
+    normalizarStatus(item.SIT_CAPA) === "ATIVO" &&
+    normalizarStatus(item.SIT_EMPR) === "ATIVO" &&
+    normalizarStatus(item.SIT_ENG) === "ATIVO"
+  );
+}
+
+function converterItemFoccoParaOpcao(item: ItemFoccoApiItem): ItemFoccoOpcao {
+  return {
+    emprId: item.EMPR_ID,
+    codItem: String(item.COD_ITEM || ""),
+    descTecnica: item.DESC_TECNICA || "",
+    descResumo: item.DESC_RESUM || "",
+    codDesenho: item.COD_DESENHO || "",
+    tpItem: item.TP_ITEM || "",
+    sitCapa: item.SIT_CAPA,
+    sitEmpr: item.SIT_EMPR,
+    sitEng: item.SIT_ENG,
+  };
+}
+
+function retornoNaoEncontrado(codDesenho: string): ResultadoItemFocco {
+  return {
+    codDesenho,
+    encontrado: false,
+
+    codItemFocco: null,
+    descricaoFocco: null,
+    tpItemFocco: null,
+
+    totalEncontrado: 0,
+    precisaEscolher: false,
+    opcoes: [],
+  };
+}
+
+export async function buscarItemFoccoPorCodDesenho(
+  codDesenho: string
+): Promise<ResultadoItemFocco> {
+  const codigoLimpo = String(codDesenho || "").trim();
+
+  if (!codigoLimpo) {
+    return retornoNaoEncontrado(codigoLimpo);
+  }
+
+  const url = `${ERP_ITEM_API_BASE}?cod_desenho=${encodeURIComponent(
+    codigoLimpo
+  )}`;
+
+  console.log("🔎 Consultando item FOCCO por desenho:", {
+    codDesenho: codigoLimpo,
+    url,
+  });
+
+  try {
+    const response = await fetch(url);
+    const data = (await response.json()) as ItemFoccoApiResponse;
+
+    console.log("📥 Retorno FOCCO:", {
+      codDesenho: codigoLimpo,
+      response: data,
+    });
+
+    if (!response.ok || !data.success || !Array.isArray(data.data)) {
+      return retornoNaoEncontrado(codigoLimpo);
+    }
+
+    const itensAtivos = data.data.filter(itemFoccoEstaAtivo);
+    const opcoes = itensAtivos.map(converterItemFoccoParaOpcao);
+
+    console.log("✅ Itens FOCCO ativos considerados:", {
+      codDesenho: codigoLimpo,
+      totalApi: data.data.length,
+      totalAtivos: itensAtivos.length,
+      opcoes,
+    });
+
+    if (opcoes.length === 0) {
+      return retornoNaoEncontrado(codigoLimpo);
+    }
+
+    if (opcoes.length === 1) {
+      const item = opcoes[0];
+
+      return {
+        codDesenho: codigoLimpo,
+        encontrado: true,
+
+        codItemFocco: item.codItem,
+        descricaoFocco: item.descTecnica || item.descResumo || null,
+        tpItemFocco: item.tpItem || null,
+
+        totalEncontrado: opcoes.length,
+        precisaEscolher: false,
+        opcoes,
+      };
+    }
+
+    return {
+      codDesenho: codigoLimpo,
+      encontrado: true,
+
+      codItemFocco: null,
+      descricaoFocco: null,
+      tpItemFocco: null,
+
+      totalEncontrado: opcoes.length,
+      precisaEscolher: true,
+      opcoes,
+    };
+  } catch (error) {
+    console.error("❌ Erro ao consultar item FOCCO:", {
+      codDesenho: codigoLimpo,
+      error,
+    });
+
+    return retornoNaoEncontrado(codigoLimpo);
+  }
 }

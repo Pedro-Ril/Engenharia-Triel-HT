@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import styles from "../RevisaoProjetoPage.module.css";
 import { EstruturaNode } from "../types/revisaoProjetoTypes";
 
@@ -8,8 +7,17 @@ type Props = {
   node: EstruturaNode;
   nodeKey: string;
   selectedNodeKey?: string;
+
+  expandedNodeKeys: Set<string>;
+
   onSelectNode: (node: EstruturaNode, nodeKey: string) => void;
-  initiallyExpanded?: boolean;
+  onToggleNode: (nodeKey: string) => void;
+
+  onContextMenuNode: (
+  event: React.MouseEvent<HTMLElement>,
+  node: EstruturaNode,
+  nodeKey: string
+) => void;
 };
 
 function formatarNumero(valor: number | null | undefined) {
@@ -21,25 +29,47 @@ function formatarNumero(valor: number | null | undefined) {
   }).format(valor);
 }
 
+function formatarUnidade(unidade: string | null | undefined) {
+  const valor = String(unidade || "").trim().toUpperCase();
+
+  if (valor === "PC") return "UN";
+
+  return valor || "-";
+}
+
 function montarNodeKey(node: EstruturaNode, parentKey: string, index: number) {
   return `${parentKey}-${node.codigo}-${node.linhaExcel ?? index}-${
     node.nivel ?? 0
   }`;
 }
 
+function getTextoFocco(node: EstruturaNode) {
+  if (!node.consultaFoccoRealizada) {
+    return "";
+  }
+
+  if (node.precisaEscolherFocco) {
+    return "Escolher item";
+  }
+
+  return node.codItemFocco || "?";
+}
+
 export default function EstruturaTree({
   node,
   nodeKey,
   selectedNodeKey,
+  expandedNodeKeys,
   onSelectNode,
-  initiallyExpanded = false,
+  onToggleNode,
+  onContextMenuNode,
 }: Props) {
   const filhos = node.filhos || [];
   const hasChildren = filhos.length > 0;
 
-  const [expanded, setExpanded] = useState(initiallyExpanded);
-
+  const expanded = expandedNodeKeys.has(nodeKey);
   const isSelected = selectedNodeKey === nodeKey;
+  const textoFocco = getTextoFocco(node);
 
   return (
     <div className={styles.treeNode}>
@@ -49,15 +79,20 @@ export default function EstruturaTree({
           isSelected ? styles.treeRowSelected : "",
         ].join(" ")}
         onClick={() => onSelectNode(node, nodeKey)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onContextMenuNode(event, node, nodeKey);
+        }}
       >
         <button
           type="button"
           className={styles.expandButton}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={(event) => {
+            event.stopPropagation();
 
             if (hasChildren) {
-              setExpanded((prev) => !prev);
+              onToggleNode(nodeKey);
             }
           }}
         >
@@ -68,7 +103,16 @@ export default function EstruturaTree({
 
         <div className={styles.treeContent}>
           <div className={styles.nodeTopLine}>
-            <span className={styles.nodeCode}>{node.codigo}</span>
+            <span className={styles.nodeCode}>
+              {node.codigo}
+
+              {textoFocco && (
+                <span className={styles.nodeFoccoCode}>
+                  {" "}
+                  ({textoFocco})
+                </span>
+              )}
+            </span>
           </div>
 
           <span className={styles.nodeDescription}>
@@ -79,11 +123,11 @@ export default function EstruturaTree({
         <div className={styles.nodeBadges}>
           <span
             className={styles.nodeBadge}
-            title={`Quantidade: ${formatarNumero(node.quantidade)} ${
-              node.unidade || ""
-            }`}
+            title={`Quantidade: ${formatarNumero(
+              node.quantidade
+            )} ${formatarUnidade(node.unidade)}`}
           >
-            {formatarNumero(node.quantidade)} {node.unidade || ""}
+            {formatarNumero(node.quantidade)} {formatarUnidade(node.unidade)}
           </span>
 
           {hasChildren && (
@@ -108,7 +152,10 @@ export default function EstruturaTree({
                 node={child}
                 nodeKey={childKey}
                 selectedNodeKey={selectedNodeKey}
+                expandedNodeKeys={expandedNodeKeys}
                 onSelectNode={onSelectNode}
+                onToggleNode={onToggleNode}
+                onContextMenuNode={onContextMenuNode}
               />
             );
           })}

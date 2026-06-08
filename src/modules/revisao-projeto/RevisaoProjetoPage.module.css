@@ -411,3 +411,355 @@
     max-width: unset;
   }
 }
+.nodeCode {
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+  font-family: inherit;
+  line-height: 1.2;
+}
+
+.nodeFoccoCode {
+  font-size: inherit;
+  font-weight: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: #b71c1c;
+}
+/* Modal - Escolher Item FOCCO */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 9999;
+}
+
+.modalContent {
+  width: min(980px, 96vw);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #b71c1c;
+  font-family: inherit;
+  line-height: 1.25;
+}
+
+.modalSubtitle {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.modalCloseButton {
+  border: none;
+  background: transparent;
+  color: #374151;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.modalCloseButton:hover {
+  color: #b71c1c;
+}
+
+.modalBody {
+  padding: 20px 24px;
+  overflow: auto;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px 24px 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Opções do FOCCO */
+
+.foccoOptionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.foccoOptionCard {
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  transition: 0.2s ease;
+}
+
+.foccoOptionCard:hover {
+  border-color: rgba(183, 28, 28, 0.22);
+  box-shadow: 0 10px 28px rgba(183, 28, 28, 0.08);
+}
+
+.foccoOptionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.foccoOptionLabel,
+.foccoInfoLabel {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #777;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.foccoOptionCode {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+  font-family: inherit;
+  line-height: 1.2;
+}
+
+.foccoOptionType {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(183, 28, 28, 0.08);
+  color: #b71c1c;
+  border: 1px solid rgba(183, 28, 28, 0.18);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.foccoOptionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.foccoInfoBlock {
+  border: 1px solid #efefef;
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 12px;
+}
+
+.foccoInfoBlock strong {
+  font-size: 14px;
+  color: #222;
+  line-height: 1.4;
+}
+
+.foccoInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.foccoOptionActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* Ajuste responsivo do modal */
+
+@media (max-width: 900px) {
+  .modalContent {
+    width: 96vw;
+  }
+
+  .foccoOptionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .foccoOptionActions {
+    justify-content: stretch;
+  }
+
+  .foccoOptionActions .searchButton {
+    width: 100%;
+  }
+}
+.summaryCardClickable {
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.summaryCardClickable:hover {
+  border-color: rgba(183, 28, 28, 0.22);
+  box-shadow: 0 8px 24px rgba(183, 28, 28, 0.08);
+}
+
+.warningText {
+  color: #b71c1c;
+  font-weight: 700;
+}
+
+.foccoResumoList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.foccoResumoCard {
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.foccoResumoContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.foccoResumoCodigo {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+}
+
+
+.foccoResumoActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .foccoResumoCard {
+    flex-direction: column;
+  }
+
+
+  .foccoResumoActions {
+    justify-content: stretch;
+  }
+
+  .foccoResumoActions .searchButton {
+    width: 100%;
+  }
+}
+/* Menu de contexto da árvore */
+
+.contextMenuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: transparent;
+}
+
+.contextMenu {
+  position: fixed;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contextMenuItem {
+  border: none;
+  background: transparent;
+  color: #222;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.contextMenuItem:hover {
+  background: rgba(183, 28, 28, 0.08);
+  color: #b71c1c;
+}
+
+.contextMenuItemDanger {
+  color: #b71c1c;
+}
+
+.contextMenuSeparator {
+  height: 1px;
+  background: #eeeeee;
+  margin: 6px 4px;
+}
+
+.contextMenuGroupTitle {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #777;
+  font-family: inherit;
+  line-height: 1.2;
+}
+.filterInfoBox {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(183, 28, 28, 0.06);
+  border: 1px solid rgba(183, 28, 28, 0.16);
+  color: #374151;
+  font-size: 13px;
+}
+
+.filterInfoBox strong {
+  color: #b71c1c;
+}
