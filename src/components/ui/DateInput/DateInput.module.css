@@ -1,0 +1,311 @@
+.wrapper {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.container {
+  width: 100%;
+  height: 44px;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  background: #ffffff;
+
+  overflow: hidden;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.container:hover:not(.disabled) {
+  border-color: #c7c7c7;
+}
+
+.container:focus-within {
+  border-color: #b71c1c;
+  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+}
+
+.input {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+
+  padding: 0 14px;
+
+  border: 0;
+  outline: 0;
+  background: transparent;
+
+  color: #171717;
+  font: inherit;
+  font-size: 15px;
+
+  cursor: pointer;
+}
+
+.input::placeholder {
+  color: #9ca3af;
+}
+
+.calendarButton {
+  width: 44px;
+  height: 100%;
+  flex: 0 0 44px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+  border-left: 1px solid #e5e7eb;
+  background: #f8fafc;
+
+  color: #6b7280;
+  cursor: pointer;
+
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.calendarButton:hover:not(:disabled) {
+  color: #b71c1c;
+  background: #fff5f5;
+}
+
+.calendarButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.calendar {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 5000;
+
+  width: 310px;
+  padding: 14px;
+
+  border: 1px solid #ead1d1;
+  border-radius: 14px;
+  background: #ffffff;
+
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+
+  animation: calendarEnter 0.18s ease;
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  margin-bottom: 12px;
+}
+
+.monthLabel {
+  color: #7f1d1d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.navigation {
+  display: flex;
+  gap: 4px;
+}
+
+.navigation button {
+  width: 32px;
+  height: 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+
+  color: #6b7280;
+  cursor: pointer;
+
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.navigation button:hover {
+  color: #b71c1c;
+  background: #fff1f1;
+}
+
+.navigation svg {
+  width: 17px;
+  height: 17px;
+}
+
+.weekdays,
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.weekdays {
+  margin-bottom: 5px;
+}
+
+.weekdays span {
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #7f1d1d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.day {
+  width: 100%;
+  aspect-ratio: 1;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+
+  color: #252525;
+  font-size: 12px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    color 0.16s ease,
+    background-color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.day:hover:not(:disabled) {
+  color: #b71c1c;
+  background: #fff1f1;
+  transform: translateY(-1px);
+}
+
+.outside {
+  color: #b6bbc3;
+}
+
+.today {
+  color: #b71c1c;
+  font-weight: 700;
+
+  box-shadow: inset 0 0 0 1px #e8a6a6;
+}
+
+.selected,
+.selected:hover:not(:disabled) {
+  color: #ffffff;
+  background: #b71c1c;
+  font-weight: 700;
+
+  box-shadow: 0 3px 8px rgba(183, 28, 28, 0.24);
+}
+
+.unavailable {
+  color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.calendarFooter {
+  margin-top: 12px;
+  padding-top: 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-top: 1px solid #f0dddd;
+}
+
+.calendarFooter button {
+  padding: 6px 8px;
+
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+
+  color: #b71c1c;
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.calendarFooter button:hover {
+  background: #fff1f1;
+}
+
+.error {
+  border-color: #b71c1c;
+}
+
+.disabled {
+  cursor: not-allowed;
+  background: #f3f4f6;
+  opacity: 0.7;
+}
+
+.disabled .input,
+.disabled .calendarButton {
+  cursor: not-allowed;
+}
+
+@keyframes calendarEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 420px) {
+  .calendar {
+    width: min(310px, calc(100vw - 48px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar,
+  .day {
+    animation: none;
+    transition: none;
+  }
+}

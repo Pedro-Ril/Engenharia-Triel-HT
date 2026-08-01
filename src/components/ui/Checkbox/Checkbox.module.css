@@ -1,0 +1,108 @@
+.container {
+  width: fit-content;
+}
+
+.label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  color: #333333;
+  cursor: pointer;
+  user-select: none;
+}
+
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.control {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-top: 1px;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.icon {
+  width: 12px;
+  height: 10px;
+
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  opacity: 0;
+  transform: scale(0.7);
+
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.input:checked + .control {
+  border-color: #b71c1c;
+  background: #b71c1c;
+}
+
+.input:checked + .control .icon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.input:focus-visible + .control {
+  border-color: #b71c1c;
+  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+}
+
+.label:hover .control {
+  border-color: #b71c1c;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.labelText {
+  color: #333333;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.hint {
+  color: #777777;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.disabled {
+  opacity: 0.6;
+}
+
+.disabled .label {
+  cursor: not-allowed;
+}

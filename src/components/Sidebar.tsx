@@ -13,6 +13,7 @@ import {
   Megaphone,
   Route,
   GitCompareArrows,
+  FilePenLine,
 } from "lucide-react";
 import AppLink from "./AppLink";
 import styles from "./Sidebar.module.css";
@@ -38,6 +39,11 @@ const menuPrincipal = [
     path: "/consulta-estrutura",
     icon: Network,
   },
+  {
+  name: "Desenho de Aprovação",
+  path: "/desenho-aprovacao",
+  icon: FilePenLine,
+},
   {
     name: "Revisão de Projetos",
     path: "/revisao-projeto",

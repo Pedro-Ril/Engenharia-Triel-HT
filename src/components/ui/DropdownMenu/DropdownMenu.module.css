@@ -1,0 +1,174 @@
+.trigger {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e1e3e6;
+  border-radius: 10px;
+  background: #ffffff;
+
+  color: #5f6877;
+  cursor: pointer;
+
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.trigger:hover:not(:disabled),
+.triggerOpen {
+  color: #b71c1c;
+  border-color: #e6b5b5;
+  background: #fff5f5;
+}
+
+.trigger:focus-visible {
+  outline: none;
+
+  border-color: #b71c1c;
+  box-shadow:
+    0 0 0 3px rgba(183, 28, 28, 0.12);
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.trigger svg {
+  width: 18px;
+  height: 18px;
+}
+
+.menu {
+  position: fixed;
+  z-index: 12000;
+
+  width: max-content;
+  min-width: 210px;
+  max-width: min(320px, calc(100vw - 24px));
+
+  padding: 6px;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+
+  animation: menuEnter 0.18s ease;
+}
+
+.itemWrapper {
+  width: 100%;
+}
+
+.separator {
+  margin-top: 5px;
+  padding-top: 5px;
+
+  border-top: 1px solid #eeeeee;
+}
+
+.item {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+
+  color: #333333;
+  cursor: pointer;
+  text-align: left;
+
+  transition:
+    color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.item:hover:not(:disabled),
+.item:focus-visible:not(:disabled) {
+  outline: none;
+  color: #b71c1c;
+  background: #fff1f1;
+}
+
+.item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.itemIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.itemIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.itemLabel {
+  min-width: 0;
+
+  overflow: hidden;
+
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.danger {
+  color: #b71c1c;
+}
+
+.danger:hover:not(:disabled),
+.danger:focus-visible:not(:disabled) {
+  color: #991b1b;
+  background: #fff0f0;
+}
+
+@keyframes menuEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .trigger,
+  .item {
+    animation: none;
+    transition: none;
+  }
+}

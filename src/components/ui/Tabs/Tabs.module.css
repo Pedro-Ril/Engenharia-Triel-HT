@@ -1,0 +1,116 @@
+.tabs {
+  width: 100%;
+  min-width: 0;
+}
+
+.list {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  overflow-x: auto;
+
+  border-bottom: 1px solid #e5e7eb;
+
+  scrollbar-width: thin;
+}
+
+.trigger {
+  position: relative;
+
+  min-height: 44px;
+  padding: 0 16px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    color 0.22s ease,
+    background-color 0.22s ease,
+    transform 0.18s ease;
+}
+
+.trigger::after {
+  content: "";
+
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+
+  height: 2px;
+
+  border-radius: 999px;
+  background: transparent;
+
+  transition:
+    background-color 0.22s ease,
+    transform 0.22s ease,
+    opacity 0.22s ease;
+  opacity: 0;
+  transform: scaleX(0.7);
+}
+
+.trigger:hover:not(:disabled) {
+  background: rgba(183, 28, 28, 0.08);
+  color: #b71c1c;
+}
+
+.trigger:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.trigger:focus-visible {
+  outline: 3px solid rgba(183, 28, 28, 0.12);
+  outline-offset: -2px;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.active {
+  color: #b71c1c;
+  background: rgba(183, 28, 28, 0.05);
+}
+
+.active::after {
+  background: #b71c1c;
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.content {
+  padding-top: 18px;
+
+  animation: fadeSlideIn 0.22s ease;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

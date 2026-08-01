@@ -1,0 +1,95 @@
+.container {
+  width: 100%;
+  height: 44px;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  background: #ffffff;
+
+  overflow: hidden;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.container:hover:not(.disabled) {
+  border-color: #c7c7c7;
+}
+
+.container:focus-within {
+  border-color: #b71c1c;
+  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+}
+
+.input {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0 14px;
+
+  border: none;
+  outline: none;
+  background: transparent;
+
+  color: #171717;
+  font-family: inherit;
+  font-size: 15px;
+
+  appearance: textfield;
+}
+
+.input::-webkit-inner-spin-button,
+.input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.input::placeholder {
+  color: #9ca3af;
+}
+
+.affix {
+  height: 100%;
+  padding: 0 13px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  background: #f8fafc;
+  color: #6b7280;
+
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.affix:first-child {
+  border-right: 1px solid #e5e7eb;
+}
+
+.affix:last-child {
+  border-left: 1px solid #e5e7eb;
+}
+
+.error {
+  border-color: #b71c1c;
+}
+
+.disabled {
+  cursor: not-allowed;
+  background: #f3f4f6;
+  opacity: 0.8;
+}
+
+.disabled .input {
+  cursor: not-allowed;
+  color: #6b7280;
+}

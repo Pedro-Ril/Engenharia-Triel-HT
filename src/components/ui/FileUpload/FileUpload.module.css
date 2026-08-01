@@ -1,0 +1,279 @@
+.wrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+.upload {
+  width: 100%;
+  min-height: 150px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1.5px dashed #d1d5db;
+  border-radius: 14px;
+  background: #fafafa;
+
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.upload:hover:not(.disabled) {
+  border-color: rgba(183, 28, 28, 0.45);
+  background: #fffafa;
+}
+
+.dragging {
+  border-color: #b71c1c;
+  background: #fff5f5;
+
+  box-shadow:
+    0 0 0 3px rgba(183, 28, 28, 0.1);
+}
+
+.input {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.selectButton {
+  width: 100%;
+  min-height: 148px;
+  padding: 22px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+
+  color: inherit;
+  cursor: pointer;
+}
+
+.selectButton:focus-visible {
+  outline: 3px solid rgba(183, 28, 28, 0.13);
+  outline-offset: 3px;
+}
+
+.uploadIcon {
+  width: 46px;
+  height: 46px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 13px;
+  background: #fdecec;
+  color: #b71c1c;
+}
+
+.uploadIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.uploadContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+
+  text-align: center;
+}
+
+.label {
+  color: #333333;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.description {
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rules {
+  margin-top: 3px;
+
+  color: #9ca3af;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.fileList {
+  margin-top: 10px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fileItem {
+  min-width: 0;
+  padding: 10px 12px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 11px;
+  background: #ffffff;
+
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.fileItem:hover {
+  border-color: #ead1d1;
+  background: #fffafa;
+}
+
+.fileIcon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+  background: #fdecec;
+  color: #b71c1c;
+}
+
+.fileIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.fileInformation {
+  min-width: 0;
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileName {
+  overflow: hidden;
+
+  color: #333333;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  color: #858c97;
+  font-size: 11px;
+}
+
+.removeButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+
+  color: #6b7280;
+  cursor: pointer;
+
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.removeButton:hover:not(:disabled) {
+  color: #b71c1c;
+  background: #fdecec;
+}
+
+.removeButton:focus-visible {
+  outline: 3px solid rgba(183, 28, 28, 0.12);
+}
+
+.removeButton svg {
+  width: 17px;
+  height: 17px;
+}
+
+.error {
+  border-color: #d9534f;
+  background: #fff5f5;
+}
+
+.errorMessage {
+  margin-top: 8px;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+
+  color: #b71c1c;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.errorMessage svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+
+  margin-top: 1px;
+}
+
+.disabled {
+  cursor: not-allowed;
+  background: #f3f4f6;
+  opacity: 0.65;
+}
+
+.disabled .selectButton {
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .selectButton {
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload,
+  .fileItem,
+  .removeButton {
+    transition: none;
+  }
+}

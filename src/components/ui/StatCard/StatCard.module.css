@@ -1,0 +1,108 @@
+.card {
+  width: 100%;
+  min-width: 0;
+  padding: 18px;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.05),
+    0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+}
+
+.icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.value {
+  display: block;
+  margin-top: 12px;
+
+  color: #111827;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.description {
+  margin: 8px 0 0;
+
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.neutral .icon {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.info {
+  border-color: #bfdbfe;
+  background: #f5f9ff;
+}
+
+.info .icon {
+  background: #e8f1ff;
+  color: #1d4ed8;
+}
+
+.success {
+  border-color: #bbf7d0;
+  background: #f1fbf4;
+}
+
+.success .icon {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.warning {
+  border-color: #fed7aa;
+  background: #fffaf2;
+}
+
+.warning .icon {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.danger {
+  border-color: #f5c8c8;
+  background: #fff5f5;
+}
+
+.danger .icon {
+  background: #fde2e2;
+  color: #b71c1c;
+}

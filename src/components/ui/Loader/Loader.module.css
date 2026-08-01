@@ -1,0 +1,85 @@
+.loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  color: #4b5563;
+}
+
+.centered {
+  width: 100%;
+  min-height: 140px;
+
+  justify-content: center;
+}
+
+.track {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  display: block;
+
+  border-radius: 999px;
+  background: rgba(183, 28, 28, 0.14);
+}
+
+.progress {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+
+  width: 42%;
+
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    #9f1717 0%,
+    #d32f2f 100%
+  );
+
+  animation: loading-slide 1.1s ease-in-out infinite;
+}
+
+.small {
+  width: 38px;
+  height: 3px;
+}
+
+.medium {
+  width: 54px;
+  height: 4px;
+}
+
+.large {
+  width: 76px;
+  height: 5px;
+}
+
+.label {
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+@keyframes loading-slide {
+  0% {
+    left: -45%;
+  }
+
+  50% {
+    left: 55%;
+  }
+
+  100% {
+    left: 105%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress {
+    left: 29%;
+    animation: none;
+  }
+}
