@@ -1,20 +1,39 @@
 import "./globals.css";
 import AppShell from "@/components/AppShell";
+import {
+  getSetoresComModulosPermitidos,
+  getUsuarioAutenticado,
+} from "@/lib/auth/autorizacao";
 
 export const metadata = {
-  title: "Engenharia - Triel HT",
-  description: "Portal interno da Engenharia Triel-HT",
+  title: "Portal Triel-HT",
+  description: "Portal interno Triel-HT",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const usuario = await getUsuarioAutenticado();
+  const setores = await getSetoresComModulosPermitidos(usuario);
+
   return (
     <html lang="pt-BR">
       <body>
-        <AppShell>{children}</AppShell>
+        <AppShell
+          setores={setores}
+          usuario={
+            usuario
+              ? {
+                  nomeExibicao: usuario.nomeExibicao,
+                  ehAdministrador: usuario.ehAdministrador,
+                }
+              : null
+          }
+        >
+          {children}
+        </AppShell>
       </body>
     </html>
   );

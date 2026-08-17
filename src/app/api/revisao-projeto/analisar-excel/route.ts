@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 
 export const runtime = "nodejs";
 
@@ -485,6 +486,9 @@ function coletarDebugM2(nodes: EstruturaNode[]) {
 }
 
 export async function POST(request: NextRequest) {
+  const acesso = await verificarAcessoModuloApi("revisao-projeto");
+  if (acesso.negado) return acesso.negado;
+
   try {
     console.log("==========================================");
     console.log("🚀 API /api/revisao-projeto/analisar-excel CHAMADA");

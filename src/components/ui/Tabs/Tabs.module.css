@@ -10,7 +10,15 @@
   align-items: center;
   gap: 6px;
 
+  /*
+   * Só queremos rolagem horizontal. Sem overflow-y explícito,
+   * o navegador promove esse eixo para "auto" também (regra do
+   * CSS Overflow quando só overflow-x é definido), e em certos
+   * níveis de zoom uma diferença de sub-pixel na altura fazia
+   * aparecer uma barra de rolagem vertical indevida.
+   */
   overflow-x: auto;
+  overflow-y: hidden;
 
   border-bottom: 1px solid #e5e7eb;
 

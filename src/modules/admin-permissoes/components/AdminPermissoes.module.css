@@ -1,0 +1,95 @@
+.usuarioSub {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.codigoInput {
+  max-width: 120px;
+}
+
+/*
+ * O Checkbox tem largura fit-content e é um bloco — dentro de
+ * uma célula de tabela com align="center" (text-align), ele
+ * não centraliza sozinho porque text-align só afeta conteúdo
+ * inline. Este wrapper flex resolve isso sem alterar o
+ * componente compartilhado.
+ */
+.checkboxCentro {
+  display: flex;
+  justify-content: center;
+}
+
+.alcaArrastar {
+  cursor: grab;
+  touch-action: none;
+  color: #9ca3af;
+}
+
+.alcaArrastar:active {
+  cursor: grabbing;
+}
+
+.painelPermissoes {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.listaUsuarios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.usuarioItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+
+  font-size: 14px;
+  color: #374151;
+  text-align: left;
+  cursor: pointer;
+
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.usuarioItem:hover {
+  background: rgba(183, 28, 28, 0.06);
+}
+
+.usuarioItemAtivo {
+  background: rgba(183, 28, 28, 0.1);
+  color: #b71c1c;
+  font-weight: 700;
+}
+
+.usuarioItemNome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.painelPermissoesConteudo {
+  min-width: 0;
+}
+
+@media (max-width: 800px) {
+  .painelPermissoes {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,114 @@
+.trigger {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 14px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  background: #ffffff;
+
+  font-size: 15px;
+  color: #171717;
+  text-align: left;
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.trigger:hover {
+  border-color: #b8b8b8;
+}
+
+.trigger:focus-visible {
+  border-color: #b71c1c;
+  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+  outline: none;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  background: #f3f4f6;
+  color: #6b7280;
+  opacity: 0.8;
+}
+
+.triggerIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: #b71c1c;
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: #6b7280;
+}
+
+.grid {
+  margin-top: 14px;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.iconButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  padding: 12px 6px;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #374151;
+
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.iconButton:hover {
+  border-color: rgba(183, 28, 28, 0.3);
+  background: rgba(183, 28, 28, 0.04);
+}
+
+.iconButton.selected {
+  border-color: #b71c1c;
+  background: rgba(183, 28, 28, 0.08);
+  color: #b71c1c;
+}
+
+.iconName {
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.semResultado {
+  margin-top: 14px;
+  color: #6b7280;
+  text-align: center;
+}

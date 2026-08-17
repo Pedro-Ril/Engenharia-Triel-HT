@@ -25,6 +25,18 @@
   background: rgba(183, 28, 28, 0.025);
 }
 
+.compact {
+  width: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.compact:hover {
+  border: none;
+  background: transparent;
+}
+
 .content {
   min-width: 0;
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   getUsuarioAtual,
 } from "@/lib/auditoria/usuario-atual";
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   getSqlServerPool,
   sql,
@@ -425,6 +426,9 @@ function createProjectSelectSql(
    ========================================================= */
 
 export async function GET() {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const pool =
       await getSqlServerPool();
@@ -472,6 +476,9 @@ export async function GET() {
 export async function POST(
   request: Request
 ) {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   let requestBody:
     CreateApprovalProjectBody;
 

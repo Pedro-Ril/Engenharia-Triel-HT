@@ -1,65 +1,38 @@
 "use client";
 
-import { useRef } from "react";
-import { usePathname } from "next/navigation";
+import { useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  BarChart3,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  FolderCheck,
-  Home,
-  Network,
+  ChevronUp,
   Download,
+  LogIn,
+  LogOut,
   Megaphone,
-  Route,
-  GitCompareArrows,
-  FilePenLine,
+  ShieldCheck,
+  User,
 } from "lucide-react";
+
+import { logout } from "@/modules/auth/services/auth.service";
+import type { SetorComModulos } from "@/lib/auth/autorizacao";
+import { resolverIcone } from "@/lib/icons/icon-registry";
+
 import AppLink from "./AppLink";
 import styles from "./Sidebar.module.css";
+
+export interface UsuarioLogado {
+  nomeExibicao: string;
+  ehAdministrador: boolean;
+}
 
 type SidebarProps = {
   open: boolean;
   setOpen: (value: boolean) => void;
+  setores: SetorComModulos[];
+  usuario: UsuarioLogado | null;
 };
-
-const menuPrincipal = [
-  {
-    name: "Início",
-    path: "/",
-    icon: Home,
-  },
-  {
-    name: "Liberação de Projeto",
-    path: "/liberacao-projeto",
-    icon: FolderCheck,
-  },
-  {
-    name: "Consulta Estrutura",
-    path: "/consulta-estrutura",
-    icon: Network,
-  },
-  {
-  name: "Desenho de Aprovação",
-  path: "/desenho-aprovacao",
-  icon: FilePenLine,
-},
-  {
-    name: "Revisão de Projetos",
-    path: "/revisao-projeto",
-    icon: GitCompareArrows,
-  },
-  {
-    name: "Dashboard BI",
-    path: "/bi",
-    icon: BarChart3,
-  },
-  {
-    name: "Roteiro de Fabricação",
-    path: "/cadastro-roteiro",
-    icon: Route,
-  },
-];
 
 const menuRodape = [
   {
@@ -74,9 +47,21 @@ const menuRodape = [
   },
 ];
 
-export default function Sidebar({ open, setOpen }: SidebarProps) {
+export default function Sidebar({
+  open,
+  setOpen,
+  setores,
+  usuario,
+}: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Pastas começam fechadas — só abrem quando o usuário clica nelas. */
+  const [setoresAbertos, setSetoresAbertos] = useState<Set<string>>(
+    new Set()
+  );
+  const [saindo, setSaindo] = useState(false);
 
   const handleSidebarClick = (e: React.MouseEvent<HTMLElement>) => {
     if (!open && e.target === e.currentTarget) {
@@ -101,6 +86,32 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
     }, 220);
   };
 
+  const toggleSetor = (setorId: string) => {
+    setSetoresAbertos((atual) => {
+      const proximo = new Set(atual);
+
+      if (proximo.has(setorId)) {
+        proximo.delete(setorId);
+      } else {
+        proximo.add(setorId);
+      }
+
+      return proximo;
+    });
+  };
+
+  const handleSair = async () => {
+    setSaindo(true);
+
+    try {
+      await logout();
+      router.push("/login");
+      router.refresh();
+    } finally {
+      setSaindo(false);
+    }
+  };
+
   return (
     <aside
       className={`${styles.sidebar} ${open ? styles.open : styles.closed}`}
@@ -119,7 +130,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           {open && (
             <div className={styles.brandText}>
               <strong className={styles.brandTitle}>Triel-HT</strong>
-              <span className={styles.brandSubtitle}>Engenharia</span>
+              <span className={styles.brandSubtitle}>Portal</span>
             </div>
           )}
         </AppLink>
@@ -141,23 +152,66 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
       <div className={styles.sectionLabel}>{open ? "Navegação" : "⋯"}</div>
 
       <nav className={styles.menu} onClick={(e) => e.stopPropagation()}>
-        {menuPrincipal.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.path;
+        {setores.map((setor) => {
+          const SetorIcon = resolverIcone(setor.icone);
+          const fechado = open && !setoresAbertos.has(setor.id);
 
           return (
-            <AppLink
-              key={item.path}
-              href={item.path}
-              className={`${styles.menuItem} ${active ? styles.active : ""}`}
-              title={item.name}
-            >
-              <span className={styles.menuIcon}>
-                <Icon size={18} />
-              </span>
+            <div key={setor.id} className={styles.setorGrupo}>
+              {open && (
+                <button
+                  type="button"
+                  className={styles.setorHeader}
+                  onClick={() => toggleSetor(setor.id)}
+                >
+                  <span className={styles.menuIcon}>
+                    <SetorIcon size={16} />
+                  </span>
 
-              {open && <span className={styles.menuText}>{item.name}</span>}
-            </AppLink>
+                  <span className={styles.setorNome}>{setor.nome}</span>
+
+                  {fechado ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronUp size={14} />
+                  )}
+                </button>
+              )}
+
+              {!fechado &&
+                setor.modulos.map((modulo) => {
+                  const Icon = resolverIcone(modulo.icone);
+                  const active = pathname === modulo.path;
+
+                  return (
+                    <AppLink
+                      key={modulo.id}
+                      href={modulo.path}
+                      className={`${styles.menuItem} ${
+                        active ? styles.active : ""
+                      }`}
+                      title={modulo.nome}
+                    >
+                      <span className={styles.menuIcon}>
+                        <Icon size={18} />
+                      </span>
+
+                      {open && (
+                        <span className={styles.menuText}>{modulo.nome}</span>
+                      )}
+
+                      {open && modulo.emDesenvolvimento && (
+                        <span
+                          className={styles.devBadge}
+                          title="Em desenvolvimento — só administradores veem"
+                        >
+                          DEV
+                        </span>
+                      )}
+                    </AppLink>
+                  );
+                })}
+            </div>
           );
         })}
       </nav>
@@ -183,18 +237,75 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               </AppLink>
             );
           })}
+
+          {usuario?.ehAdministrador && (
+            <AppLink
+              href="/admin/permissoes"
+              className={`${styles.menuItem} ${
+                pathname === "/admin/permissoes" ? styles.active : ""
+              }`}
+              title="Administração"
+            >
+              <span className={styles.menuIcon}>
+                <ShieldCheck size={18} />
+              </span>
+
+              {open && (
+                <span className={styles.menuText}>Administração</span>
+              )}
+            </AppLink>
+          )}
         </nav>
 
-        {open ? (
-          <div className={styles.welcomeCard}>
-            <span className={styles.welcomeMini}>Bem-vindo</span>
-            <strong className={styles.welcomeTitle}>Portal da Engenharia</strong>
-            <p className={styles.welcomeText}>
-              Utilize o menu para acessar os módulos disponíveis.
-            </p>
-          </div>
+        {usuario ? (
+          open ? (
+            <div className={styles.welcomeCard}>
+              <span className={styles.welcomeMini}>Conectado como</span>
+              <strong className={styles.welcomeTitle}>
+                {usuario.nomeExibicao}
+              </strong>
+
+              <div className={styles.contaAcoes}>
+                <AppLink href="/minha-conta" className={styles.contaLink}>
+                  <User size={14} />
+                  Minha conta
+                </AppLink>
+
+                <button
+                  type="button"
+                  className={styles.sairButton}
+                  onClick={handleSair}
+                  disabled={saindo}
+                >
+                  <LogOut size={14} />
+                  {saindo ? "Saindo..." : "Sair"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={styles.collapsedDot}
+              title="Sair"
+              onClick={handleSair}
+              disabled={saindo}
+            >
+              <LogOut size={16} />
+            </button>
+          )
+        ) : open ? (
+          <AppLink href="/login" className={styles.entrarCard}>
+            <LogIn size={16} />
+            Entrar
+          </AppLink>
         ) : (
-          <div className={styles.collapsedDot} title="Portal da Engenharia" />
+          <AppLink
+            href="/login"
+            className={styles.collapsedDot}
+            title="Entrar"
+          >
+            <LogIn size={16} />
+          </AppLink>
         )}
       </div>
     </aside>

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   getUsuarioAtual,
 } from "@/lib/auditoria/usuario-atual";
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   getSqlServerPool,
   sql,
@@ -516,6 +517,9 @@ export async function GET(
   _request: Request,
   context: RouteContext
 ) {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const { id } =
       await context.params;
@@ -601,6 +605,9 @@ export async function PATCH(
   request: Request,
   context: RouteContext
 ) {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const { id } =
       await context.params;
@@ -1387,6 +1394,9 @@ export async function DELETE(
   request: Request,
   context: RouteContext
 ) {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const { id } =
       await context.params;

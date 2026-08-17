@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   getUsuarioAtual,
 } from "@/lib/auditoria/usuario-atual";
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   getSqlServerPool,
   sql,
@@ -95,6 +96,9 @@ export async function POST(
   request: Request,
   context: RouteContext
 ) {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   const { id } = await context.params;
 
   if (!uniqueIdentifierPattern.test(id)) {

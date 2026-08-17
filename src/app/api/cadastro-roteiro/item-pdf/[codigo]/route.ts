@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { PDFDocument } from "pdf-lib";
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 
 const PDF_DIR =
   process.env.PDF_DESENHOS_DIR ||
@@ -72,6 +73,9 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ codigo: string }> }
 ) {
+  const acesso = await verificarAcessoModuloApi("cadastro-roteiro");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const { codigo: codigoParam } = await context.params;
     const codigo = limparCodigo(codigoParam);

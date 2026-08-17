@@ -1,0 +1,154 @@
+import {
+  Archive,
+  BadgeCheck,
+  Banknote,
+  BarChart3,
+  Boxes,
+  Briefcase,
+  Building2,
+  Calculator,
+  Calendar,
+  ClipboardCheck,
+  ClipboardList,
+  Clock,
+  Cog,
+  CreditCard,
+  Database,
+  DollarSign,
+  Download,
+  Factory,
+  FilePenLine,
+  FileText,
+  Folder,
+  FolderCheck,
+  FolderOpen,
+  Gauge,
+  GitCompareArrows,
+  Globe,
+  Hammer,
+  Handshake,
+  HardHat,
+  HeartPulse,
+  Landmark,
+  Layers,
+  LineChart,
+  Mail,
+  MapPin,
+  Megaphone,
+  Network,
+  Package,
+  PackageSearch,
+  Phone,
+  PieChart,
+  Printer,
+  Receipt,
+  Recycle,
+  Route,
+  Ruler,
+  Scale,
+  Server,
+  Settings,
+  Shield,
+  ShieldCheck,
+  ShoppingCart,
+  Star,
+  Tag,
+  Target,
+  TrendingUp,
+  Truck,
+  UserCog,
+  Users,
+  Warehouse,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+/*
+ * Catálogo de ícones oferecido na tela de administração
+ * (seletor visual, não é mais possível digitar o nome). O
+ * banco continua guardando só o nome (string) — este mapa
+ * resolve esse nome para o componente lucide-react real, e
+ * também alimenta o seletor com a lista completa.
+ */
+const REGISTRO_ICONES: Record<string, LucideIcon> = {
+  Archive,
+  BadgeCheck,
+  Banknote,
+  BarChart3,
+  Boxes,
+  Briefcase,
+  Building2,
+  Calculator,
+  Calendar,
+  ClipboardCheck,
+  ClipboardList,
+  Clock,
+  Cog,
+  CreditCard,
+  Database,
+  DollarSign,
+  Download,
+  Factory,
+  FilePenLine,
+  FileText,
+  Folder,
+  FolderCheck,
+  FolderOpen,
+  Gauge,
+  GitCompareArrows,
+  Globe,
+  Hammer,
+  Handshake,
+  HardHat,
+  HeartPulse,
+  Landmark,
+  Layers,
+  LineChart,
+  Mail,
+  MapPin,
+  Megaphone,
+  Network,
+  Package,
+  PackageSearch,
+  Phone,
+  PieChart,
+  Printer,
+  Receipt,
+  Recycle,
+  Route,
+  Ruler,
+  Scale,
+  Server,
+  Settings,
+  Shield,
+  ShieldCheck,
+  ShoppingCart,
+  Star,
+  Tag,
+  Target,
+  TrendingUp,
+  Truck,
+  UserCog,
+  Users,
+  Warehouse,
+  Wrench,
+  Zap,
+};
+
+export interface OpcaoIcone {
+  nome: string;
+  Icon: LucideIcon;
+}
+
+export const ICONES_PORTAL: OpcaoIcone[] = Object.entries(REGISTRO_ICONES)
+  .map(([nome, Icon]) => ({ nome, Icon }))
+  .sort((a, b) => a.nome.localeCompare(b.nome));
+
+export function resolverIcone(nomeIcone: string | null): LucideIcon {
+  if (!nomeIcone) {
+    return Folder;
+  }
+
+  return REGISTRO_ICONES[nomeIcone] ?? Folder;
+}

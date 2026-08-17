@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   getSqlServerPool,
   sql,
@@ -56,6 +57,9 @@ export async function GET(
   _request: Request,
   context: RouteContext
 ) {
+  const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const { id } = await context.params;
 

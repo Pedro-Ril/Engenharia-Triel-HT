@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "./db";
+import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 
 type SqlBuild = {
   whereClause: string;
@@ -82,6 +83,9 @@ function getDiaSemanaLabel(dia: number): string {
 }
 
 export async function GET(req: NextRequest) {
+  const acesso = await verificarAcessoModuloApi("bi");
+  if (acesso.negado) return acesso.negado;
+
   try {
     const { searchParams } = new URL(req.url);
     const { whereClause, params } = buildWhereClause(searchParams);

@@ -9,6 +9,12 @@ interface SwitchProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label: ReactNode;
   hint?: string;
+  /*
+   * Remove o visual de "card" (borda, fundo, padding) — para
+   * usar o switch sozinho, sem rótulo, dentro de uma célula de
+   * tabela ou cabeçalho compacto.
+   */
+  compact?: boolean;
 }
 
 export function Switch({
@@ -16,11 +22,13 @@ export function Switch({
   hint,
   id,
   disabled = false,
+  compact = false,
   className = "",
   ...props
 }: SwitchProps) {
   const containerClassName = [
     styles.container,
+    compact ? styles.compact : "",
     disabled ? styles.disabled : "",
     className,
   ]
@@ -32,17 +40,19 @@ export function Switch({
       htmlFor={id}
       className={containerClassName}
     >
-      <span className={styles.content}>
-        <span className={styles.label}>
-          {label}
-        </span>
-
-        {hint && (
-          <span className={styles.hint}>
-            {hint}
+      {label && (
+        <span className={styles.content}>
+          <span className={styles.label}>
+            {label}
           </span>
-        )}
-      </span>
+
+          {hint && (
+            <span className={styles.hint}>
+              {hint}
+            </span>
+          )}
+        </span>
+      )}
 
       <span className={styles.switchWrapper}>
         <input

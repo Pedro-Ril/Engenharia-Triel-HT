@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import type {
   CSSProperties,
   HTMLAttributes,
@@ -88,13 +89,13 @@ export function TableBody({
   );
 }
 
-export function TableRow({
-  children,
-  className = "",
-  ...props
-}: HTMLAttributes<HTMLTableRowElement>) {
+export const TableRow = forwardRef<
+  HTMLTableRowElement,
+  HTMLAttributes<HTMLTableRowElement>
+>(function TableRow({ children, className = "", ...props }, ref) {
   return (
     <tr
+      ref={ref}
       className={[styles.row, className]
         .filter(Boolean)
         .join(" ")}
@@ -103,7 +104,7 @@ export function TableRow({
       {children}
     </tr>
   );
-}
+});
 
 export function TableHeaderCell({
   children,
