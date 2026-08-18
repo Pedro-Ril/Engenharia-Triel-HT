@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
@@ -21,6 +22,7 @@ import {
 import {
   atualizarUsuario,
   excluirUsuario,
+  importarUsuariosAd,
 } from "../services/adminPermissoes.service";
 import type { PortalUsuarioAdmin } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
@@ -30,6 +32,7 @@ interface UsuariosPainelProps {
   usuarios: PortalUsuarioAdmin[];
   onUsuarioAtualizado: (usuario: PortalUsuarioAdmin) => void;
   onUsuarioExcluido: (usuarioId: string) => void;
+  onUsuariosImportados: (usuarios: PortalUsuarioAdmin[]) => void;
   onFeedback: FeedbackHandler;
 }
 
@@ -37,6 +40,7 @@ export function UsuariosPainel({
   usuarios,
   onUsuarioAtualizado,
   onUsuarioExcluido,
+  onUsuariosImportados,
   onFeedback,
 }: UsuariosPainelProps) {
   const [codigosEmEdicao, setCodigosEmEdicao] = useState<
@@ -46,6 +50,32 @@ export function UsuariosPainel({
   const [usuarioExcluindo, setUsuarioExcluindo] =
     useState<PortalUsuarioAdmin | null>(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [importando, setImportando] = useState(false);
+
+  async function handleImportarAd() {
+    setImportando(true);
+
+    try {
+      const resultado = await importarUsuariosAd();
+
+      if (resultado.ok && resultado.data) {
+        onUsuariosImportados(resultado.data.usuarios);
+        onFeedback(
+          "success",
+          "Importação concluída",
+          resultado.message ?? "Usuários importados do Active Directory."
+        );
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível importar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setImportando(false);
+    }
+  }
 
   async function salvarCodigoEmpresa(usuario: PortalUsuarioAdmin) {
     const codigo = codigosEmEdicao[usuario.id];
@@ -134,17 +164,36 @@ export function UsuariosPainel({
     }
   }
 
+  const botaoImportar = (
+    <Stack direction="row" justify="end">
+      <Button
+        variant="secondary"
+        onClick={handleImportarAd}
+        loading={importando}
+      >
+        <Download size={16} />
+        Importar do AD
+      </Button>
+    </Stack>
+  );
+
   if (usuarios.length === 0) {
     return (
-      <p>
-        Nenhum usuário logou no portal ainda. Assim que alguém entrar com o
-        usuário de rede, ele aparece aqui.
-      </p>
+      <Stack gap={16}>
+        {botaoImportar}
+
+        <p>
+          Nenhum usuário logou no portal ainda ou foi importado do AD. Use o
+          botão acima para trazer os usuários do grupo configurado.
+        </p>
+      </Stack>
     );
   }
 
   return (
-    <>
+    <Stack gap={16}>
+      {botaoImportar}
+
       <Table minWidth={900}>
         <TableHead>
           <TableRow>
@@ -248,6 +297,6 @@ export function UsuariosPainel({
         onClose={() => setUsuarioExcluindo(null)}
         onConfirm={handleConfirmarExclusao}
       />
-    </>
+    </Stack>
   );
 }

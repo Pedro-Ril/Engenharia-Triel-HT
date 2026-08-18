@@ -134,6 +134,22 @@ export async function excluirUsuario(id: string): Promise<ApiEnvelope<null>> {
   return parseResponse<null>(response);
 }
 
+export interface ResultadoImportacaoAd {
+  encontrados: number;
+  criados: number;
+  atualizados: number;
+  usuarios: PortalUsuarioAdmin[];
+}
+
+export async function importarUsuariosAd(): Promise<
+  ApiEnvelope<ResultadoImportacaoAd>
+> {
+  const response = await fetch("/api/admin/usuarios/importar-ad", {
+    method: "POST",
+  });
+  return parseResponse<ResultadoImportacaoAd>(response);
+}
+
 export async function listarPermissoes(): Promise<PortalPermissao[]> {
   const response = await fetch("/api/admin/permissoes");
   const body = await parseResponse<PortalPermissao[]>(response);
@@ -171,6 +187,7 @@ export async function salvarConfiguracaoAd(dados: {
   usuarioServico: string;
   senhaServico: string | null;
   grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
 }): Promise<ApiEnvelope<ConfiguracaoAd>> {
   const response = await fetch("/api/admin/configuracao-ad", {
     method: "PUT",

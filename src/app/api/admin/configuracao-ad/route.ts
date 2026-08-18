@@ -33,6 +33,7 @@ interface UpdateConfiguracaoAdBody {
   usuarioServico?: unknown;
   senhaServico?: unknown;
   grupoAdminDn?: unknown;
+  grupoUsuariosDn?: unknown;
 }
 
 export async function PUT(request: Request) {
@@ -71,6 +72,11 @@ export async function PUT(request: Request) {
       "grupo de administradores",
       300
     );
+    const grupoUsuariosDn = optionalText(
+      body.grupoUsuariosDn,
+      "grupo de usuários",
+      300
+    );
 
     const configuracao = await salvarConfiguracaoAd({
       url,
@@ -78,6 +84,7 @@ export async function PUT(request: Request) {
       usuarioServico,
       senhaServico,
       grupoAdminDn,
+      grupoUsuariosDn,
       atualizadoPor: acesso.usuario.samAccountName,
     });
 

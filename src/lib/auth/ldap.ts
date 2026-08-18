@@ -172,6 +172,54 @@ export async function authenticateWithActiveDirectory(
   };
 }
 
+/*
+ * Busca todos os usuários que são membro do grupo informado
+ * (ex: grupo de usuários liberados para importação). Usa
+ * memberOf no filtro em vez de ler o atributo member do
+ * grupo — evita lidar com paginação/range retrieval do AD
+ * para grupos grandes.
+ */
+export async function buscarMembrosDoGrupo(
+  config: ConfiguracaoAd,
+  grupoDn: string
+): Promise<ActiveDirectoryUser[]> {
+  const client = new Client({ url: config.url });
+
+  try {
+    await client.bind(config.usuarioServico, config.senhaServico);
+
+    const { searchEntries } = await client.search(config.baseDn, {
+      scope: "sub",
+      filter: escapeFilter`(&(objectClass=user)(objectCategory=person)(memberOf=${grupoDn}))`,
+      attributes: [
+        "distinguishedName",
+        "sAMAccountName",
+        "displayName",
+        "mail",
+        "memberOf",
+      ],
+    });
+
+    return searchEntries.map((entry) => {
+      const memberOf = toStringArray(entry.memberOf);
+
+      return {
+        distinguishedName: toSingleString(entry.distinguishedName) ?? entry.dn,
+        samAccountName: toSingleString(entry.sAMAccountName) ?? "",
+        nomeExibicao:
+          toSingleString(entry.displayName) ??
+          toSingleString(entry.sAMAccountName) ??
+          "",
+        email: toSingleString(entry.mail),
+        memberOf,
+        ehAdministrador: ehMembroDoGrupoAdmin(memberOf, config.grupoAdminDn),
+      };
+    });
+  } finally {
+    await client.unbind();
+  }
+}
+
 export function ehMembroDoGrupoAdmin(
   memberOf: string[],
   grupoAdminDn: string

@@ -119,6 +119,80 @@ export async function upsertUsuarioLogin(
   return mapRow(result.recordset[0]);
 }
 
+export interface ResultadoUpsertImportado {
+  usuario: PortalUsuario;
+  criado: boolean;
+}
+
+/*
+ * Usado pela importação manual de usuários do AD (ver
+ * src/lib/auth/importacao-usuarios.ts) — cria o cadastro
+ * ANTES do primeiro login, para o admin já poder liberar
+ * acesso. Diferente de upsertUsuarioLogin: nunca toca
+ * `ultimo_login_em` (a pessoa ainda não logou) nem
+ * `ativo`/`sessao_invalidada_em` de quem já existia.
+ */
+export async function upsertUsuarioImportado(
+  diretorioUsuario: Pick<
+    ActiveDirectoryUser,
+    "samAccountName" | "nomeExibicao" | "email" | "ehAdministrador"
+  >
+): Promise<ResultadoUpsertImportado> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input(
+    "samAccountName",
+    sql.NVarChar(150),
+    diretorioUsuario.samAccountName.toLowerCase()
+  );
+
+  request.input(
+    "nomeExibicao",
+    sql.NVarChar(200),
+    diretorioUsuario.nomeExibicao
+  );
+
+  request.input("email", sql.NVarChar(256), diretorioUsuario.email);
+  request.input("ehAdministrador", sql.Bit, diretorioUsuario.ehAdministrador);
+
+  const result = await request.query<PortalUsuarioRow & { acao: string }>(`
+    SET XACT_ABORT ON;
+
+    MERGE INTO dbo.portal_usuarios AS destino
+    USING (SELECT @samAccountName AS sam_account_name) AS origem
+      ON destino.sam_account_name = origem.sam_account_name
+    WHEN MATCHED THEN
+      UPDATE SET
+        [nome_exibicao] = @nomeExibicao,
+        [email] = @email,
+        [eh_administrador] = @ehAdministrador
+    WHEN NOT MATCHED THEN
+      INSERT
+        ([sam_account_name], [nome_exibicao], [email], [eh_administrador])
+      VALUES
+        (@samAccountName, @nomeExibicao, @email, @ehAdministrador)
+    OUTPUT
+      $action AS [acao],
+      CONVERT(VARCHAR(36), INSERTED.[id]) AS [id],
+      INSERTED.[sam_account_name],
+      INSERTED.[nome_exibicao],
+      INSERTED.[email],
+      INSERTED.[codigo_empresa],
+      CAST(INSERTED.[eh_administrador] AS BIT) AS [eh_administrador],
+      CAST(INSERTED.[ativo] AS BIT) AS [ativo],
+      CONVERT(VARCHAR(33), INSERTED.[sessao_invalidada_em], 126) AS [sessao_invalidada_em],
+      CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em];
+  `);
+
+  const row = result.recordset[0];
+
+  return {
+    usuario: mapRow(row),
+    criado: row.acao === "INSERT",
+  };
+}
+
 export async function getUsuarioBySamAccountName(
   samAccountName: string
 ): Promise<PortalUsuario | null> {

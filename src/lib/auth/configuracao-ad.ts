@@ -16,6 +16,7 @@ export interface ConfiguracaoAd {
   usuarioServico: string;
   senhaServico: string;
   grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
   atualizadoEm: string;
   atualizadoPor: string | null;
 }
@@ -30,6 +31,7 @@ export interface ConfiguracaoAdSemSenha {
   usuarioServico: string;
   senhaConfigurada: boolean;
   grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
   atualizadoEm: string;
   atualizadoPor: string | null;
 }
@@ -40,6 +42,7 @@ interface ConfiguracaoAdRow {
   usuario_servico: string;
   senha_servico_cifrada: Buffer;
   grupo_admin_dn: string;
+  grupo_usuarios_dn: string | null;
   atualizado_em: Date;
   atualizado_por: string | null;
 }
@@ -50,6 +53,7 @@ const colunasConfiguracao = `
   [usuario_servico],
   [senha_servico_cifrada],
   [grupo_admin_dn],
+  [grupo_usuarios_dn],
   [atualizado_em],
   [atualizado_por]
 `;
@@ -75,6 +79,7 @@ export async function getConfiguracaoAd(): Promise<ConfiguracaoAd | null> {
     usuarioServico: row.usuario_servico,
     senhaServico: descriptografarSegredo(row.senha_servico_cifrada),
     grupoAdminDn: row.grupo_admin_dn,
+    grupoUsuariosDn: row.grupo_usuarios_dn,
     atualizadoEm: row.atualizado_em.toISOString(),
     atualizadoPor: row.atualizado_por,
   };
@@ -88,7 +93,7 @@ export async function getConfiguracaoAdSemSenha(): Promise<
   const result = await pool.request().query<
     Omit<ConfiguracaoAdRow, "senha_servico_cifrada">
   >(`
-    SELECT [url], [base_dn], [usuario_servico], [grupo_admin_dn], [atualizado_em], [atualizado_por]
+    SELECT [url], [base_dn], [usuario_servico], [grupo_admin_dn], [grupo_usuarios_dn], [atualizado_em], [atualizado_por]
     FROM dbo.portal_configuracao_ad
     WHERE [id] = 1;
   `);
@@ -105,6 +110,7 @@ export async function getConfiguracaoAdSemSenha(): Promise<
     usuarioServico: row.usuario_servico,
     senhaConfigurada: true,
     grupoAdminDn: row.grupo_admin_dn,
+    grupoUsuariosDn: row.grupo_usuarios_dn,
     atualizadoEm: row.atualizado_em.toISOString(),
     atualizadoPor: row.atualizado_por,
   };
@@ -117,6 +123,7 @@ export async function salvarConfiguracaoAd(params: {
   /* null = manter a senha já cadastrada sem alterá-la. */
   senhaServico: string | null;
   grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
   atualizadoPor: string;
 }): Promise<ConfiguracaoAdSemSenha> {
   const pool = await getSqlServerPool();
@@ -141,6 +148,7 @@ export async function salvarConfiguracaoAd(params: {
   request.input("baseDn", sql.NVarChar(300), params.baseDn);
   request.input("usuarioServico", sql.NVarChar(150), params.usuarioServico);
   request.input("grupoAdminDn", sql.NVarChar(300), params.grupoAdminDn);
+  request.input("grupoUsuariosDn", sql.NVarChar(300), params.grupoUsuariosDn);
   request.input("atualizadoPor", sql.NVarChar(150), params.atualizadoPor);
 
   if (params.senhaServico) {
@@ -159,6 +167,7 @@ export async function salvarConfiguracaoAd(params: {
         [base_dn] = @baseDn,
         [usuario_servico] = @usuarioServico,
         [grupo_admin_dn] = @grupoAdminDn,
+        [grupo_usuarios_dn] = @grupoUsuariosDn,
         [atualizado_em] = SYSDATETIME(),
         [atualizado_por] = @atualizadoPor
         ${params.senhaServico ? ", [senha_servico_cifrada] = @senhaServicoCifrada" : ""}
@@ -167,22 +176,24 @@ export async function salvarConfiguracaoAd(params: {
         INSERTED.[base_dn],
         INSERTED.[usuario_servico],
         INSERTED.[grupo_admin_dn],
+        INSERTED.[grupo_usuarios_dn],
         INSERTED.[atualizado_em],
         INSERTED.[atualizado_por]
       WHERE [id] = 1;
     `
     : `
       INSERT INTO dbo.portal_configuracao_ad
-        ([id], [url], [base_dn], [usuario_servico], [senha_servico_cifrada], [grupo_admin_dn], [atualizado_por])
+        ([id], [url], [base_dn], [usuario_servico], [senha_servico_cifrada], [grupo_admin_dn], [grupo_usuarios_dn], [atualizado_por])
       OUTPUT
         INSERTED.[url],
         INSERTED.[base_dn],
         INSERTED.[usuario_servico],
         INSERTED.[grupo_admin_dn],
+        INSERTED.[grupo_usuarios_dn],
         INSERTED.[atualizado_em],
         INSERTED.[atualizado_por]
       VALUES
-        (1, @url, @baseDn, @usuarioServico, @senhaServicoCifrada, @grupoAdminDn, @atualizadoPor);
+        (1, @url, @baseDn, @usuarioServico, @senhaServicoCifrada, @grupoAdminDn, @grupoUsuariosDn, @atualizadoPor);
     `;
 
   const result = await request.query<
@@ -197,6 +208,7 @@ export async function salvarConfiguracaoAd(params: {
     usuarioServico: row.usuario_servico,
     senhaConfigurada: true,
     grupoAdminDn: row.grupo_admin_dn,
+    grupoUsuariosDn: row.grupo_usuarios_dn,
     atualizadoEm: row.atualizado_em.toISOString(),
     atualizadoPor: row.atualizado_por,
   };

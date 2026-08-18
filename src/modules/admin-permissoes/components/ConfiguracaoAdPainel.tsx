@@ -27,6 +27,7 @@ function formularioInicial(configuracaoAd: ConfiguracaoAd | null) {
     usuarioServico: configuracaoAd?.usuarioServico ?? "",
     senhaServico: "",
     grupoAdminDn: configuracaoAd?.grupoAdminDn ?? "",
+    grupoUsuariosDn: configuracaoAd?.grupoUsuariosDn ?? "",
   };
 }
 
@@ -50,6 +51,7 @@ export function ConfiguracaoAdPainel({
         usuarioServico: formulario.usuarioServico,
         senhaServico: formulario.senhaServico.trim() || null,
         grupoAdminDn: formulario.grupoAdminDn,
+        grupoUsuariosDn: formulario.grupoUsuariosDn.trim() || null,
       });
 
       if (resultado.ok && resultado.data) {
@@ -152,6 +154,21 @@ export function ConfiguracaoAdPainel({
                 setFormulario((atual) => ({
                   ...atual,
                   grupoAdminDn: event.target.value,
+                }))
+              }
+            />
+          </Field>
+
+          <Field
+            label="Grupo de usuários (DN)"
+            hint='opcional — quem estiver neste grupo do AD pode ser importado antes do primeiro login, na aba "Usuários"'
+          >
+            <Input
+              value={formulario.grupoUsuariosDn}
+              onChange={(event) =>
+                setFormulario((atual) => ({
+                  ...atual,
+                  grupoUsuariosDn: event.target.value,
                 }))
               }
             />

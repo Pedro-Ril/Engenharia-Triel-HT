@@ -189,6 +189,7 @@ export function AdminPermissoesPage() {
                     atual.filter((item) => item.usuarioId !== usuarioId)
                   );
                 }}
+                onUsuariosImportados={setUsuarios}
               />
             ),
           },

@@ -47,6 +47,7 @@ export interface ConfiguracaoAd {
   usuarioServico: string;
   senhaConfigurada: boolean;
   grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
   atualizadoEm: string;
   atualizadoPor: string | null;
 }
