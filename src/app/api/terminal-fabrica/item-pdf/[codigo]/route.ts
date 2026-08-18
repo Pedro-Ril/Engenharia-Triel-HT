@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   limparCodigoPdf,
   localizarPdfsDoItem,
   montarPdfUnico,
 } from "@/lib/pdf/roteiro-pdf";
 
+/*
+ * Rota pública (sem login) — o terminal de fábrica é um kiosk
+ * de uso compartilhado no chão de fábrica, sem usuário logado
+ * (ver src/lib/auth/rotas-publicas.ts, prefixo
+ * "/api/terminal-fabrica"). Mesma lógica de busca/junção de
+ * PDF do cadastro-roteiro, só que sem a checagem de permissão
+ * por módulo.
+ */
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ codigo: string }> }
 ) {
-  const acesso = await verificarAcessoModuloApi("cadastro-roteiro");
-  if (acesso.negado) return acesso.negado;
-
   try {
     const { codigo: codigoParam } = await context.params;
     const codigo = limparCodigoPdf(codigoParam);
@@ -53,7 +57,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("[PDF] Erro ao montar PDF:", error);
+    console.error("[Terminal Fábrica][PDF] Erro ao montar PDF:", error);
 
     return NextResponse.json(
       {

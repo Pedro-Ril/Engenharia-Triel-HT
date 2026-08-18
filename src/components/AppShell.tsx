@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import type { UsuarioLogado } from "@/components/Sidebar";
 import { RouteLoadingProvider } from "@/components/RouteLoadingProvider";
@@ -13,31 +14,85 @@ interface AppShellProps {
   usuario: UsuarioLogado | null;
 }
 
-export default function AppShell({
+interface PainelPortalProps extends AppShellProps {
+  menuOpen: boolean;
+  setMenuOpen: (open: boolean) => void;
+}
+
+/*
+ * Rotas que aceitam rodar em tela cheia, sem o menu lateral/
+ * topo do portal, quando acessadas com "?fullscreen=1" na URL
+ * — pensado para o terminal de chão de fábrica (ver
+ * src/app/terminal-fabrica), configurado assim só no terminal
+ * físico. Sem o parâmetro, a rota funciona normalmente, com o
+ * menu lateral como qualquer outra página.
+ */
+const ROTAS_COM_TELA_CHEIA = ["/terminal-fabrica"];
+
+function PainelPortal({
   children,
   setores,
   usuario,
-}: AppShellProps) {
+  menuOpen,
+  setMenuOpen,
+}: PainelPortalProps) {
+  return (
+    <div className={styles.app}>
+      <Sidebar
+        open={menuOpen}
+        setOpen={setMenuOpen}
+        setores={setores}
+        usuario={usuario}
+      />
+
+      <main
+        className={`${styles.content} ${
+          menuOpen ? styles.contentOpen : styles.contentClosed
+        }`}
+      >
+        {children}
+      </main>
+    </div>
+  );
+}
+
+function AppShellConteudo(props: PainelPortalProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const suportaTelaCheia = ROTAS_COM_TELA_CHEIA.some(
+    (prefixo) => pathname === prefixo || pathname?.startsWith(`${prefixo}/`)
+  );
+  const telaCheiaAtiva =
+    suportaTelaCheia && searchParams.get("fullscreen") === "1";
+
+  if (telaCheiaAtiva) {
+    return <>{props.children}</>;
+  }
+
+  return <PainelPortal {...props} />;
+}
+
+export default function AppShell(props: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <RouteLoadingProvider>
-      <div className={styles.app}>
-        <Sidebar
-          open={menuOpen}
-          setOpen={setMenuOpen}
-          setores={setores}
-          usuario={usuario}
+      <Suspense
+        fallback={
+          <PainelPortal
+            {...props}
+            menuOpen={menuOpen}
+            setMenuOpen={setMenuOpen}
+          />
+        }
+      >
+        <AppShellConteudo
+          {...props}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
         />
-
-        <main
-          className={`${styles.content} ${
-            menuOpen ? styles.contentOpen : styles.contentClosed
-          }`}
-        >
-          {children}
-        </main>
-      </div>
+      </Suspense>
     </RouteLoadingProvider>
   );
 }

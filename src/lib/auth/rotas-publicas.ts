@@ -13,7 +13,17 @@
 
 const ROTAS_PUBLICAS_EXATAS = new Set<string>(["/", "/login"]);
 
-const PREFIXOS_PUBLICOS = ["/atualizacoes", "/downloads", "/api/auth"];
+const PREFIXOS_PUBLICOS = [
+  "/atualizacoes",
+  "/downloads",
+  "/api/auth",
+  /*
+   * Terminal de fábrica: kiosk de uso compartilhado no chão de
+   * fábrica, sem usuário logado (ver src/app/terminal-fabrica).
+   */
+  "/terminal-fabrica",
+  "/api/terminal-fabrica",
+];
 
 export function ehRotaPublica(pathname: string): boolean {
   if (ROTAS_PUBLICAS_EXATAS.has(pathname)) {

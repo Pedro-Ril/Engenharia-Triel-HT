@@ -1,9 +1,11 @@
 import type {
+  BuscaTerminalFabrica,
   ConfiguracaoAd,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
   PortalUsuarioAdmin,
+  ResumoBuscasTerminalFabrica,
 } from "../types/adminPermissoes.types";
 
 interface ApiEnvelope<T> {
@@ -195,4 +197,20 @@ export async function salvarConfiguracaoAd(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfiguracaoAd>(response);
+}
+
+export interface BuscasTerminalFabricaData {
+  buscas: BuscaTerminalFabrica[];
+  resumo: ResumoBuscasTerminalFabrica;
+}
+
+export async function buscarBuscasTerminalFabrica(): Promise<BuscasTerminalFabricaData> {
+  const response = await fetch("/api/admin/terminal-fabrica/buscas");
+  const body = await parseResponse<BuscasTerminalFabricaData>(response);
+  return (
+    body.data ?? {
+      buscas: [],
+      resumo: { totalBuscas: 0, buscasHoje: 0, naoEncontrados: 0 },
+    }
+  );
 }

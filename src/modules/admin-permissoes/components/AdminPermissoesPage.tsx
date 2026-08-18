@@ -30,6 +30,7 @@ import type { ToastState } from "../types/toast.types";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
+import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 
 const toastInicial: ToastState = {
@@ -242,6 +243,11 @@ export function AdminPermissoesPage() {
                 onConfiguracaoAtualizada={setConfiguracaoAd}
               />
             ),
+          },
+          {
+            value: "terminal-fabrica",
+            label: "Terminal de Fábrica",
+            content: <TerminalFabricaPainel />,
           },
         ]}
       />

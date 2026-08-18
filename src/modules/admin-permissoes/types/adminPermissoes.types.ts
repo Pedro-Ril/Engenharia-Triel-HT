@@ -41,6 +41,21 @@ export interface PortalPermissao {
   concedidoPor: string;
 }
 
+export interface BuscaTerminalFabrica {
+  id: string;
+  codigoBuscado: string;
+  encontrado: boolean;
+  buscadoEm: string;
+  usuarioNome: string | null;
+  ipOrigem: string | null;
+}
+
+export interface ResumoBuscasTerminalFabrica {
+  totalBuscas: number;
+  buscasHoje: number;
+  naoEncontrados: number;
+}
+
 export interface ConfiguracaoAd {
   url: string;
   baseDn: string;
