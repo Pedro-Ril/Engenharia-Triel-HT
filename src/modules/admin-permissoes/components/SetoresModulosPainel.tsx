@@ -22,11 +22,11 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Drawer } from "@/components/ui/Drawer";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { IconPicker } from "@/components/ui/IconPicker";
 import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { Stack } from "@/components/ui/Stack";
 
@@ -536,10 +536,11 @@ export function SetoresModulosPainel({
         </SortableContext>
       </DndContext>
 
-      <Modal
+      <Drawer
         open={setorEditando !== null}
         onClose={() => setSetorEditando(null)}
         title="Editar setor"
+        description="Ajuste os dados da pasta exibida no menu lateral."
         size="medium"
         footer={
           <Stack direction="row" justify="end" gap={10}>
@@ -603,13 +604,14 @@ export function SetoresModulosPainel({
             )}
           </Stack>
         )}
-      </Modal>
+      </Drawer>
 
-      <Modal
+      <Drawer
         open={moduloEditando !== null}
         onClose={() => setModuloEditando(null)}
         title="Editar módulo"
-        size="medium"
+        description="Ajuste os dados da ferramenta e os setores em que ela aparece."
+        size="large"
         footer={
           <Stack direction="row" justify="end" gap={10}>
             <Button variant="secondary" onClick={() => setModuloEditando(null)}>
@@ -726,7 +728,7 @@ export function SetoresModulosPainel({
             )}
           </Stack>
         )}
-      </Modal>
+      </Drawer>
 
       <ConfirmDialog
         open={setorExcluindo !== null}

@@ -1,446 +1,157 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import styles from "@/app/atualizacoes/page.module.css";
+import { getEstiloCorTag } from "@/lib/atualizacoes/cores-tag";
+import type {
+  Atualizacao,
+  AtualizacaoTag,
+  TipoAtualizacaoItem,
+} from "@/lib/atualizacoes/atualizacoes";
 
-type Modulo =
-  | "downloads"
-  | "consulta-estrutura"
-  | "liberacao-projeto"
-  | "bi"
-  | "sistema"
-  | "roteiro-fabricacao";
+interface AtualizacoesPageProps {
+  atualizacoes: Atualizacao[];
+}
 
-type Atualizacao = {
-  data: string;
-  versao: string;
-  titulo: string;
-  modulos: Modulo[];
-  descricao: string;
-  itens: {
-    tipo: "melhoria" | "correcao" | "novo";
-    texto: string;
-  }[];
-};
-
-const MODULO_CONFIG = {
-  downloads: {
-    label: "Downloads",
-    className: styles.moduloDownloads,
-    dotClass: styles.dotDownloads,
-  },
-  "consulta-estrutura": {
-    label: "Consulta Estrutura",
-    className: styles.moduloAgro,
-    dotClass: styles.dotAgro,
-  },
-  "liberacao-projeto": {
-    label: "Liberação de Projeto",
-    className: styles.moduloViaturas,
-    dotClass: styles.dotViaturas,
-  },
-  bi: {
-    label: "Dashboard BI",
-    className: styles.moduloBI,
-    dotClass: styles.dotBI,
-  },
-  sistema: {
-    label: "Portal Engenharia",
-    className: styles.moduloSistema,
-    dotClass: styles.dotSistema,
-  },
-  "roteiro-fabricacao": {
-    label: "Roteiro de Fabricação",
-    className: styles.moduloRoteiroFabricacao,
-    dotClass: styles.dotRoteiroFabricacao,
-  },
-};
-
-const LEGENDA: { key: Modulo; label: string }[] = [
-  { key: "downloads", label: "Downloads" },
-  { key: "consulta-estrutura", label: "Consulta Estrutura" },
-  { key: "liberacao-projeto", label: "Liberação de Projeto" },
-  { key: "bi", label: "Dashboard BI" },
-  { key: "sistema", label: "Portal Engenharia" },
-  { key: "roteiro-fabricacao", label: "Roteiro de Fabricação" },
-];
-
-const ATUALIZACOES: Atualizacao[] = [
-  {
-  data: "19/05/2026",
-  versao: "V1.1.10",
-  titulo: "Melhorias de feedback nas ações de roteiro",
-  modulos: ["roteiro-fabricacao"],
-  descricao:
-    "Implementadas melhorias no retorno visual das ações de roteiro, padronizando as notificações de cadastro, edição e exclusão de operações com exibição detalhada do retorno do sistema.",
-  itens: [
-    {
-      tipo: "melhoria",
-      texto: "Adicionadas notificações visuais para exclusão individual de operações do roteiro.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Adicionadas notificações visuais para exclusão completa do roteiro do item.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Padronizado o feedback das ações de roteiro seguindo o mesmo comportamento utilizado no cadastro de operações.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Adicionada abertura do retorno completo em JSON ao clicar nas notificações de sucesso ou erro.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Melhorada a rastreabilidade das ações de edição e remoção, permitindo visualizar os detalhes técnicos retornados pelo sistema.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Aprimorada a experiência do usuário com mensagens claras para operações concluídas com sucesso ou com falha.",
-    },
-  ],
-},
-  {
-  data: "19/05/2026",
-  versao: "V1.1.9",
-  titulo: "Integração avançada com 3DPlay e visualização de PDFs",
-  modulos: ["roteiro-fabricacao"],
-  descricao:
-    "Implementadas novas funcionalidades de visualização técnica integradas ao 3DEXPERIENCE e ao acervo de desenhos da engenharia, permitindo acesso rápido aos modelos 3D e PDFs diretamente pela estrutura do produto.",
-  itens: [
-    {
-      tipo: "novo",
-      texto: "Adicionado botão para abertura rápida do 3DPlay diretamente na estrutura do produto.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada integração automática com o 3DEXPERIENCE para pesquisa de modelos 3D por código e revisão.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada validação automática da revisão do item antes da abertura do modelo 3D.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado suporte para múltiplas representações 3D do mesmo item, incluindo modelos padrão e FLAT-PATTERN.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado modal de seleção de modelos 3D quando encontrados múltiplos resultados válidos para o item.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado botão para visualização de PDFs de detalhamento diretamente pela estrutura.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada busca automática de PDFs técnicos no diretório central de desenhos da engenharia.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado suporte para agrupamento automático de múltiplas páginas PDF do mesmo item em um único documento.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada abertura automática dos PDFs consolidados em nova guia do navegador.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Melhorada a experiência visual dos acessos rápidos técnicos utilizando novos botões integrados à estrutura.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Padronizado o visual dos botões técnicos seguindo o mesmo padrão visual do módulo 3D.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Adicionadas notificações inteligentes para itens sem PDF ou sem modelos 3D encontrados.",
-    },
-  ],
-},
-  {
-  data: "17/05/2026",
-  versao: "V1.1.8",
-  titulo: "Validação inteligente de revisões dos roteiros",
-  modulos: ["roteiro-fabricacao"],
-  descricao:
-    "Implementada a nova validação inteligente de revisões entre o 3DEXPERIENCE e o ERP, permitindo identificar automaticamente roteiros desatualizados, sem revisão vinculada ou divergentes da estrutura atual do produto.",
-  itens: [
-    {
-      tipo: "novo",
-      texto: "Adicionada validação automática entre a revisão retornada pelo 3DEXPERIENCE e a revisão cadastrada no roteiro do ERP.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada identificação visual de itens com roteiro desatualizado através de destaque em laranja na estrutura.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada badge de atenção para itens com divergência de revisão entre ERP e estrutura.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado modal informativo ao clicar na badge de atenção, exibindo detalhes da divergência de revisão.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado card de resumo para itens com atenção na estrutura.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado modal listando todos os itens com revisão divergente ou sem revisão no ERP.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado filtro dedicado para exibição apenas de itens com atenção na estrutura.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Mantida a exibição da quantidade de operações do roteiro mesmo em itens sinalizados com atenção.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Melhorada a rastreabilidade visual de revisões desatualizadas durante a navegação da estrutura.",
-    },
-  ],
-},
-  {
-  data: "17/05/2026",
-  versao: "V1.1.7",
-  titulo: "Nova central de gerenciamento de roteiros",
-  modulos: ["roteiro-fabricacao"],
-  descricao:
-    "Implementada a nova central de gerenciamento de roteiros integrada à estrutura do produto, trazendo recursos de cadastro, edição, exclusão, atualização dinâmica e retorno visual das operações enviadas ao ERP.",
-  itens: [
-    {
-      tipo: "novo",
-      texto: "Adicionado cadastro completo de roteiros diretamente pela estrutura do produto.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada visualização de operações já cadastradas no roteiro do item.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada edição de operações existentes diretamente pelos cards do roteiro.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada exclusão individual de operações do roteiro.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada funcionalidade para exclusão completa do roteiro do item.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado modal de retorno do ERP exibindo sucesso, erros e resumo do processamento após o envio.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado fluxo de salvar e adicionar próxima operação sem fechar o modal.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionado fluxo de salvar e sair com envio consolidado de todas as operações.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionada atualização dinâmica apenas do item alterado na estrutura, reduzindo significativamente o tempo de recarregamento.",
-    },
-    {
-      tipo: "novo",
-      texto: "Adicionados ícones interativos com tooltips para ações de edição e exclusão.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Padronizado o layout visual dos modais de roteiro seguindo o padrão visual do portal.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Melhorada a experiência de navegação e manutenção de operações dentro da estrutura.",
-    },
-  ],
-},
-  {
-  data: "27/04/2026",
-  versao: "V1.1.6",
-  titulo: "Melhoria no modal de Downloads",
-  modulos: ["downloads"],
-  descricao:
-    "Aprimorado o modal da Central de Downloads para melhorar a apresentação das instruções de instalação, funcionamento e acesso ao arquivo.",
-  itens: [
-    {
-      tipo: "novo",
-      texto: "Adicionado modal de visualização ao clicar nos cards de download, exibindo instruções de instalação e funcionamento.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Organizadas as informações de instalação e funcionamento em cards separados, facilitando a leitura.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Adicionado botão de download diretamente no rodapé do modal.",
-    },
-  ],
-},
-  {
-  data: "27/04/2026",
-  versao: "V1.1.5",
-  titulo: "Reorganização do menu lateral",
-  modulos: ["sistema", "downloads"],
-  descricao:
-    "Reorganizado o menu lateral do Portal da Engenharia para melhorar a navegação e separar os módulos principais dos acessos auxiliares.",
-  itens: [
-    {
-      tipo: "melhoria",
-      texto: "Reposicionados os atalhos de Downloads e Atualizações para a área inferior do menu lateral.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Separados os módulos principais dos acessos de apoio, deixando a navegação mais limpa e objetiva.",
-    },
-    {
-      tipo: "melhoria",
-      texto: "Mantido o padrão visual do menu com destaque para a rota ativa e comportamento responsivo.",
-    },
-  ],
-},
-  {
-    data: "27/04/2026",
-    versao: "V1.1.4",
-    titulo: "Implementação da aba de Downloads",
-    modulos: ["downloads"],
-    descricao:
-      "Implantada a nova área de downloads no Portal da Engenharia, permitindo acesso centralizado a arquivos, instaladores e utilitários.",
-    itens: [
-      {
-        tipo: "novo",
-        texto: "Criada a página de Downloads com exibição em formato de cards para organização dos arquivos.",
-      },
-      {
-        tipo: "melhoria",
-        texto: "Adicionado acesso ao módulo de Downloads no menu lateral do portal.",
-      },
-      {
-        tipo: "melhoria",
-        texto: "Padronização visual da página conforme o layout e identidade do portal.",
-      },
-    ],
-  },
-  {
-    data: "18/03/2026",
-    versao: "V1.1.3",
-    titulo: "Ajuste no tempo de atualização da página",
-    modulos: ["sistema"],
-    descricao:
-      "Ajustado o comportamento de atualização da página para proporcionar maior fluidez e melhor experiência ao usuário.",
-    itens: [
-      {
-        tipo: "melhoria",
-        texto: "Refinamento do tempo e da lógica de atualização automática da interface.",
-      },
-    ],
-  },
-  {
-    data: "17/03/2026",
-    versao: "V1.1.2",
-    titulo: "Implementação de remoção de itens inválidos",
-    modulos: ["consulta-estrutura"],
-    descricao:
-      "Incluída funcionalidade para identificação e remoção de itens inválidos na consulta de estrutura de produto.",
-    itens: [
-      {
-        tipo: "novo",
-        texto: "Adicionado botão para remoção de itens inválidos diretamente na interface.",
-      },
-      {
-        tipo: "novo",
-        texto: "Implementada lógica para tratamento e exclusão dos registros inválidos.",
-      },
-    ],
-  },
-  {
-    data: "13/03/2026",
-    versao: "V1.1.1",
-    titulo: "Ajustes na exibição da árvore de estrutura",
-    modulos: ["consulta-estrutura"],
-    descricao:
-      "Realizados ajustes na visualização da estrutura de produto para melhorar a leitura e organização hierárquica.",
-    itens: [
-      {
-        tipo: "correcao",
-        texto: "Correção na formatação da árvore, garantindo exibição adequada dos níveis estruturais.",
-      },
-    ],
-  },
-  {
-    data: "12/03/2026",
-    versao: "V1.1.0",
-    titulo: "Criação do módulo de BI",
-    modulos: ["bi"],
-    descricao:
-      "Implantação inicial da área de Business Intelligence no portal, permitindo visualização de dados e indicadores.",
-    itens: [
-      {
-        tipo: "novo",
-        texto: "Criada a página de Dashboard BI para acompanhamento de indicadores.",
-      },
-    ],
-  },
-  {
-    data: "12/03/2026",
-    versao: "V1.0.1",
-    titulo: "Melhorias visuais e suporte ao dark mode",
-    modulos: ["consulta-estrutura", "sistema"],
-    descricao:
-      "Aplicados ajustes visuais no portal, incluindo melhorias na leitura e adaptação ao modo escuro.",
-    itens: [
-      {
-        tipo: "melhoria",
-        texto: "Ajuste nas cores das fontes para melhor legibilidade no dark mode.",
-      },
-      {
-        tipo: "melhoria",
-        texto: "Aprimoramento da exibição da estrutura de produto.",
-      },
-    ],
-  },
-  {
-    data: "12/03/2026",
-    versao: "V1.0.0",
-    titulo: "Preparação para ambiente de produção",
-    modulos: ["sistema"],
-    descricao:
-      "Realizados ajustes e validações finais para disponibilização do portal em ambiente produtivo.",
-    itens: [
-      {
-        tipo: "melhoria",
-        texto: "Adequação de configurações e comportamentos para execução estável em produção.",
-      },
-    ],
-  },
-];
+/*
+ * `publicadoEm` vem do SQL Server sem timezone (hora local do
+ * servidor) — igual ao resto do app, não leva "Z" aqui (ver
+ * formatarData em MinhaContaPage.tsx e o comentário em
+ * formatarTempoRelativo de HomeContent.tsx).
+ */
+function formatarDataHora(publicadoEm: string): string {
+  return new Date(publicadoEm).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
 
 const TIPO_CONFIG = {
   novo: {
     label: "Novo",
     className: styles.badgeNovo,
+    bg: "rgba(15, 118, 110, 0.1)",
+    texto: "#0f766e",
   },
   melhoria: {
     label: "Melhoria",
     className: styles.badgeMelhoria,
+    bg: "rgba(183, 28, 28, 0.08)",
+    texto: "#b71c1c",
   },
   correcao: {
     label: "Correção",
     className: styles.badgeCorrecao,
+    bg: "rgba(146, 64, 14, 0.1)",
+    texto: "#92400e",
   },
 };
 
-export default function AtualizacoesPage() {
+function TagChip({ tag }: { tag: AtualizacaoTag }) {
+  const estilo = getEstiloCorTag(tag.cor);
+
+  return (
+    <span
+      className={styles.badgeModulo}
+      style={{ background: estilo.bg, color: estilo.texto, borderColor: estilo.borda }}
+    >
+      {tag.nome}
+    </span>
+  );
+}
+
+function TagDot({ tag }: { tag: AtualizacaoTag }) {
+  const estilo = getEstiloCorTag(tag.cor);
+
+  return (
+    <span
+      className={styles.sidebarDot}
+      style={{ background: estilo.dot }}
+      title={tag.nome}
+    />
+  );
+}
+
+export default function AtualizacoesPage({
+  atualizacoes,
+}: AtualizacoesPageProps) {
   const [selecionada, setSelecionada] = useState<Atualizacao | null>(null);
   const [ativo, setAtivo] = useState<number | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const [tagsSelecionadas, setTagsSelecionadas] = useState<Set<string>>(
+    new Set()
+  );
+  const [tiposSelecionados, setTiposSelecionados] = useState<
+    Set<TipoAtualizacaoItem>
+  >(new Set());
+
+  const legenda = useMemo(() => {
+    const mapa = new Map<string, AtualizacaoTag>();
+    for (const atualizacao of atualizacoes) {
+      for (const tag of atualizacao.tags) {
+        mapa.set(tag.id, tag);
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.ordem - b.ordem);
+  }, [atualizacoes]);
+
+  /*
+   * A lista de opções (legenda de módulos, pills de tipo) usa
+   * sempre `atualizacoes` (sem filtro) — só o que é exibido na
+   * timeline/sidebar usa a versão filtrada. Assim o usuário
+   * sempre consegue trocar ou limpar os filtros, mesmo depois de
+   * já ter reduzido o resultado a zero itens.
+   */
+  const atualizacoesFiltradas = useMemo(() => {
+    if (tagsSelecionadas.size === 0 && tiposSelecionados.size === 0) {
+      return atualizacoes;
+    }
+
+    return atualizacoes.filter((item) => {
+      const passaTag =
+        tagsSelecionadas.size === 0 ||
+        item.tags.some((tag) => tagsSelecionadas.has(tag.id));
+
+      const passaTipo =
+        tiposSelecionados.size === 0 ||
+        item.itens.some((i) => tiposSelecionados.has(i.tipo));
+
+      return passaTag && passaTipo;
+    });
+  }, [atualizacoes, tagsSelecionadas, tiposSelecionados]);
+
+  const filtrosAtivos = tagsSelecionadas.size > 0 || tiposSelecionados.size > 0;
+
+  function alternarTag(id: string) {
+    setTagsSelecionadas((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(id)) {
+        novo.delete(id);
+      } else {
+        novo.add(id);
+      }
+      return novo;
+    });
+  }
+
+  function alternarTipo(tipo: TipoAtualizacaoItem) {
+    setTiposSelecionados((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(tipo)) {
+        novo.delete(tipo);
+      } else {
+        novo.add(tipo);
+      }
+      return novo;
+    });
+  }
+
+  function limparFiltros() {
+    setTagsSelecionadas(new Set());
+    setTiposSelecionados(new Set());
+  }
 
   const scrollTo = (index: number) => {
     const el = itemRefs.current[index];
@@ -474,15 +185,21 @@ export default function AtualizacoesPage() {
     requestAnimationFrame(step);
   };
 
-  const renderModulos = (modulos: Modulo[]) =>
-    modulos.map((m) => (
-      <span
-        key={m}
-        className={`${styles.badgeModulo} ${MODULO_CONFIG[m].className}`}
-      >
-        {MODULO_CONFIG[m].label}
-      </span>
-    ));
+  if (atualizacoes.length === 0) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerInner}>
+            <span className={styles.headerBadge}>Histórico</span>
+            <h1 className={styles.headerTitle}>Atualizações do Portal</h1>
+            <p className={styles.headerSubtitle}>
+              Ainda não há nenhuma atualização publicada.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -493,7 +210,7 @@ export default function AtualizacoesPage() {
           </span>
 
           <h1 className={styles.headerTitle}>
-            Atualizações do Portal da Engenharia
+            Atualizações do Portal Triel-HT
           </h1>
 
           <p className={styles.headerSubtitle}>
@@ -504,12 +221,99 @@ export default function AtualizacoesPage() {
 
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
-          <div className={styles.sidebarList}>
-            <p className={styles.sidebarLabel}>Versões</p>
+          {(legenda.length > 0 || filtrosAtivos) && (
+            <div className={styles.legenda}>
+              <div className={styles.filtroHeader}>
+                <p className={styles.legendaLabel}>Filtrar por módulo</p>
 
-            {ATUALIZACOES.map((item, index) => (
+                {filtrosAtivos && (
+                  <button
+                    type="button"
+                    className={styles.limparFiltros}
+                    onClick={limparFiltros}
+                  >
+                    <X size={12} />
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+
+              <div className={styles.filtroChips}>
+                {legenda.map((tag) => {
+                  const estilo = getEstiloCorTag(tag.cor);
+                  const ativo = tagsSelecionadas.has(tag.id);
+
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      aria-pressed={ativo}
+                      className={styles.filtroChip}
+                      style={
+                        ativo
+                          ? {
+                              background: estilo.bg,
+                              color: estilo.texto,
+                              borderColor: estilo.borda,
+                            }
+                          : undefined
+                      }
+                      onClick={() => alternarTag(tag.id)}
+                    >
+                      <TagDot tag={tag} />
+                      {tag.nome}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className={styles.legendaLabel} style={{ marginTop: "10px" }}>
+                Filtrar por tipo
+              </p>
+
+              <div className={styles.filtroChips}>
+                {(["novo", "melhoria", "correcao"] as TipoAtualizacaoItem[]).map(
+                  (tipo) => {
+                    const ativo = tiposSelecionados.has(tipo);
+                    const config = TIPO_CONFIG[tipo];
+
+                    return (
+                      <button
+                        key={tipo}
+                        type="button"
+                        aria-pressed={ativo}
+                        className={styles.filtroChip}
+                        style={
+                          ativo
+                            ? { background: config.bg, color: config.texto }
+                            : undefined
+                        }
+                        onClick={() => alternarTipo(tipo)}
+                      >
+                        {config.label}
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className={styles.sidebarList}>
+            <p className={styles.sidebarLabel}>
+              Versões
+              {filtrosAtivos && ` (${atualizacoesFiltradas.length} de ${atualizacoes.length})`}
+            </p>
+
+            {atualizacoesFiltradas.length === 0 && (
+              <p className={styles.semResultado}>
+                Nenhuma atualização com esses filtros.
+              </p>
+            )}
+
+            {atualizacoesFiltradas.map((item, index) => (
               <button
-                key={`${item.versao}-${index}`}
+                key={item.id}
                 type="button"
                 className={styles.sidebarItem}
                 onClick={() => scrollTo(index)}
@@ -520,36 +324,34 @@ export default function AtualizacoesPage() {
                 </div>
 
                 <div className={styles.sidebarDots}>
-                  {item.modulos.map((m) => (
-                    <span
-                      key={m}
-                      className={`${styles.sidebarDot} ${MODULO_CONFIG[m].dotClass}`}
-                    />
+                  {item.tags.map((tag) => (
+                    <TagDot key={tag.id} tag={tag} />
                   ))}
                 </div>
               </button>
             ))}
           </div>
-
-          <div className={styles.legenda}>
-            <p className={styles.legendaLabel}>Módulos</p>
-
-            {LEGENDA.map(({ key, label }) => (
-              <div key={key} className={styles.legendaItem}>
-                <span
-                  className={`${styles.legendaDot} ${MODULO_CONFIG[key].dotClass}`}
-                />
-                <span className={styles.legendaTexto}>{label}</span>
-              </div>
-            ))}
-          </div>
         </aside>
 
         <div className={styles.container}>
+          {atualizacoesFiltradas.length === 0 && (
+            <div className={styles.semResultadoCard}>
+              <p>Nenhuma atualização encontrada com os filtros selecionados.</p>
+              <button
+                type="button"
+                className={styles.limparFiltros}
+                onClick={limparFiltros}
+              >
+                <X size={12} />
+                Limpar filtros
+              </button>
+            </div>
+          )}
+
           <div className={styles.timeline}>
-            {ATUALIZACOES.map((item, index) => (
+            {atualizacoesFiltradas.map((item, index) => (
               <div
-                key={`${item.versao}-${index}`}
+                key={item.id}
                 className={styles.timelineItem}
                 ref={(el) => {
                   itemRefs.current[index] = el;
@@ -558,7 +360,7 @@ export default function AtualizacoesPage() {
                 <div className={styles.timelineSide}>
                   <div className={styles.timelineDot} />
 
-                  {index < ATUALIZACOES.length - 1 && (
+                  {index < atualizacoesFiltradas.length - 1 && (
                     <div className={styles.timelineLine} />
                   )}
                 </div>
@@ -572,11 +374,15 @@ export default function AtualizacoesPage() {
                 >
                   <div className={styles.cardTop}>
                     <span className={styles.cardVersao}>{item.versao}</span>
-                    <span className={styles.cardData}>{item.data}</span>
+                    <span className={styles.cardData}>
+                      {formatarDataHora(item.publicadoEm)}
+                    </span>
                   </div>
 
                   <div className={styles.cardModulos}>
-                    {renderModulos(item.modulos)}
+                    {item.tags.map((tag) => (
+                      <TagChip key={tag.id} tag={tag} />
+                    ))}
                   </div>
 
                   <h3 className={styles.cardTitulo}>{item.titulo}</h3>
@@ -609,17 +415,17 @@ export default function AtualizacoesPage() {
               <div>
                 <div className={styles.modalMeta}>
                   <span className={styles.headerBadge}>
-                    {selecionada.versao} · {selecionada.data}
+                    {selecionada.versao} · {formatarDataHora(selecionada.publicadoEm)}
                   </span>
 
-                  {renderModulos(selecionada.modulos)}
+                  {selecionada.tags.map((tag) => (
+                    <TagChip key={tag.id} tag={tag} />
+                  ))}
                 </div>
 
                 <h2 className={styles.modalTitle}>{selecionada.titulo}</h2>
 
-                <p className={styles.modalSubtitle}>
-                  {selecionada.descricao}
-                </p>
+                <p className={styles.modalSubtitle}>{selecionada.descricao}</p>
               </div>
 
               <button
@@ -633,8 +439,8 @@ export default function AtualizacoesPage() {
 
             <div className={styles.modalBody}>
               <ul className={styles.itensList}>
-                {selecionada.itens.map((item, i) => (
-                  <li key={i} className={styles.itemRow}>
+                {selecionada.itens.map((item) => (
+                  <li key={item.id} className={styles.itemRow}>
                     <span
                       className={`${styles.badge} ${TIPO_CONFIG[item.tipo].className}`}
                     >

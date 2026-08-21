@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Boxes, Home, KeyRound, Layers, Users } from "lucide-react";
+import {
+  Boxes,
+  Factory,
+  Home,
+  KeyRound,
+  Layers,
+  Megaphone,
+  Settings,
+  Users,
+} from "lucide-react";
 
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { FormGrid } from "@/components/ui/FormGrid";
@@ -9,7 +18,6 @@ import { Loader } from "@/components/ui/Loader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
-import { Tabs } from "@/components/ui/Tabs";
 import { Toast } from "@/components/ui/Toast";
 
 import {
@@ -27,6 +35,10 @@ import type {
   PortalUsuarioAdmin,
 } from "../types/adminPermissoes.types";
 import type { ToastState } from "../types/toast.types";
+import { AdminNavegacao } from "./AdminNavegacao";
+import type { GrupoNavegacaoAdmin } from "./AdminNavegacao";
+import styles from "./AdminPermissoes.module.css";
+import { AtualizacoesPainel } from "./AtualizacoesPainel";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
@@ -40,9 +52,44 @@ const toastInicial: ToastState = {
   description: "",
 };
 
+const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
+  {
+    titulo: "Acessos",
+    itens: [
+      { valor: "permissoes", label: "Permissões", icon: <KeyRound size={16} /> },
+      { valor: "usuarios", label: "Usuários", icon: <Users size={16} /> },
+      {
+        valor: "setores",
+        label: "Setores e módulos",
+        icon: <Layers size={16} />,
+      },
+    ],
+  },
+  {
+    titulo: "Sistema",
+    itens: [
+      {
+        valor: "configuracoes",
+        label: "Configurações",
+        icon: <Settings size={16} />,
+      },
+      {
+        valor: "terminal-fabrica",
+        label: "Terminal de Fábrica",
+        icon: <Factory size={16} />,
+      },
+      {
+        valor: "atualizacoes",
+        label: "Atualizações",
+        icon: <Megaphone size={16} />,
+      },
+    ],
+  },
+];
+
 export function AdminPermissoesPage() {
   const [carregando, setCarregando] = useState(true);
-  const [aba, setAba] = useState("permissoes");
+  const [secao, setSecao] = useState("permissoes");
   const [toast, setToast] = useState<ToastState>(toastInicial);
 
   const [setores, setSetores] = useState<PortalSetor[]>([]);
@@ -91,7 +138,7 @@ export function AdminPermissoesPage() {
   if (carregando) {
     return (
       <PageContainer>
-        <Loader label="Carregando dados de permissões..." />
+        <Loader label="Carregando dados de administração..." />
       </PageContainer>
     );
   }
@@ -102,8 +149,8 @@ export function AdminPermissoesPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Gestão de permissões"
-        description="Controle quem tem acesso a cada ferramenta do portal, organize setores e defina o código de empresa de cada usuário."
+        title="Administração"
+        description="Acessos, usuários, setores, integrações e as demais configurações do portal, tudo num só lugar."
       />
 
       <Breadcrumb
@@ -143,114 +190,106 @@ export function AdminPermissoesPage() {
         />
       </FormGrid>
 
-      <Tabs
-        value={aba}
-        onValueChange={setAba}
-        items={[
-          {
-            value: "permissoes",
-            label: "Permissões",
-            content: (
-              <PermissoesPainel
-                setores={setores}
-                modulos={modulos}
-                usuarios={usuarios}
-                permissoes={permissoes}
-                onFeedback={mostrarFeedback}
-                onPermissaoCriada={(permissao) =>
-                  setPermissoes((atual) => [...atual, permissao])
-                }
-                onPermissaoRemovida={(permissaoId) =>
-                  setPermissoes((atual) =>
-                    atual.filter((item) => item.id !== permissaoId)
+      <div className={styles.paginaAdminGrid}>
+        <AdminNavegacao
+          grupos={GRUPOS_NAVEGACAO}
+          ativo={secao}
+          onSelecionar={setSecao}
+        />
+
+        <div className={styles.paginaAdminConteudo}>
+          {secao === "permissoes" && (
+            <PermissoesPainel
+              setores={setores}
+              modulos={modulos}
+              usuarios={usuarios}
+              permissoes={permissoes}
+              onFeedback={mostrarFeedback}
+              onPermissaoCriada={(permissao) =>
+                setPermissoes((atual) => [...atual, permissao])
+              }
+              onPermissaoRemovida={(permissaoId) =>
+                setPermissoes((atual) =>
+                  atual.filter((item) => item.id !== permissaoId)
+                )
+              }
+            />
+          )}
+
+          {secao === "usuarios" && (
+            <UsuariosPainel
+              usuarios={usuarios}
+              onFeedback={mostrarFeedback}
+              onUsuarioAtualizado={(usuario) =>
+                setUsuarios((atual) =>
+                  atual.map((item) =>
+                    item.id === usuario.id ? usuario : item
                   )
-                }
-              />
-            ),
-          },
-          {
-            value: "usuarios",
-            label: "Usuários",
-            content: (
-              <UsuariosPainel
-                usuarios={usuarios}
-                onFeedback={mostrarFeedback}
-                onUsuarioAtualizado={(usuario) =>
-                  setUsuarios((atual) =>
-                    atual.map((item) =>
-                      item.id === usuario.id ? usuario : item
-                    )
+                )
+              }
+              onUsuarioExcluido={(usuarioId) => {
+                setUsuarios((atual) =>
+                  atual.filter((item) => item.id !== usuarioId)
+                );
+                setPermissoes((atual) =>
+                  atual.filter((item) => item.usuarioId !== usuarioId)
+                );
+              }}
+              onUsuariosImportados={setUsuarios}
+            />
+          )}
+
+          {secao === "setores" && (
+            <SetoresModulosPainel
+              setores={setores}
+              modulos={modulos}
+              onFeedback={mostrarFeedback}
+              onSetorCriado={(setor) =>
+                setSetores((atual) => [...atual, setor])
+              }
+              onSetorAtualizado={(setor) =>
+                setSetores((atual) =>
+                  atual.map((item) => (item.id === setor.id ? setor : item))
+                )
+              }
+              onSetorExcluido={(setorId) =>
+                setSetores((atual) =>
+                  atual.filter((item) => item.id !== setorId)
+                )
+              }
+              onModuloCriado={(modulo) =>
+                setModulos((atual) => [...atual, modulo])
+              }
+              onModuloAtualizado={(modulo) =>
+                setModulos((atual) =>
+                  atual.map((item) =>
+                    item.id === modulo.id ? modulo : item
                   )
-                }
-                onUsuarioExcluido={(usuarioId) => {
-                  setUsuarios((atual) =>
-                    atual.filter((item) => item.id !== usuarioId)
-                  );
-                  setPermissoes((atual) =>
-                    atual.filter((item) => item.usuarioId !== usuarioId)
-                  );
-                }}
-                onUsuariosImportados={setUsuarios}
-              />
-            ),
-          },
-          {
-            value: "setores",
-            label: "Setores e módulos",
-            content: (
-              <SetoresModulosPainel
-                setores={setores}
-                modulos={modulos}
-                onFeedback={mostrarFeedback}
-                onSetorCriado={(setor) =>
-                  setSetores((atual) => [...atual, setor])
-                }
-                onSetorAtualizado={(setor) =>
-                  setSetores((atual) =>
-                    atual.map((item) => (item.id === setor.id ? setor : item))
-                  )
-                }
-                onSetorExcluido={(setorId) =>
-                  setSetores((atual) =>
-                    atual.filter((item) => item.id !== setorId)
-                  )
-                }
-                onModuloCriado={(modulo) =>
-                  setModulos((atual) => [...atual, modulo])
-                }
-                onModuloAtualizado={(modulo) =>
-                  setModulos((atual) =>
-                    atual.map((item) =>
-                      item.id === modulo.id ? modulo : item
-                    )
-                  )
-                }
-                onModuloExcluido={(moduloId) =>
-                  setModulos((atual) =>
-                    atual.filter((item) => item.id !== moduloId)
-                  )
-                }
-              />
-            ),
-          },
-          {
-            value: "configuracoes",
-            label: "Configurações",
-            content: (
-              <ConfiguracaoAdPainel
-                configuracaoAd={configuracaoAd}
-                onFeedback={mostrarFeedback}
-                onConfiguracaoAtualizada={setConfiguracaoAd}
-              />
-            ),
-          },
-          {
-            value: "terminal-fabrica",
-            label: "Terminal de Fábrica",
-            content: <TerminalFabricaPainel />,
-          },
-        ]}
-      />
+                )
+              }
+              onModuloExcluido={(moduloId) =>
+                setModulos((atual) =>
+                  atual.filter((item) => item.id !== moduloId)
+                )
+              }
+            />
+          )}
+
+          {secao === "configuracoes" && (
+            <ConfiguracaoAdPainel
+              configuracaoAd={configuracaoAd}
+              onFeedback={mostrarFeedback}
+              onConfiguracaoAtualizada={setConfiguracaoAd}
+            />
+          )}
+
+          {secao === "terminal-fabrica" && <TerminalFabricaPainel />}
+
+          {secao === "atualizacoes" && (
+            <AtualizacoesPainel onFeedback={mostrarFeedback} />
+          )}
+        </div>
+      </div>
 
       <Toast
         open={toast.open}

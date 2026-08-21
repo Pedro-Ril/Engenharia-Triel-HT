@@ -66,3 +66,36 @@ export interface ConfiguracaoAd {
   atualizadoEm: string;
   atualizadoPor: string | null;
 }
+
+export type TipoAtualizacaoItem = "novo" | "melhoria" | "correcao";
+
+export interface AtualizacaoTag {
+  id: string;
+  chave: string;
+  nome: string;
+  cor: string;
+  ordem: number;
+  ativo: boolean;
+}
+
+export interface AtualizacaoItem {
+  id: string;
+  tipo: TipoAtualizacaoItem;
+  texto: string;
+  ordem: number;
+}
+
+export interface Atualizacao {
+  id: string;
+  versao: string;
+  titulo: string;
+  descricao: string;
+  publicadoEm: string;
+  publicado: boolean;
+  ordem: number;
+  tags: AtualizacaoTag[];
+  itens: AtualizacaoItem[];
+  criadoEm: string;
+  atualizadoEm: string;
+  criadoPor: string | null;
+}

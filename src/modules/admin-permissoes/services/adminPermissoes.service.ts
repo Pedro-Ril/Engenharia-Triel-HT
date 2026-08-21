@@ -1,4 +1,6 @@
 import type {
+  Atualizacao,
+  AtualizacaoTag,
   BuscaTerminalFabrica,
   ConfiguracaoAd,
   PortalModulo,
@@ -6,6 +8,7 @@ import type {
   PortalSetor,
   PortalUsuarioAdmin,
   ResumoBuscasTerminalFabrica,
+  TipoAtualizacaoItem,
 } from "../types/adminPermissoes.types";
 
 interface ApiEnvelope<T> {
@@ -213,4 +216,92 @@ export async function buscarBuscasTerminalFabrica(): Promise<BuscasTerminalFabri
       resumo: { totalBuscas: 0, buscasHoje: 0, naoEncontrados: 0 },
     }
   );
+}
+
+export async function listarTagsAtualizacao(): Promise<AtualizacaoTag[]> {
+  const response = await fetch("/api/admin/atualizacoes/tags");
+  const body = await parseResponse<AtualizacaoTag[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarTagAtualizacao(dados: {
+  chave: string;
+  nome: string;
+  cor: string;
+  ordem: number;
+}): Promise<ApiEnvelope<AtualizacaoTag>> {
+  const response = await fetch("/api/admin/atualizacoes/tags", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<AtualizacaoTag>(response);
+}
+
+export async function atualizarTagAtualizacao(
+  id: string,
+  dados: { nome: string; cor: string; ordem: number; ativo: boolean }
+): Promise<ApiEnvelope<AtualizacaoTag>> {
+  const response = await fetch(`/api/admin/atualizacoes/tags/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<AtualizacaoTag>(response);
+}
+
+export async function excluirTagAtualizacao(
+  id: string
+): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/atualizacoes/tags/${id}`, {
+    method: "DELETE",
+  });
+  return parseResponse<null>(response);
+}
+
+export async function listarAtualizacoesAdmin(): Promise<Atualizacao[]> {
+  const response = await fetch("/api/admin/atualizacoes");
+  const body = await parseResponse<Atualizacao[]>(response);
+  return body.data ?? [];
+}
+
+export interface SalvarAtualizacaoDados {
+  versao: string;
+  titulo: string;
+  descricao: string;
+  publicadoEm: string;
+  publicado: boolean;
+  ordem: number;
+  tagIds: string[];
+  itens: { tipo: TipoAtualizacaoItem; texto: string }[];
+}
+
+export async function criarAtualizacao(
+  dados: SalvarAtualizacaoDados
+): Promise<ApiEnvelope<Atualizacao>> {
+  const response = await fetch("/api/admin/atualizacoes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<Atualizacao>(response);
+}
+
+export async function atualizarAtualizacao(
+  id: string,
+  dados: SalvarAtualizacaoDados
+): Promise<ApiEnvelope<Atualizacao>> {
+  const response = await fetch(`/api/admin/atualizacoes/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<Atualizacao>(response);
+}
+
+export async function excluirAtualizacao(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/atualizacoes/${id}`, {
+    method: "DELETE",
+  });
+  return parseResponse<null>(response);
 }
