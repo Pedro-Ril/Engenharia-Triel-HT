@@ -1,0 +1,39 @@
+/*
+ * FormGrid usa align-items:start (não estica os cards para a
+ * mesma altura), então cada card de um par gráfico+tabela
+ * fixa sua própria altura aqui, com rolagem interna quando o
+ * conteúdo não cabe — assim os dois lados sempre ficam do
+ * mesmo tamanho, independente de quantas linhas/módulos existam.
+ */
+.painelConteudo {
+  width: 100%;
+  height: 360px;
+}
+
+/*
+ * Só as tabelas precisam rolar (o número de linhas varia). Os
+ * gráficos recebem altura fixa em pixels direto no
+ * ResponsiveContainer — nunca "transbordam" de verdade, então
+ * overflow:auto neles só arriscava abrir uma barra de rolagem
+ * fantasma por 1px de diferença de arredondamento.
+ */
+.painelRolavel {
+  overflow-y: auto;
+}
+
+.cabecalhoFixo {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.painelVazio {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  text-align: center;
+}

@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Download,
   LogIn,
   LogOut,
@@ -156,27 +155,46 @@ export default function Sidebar({
           const SetorIcon = resolverIcone(setor.icone);
           const fechado = open && !setoresAbertos.has(setor.id);
 
-          return (
-            <div key={setor.id} className={styles.setorGrupo}>
-              {open && (
+          if (!open) {
+            return (
+              <div key={setor.id} className={styles.setorGrupo}>
                 <button
                   type="button"
-                  className={styles.setorHeader}
-                  onClick={() => toggleSetor(setor.id)}
+                  className={styles.menuItem}
+                  title={setor.nome}
+                  onClick={() => {
+                    setSetoresAbertos((atual) => new Set(atual).add(setor.id));
+                    setOpen(true);
+                  }}
                 >
                   <span className={styles.menuIcon}>
-                    <SetorIcon size={16} />
+                    <SetorIcon size={18} />
                   </span>
-
-                  <span className={styles.setorNome}>{setor.nome}</span>
-
-                  {fechado ? (
-                    <ChevronDown size={14} />
-                  ) : (
-                    <ChevronUp size={14} />
-                  )}
                 </button>
-              )}
+              </div>
+            );
+          }
+
+          return (
+            <div key={setor.id} className={styles.setorGrupo}>
+              <button
+                type="button"
+                className={styles.setorHeader}
+                onClick={() => toggleSetor(setor.id)}
+              >
+                <span className={styles.menuIcon}>
+                  <SetorIcon size={16} />
+                </span>
+
+                <span className={styles.setorNome}>{setor.nome}</span>
+
+                <ChevronDown
+                  size={14}
+                  className={`${styles.setorChevron} ${
+                    fechado ? "" : styles.setorChevronAberto
+                  }`}
+                />
+              </button>
 
               {!fechado &&
                 setor.modulos.map((modulo) => {

@@ -10,6 +10,18 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -32,6 +44,7 @@ import { resolverIcone } from "@/lib/icons/icon-registry";
 
 import { buscarMinhaConta } from "../services/minhaConta.service";
 import type { MinhaContaData } from "../types/minhaConta.types";
+import styles from "./MinhaConta.module.css";
 
 const motivosFalha: Record<string, string> = {
   credenciais_invalidas: "Usuário ou senha em branco",
@@ -82,6 +95,15 @@ export function MinhaContaPage() {
   const { perfil, historico, acessosModulos } = dados;
   const totalSucessos = historico.filter((item) => item.sucesso).length;
 
+  const dadosAcessosGrafico = [...acessosModulos]
+    .sort((a, b) => b.totalAcessos - a.totalAcessos)
+    .map((item) => ({ nome: item.moduloNome, total: item.totalAcessos }));
+
+  const dadosLoginGrafico = [
+    { label: "Sucesso", total: totalSucessos, cor: "#166534" },
+    { label: "Falha", total: historico.length - totalSucessos, cor: "#b71c1c" },
+  ].filter((item) => item.total > 0);
+
   return (
     <PageContainer>
       <PageHeader
@@ -114,6 +136,7 @@ export function MinhaContaPage() {
         <StatCard
           label="Perfil"
           value={perfil.ehAdministrador ? "Administrador" : "Usuário"}
+          description="Definido pelo grupo do Active Directory."
           icon={<ShieldCheck />}
           variant={perfil.ehAdministrador ? "info" : "neutral"}
         />
@@ -126,102 +149,171 @@ export function MinhaContaPage() {
         />
       </FormGrid>
 
-      <Card
-        title="Acessos por módulo"
-        description="Quantas vezes você abriu cada ferramenta liberada para o seu usuário."
-      >
-        {acessosModulos.length === 0 ? (
-          <p>Nenhuma ferramenta liberada para o seu usuário ainda.</p>
-        ) : (
-          <Table minWidth={560}>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Módulo</TableHeaderCell>
-                <TableHeaderCell align="center">Acessos</TableHeaderCell>
-                <TableHeaderCell>Último acesso</TableHeaderCell>
-              </TableRow>
-            </TableHead>
+      <FormGrid columns={2}>
+        <Card
+          title="Acessos por módulo"
+          description="Ferramentas mais utilizadas por você."
+        >
+          <div className={styles.painelConteudo}>
+            {dadosAcessosGrafico.length === 0 ? (
+              <div className={styles.painelVazio}>
+                Nenhuma ferramenta acessada ainda.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={360}>
+                <BarChart data={dadosAcessosGrafico} layout="vertical" margin={{ left: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis type="category" dataKey="nome" width={150} tick={{ fontSize: 12 }} />
+                  <Tooltip cursor={false} />
+                  <Bar dataKey="total" name="Acessos" fill="#b71c1c" radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
 
-            <TableBody>
-              {acessosModulos.map((item) => {
-                const ModuloIcon = resolverIcone(item.moduloIcone);
-
-                return (
-                  <TableRow key={item.moduloId}>
-                    <TableCell>
-                      <Stack direction="row" gap={8} align="center">
-                        <ModuloIcon size={16} />
-                        {item.moduloNome}
-                      </Stack>
-                    </TableCell>
-
-                    <TableCell align="center">{item.totalAcessos}</TableCell>
-
-                    <TableCell>{formatarData(item.ultimoAcesso)}</TableCell>
+        <Card
+          title="Detalhe de acessos por módulo"
+          description="Quantas vezes você abriu cada ferramenta liberada para o seu usuário."
+        >
+          <div className={`${styles.painelConteudo} ${styles.painelRolavel}`}>
+            {acessosModulos.length === 0 ? (
+              <div className={styles.painelVazio}>
+                Nenhuma ferramenta liberada para o seu usuário ainda.
+              </div>
+            ) : (
+              <Table minWidth={420}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell className={styles.cabecalhoFixo}>Módulo</TableHeaderCell>
+                    <TableHeaderCell align="center" className={styles.cabecalhoFixo}>
+                      Acessos
+                    </TableHeaderCell>
+                    <TableHeaderCell className={styles.cabecalhoFixo}>
+                      Último acesso
+                    </TableHeaderCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+                </TableHead>
 
-      <Card
-        title="Histórico de acessos"
-        description="Últimas 50 tentativas de login com o seu usuário."
-      >
-        {historico.length === 0 ? (
-          <p>Nenhum registro encontrado.</p>
-        ) : (
-          <Table minWidth={560}>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell align="center">Status</TableHeaderCell>
-                <TableHeaderCell>Data</TableHeaderCell>
-                <TableHeaderCell>Detalhe</TableHeaderCell>
-                <TableHeaderCell>Origem</TableHeaderCell>
-              </TableRow>
-            </TableHead>
+                <TableBody>
+                  {acessosModulos.map((item) => {
+                    const ModuloIcon = resolverIcone(item.moduloIcone);
 
-            <TableBody>
-              {historico.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell align="center">
-                    {item.sucesso ? (
-                      <CheckCircle2
-                        size={18}
-                        color="#16a34a"
-                        aria-label="Login bem-sucedido"
-                      />
-                    ) : (
-                      <XCircle
-                        size={18}
-                        color="#c62828"
-                        aria-label="Login com falha"
-                      />
-                    )}
-                  </TableCell>
+                    return (
+                      <TableRow key={item.moduloId}>
+                        <TableCell>
+                          <Stack direction="row" gap={8} align="center">
+                            <ModuloIcon size={16} />
+                            {item.moduloNome}
+                          </Stack>
+                        </TableCell>
 
-                  <TableCell>{formatarData(item.criadoEm)}</TableCell>
+                        <TableCell align="center">{item.totalAcessos}</TableCell>
 
-                  <TableCell>
-                    {item.sucesso ? (
-                      <Badge variant="success">Login realizado</Badge>
-                    ) : (
-                      <Badge variant="danger">
-                        {motivosFalha[item.motivoFalha ?? ""] ??
-                          "Falha no login"}
-                      </Badge>
-                    )}
-                  </TableCell>
+                        <TableCell>{formatarData(item.ultimoAcesso)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </Card>
+      </FormGrid>
 
-                  <TableCell>{item.ipOrigem ?? "—"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+      <FormGrid columns={2}>
+        <Card
+          title="Logins"
+          description="Sucessos x falhas nas últimas tentativas registradas."
+        >
+          <div className={styles.painelConteudo}>
+            {dadosLoginGrafico.length === 0 ? (
+              <div className={styles.painelVazio}>Nenhum login registrado ainda.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={360}>
+                <PieChart>
+                  <Pie
+                    data={dadosLoginGrafico}
+                    dataKey="total"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    label
+                  >
+                    {dadosLoginGrafico.map((entry) => (
+                      <Cell key={entry.label} fill={entry.cor} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
+        <Card
+          title="Histórico de acessos"
+          description="Últimas 50 tentativas de login com o seu usuário."
+        >
+          <div className={`${styles.painelConteudo} ${styles.painelRolavel}`}>
+            {historico.length === 0 ? (
+              <div className={styles.painelVazio}>Nenhum registro encontrado.</div>
+            ) : (
+              <Table minWidth={420}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell align="center" className={styles.cabecalhoFixo}>
+                      Status
+                    </TableHeaderCell>
+                    <TableHeaderCell className={styles.cabecalhoFixo}>Data</TableHeaderCell>
+                    <TableHeaderCell className={styles.cabecalhoFixo}>Detalhe</TableHeaderCell>
+                    <TableHeaderCell className={styles.cabecalhoFixo}>Origem</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {historico.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell align="center">
+                        {item.sucesso ? (
+                          <CheckCircle2
+                            size={18}
+                            color="#16a34a"
+                            aria-label="Login bem-sucedido"
+                          />
+                        ) : (
+                          <XCircle
+                            size={18}
+                            color="#c62828"
+                            aria-label="Login com falha"
+                          />
+                        )}
+                      </TableCell>
+
+                      <TableCell>{formatarData(item.criadoEm)}</TableCell>
+
+                      <TableCell>
+                        {item.sucesso ? (
+                          <Badge variant="success">Login realizado</Badge>
+                        ) : (
+                          <Badge variant="danger">
+                            {motivosFalha[item.motivoFalha ?? ""] ??
+                              "Falha no login"}
+                          </Badge>
+                        )}
+                      </TableCell>
+
+                      <TableCell>{item.ipOrigem ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </Card>
+      </FormGrid>
     </PageContainer>
   );
 }

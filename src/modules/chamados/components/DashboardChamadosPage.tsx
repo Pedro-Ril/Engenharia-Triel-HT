@@ -35,9 +35,18 @@ import type { EstatisticasChamados, SetorChamado } from "../types/chamados.types
 import { PRIORIDADE_LABELS, STATUS_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
 
+interface FiltrosDashboard {
+  setorId: string;
+  empresa: string;
+  dataInicial: string;
+  dataFinal: string;
+}
+
 interface DashboardChamadosPageProps {
   setores: SetorChamado[];
   empresas: string[];
+  fullscreen?: boolean;
+  filtrosIniciais?: FiltrosDashboard;
 }
 
 const CORES_STATUS: Record<string, string> = {
@@ -71,11 +80,16 @@ function formatarHoras(horas: number | null): string {
   return `${(horas / 24).toFixed(1)} d`;
 }
 
-export function DashboardChamadosPage({ setores, empresas }: DashboardChamadosPageProps) {
-  const [setorId, setSetorId] = useState("");
-  const [empresa, setEmpresa] = useState("");
-  const [dataInicial, setDataInicial] = useState("");
-  const [dataFinal, setDataFinal] = useState("");
+export function DashboardChamadosPage({
+  setores,
+  empresas,
+  fullscreen = false,
+  filtrosIniciais,
+}: DashboardChamadosPageProps) {
+  const [setorId, setSetorId] = useState(filtrosIniciais?.setorId ?? "");
+  const [empresa, setEmpresa] = useState(filtrosIniciais?.empresa ?? "");
+  const [dataInicial, setDataInicial] = useState(filtrosIniciais?.dataInicial ?? "");
+  const [dataFinal, setDataFinal] = useState(filtrosIniciais?.dataFinal ?? "");
 
   const [dados, setDados] = useState<EstatisticasChamados | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -144,6 +158,207 @@ export function DashboardChamadosPage({ setores, empresas }: DashboardChamadosPa
     [empresas]
   );
 
+  const setorFiltradoNome = useMemo(
+    () => setores.find((setor) => setor.id === setorId)?.nome,
+    [setores, setorId]
+  );
+
+  if (carregando || !dados) {
+    return fullscreen ? (
+      <div className={styles.tvDashboard}>
+        <Loader label="Carregando indicadores..." />
+      </div>
+    ) : (
+      <PageContainer>
+        <PageHeader
+          title="Dashboard de chamados"
+          description="Indicadores consolidados dos setores que você atende."
+        />
+        <Card>
+          <Loader label="Carregando indicadores..." />
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  const graficoStatus = (
+    <PieChart>
+      <Pie
+        data={dadosStatus}
+        dataKey="total"
+        nameKey="label"
+        cx="50%"
+        cy="50%"
+        outerRadius="80%"
+        label
+      >
+        {dadosStatus.map((entry) => (
+          <Cell key={entry.status} fill={CORES_STATUS[entry.status]} />
+        ))}
+      </Pie>
+      <Tooltip />
+      <Legend />
+    </PieChart>
+  );
+
+  const graficoPrioridade = (
+    <BarChart data={dadosPrioridade}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="label" />
+      <YAxis allowDecimals={false} />
+      <Tooltip />
+      <Bar dataKey="total" name="Chamados" radius={[8, 8, 0, 0]}>
+        {dadosPrioridade.map((entry) => (
+          <Cell key={entry.prioridade} fill={CORES_PRIORIDADE[entry.prioridade]} />
+        ))}
+      </Bar>
+    </BarChart>
+  );
+
+  const graficoPorDia = (
+    <LineChart data={dados.porDia}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="dia" />
+      <YAxis allowDecimals={false} />
+      <Tooltip />
+      <Line type="monotone" dataKey="total" name="Chamados" stroke="#b71c1c" strokeWidth={3} />
+    </LineChart>
+  );
+
+  const graficoPorSetor = (
+    <BarChart data={dados.porSetor} layout="vertical" margin={{ left: 24 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" allowDecimals={false} />
+      <YAxis type="category" dataKey="setorNome" width={160} tick={{ fontSize: 12 }} />
+      <Tooltip />
+      <Bar dataKey="total" name="Chamados" radius={[0, 8, 8, 0]}>
+        {dados.porSetor.map((entry, index) => (
+          <Cell key={entry.setorId} fill={CORES_SETOR[index % CORES_SETOR.length]} />
+        ))}
+      </Bar>
+    </BarChart>
+  );
+
+  const graficoPorAtendente = (
+    <BarChart data={dados.porAtendente} layout="vertical" margin={{ left: 24 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" allowDecimals={false} />
+      <YAxis type="category" dataKey="atendenteNome" width={160} tick={{ fontSize: 12 }} />
+      <Tooltip />
+      <Bar dataKey="total" name="Chamados" fill="#3949ab" radius={[0, 8, 8, 0]} />
+    </BarChart>
+  );
+
+  const graficoPorEmpresa = (
+    <BarChart data={dados.porEmpresa} layout="vertical" margin={{ left: 24 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" allowDecimals={false} />
+      <YAxis type="category" dataKey="empresa" width={160} tick={{ fontSize: 12 }} />
+      <Tooltip />
+      <Bar dataKey="total" name="Chamados" fill="#00897b" radius={[0, 8, 8, 0]} />
+    </BarChart>
+  );
+
+  if (fullscreen) {
+    return (
+      <div className={styles.tvDashboard}>
+        <div className={styles.tvHeader}>
+          <h1 className={styles.tvTitulo}>Dashboard de chamados</h1>
+          {(setorFiltradoNome || empresa) && (
+            <span className={styles.tvSubtitulo}>
+              {[setorFiltradoNome, empresa].filter(Boolean).join(" · ")}
+            </span>
+          )}
+        </div>
+
+        <div className={styles.tvStatsRow}>
+          <div className={styles.tvStatTile}>
+            <span className={styles.tvStatLabel}>Total</span>
+            <strong className={styles.tvStatValor}>{dados.totais.total}</strong>
+          </div>
+          <div className={styles.tvStatTile}>
+            <span className={styles.tvStatLabel}>Abertos</span>
+            <strong className={styles.tvStatValor}>{dados.totais.aberto}</strong>
+          </div>
+          <div className={styles.tvStatTile}>
+            <span className={styles.tvStatLabel}>Em andamento</span>
+            <strong className={styles.tvStatValor}>{dados.totais.emAndamento}</strong>
+          </div>
+          <div className={styles.tvStatTile}>
+            <span className={styles.tvStatLabel}>Aguardando confirmação</span>
+            <strong className={styles.tvStatValor}>{dados.totais.aguardandoConfirmacao}</strong>
+          </div>
+          <div className={styles.tvStatTile}>
+            <span className={styles.tvStatLabel}>Resolvidos</span>
+            <strong className={styles.tvStatValor}>{dados.totais.resolvido}</strong>
+          </div>
+          <div className={styles.tvStatTile}>
+            <span className={styles.tvStatLabel}>Tempo médio de resolução</span>
+            <strong className={styles.tvStatValor}>
+              {formatarHoras(dados.tempoMedioResolucaoHoras)}
+            </strong>
+          </div>
+        </div>
+
+        <div className={styles.tvChartsGrid}>
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por status</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoStatus}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por prioridade</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPrioridade}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados abertos por dia</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPorDia}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por setor</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPorSetor}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por atendente</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPorAtendente}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por empresa</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPorEmpresa}
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <PageContainer>
       <Breadcrumb
@@ -179,163 +394,92 @@ export function DashboardChamadosPage({ setores, empresas }: DashboardChamadosPa
         </FormGrid>
       </Card>
 
-      {carregando || !dados ? (
-        <Card>
-          <Loader label="Carregando indicadores..." />
+      <Stack gap={20}>
+        <FormGrid columns={4}>
+          <StatCard label="Total" value={dados.totais.total} icon={<Inbox />} />
+          <StatCard
+            label="Abertos"
+            value={dados.totais.aberto}
+            variant="info"
+            icon={<Inbox />}
+          />
+          <StatCard
+            label="Em andamento"
+            value={dados.totais.emAndamento}
+            variant="warning"
+            icon={<Clock3 />}
+          />
+          <StatCard
+            label="Aguardando confirmação"
+            value={dados.totais.aguardandoConfirmacao}
+            variant="warning"
+            icon={<Clock3 />}
+          />
+          <StatCard
+            label="Resolvidos"
+            value={dados.totais.resolvido}
+            variant="success"
+            icon={<BarChart3 />}
+          />
+          <StatCard
+            label="Tempo médio de resolução"
+            value={formatarHoras(dados.tempoMedioResolucaoHoras)}
+            icon={<Clock3 />}
+          />
+        </FormGrid>
+
+        <FormGrid columns={2}>
+          <Card title="Chamados por status">
+            <div className={styles.chartWrapper}>
+              <ResponsiveContainer width="100%" height={280}>
+                {graficoStatus}
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Chamados por prioridade">
+            <div className={styles.chartWrapper}>
+              <ResponsiveContainer width="100%" height={280}>
+                {graficoPrioridade}
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </FormGrid>
+
+        <Card title="Chamados abertos por dia">
+          <div className={styles.chartWrapper}>
+            <ResponsiveContainer width="100%" height={280}>
+              {graficoPorDia}
+            </ResponsiveContainer>
+          </div>
         </Card>
-      ) : (
-        <Stack gap={20}>
-          <FormGrid columns={4}>
-            <StatCard label="Total" value={dados.totais.total} icon={<Inbox />} />
-            <StatCard
-              label="Abertos"
-              value={dados.totais.aberto}
-              variant="info"
-              icon={<Inbox />}
-            />
-            <StatCard
-              label="Em andamento"
-              value={dados.totais.emAndamento}
-              variant="warning"
-              icon={<Clock3 />}
-            />
-            <StatCard
-              label="Aguardando confirmação"
-              value={dados.totais.aguardandoConfirmacao}
-              variant="warning"
-              icon={<Clock3 />}
-            />
-            <StatCard
-              label="Resolvidos"
-              value={dados.totais.resolvido}
-              variant="success"
-              icon={<BarChart3 />}
-            />
-            <StatCard
-              label="Tempo médio de resolução"
-              value={formatarHoras(dados.tempoMedioResolucaoHoras)}
-              icon={<Clock3 />}
-            />
-          </FormGrid>
 
-          <FormGrid columns={2}>
-            <Card title="Chamados por status">
-              <div className={styles.chartWrapper}>
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={dadosStatus}
-                      dataKey="total"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label
-                    >
-                      {dadosStatus.map((entry) => (
-                        <Cell key={entry.status} fill={CORES_STATUS[entry.status]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card title="Chamados por prioridade">
-              <div className={styles.chartWrapper}>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={dadosPrioridade}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="total" name="Chamados" radius={[8, 8, 0, 0]}>
-                      {dadosPrioridade.map((entry) => (
-                        <Cell key={entry.prioridade} fill={CORES_PRIORIDADE[entry.prioridade]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </FormGrid>
-
-          <Card title="Chamados abertos por dia">
+        <FormGrid columns={2}>
+          <Card title="Chamados por setor">
             <div className={styles.chartWrapper}>
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={dados.porDia}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dia" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="total"
-                    name="Chamados"
-                    stroke="#b71c1c"
-                    strokeWidth={3}
-                  />
-                </LineChart>
+                {graficoPorSetor}
               </ResponsiveContainer>
             </div>
           </Card>
 
-          <FormGrid columns={2}>
-            <Card title="Chamados por setor">
-              <div className={styles.chartWrapper}>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={dados.porSetor} layout="vertical" margin={{ left: 24 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" allowDecimals={false} />
-                    <YAxis type="category" dataKey="setorNome" width={160} tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="total" name="Chamados" radius={[0, 8, 8, 0]}>
-                      {dados.porSetor.map((entry, index) => (
-                        <Cell key={entry.setorId} fill={CORES_SETOR[index % CORES_SETOR.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card title="Chamados por atendente">
-              <div className={styles.chartWrapper}>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={dados.porAtendente} layout="vertical" margin={{ left: 24 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" allowDecimals={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="atendenteNome"
-                      width={160}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip />
-                    <Bar dataKey="total" name="Chamados" fill="#3949ab" radius={[0, 8, 8, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </FormGrid>
-
-          <Card title="Chamados por empresa">
+          <Card title="Chamados por atendente">
             <div className={styles.chartWrapper}>
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={dados.porEmpresa} layout="vertical" margin={{ left: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" allowDecimals={false} />
-                  <YAxis type="category" dataKey="empresa" width={160} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Bar dataKey="total" name="Chamados" fill="#00897b" radius={[0, 8, 8, 0]} />
-                </BarChart>
+                {graficoPorAtendente}
               </ResponsiveContainer>
             </div>
           </Card>
-        </Stack>
-      )}
+        </FormGrid>
+
+        <Card title="Chamados por empresa">
+          <div className={styles.chartWrapper}>
+            <ResponsiveContainer width="100%" height={280}>
+              {graficoPorEmpresa}
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </Stack>
     </PageContainer>
   );
 }
