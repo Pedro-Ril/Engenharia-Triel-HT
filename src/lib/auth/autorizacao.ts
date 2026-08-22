@@ -155,6 +155,16 @@ export async function podeAcessarModulo(
             AND m.[em_desenvolvimento] = 0
             AND p.[usuario_id] = @usuarioId
         ) THEN 1
+        WHEN EXISTS (
+          SELECT 1
+          FROM dbo.portal_modulos AS m
+          INNER JOIN dbo.portal_chamados_atendentes AS ca
+            ON ca.[usuario_id] = @usuarioId
+          WHERE m.[chave] = @moduloChave
+            AND m.[ativo] = 1
+            AND m.[em_desenvolvimento] = 0
+            AND m.[restrito_atendente_chamados] = 1
+        ) THEN 1
         ELSE 0
       END
       AS BIT
@@ -340,6 +350,14 @@ export const getSetoresComModulosPermitidos = cache(async (
               WHERE p.[modulo_id] = m.[id]
                 AND p.[usuario_id] = @usuarioId
             )
+            OR (
+              m.[restrito_atendente_chamados] = 1
+              AND EXISTS (
+                SELECT 1
+                FROM dbo.portal_chamados_atendentes AS ca
+                WHERE ca.[usuario_id] = @usuarioId
+              )
+            )
           )
         )
       )
@@ -418,6 +436,11 @@ export const getTodosSetoresComStatusAcesso = cache(async (
             FROM dbo.portal_permissoes AS p
             WHERE p.[modulo_id] = m.[id]
               AND p.[usuario_id] = @usuarioId
+          ) THEN 1
+          WHEN m.[restrito_atendente_chamados] = 1 AND EXISTS (
+            SELECT 1
+            FROM dbo.portal_chamados_atendentes AS ca
+            WHERE ca.[usuario_id] = @usuarioId
           ) THEN 1
           ELSE 0
         END

@@ -220,7 +220,8 @@ export default function Sidebar({
         <nav className={styles.footerMenu}>
           {menuRodape.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.path;
+            const active =
+              pathname === item.path || pathname?.startsWith(`${item.path}/`);
 
             return (
               <AppLink

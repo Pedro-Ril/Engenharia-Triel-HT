@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -24,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, ChevronDown, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -34,6 +28,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DateInput } from "@/components/ui/DateInput";
 import { Drawer } from "@/components/ui/Drawer";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { IconButton } from "@/components/ui/IconButton";
@@ -198,20 +193,11 @@ function TagBadge({ tag }: { tag: Pick<AtualizacaoTag, "nome" | "cor"> }) {
   );
 }
 
-interface PosicaoDropdown {
-  top: number;
-  left: number;
-  width: number;
-}
+const OPCOES_TIPO_ITEM = (Object.keys(TIPO_ESTILOS) as TipoAtualizacaoItem[]).map((tipo) => ({
+  value: tipo,
+  label: TIPO_ESTILOS[tipo].label,
+}));
 
-/*
- * `<select>` nativo não permite estilizar a lista aberta (o
- * navegador renderiza o popup fora do controle do CSS) — por
- * isso, só para este campo, usamos um dropdown com popover
- * próprio, seguindo o mesmo visual que já existe no DropdownMenu
- * (menu flutuante com sombra) combinado com a caixa do Select
- * (borda arredondada, seta) para o gatilho.
- */
 function SelectTipoItem({
   valor,
   onChange,
@@ -219,118 +205,13 @@ function SelectTipoItem({
   valor: TipoAtualizacaoItem;
   onChange: (tipo: TipoAtualizacaoItem) => void;
 }) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const [mounted, setMounted] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [posicao, setPosicao] = useState<PosicaoDropdown | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) {
-      setPosicao(null);
-      return;
-    }
-
-    function atualizarPosicao() {
-      const trigger = triggerRef.current;
-      if (!trigger) return;
-
-      const rect = trigger.getBoundingClientRect();
-      setPosicao({ top: rect.bottom + 6, left: rect.left, width: rect.width });
-    }
-
-    const frame = window.requestAnimationFrame(atualizarPosicao);
-    window.addEventListener("resize", atualizarPosicao);
-    window.addEventListener("scroll", atualizarPosicao, true);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", atualizarPosicao);
-      window.removeEventListener("scroll", atualizarPosicao, true);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handleClickFora(event: MouseEvent) {
-      const alvo = event.target as Node;
-      if (!triggerRef.current?.contains(alvo) && !menuRef.current?.contains(alvo)) {
-        setOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickFora);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickFora);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [open]);
-
   return (
     <div className={styles.tipoSelect}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={styles.tipoDropdownTrigger}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((atual) => !atual)}
-      >
-        <span>{TIPO_ESTILOS[valor].label}</span>
-        <ChevronDown
-          size={16}
-          className={styles.tipoDropdownChevron}
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        />
-      </button>
-
-      {mounted &&
-        open &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="listbox"
-            className={styles.tipoDropdownMenu}
-            style={
-              posicao
-                ? { top: posicao.top, left: posicao.left, width: posicao.width }
-                : { visibility: "hidden" }
-            }
-          >
-            {(Object.keys(TIPO_ESTILOS) as TipoAtualizacaoItem[]).map((tipo) => (
-              <button
-                key={tipo}
-                type="button"
-                role="option"
-                aria-selected={tipo === valor}
-                className={styles.tipoDropdownItem}
-                onClick={() => {
-                  onChange(tipo);
-                  setOpen(false);
-                }}
-              >
-                <span>{TIPO_ESTILOS[tipo].label}</span>
-                {tipo === valor && <Check size={15} aria-hidden="true" />}
-              </button>
-            ))}
-          </div>,
-          document.body
-        )}
+      <Dropdown
+        value={valor}
+        options={OPCOES_TIPO_ITEM}
+        onValueChange={(novoValor) => onChange(novoValor as TipoAtualizacaoItem)}
+      />
     </div>
   );
 }

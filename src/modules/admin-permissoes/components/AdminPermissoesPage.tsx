@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Boxes,
   Factory,
+  Headset,
   Home,
   KeyRound,
   Layers,
@@ -38,6 +39,7 @@ import type { ToastState } from "../types/toast.types";
 import { AdminNavegacao } from "./AdminNavegacao";
 import type { GrupoNavegacaoAdmin } from "./AdminNavegacao";
 import styles from "./AdminPermissoes.module.css";
+import { AtendentesChamadosPainel } from "./AtendentesChamadosPainel";
 import { AtualizacoesPainel } from "./AtualizacoesPainel";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
@@ -82,6 +84,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "atualizacoes",
         label: "Atualizações",
         icon: <Megaphone size={16} />,
+      },
+      {
+        valor: "chamados",
+        label: "Chamados",
+        icon: <Headset size={16} />,
       },
     ],
   },
@@ -287,6 +294,10 @@ export function AdminPermissoesPage() {
 
           {secao === "atualizacoes" && (
             <AtualizacoesPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "chamados" && (
+            <AtendentesChamadosPainel onFeedback={mostrarFeedback} />
           )}
         </div>
       </div>

@@ -1,0 +1,80 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Home, LifeBuoy, ShieldAlert } from "lucide-react";
+
+import { Alert } from "@/components/ui/Alert";
+import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Card } from "@/components/ui/Card";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
+import { listarAtendentes } from "@/lib/chamados/atendentes";
+import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
+import { buscarChamadoPorNumero } from "@/lib/chamados/chamados";
+import { ChamadoDetalhePage } from "@/modules/chamados/components/ChamadoDetalhePage";
+
+interface PageProps {
+  params: Promise<{ numero: string }>;
+  searchParams: Promise<{ nome?: string }>;
+}
+
+export default async function Page({ params, searchParams }: PageProps) {
+  const [{ numero: numeroParam }, { nome }] = await Promise.all([params, searchParams]);
+  const numero = Number(numeroParam);
+
+  if (!Number.isInteger(numero) || numero <= 0) {
+    notFound();
+  }
+
+  const [usuario, chamado] = await Promise.all([
+    getUsuarioAutenticado(),
+    buscarChamadoPorNumero(numero),
+  ]);
+
+  if (!chamado) {
+    notFound();
+  }
+
+  const nomeConfirmado = nome ?? null;
+  const { podeVer, ehAtendente } = await verificarAcessoChamado(
+    chamado,
+    usuario,
+    nomeConfirmado
+  );
+
+  if (!podeVer) {
+    return (
+      <PageContainer>
+        <Breadcrumb
+          items={[
+            { label: "Início", href: "/", icon: <Home size={14} /> },
+            { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
+            { label: `Nº ${numero}`, current: true },
+          ]}
+        />
+
+        <Card>
+          <Alert variant="danger" icon={<ShieldAlert />} title="Sem acesso a este chamado">
+            Confira se o número e o nome informados estão corretos, ou use{" "}
+            <Link href="/chamados/consultar">Consultar chamado</Link> novamente.
+          </Alert>
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  const mensagensVisiveis = ehAtendente
+    ? chamado.mensagens
+    : chamado.mensagens.filter((mensagem) => !mensagem.interno);
+
+  const atendentesDoSetor = ehAtendente
+    ? (await listarAtendentes()).filter((atendente) => atendente.setorId === chamado.setorId)
+    : [];
+
+  return (
+    <ChamadoDetalhePage
+      chamado={{ ...chamado, mensagens: mensagensVisiveis, ehAtendente }}
+      nomeConfirmado={nomeConfirmado}
+      atendentesDoSetor={atendentesDoSetor}
+    />
+  );
+}

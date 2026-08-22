@@ -25,6 +25,7 @@ export interface PortalModulo {
   publicoSemLogin: boolean;
   publicoAutenticado: boolean;
   emDesenvolvimento: boolean;
+  restritoAtendenteChamados: boolean;
   ativo: boolean;
   ordem: number;
 }
@@ -199,6 +200,7 @@ const moduloSelectColumns = `
   CAST([publico_sem_login] AS BIT) AS [publicoSemLogin],
   CAST([publico_autenticado] AS BIT) AS [publicoAutenticado],
   CAST([em_desenvolvimento] AS BIT) AS [emDesenvolvimento],
+  CAST([restrito_atendente_chamados] AS BIT) AS [restritoAtendenteChamados],
   CAST([ativo] AS BIT) AS [ativo],
   [ordem]
 `;
@@ -212,6 +214,7 @@ const moduloOutputColumns = `
   CAST(INSERTED.[publico_sem_login] AS BIT) AS [publicoSemLogin],
   CAST(INSERTED.[publico_autenticado] AS BIT) AS [publicoAutenticado],
   CAST(INSERTED.[em_desenvolvimento] AS BIT) AS [emDesenvolvimento],
+  CAST(INSERTED.[restrito_atendente_chamados] AS BIT) AS [restritoAtendenteChamados],
   CAST(INSERTED.[ativo] AS BIT) AS [ativo],
   INSERTED.[ordem]
 `;
@@ -294,6 +297,7 @@ export async function criarModulo(params: {
   publicoSemLogin: boolean;
   publicoAutenticado: boolean;
   emDesenvolvimento: boolean;
+  restritoAtendenteChamados: boolean;
   ordem: number;
 }): Promise<PortalModulo> {
   if (params.setorIds.length === 0) {
@@ -313,13 +317,14 @@ export async function criarModulo(params: {
     insertRequest.input("publicoSemLogin", sql.Bit, params.publicoSemLogin);
     insertRequest.input("publicoAutenticado", sql.Bit, params.publicoAutenticado);
     insertRequest.input("emDesenvolvimento", sql.Bit, params.emDesenvolvimento);
+    insertRequest.input("restritoAtendenteChamados", sql.Bit, params.restritoAtendenteChamados);
     insertRequest.input("ordem", sql.Int, params.ordem);
 
     const result = await insertRequest.query<PortalModuloRow>(`
       INSERT INTO dbo.portal_modulos
-        ([chave], [nome], [path], [icone], [publico_sem_login], [publico_autenticado], [em_desenvolvimento], [ordem])
+        ([chave], [nome], [path], [icone], [publico_sem_login], [publico_autenticado], [em_desenvolvimento], [restrito_atendente_chamados], [ordem])
       OUTPUT ${moduloOutputColumns}
-      VALUES (@chave, @nome, @path, @icone, @publicoSemLogin, @publicoAutenticado, @emDesenvolvimento, @ordem);
+      VALUES (@chave, @nome, @path, @icone, @publicoSemLogin, @publicoAutenticado, @emDesenvolvimento, @restritoAtendenteChamados, @ordem);
     `);
 
     const novoModulo = result.recordset[0];
@@ -356,6 +361,7 @@ export async function atualizarModulo(
     publicoSemLogin: boolean;
     publicoAutenticado: boolean;
     emDesenvolvimento: boolean;
+    restritoAtendenteChamados: boolean;
     ativo: boolean;
     ordem: number;
     setorIds: string[];
@@ -378,6 +384,7 @@ export async function atualizarModulo(
     updateRequest.input("publicoSemLogin", sql.Bit, params.publicoSemLogin);
     updateRequest.input("publicoAutenticado", sql.Bit, params.publicoAutenticado);
     updateRequest.input("emDesenvolvimento", sql.Bit, params.emDesenvolvimento);
+    updateRequest.input("restritoAtendenteChamados", sql.Bit, params.restritoAtendenteChamados);
     updateRequest.input("ativo", sql.Bit, params.ativo);
     updateRequest.input("ordem", sql.Int, params.ordem);
 
@@ -390,6 +397,7 @@ export async function atualizarModulo(
         [publico_sem_login] = @publicoSemLogin,
         [publico_autenticado] = @publicoAutenticado,
         [em_desenvolvimento] = @emDesenvolvimento,
+        [restrito_atendente_chamados] = @restritoAtendenteChamados,
         [ativo] = @ativo,
         [ordem] = @ordem,
         [atualizado_em] = SYSDATETIME()

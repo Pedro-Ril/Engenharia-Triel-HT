@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import { History } from "lucide-react";
+import { History, LifeBuoy } from "lucide-react";
 
 import AppLink from "@/components/AppLink";
 import { resolverIcone } from "@/lib/icons/icon-registry";
@@ -205,6 +205,32 @@ export function HomeContent({
             </div>
           </div>
         </aside>
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.suporteBanner}>
+          <span className={styles.suporteBannerIcone}>
+            <LifeBuoy size={26} />
+          </span>
+
+          <div className={styles.suporteBannerTexto}>
+            <h2 className={styles.suporteBannerTitulo}>Precisa de ajuda?</h2>
+            <p className={styles.suporteBannerDescricao}>
+              Encontrou um problema, tem uma dúvida ou precisa de suporte de
+              algum setor? Abra um chamado — não é preciso login para
+              registrar, e você acompanha o andamento pelo número recebido.
+            </p>
+          </div>
+
+          <div className={styles.suporteBannerAcoes}>
+            <AppLink href="/chamados" className={styles.primaryButton}>
+              Abrir chamado
+            </AppLink>
+            <AppLink href="/chamados/consultar" className={styles.secondaryButton}>
+              Consultar chamado
+            </AppLink>
+          </div>
+        </div>
       </section>
 
       {usuario && recentes.length > 0 && (

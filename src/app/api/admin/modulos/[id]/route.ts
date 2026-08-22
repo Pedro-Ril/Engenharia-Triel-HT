@@ -25,6 +25,7 @@ interface UpdateModuloBody {
   publicoSemLogin?: unknown;
   publicoAutenticado?: unknown;
   emDesenvolvimento?: unknown;
+  restritoAtendenteChamados?: unknown;
   ativo?: unknown;
   ordem?: unknown;
   setorIds?: unknown;
@@ -80,6 +81,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       "emDesenvolvimento",
       false
     );
+    const restritoAtendenteChamados = optionalBoolean(
+      body.restritoAtendenteChamados,
+      "restritoAtendenteChamados",
+      false
+    );
     const ativo = optionalBoolean(body.ativo, "ativo", true);
     const ordem = optionalInteger(body.ordem, "ordem", 0);
     const setorIds = requiredUuidArray(body.setorIds, "setores");
@@ -95,6 +101,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       publicoSemLogin,
       publicoAutenticado,
       emDesenvolvimento,
+      restritoAtendenteChamados,
       ativo,
       ordem,
       setorIds,

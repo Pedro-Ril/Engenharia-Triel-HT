@@ -75,6 +75,7 @@ export async function criarModulo(dados: {
   publicoSemLogin: boolean;
   publicoAutenticado: boolean;
   emDesenvolvimento: boolean;
+  restritoAtendenteChamados?: boolean;
   ordem: number;
 }): Promise<ApiEnvelope<PortalModulo>> {
   const response = await fetch("/api/admin/modulos", {
@@ -94,6 +95,7 @@ export async function atualizarModulo(
     publicoSemLogin: boolean;
     publicoAutenticado: boolean;
     emDesenvolvimento: boolean;
+    restritoAtendenteChamados: boolean;
     ativo: boolean;
     ordem: number;
     setorIds: string[];

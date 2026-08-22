@@ -41,6 +41,7 @@ interface CreateModuloBody {
   publicoSemLogin?: unknown;
   publicoAutenticado?: unknown;
   emDesenvolvimento?: unknown;
+  restritoAtendenteChamados?: unknown;
   ordem?: unknown;
 }
 
@@ -83,6 +84,11 @@ export async function POST(request: Request) {
       "emDesenvolvimento",
       false
     );
+    const restritoAtendenteChamados = optionalBoolean(
+      body.restritoAtendenteChamados,
+      "restritoAtendenteChamados",
+      false
+    );
     const ordem = optionalInteger(body.ordem, "ordem", 0);
 
     if (!path.startsWith("/")) {
@@ -98,6 +104,7 @@ export async function POST(request: Request) {
       publicoSemLogin,
       publicoAutenticado,
       emDesenvolvimento,
+      restritoAtendenteChamados,
       ordem,
     });
 

@@ -23,6 +23,16 @@ const PREFIXOS_PUBLICOS = [
    */
   "/terminal-fabrica",
   "/api/terminal-fabrica",
+  /*
+   * Chamados: qualquer pessoa abre um chamado sem precisar de
+   * login (ver src/app/chamados e o plano de implementação do
+   * módulo). `/chamados/atender` e `/api/chamados/fila`, apesar
+   * do prefixo, exigem autenticação e o papel de atendente — a
+   * checagem é feita dentro da própria rota/página
+   * (requireAtendenteChamados), não aqui.
+   */
+  "/chamados",
+  "/api/chamados",
 ];
 
 export function ehRotaPublica(pathname: string): boolean {

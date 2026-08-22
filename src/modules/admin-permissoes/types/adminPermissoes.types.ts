@@ -17,6 +17,7 @@ export interface PortalModulo {
   publicoSemLogin: boolean;
   publicoAutenticado: boolean;
   emDesenvolvimento: boolean;
+  restritoAtendenteChamados: boolean;
   ativo: boolean;
   ordem: number;
 }

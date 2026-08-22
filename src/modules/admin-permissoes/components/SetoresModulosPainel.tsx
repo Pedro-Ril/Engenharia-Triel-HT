@@ -300,6 +300,7 @@ export function SetoresModulosPainel({
         campos.publicoAutenticado ?? modulo.publicoAutenticado,
       emDesenvolvimento:
         campos.emDesenvolvimento ?? modulo.emDesenvolvimento,
+      restritoAtendenteChamados: modulo.restritoAtendenteChamados,
       ativo: campos.ativo ?? modulo.ativo,
       ordem: campos.ordem ?? modulo.ordem,
       setorIds: modulo.setorIds,
@@ -335,6 +336,7 @@ export function SetoresModulosPainel({
             publicoSemLogin: modulo.publicoSemLogin,
             publicoAutenticado: modulo.publicoAutenticado,
             emDesenvolvimento: modulo.emDesenvolvimento,
+            restritoAtendenteChamados: modulo.restritoAtendenteChamados,
             ativo: modulo.ativo,
             ordem: indice,
             setorIds: modulo.setorIds,
@@ -387,6 +389,7 @@ export function SetoresModulosPainel({
         publicoSemLogin: moduloEditando.publicoSemLogin,
         publicoAutenticado: moduloEditando.publicoAutenticado,
         emDesenvolvimento: formModuloEdicao.emDesenvolvimento,
+        restritoAtendenteChamados: moduloEditando.restritoAtendenteChamados,
         ativo: moduloEditando.ativo,
         ordem: Number(formModuloEdicao.ordem) || 0,
         setorIds: formModuloEdicao.setorIds,
