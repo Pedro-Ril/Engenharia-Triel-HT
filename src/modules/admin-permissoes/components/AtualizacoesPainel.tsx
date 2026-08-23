@@ -427,7 +427,7 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
     setAtualizacoes(comNovaOrdem);
 
     try {
-      await Promise.all(
+      const resultados = await Promise.all(
         alterados.map((item) =>
           atualizarAtualizacao(item.id, {
             versao: item.versao,
@@ -441,12 +441,18 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
           })
         )
       );
+
+      if (resultados.some((resultado) => !resultado.ok)) {
+        throw new Error("Falha ao salvar parte da nova ordem.");
+      }
     } catch {
       onFeedback(
         "danger",
         "Não foi possível salvar a nova ordem",
-        "Tente novamente em instantes."
+        "A lista foi restaurada com os dados reais do servidor — tente reordenar novamente."
       );
+
+      setAtualizacoes(await listarAtualizacoesAdmin());
     }
   }
 
@@ -758,7 +764,7 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
               />
             </Field>
 
-            <Field label="Ordem">
+            <Field label="Ordem" hint="também pode ser ajustada arrastando a lista — evite repetir o número de outro item">
               <NumberInput
                 value={novaTag.ordem}
                 onChange={(event) =>
@@ -860,7 +866,7 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
             />
           </Field>
 
-          <Field label="Ordem">
+          <Field label="Ordem" hint="também pode ser ajustada arrastando a lista — evite repetir o número de outro item">
             <NumberInput
               value={formTagEdicao.ordem}
               onChange={(event) =>

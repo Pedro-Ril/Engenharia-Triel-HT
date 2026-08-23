@@ -58,11 +58,24 @@ export async function carregarContextoAcao(
   }
 
   const usuario = await getUsuarioAutenticado();
-  const { podeVer, ehAtendente } = await verificarAcessoChamado(
+  const { podeVer, ehAtendente, bloqueadoPorTentativas } = await verificarAcessoChamado(
     chamado,
     usuario,
     nomeConfirmado
   );
+
+  if (bloqueadoPorTentativas) {
+    return {
+      contexto: null,
+      erro: NextResponse.json(
+        {
+          ok: false,
+          message: "Muitas tentativas com nome incorreto para este chamado. Tente novamente mais tarde.",
+        },
+        { status: 429 }
+      ),
+    };
+  }
 
   if (!podeVer) {
     return {

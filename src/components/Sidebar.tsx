@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -54,7 +54,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const asideRef = useRef<HTMLElement>(null);
 
   /* Pastas começam fechadas — só abrem quando o usuário clica nelas. */
   const [setoresAbertos, setSetoresAbertos] = useState<Set<string>>(
@@ -68,22 +68,19 @@ export default function Sidebar({
     }
   };
 
-  const handleMouseEnter = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
+  /* Fica aberto até o usuário clicar fora dele — não fecha sozinho por conta própria. */
+  useEffect(() => {
+    if (!open) return;
 
-  const handleMouseLeave = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
+    function handleClickFora(event: MouseEvent) {
+      if (asideRef.current && !asideRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
     }
 
-    closeTimer.current = setTimeout(() => {
-      setOpen(false);
-    }, 220);
-  };
+    document.addEventListener("mousedown", handleClickFora);
+    return () => document.removeEventListener("mousedown", handleClickFora);
+  }, [open, setOpen]);
 
   const toggleSetor = (setorId: string) => {
     setSetoresAbertos((atual) => {
@@ -104,6 +101,19 @@ export default function Sidebar({
 
     try {
       await logout();
+
+      /*
+       * Avisa outras abas abertas do mesmo navegador — sem isso,
+       * elas continuam mostrando "Conectado como X" com links
+       * habilitados até alguém tentar navegar e cair num
+       * redirecionamento confuso pro login.
+       */
+      try {
+        localStorage.setItem("portal-logout-em", String(Date.now()));
+      } catch {
+        /* localStorage indisponível (modo privado etc.) — não impede o logout desta aba. */
+      }
+
       router.push("/login");
       router.refresh();
     } finally {
@@ -113,10 +123,9 @@ export default function Sidebar({
 
   return (
     <aside
+      ref={asideRef}
       className={`${styles.sidebar} ${open ? styles.open : styles.closed}`}
       onClick={handleSidebarClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       <div className={styles.topArea}>
         <AppLink
@@ -162,6 +171,7 @@ export default function Sidebar({
                   type="button"
                   className={styles.menuItem}
                   title={setor.nome}
+                  aria-label={setor.nome}
                   onClick={() => {
                     setSetoresAbertos((atual) => new Set(atual).add(setor.id));
                     setOpen(true);
@@ -209,6 +219,7 @@ export default function Sidebar({
                         active ? styles.active : ""
                       }`}
                       title={modulo.nome}
+                      aria-label={modulo.nome}
                     >
                       <span className={styles.menuIcon}>
                         <Icon size={18} />
@@ -247,6 +258,7 @@ export default function Sidebar({
                 href={item.path}
                 className={`${styles.menuItem} ${active ? styles.active : ""}`}
                 title={item.name}
+                aria-label={item.name}
               >
                 <span className={styles.menuIcon}>
                   <Icon size={18} />
@@ -264,6 +276,7 @@ export default function Sidebar({
                 pathname === "/admin/permissoes" ? styles.active : ""
               }`}
               title="Administração"
+              aria-label="Administração"
             >
               <span className={styles.menuIcon}>
                 <ShieldCheck size={18} />
@@ -306,6 +319,7 @@ export default function Sidebar({
               type="button"
               className={styles.collapsedDot}
               title="Sair"
+              aria-label="Sair"
               onClick={handleSair}
               disabled={saindo}
             >
@@ -322,6 +336,7 @@ export default function Sidebar({
             href="/login"
             className={styles.collapsedDot}
             title="Entrar"
+            aria-label="Entrar"
           >
             <LogIn size={16} />
           </AppLink>

@@ -9,6 +9,7 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FileUpload } from "@/components/ui/FileUpload";
@@ -68,6 +69,7 @@ export function ChamadoDetalhePage({
   const [erro, setErro] = useState<string | null>(null);
   const [salvandoControle, setSalvandoControle] = useState(false);
   const [executandoAcao, setExecutandoAcao] = useState<string | null>(null);
+  const [confirmandoReabrir, setConfirmandoReabrir] = useState(false);
 
   async function handleEnviarMensagem() {
     if (!texto.trim()) {
@@ -101,6 +103,7 @@ export function ChamadoDetalhePage({
   }
 
   async function handleAtualizar(campo: "prioridade" | "atendenteUsuarioId", valor: string) {
+    setErro(null);
     setSalvandoControle(true);
 
     try {
@@ -109,8 +112,15 @@ export function ChamadoDetalhePage({
           ? { prioridade: valor as PrioridadeChamado }
           : { atendenteUsuarioId: valor || null };
 
-      await atualizarChamado(chamado.numero, dados);
-      router.refresh();
+      const resultado = await atualizarChamado(chamado.numero, dados);
+
+      if (resultado.ok) {
+        router.refresh();
+      } else {
+        setErro(resultado.message ?? "Não foi possível salvar a alteração.");
+      }
+    } catch {
+      setErro("Não foi possível salvar a alteração. Tente novamente.");
     } finally {
       setSalvandoControle(false);
     }
@@ -173,6 +183,8 @@ export function ChamadoDetalhePage({
         }
       />
 
+      {erro && <Alert variant="danger">{erro}</Alert>}
+
       {aguardandoConfirmacao && (
         <Alert variant="warning" title="Aguardando confirmação">
           O atendente marcou este chamado como resolvido. Se o problema realmente foi
@@ -217,7 +229,7 @@ export function ChamadoDetalhePage({
             {podeReabrir && (
               <Button
                 variant="secondary"
-                onClick={() => executarAcao("reabrir", reabrirChamado)}
+                onClick={() => setConfirmandoReabrir(true)}
                 loading={executandoAcao === "reabrir"}
               >
                 <RotateCcw size={16} />
@@ -328,9 +340,10 @@ export function ChamadoDetalhePage({
             )}
           </div>
 
-          <Field label="Responder">
+          <Field label="Responder" hint={`${texto.length}/4000 caracteres`}>
             <Textarea
               rows={4}
+              maxLength={4000}
               value={texto}
               onChange={(event) => setTexto(event.target.value)}
             />
@@ -358,6 +371,20 @@ export function ChamadoDetalhePage({
           </Stack>
         </Stack>
       </Card>
+
+      <ConfirmDialog
+        open={confirmandoReabrir}
+        title="Reabrir chamado?"
+        variant="warning"
+        message="O chamado volta para 'em andamento' e o atendente será notificado para continuar o atendimento. Use isso se o problema não foi realmente resolvido."
+        confirmLabel="Reabrir"
+        loading={executandoAcao === "reabrir"}
+        onConfirm={async () => {
+          await executarAcao("reabrir", reabrirChamado);
+          setConfirmandoReabrir(false);
+        }}
+        onClose={() => setConfirmandoReabrir(false)}
+      />
     </PageContainer>
   );
 }

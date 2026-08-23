@@ -5,6 +5,7 @@ import { Headset } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Loader } from "@/components/ui/Loader";
 import { Stack } from "@/components/ui/Stack";
@@ -39,6 +40,17 @@ export function AtendentesChamadosPainel({ onFeedback }: AtendentesChamadosPaine
   const [usuarioSelecionadoId, setUsuarioSelecionadoId] = useState<string | null>(null);
   const [alterando, setAlterando] = useState<string | null>(null);
   const [alterandoAceite, setAlterandoAceite] = useState<string | null>(null);
+  const [removendo, setRemovendo] = useState<{
+    usuario: PortalUsuarioAdmin;
+    setor: PortalSetor;
+  } | null>(null);
+
+  useEffect(() => {
+    if (usuarioSelecionadoId && !usuarios.some((u) => u.id === usuarioSelecionadoId)) {
+      setUsuarioSelecionadoId(usuarios[0]?.id ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarios]);
 
   useEffect(() => {
     async function carregar() {
@@ -220,9 +232,13 @@ export function AtendentesChamadosPainel({ onFeedback }: AtendentesChamadosPaine
                           label={setor.nome}
                           checked={marcado}
                           disabled={alterando === chave}
-                          onChange={(event) =>
-                            alternar(usuarioSelecionado, setor, event.target.checked)
-                          }
+                          onChange={(event) => {
+                            if (event.target.checked) {
+                              alternar(usuarioSelecionado, setor, true);
+                            } else {
+                              setRemovendo({ usuario: usuarioSelecionado, setor });
+                            }
+                          }}
                         />
                       );
                     })}
@@ -233,6 +249,25 @@ export function AtendentesChamadosPainel({ onFeedback }: AtendentesChamadosPaine
           </div>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={removendo !== null}
+        title="Remover atendente?"
+        variant="warning"
+        message={
+          removendo
+            ? `${removendo.usuario.nomeExibicao} deixa de atender chamados do setor "${removendo.setor.nome}".`
+            : ""
+        }
+        confirmLabel="Remover"
+        loading={removendo ? alterando === `${removendo.usuario.id}:${removendo.setor.id}` : false}
+        onConfirm={async () => {
+          if (!removendo) return;
+          await alternar(removendo.usuario, removendo.setor, false);
+          setRemovendo(null);
+        }}
+        onClose={() => setRemovendo(null)}
+      />
     </Stack>
   );
 }

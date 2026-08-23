@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Stack } from "@/components/ui/Stack";
 
@@ -50,6 +51,22 @@ export function PermissoesPainel({
   >(usuariosAtivos[0]?.id ?? null);
 
   const [alterando, setAlterando] = useState<string | null>(null);
+  const [revogando, setRevogando] = useState<{
+    usuario: PortalUsuarioAdmin;
+    modulo: PortalModulo;
+  } | null>(null);
+
+  /*
+   * Se o usuário selecionado for desativado (aba Usuários) ou
+   * deixar de existir enquanto esta aba está aberta, a seleção
+   * fica "órfã" — troca sozinha em vez de só sumir sem explicação.
+   */
+  useEffect(() => {
+    if (usuarioSelecionadoId && !usuariosAtivos.some((u) => u.id === usuarioSelecionadoId)) {
+      setUsuarioSelecionadoId(usuariosAtivos[0]?.id ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuariosAtivos]);
 
   /*
    * Só faz sentido conceder acesso individual a módulos que
@@ -203,13 +220,13 @@ export function PermissoesPainel({
                           temPermissao(usuarioSelecionado.id, modulo.id)
                         )}
                         disabled={alterando === chave}
-                        onChange={(event) =>
-                          alternar(
-                            usuarioSelecionado,
-                            modulo,
-                            event.target.checked
-                          )
-                        }
+                        onChange={(event) => {
+                          if (event.target.checked) {
+                            alternar(usuarioSelecionado, modulo, true);
+                          } else {
+                            setRevogando({ usuario: usuarioSelecionado, modulo });
+                          }
+                        }}
                       />
                     );
                   })}
@@ -225,6 +242,25 @@ export function PermissoesPainel({
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={revogando !== null}
+        title="Revogar acesso?"
+        variant="warning"
+        message={
+          revogando
+            ? `${revogando.usuario.nomeExibicao} perde o acesso a "${revogando.modulo.nome}" imediatamente.`
+            : ""
+        }
+        confirmLabel="Revogar"
+        loading={revogando ? alterando === `${revogando.usuario.id}:${revogando.modulo.id}` : false}
+        onConfirm={async () => {
+          if (!revogando) return;
+          await alternar(revogando.usuario, revogando.modulo, false);
+          setRevogando(null);
+        }}
+        onClose={() => setRevogando(null)}
+      />
     </div>
   );
 }

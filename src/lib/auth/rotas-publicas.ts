@@ -16,6 +16,7 @@ const ROTAS_PUBLICAS_EXATAS = new Set<string>(["/", "/login"]);
 const PREFIXOS_PUBLICOS = [
   "/atualizacoes",
   "/downloads",
+  "/api/downloads",
   "/api/auth",
   /*
    * Terminal de fábrica: kiosk de uso compartilhado no chão de

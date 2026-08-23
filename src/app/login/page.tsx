@@ -4,6 +4,7 @@ import {
   getSetoresComModulosPermitidos,
   getUsuarioAutenticado,
 } from "@/lib/auth/autorizacao";
+import { proximaRotaSegura } from "@/lib/auth/next-redirect";
 import { HomeContent } from "@/modules/home/components/HomeContent";
 
 interface PageProps {
@@ -15,7 +16,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
 
   if (usuario) {
     const { next } = await searchParams;
-    redirect(next && next.startsWith("/") ? next : "/");
+    redirect(proximaRotaSegura(next));
   }
 
   const setores = await getSetoresComModulosPermitidos(null);

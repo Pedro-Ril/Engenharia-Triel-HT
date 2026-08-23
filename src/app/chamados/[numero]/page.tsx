@@ -35,7 +35,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   }
 
   const nomeConfirmado = nome ?? null;
-  const { podeVer, ehAtendente } = await verificarAcessoChamado(
+  const { podeVer, ehAtendente, bloqueadoPorTentativas } = await verificarAcessoChamado(
     chamado,
     usuario,
     nomeConfirmado
@@ -53,10 +53,17 @@ export default async function Page({ params, searchParams }: PageProps) {
         />
 
         <Card>
-          <Alert variant="danger" icon={<ShieldAlert />} title="Sem acesso a este chamado">
-            Confira se o número e o nome informados estão corretos, ou use{" "}
-            <Link href="/chamados/consultar">Consultar chamado</Link> novamente.
-          </Alert>
+          {bloqueadoPorTentativas ? (
+            <Alert variant="danger" icon={<ShieldAlert />} title="Muitas tentativas">
+              Foram feitas muitas tentativas com nome incorreto para este chamado.
+              Aguarde alguns minutos e tente novamente.
+            </Alert>
+          ) : (
+            <Alert variant="danger" icon={<ShieldAlert />} title="Sem acesso a este chamado">
+              Confira se o número e o nome informados estão corretos, ou use{" "}
+              <Link href="/chamados/consultar">Consultar chamado</Link> novamente.
+            </Alert>
+          )}
         </Card>
       </PageContainer>
     );

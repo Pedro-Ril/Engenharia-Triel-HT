@@ -243,6 +243,29 @@
     width: 230px;
   }
 }
+
+/*
+ * Em telas pequenas o menu vira um painel flutuante por cima do
+ * conteúdo (fora da tela quando fechado) em vez de reservar uma
+ * faixa fixa de largura o tempo todo — a versão "ícone apenas"
+ * não faz sentido numa tela estreita.
+ */
+@media (max-width: 640px) {
+  .sidebar {
+    width: 260px;
+    transition: transform 0.28s ease;
+  }
+
+  .closed {
+    width: 260px;
+    transform: translateX(-100%);
+  }
+
+  .open {
+    width: 260px;
+    transform: translateX(0);
+  }
+}
 .bottomArea {
   margin-top: auto;
   display: flex;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Boxes,
+  Download,
   Factory,
   Headset,
   Home,
@@ -21,8 +22,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Toast } from "@/components/ui/Toast";
 
+import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
+
 import {
   buscarConfiguracaoAd,
+  listarDownloadsAdmin,
   listarModulos,
   listarPermissoes,
   listarSetores,
@@ -42,6 +46,7 @@ import styles from "./AdminPermissoes.module.css";
 import { AtendentesChamadosPainel } from "./AtendentesChamadosPainel";
 import { AtualizacoesPainel } from "./AtualizacoesPainel";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
+import { DownloadsPainel } from "./DownloadsPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
@@ -86,6 +91,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         icon: <Megaphone size={16} />,
       },
       {
+        valor: "downloads",
+        label: "Downloads",
+        icon: <Download size={16} />,
+      },
+      {
         valor: "chamados",
         label: "Chamados",
         icon: <Headset size={16} />,
@@ -106,6 +116,7 @@ export function AdminPermissoesPage() {
   const [configuracaoAd, setConfiguracaoAd] = useState<ConfiguracaoAd | null>(
     null
   );
+  const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
 
   function mostrarFeedback(
     variant: ToastState["variant"],
@@ -116,19 +127,23 @@ export function AdminPermissoesPage() {
   }
 
   useEffect(() => {
-    async function carregar() {
+    async function carregar(mostrarLoader: boolean) {
+      if (mostrarLoader) setCarregando(true);
+
       const [
         setoresData,
         modulosData,
         usuariosData,
         permissoesData,
         configuracaoAdData,
+        downloadsData,
       ] = await Promise.all([
         listarSetores(),
         listarModulos(),
         listarUsuarios(),
         listarPermissoes(),
         buscarConfiguracaoAd(),
+        listarDownloadsAdmin(),
       ]);
 
       setSetores(setoresData);
@@ -136,10 +151,26 @@ export function AdminPermissoesPage() {
       setUsuarios(usuariosData);
       setPermissoes(permissoesData);
       setConfiguracaoAd(configuracaoAdData);
+      setDownloads(downloadsData);
       setCarregando(false);
     }
 
-    carregar();
+    carregar(true);
+
+    /*
+     * Não há controle de versão nas escritas — se outro admin
+     * mexer nesses dados enquanto esta aba fica em segundo
+     * plano, buscar de novo ao voltar reduz (sem eliminar) a
+     * chance de sobrescrever uma mudança recente às cegas.
+     */
+    function aoFicarVisivel() {
+      if (document.visibilityState === "visible") {
+        carregar(false);
+      }
+    }
+
+    document.addEventListener("visibilitychange", aoFicarVisivel);
+    return () => document.removeEventListener("visibilitychange", aoFicarVisivel);
   }, []);
 
   if (carregando) {
@@ -226,6 +257,7 @@ export function AdminPermissoesPage() {
           {secao === "usuarios" && (
             <UsuariosPainel
               usuarios={usuarios}
+              permissoes={permissoes}
               onFeedback={mostrarFeedback}
               onUsuarioAtualizado={(usuario) =>
                 setUsuarios((atual) =>
@@ -294,6 +326,25 @@ export function AdminPermissoesPage() {
 
           {secao === "atualizacoes" && (
             <AtualizacoesPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "downloads" && (
+            <DownloadsPainel
+              downloads={downloads}
+              onFeedback={mostrarFeedback}
+              onDownloadCriado={(download) =>
+                setDownloads((atual) => [...atual, download])
+              }
+              onDownloadAtualizado={(download) =>
+                setDownloads((atual) =>
+                  atual.map((item) => (item.id === download.id ? download : item))
+                )
+              }
+              onDownloadExcluido={(id) =>
+                setDownloads((atual) => atual.filter((item) => item.id !== id))
+              }
+              onDownloadsRecarregados={setDownloads}
+            />
           )}
 
           {secao === "chamados" && (

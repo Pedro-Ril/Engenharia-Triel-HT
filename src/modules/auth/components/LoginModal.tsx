@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { proximaRotaSegura } from "@/lib/auth/next-redirect";
 
 import { login } from "../services/auth.service";
 import styles from "./LoginModal.module.css";
@@ -39,8 +40,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
         return;
       }
 
-      const proximaRota = searchParams.get("next");
-      router.push(proximaRota && proximaRota.startsWith("/") ? proximaRota : "/");
+      router.push(proximaRotaSegura(searchParams.get("next")));
       router.refresh();
       onClose();
     } catch {

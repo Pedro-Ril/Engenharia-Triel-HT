@@ -392,6 +392,7 @@ export async function buscarChamadoPorNumero(numero: number): Promise<Chamado | 
 }
 
 export interface ContextoAcessoAnexo {
+  chamadoId: string;
   setorId: string;
   solicitanteUsuarioId: string | null;
   solicitanteNome: string;
@@ -412,12 +413,14 @@ export async function buscarContextoAnexo(
   request.input("anexoId", sql.UniqueIdentifier, anexoId);
 
   const result = await request.query<{
+    chamado_id: string;
     setor_id: string;
     solicitante_usuario_id: string | null;
     solicitante_nome: string;
     interno: boolean;
   }>(`
     SELECT
+      CONVERT(VARCHAR(36), c.[id]) AS [chamado_id],
       CONVERT(VARCHAR(36), c.[setor_id]) AS [setor_id],
       CONVERT(VARCHAR(36), c.[solicitante_usuario_id]) AS [solicitante_usuario_id],
       c.[solicitante_nome],
@@ -432,6 +435,7 @@ export async function buscarContextoAnexo(
   if (!row) return null;
 
   return {
+    chamadoId: row.chamado_id,
     setorId: row.setor_id,
     solicitanteUsuarioId: row.solicitante_usuario_id,
     solicitanteNome: row.solicitante_nome,
@@ -804,16 +808,54 @@ async function transicionarStatus(params: {
   }
 }
 
+/*
+ * Um atendente pode marcar como resolvido direto de "aberto"
+ * (sem passar por aceitarChamado antes) — atalho intencional.
+ * Pra não deixar o chamado sem atendente registrado (o que
+ * distorce métricas de desempenho), esta função também
+ * reivindica o chamado pra quem está resolvendo, caso ainda
+ * ninguém tenha aceitado.
+ */
 export async function marcarComoResolvidoPendente(
   chamadoId: string,
+  atendenteUsuarioId: string,
   atendenteNome: string
 ): Promise<boolean> {
-  return transicionarStatus({
-    chamadoId,
-    statusPermitidos: ["aberto", "em_andamento"],
-    novoStatus: "aguardando_confirmacao",
-    mensagemSistema: `${atendenteNome} marcou o chamado como resolvido. Aguardando confirmação do solicitante.`,
-  });
+  const pool = await getSqlServerPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const request = new sql.Request(transaction);
+    request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+    request.input("atendenteUsuarioId", sql.UniqueIdentifier, atendenteUsuarioId);
+
+    const result = await request.query(`
+      UPDATE dbo.portal_chamados
+      SET
+        [status] = 'aguardando_confirmacao',
+        [atendente_usuario_id] = ISNULL([atendente_usuario_id], @atendenteUsuarioId),
+        [atualizado_em] = SYSDATETIME()
+      WHERE [id] = @chamadoId
+        AND [status] IN ('aberto', 'em_andamento');
+    `);
+
+    const sucesso = (result.rowsAffected[0] ?? 0) > 0;
+
+    if (sucesso) {
+      await registrarMensagemSistema(
+        transaction,
+        chamadoId,
+        `${atendenteNome} marcou o chamado como resolvido. Aguardando confirmação do solicitante.`
+      );
+    }
+
+    await transaction.commit();
+    return sucesso;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 export async function confirmarResolucao(

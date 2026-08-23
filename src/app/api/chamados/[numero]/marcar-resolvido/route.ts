@@ -27,7 +27,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const sucesso = await marcarComoResolvidoPendente(chamado.id, usuario.nomeExibicao);
+    const sucesso = await marcarComoResolvidoPendente(chamado.id, usuario.id, usuario.nomeExibicao);
 
     if (!sucesso) {
       return NextResponse.json(

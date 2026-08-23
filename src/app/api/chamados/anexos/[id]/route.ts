@@ -38,7 +38,7 @@ export async function GET(request: Request, context: RouteContext) {
     const nomeConfirmado = new URL(request.url).searchParams.get("nome");
 
     const { podeVer, ehAtendente } = await verificarAcessoChamado(
-      contexto,
+      { id: contexto.chamadoId, setorId: contexto.setorId, solicitanteUsuarioId: contexto.solicitanteUsuarioId, solicitanteNome: contexto.solicitanteNome },
       usuario,
       nomeConfirmado
     );

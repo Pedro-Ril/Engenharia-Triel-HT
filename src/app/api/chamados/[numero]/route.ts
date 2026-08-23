@@ -109,6 +109,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
+    if (chamado.status === "fechado") {
+      return NextResponse.json(
+        { ok: false, message: "Este chamado está fechado — reabra-o antes de alterar prioridade ou atendente." },
+        { status: 409 }
+      );
+    }
+
     const parsedBody: unknown = await request.json();
     if (!isObject(parsedBody)) {
       throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");

@@ -36,6 +36,8 @@ import {
   criarSetor,
   excluirModulo,
   excluirSetor,
+  listarModulos,
+  listarSetores,
 } from "../services/adminPermissoes.service";
 import type {
   PortalModulo,
@@ -189,7 +191,7 @@ export function SetoresModulosPainel({
     );
 
     try {
-      await Promise.all(
+      const resultados = await Promise.all(
         alterados.map(({ setor, indice }) =>
           atualizarSetor(setor.id, {
             nome: setor.nome,
@@ -199,12 +201,19 @@ export function SetoresModulosPainel({
           })
         )
       );
+
+      if (resultados.some((resultado) => !resultado.ok)) {
+        throw new Error("Falha ao salvar parte da nova ordem.");
+      }
     } catch {
       onFeedback(
         "danger",
         "Não foi possível salvar a nova ordem dos setores",
-        "Tente novamente em instantes."
+        "A lista foi restaurada com os dados reais do servidor — tente reordenar novamente."
       );
+
+      const setoresAtuais = await listarSetores();
+      setoresAtuais.forEach((setor) => onSetorAtualizado(setor));
     }
   }
 
@@ -327,7 +336,7 @@ export function SetoresModulosPainel({
     );
 
     try {
-      await Promise.all(
+      const resultados = await Promise.all(
         alterados.map(({ modulo, indice }) =>
           atualizarModulo(modulo.id, {
             nome: modulo.nome,
@@ -343,12 +352,19 @@ export function SetoresModulosPainel({
           })
         )
       );
+
+      if (resultados.some((resultado) => !resultado.ok)) {
+        throw new Error("Falha ao salvar parte da nova ordem.");
+      }
     } catch {
       onFeedback(
         "danger",
         "Não foi possível salvar a nova ordem dos módulos",
-        "Tente novamente em instantes."
+        "A lista foi restaurada com os dados reais do servidor — tente reordenar novamente."
       );
+
+      const modulosAtuais = await listarModulos();
+      modulosAtuais.forEach((modulo) => onModuloAtualizado(modulo));
     }
   }
 
@@ -476,7 +492,7 @@ export function SetoresModulosPainel({
               />
             </Field>
 
-            <Field label="Ordem">
+            <Field label="Ordem" hint="também pode ser ajustada arrastando a lista — evite repetir o número de outro item do mesmo setor">
               <NumberInput
                 value={novoSetor.ordem}
                 onChange={(event) =>
@@ -563,7 +579,7 @@ export function SetoresModulosPainel({
       >
         {setorEditando && (
           <Stack gap={16}>
-            <Field label="Chave" hint="não pode ser alterada depois de criada">
+            <Field label="Chave" hint="não pode ser alterada depois de criada — é usada internamente para resolver permissões de acesso, então um erro de digitação só se corrige excluindo e recriando">
               <Input value={setorEditando.chave} disabled />
             </Field>
 
@@ -580,7 +596,7 @@ export function SetoresModulosPainel({
                 />
               </Field>
 
-              <Field label="Ordem">
+              <Field label="Ordem" hint="também pode ser ajustada arrastando a lista — evite repetir o número de outro item do mesmo setor">
                 <NumberInput
                   value={formSetorEdicao.ordem}
                   onChange={(event) =>
@@ -637,7 +653,7 @@ export function SetoresModulosPainel({
       >
         {moduloEditando && (
           <Stack gap={16}>
-            <Field label="Chave" hint="não pode ser alterada depois de criada">
+            <Field label="Chave" hint="não pode ser alterada depois de criada — é usada internamente para resolver permissões de acesso, então um erro de digitação só se corrige excluindo e recriando">
               <Input value={moduloEditando.chave} disabled />
             </Field>
 
@@ -680,7 +696,7 @@ export function SetoresModulosPainel({
                 />
               </Field>
 
-              <Field label="Ordem">
+              <Field label="Ordem" hint="também pode ser ajustada arrastando a lista — evite repetir o número de outro item do mesmo setor">
                 <NumberInput
                   value={formModuloEdicao.ordem}
                   onChange={(event) =>

@@ -72,17 +72,75 @@ export interface AcessoChamadoDetalhe {
   podeVer: boolean;
   /* Também controla quem vê notas internas e os controles de status/prioridade/atendente. */
   ehAtendente: boolean;
+  /* Dono real: sessão do solicitante OU nome confirmado corretamente (chamado anônimo). */
+  ehDono: boolean;
+  /*
+   * true quando o acesso foi negado por excesso de tentativas de
+   * nome contra este chamado — permite mostrar uma mensagem
+   * diferente de "número/nome errados".
+   */
+  bloqueadoPorTentativas: boolean;
+}
+
+const LIMITE_TENTATIVAS_NOME = 8;
+const JANELA_TENTATIVAS_MINUTOS = 15;
+
+/*
+ * Acesso a um chamado aberto sem login depende de acertar o
+ * nome do solicitante — número de chamado é sequencial e nome é
+ * baixa entropia, então sem isso alguém poderia tentar vários
+ * nomes contra o mesmo chamado até acertar. Só concede acesso
+ * (contarTentativasFalhasRecentes) e só grava tentativa
+ * (registrarTentativaNome) quando alguém de fato tentou o
+ * caminho "nome confirmado" — sessão de dono/atendente nunca
+ * passa por aqui.
+ */
+async function contarTentativasFalhasRecentes(chamadoId: string): Promise<number> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("minutos", sql.Int, JANELA_TENTATIVAS_MINUTOS);
+
+  const result = await request.query<{ total: number }>(`
+    SELECT COUNT(*) AS [total]
+    FROM dbo.portal_chamados_tentativas_nome
+    WHERE [chamado_id] = @chamadoId
+      AND [sucesso] = 0
+      AND [tentado_em] >= DATEADD(MINUTE, -@minutos, SYSDATETIME());
+  `);
+
+  return result.recordset[0]?.total ?? 0;
+}
+
+async function registrarTentativaNome(chamadoId: string, sucesso: boolean): Promise<void> {
+  try {
+    const pool = await getSqlServerPool();
+    const request = pool.request();
+
+    request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+    request.input("sucesso", sql.Bit, sucesso);
+
+    await request.query(`
+      INSERT INTO dbo.portal_chamados_tentativas_nome ([chamado_id], [sucesso])
+      VALUES (@chamadoId, @sucesso);
+    `);
+  } catch (error) {
+    console.error("Erro ao registrar tentativa de acesso por nome:", error);
+  }
 }
 
 /*
  * Checagem de acesso ao detalhe/thread de UM chamado — usada
  * tanto pela página `/chamados/[numero]` (Server Component)
- * quanto pelas rotas de API GET/POST de mensagens. `nomeConfirmado`
+ * quanto pelas rotas de API GET/POST de mensagens e pelas ações
+ * (aceitar/reabrir/etc, via carregarContextoAcao). `nomeConfirmado`
  * só importa quando o chamado foi aberto sem login (ver
  * /chamados/consultar).
  */
 export async function verificarAcessoChamado(
   chamado: {
+    id: string;
     setorId: string;
     solicitanteUsuarioId: string | null;
     solicitanteNome: string;
@@ -94,14 +152,28 @@ export async function verificarAcessoChamado(
   const ehAtendente =
     setoresAtendidos === null || setoresAtendidos.includes(chamado.setorId);
 
-  const ehDono = usuario !== null && chamado.solicitanteUsuarioId === usuario.id;
+  const ehDonoPorSessao = usuario !== null && chamado.solicitanteUsuarioId === usuario.id;
+
+  const tentandoPorNome =
+    !chamado.solicitanteUsuarioId && !ehDonoPorSessao && !ehAtendente && Boolean(nomeConfirmado);
+
+  if (!tentandoPorNome) {
+    const ehDono = ehDonoPorSessao;
+    return { podeVer: ehDono || ehAtendente, ehAtendente, ehDono, bloqueadoPorTentativas: false };
+  }
+
+  const falhasRecentes = await contarTentativasFalhasRecentes(chamado.id);
+
+  if (falhasRecentes >= LIMITE_TENTATIVAS_NOME) {
+    return { podeVer: false, ehAtendente: false, ehDono: false, bloqueadoPorTentativas: true };
+  }
 
   const nomeBate =
-    !chamado.solicitanteUsuarioId &&
-    Boolean(nomeConfirmado) &&
     nomeConfirmado!.trim().toLowerCase() === chamado.solicitanteNome.trim().toLowerCase();
 
-  return { podeVer: ehDono || ehAtendente || nomeBate, ehAtendente };
+  await registrarTentativaNome(chamado.id, nomeBate);
+
+  return { podeVer: nomeBate, ehAtendente: false, ehDono: nomeBate, bloqueadoPorTentativas: false };
 }
 
 /* Equivalente a requireAdminApi, para as rotas de API da fila de atendimento. */

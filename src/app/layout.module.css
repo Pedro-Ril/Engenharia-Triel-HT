@@ -23,3 +23,50 @@
     margin-left: 230px;
   }
 }
+
+/*
+ * Em telas de celular o menu lateral vira um painel flutuante
+ * por cima do conteúdo (ver .sidebar/.open em Sidebar.module.css)
+ * em vez de empurrar a página — nunca reserva espaço lateral.
+ */
+@media (max-width: 640px) {
+  .contentOpen,
+  .contentClosed {
+    margin-left: 0;
+  }
+}
+
+.menuGatilhoMobile {
+  display: none;
+}
+
+.menuBackdrop {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .menuGatilhoMobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 90;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: none;
+    background: #b71c1c;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .menuBackdrop.aberto {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    background: rgba(0, 0, 0, 0.4);
+  }
+}

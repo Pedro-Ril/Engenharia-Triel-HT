@@ -18,9 +18,11 @@ import {
   YAxis,
 } from "recharts";
 
+import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
@@ -110,12 +112,24 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
   const [prioridade, setPrioridade] = useState("");
   const [setorId, setSetorId] = useState("");
   const [empresa, setEmpresa] = useState("");
+  const [buscaDigitada, setBuscaDigitada] = useState("");
   const [busca, setBusca] = useState("");
   const [paginaLista, setPaginaLista] = useState(1);
+  const [ocultarFechados, setOcultarFechados] = useState(true);
 
   const [itens, setItens] = useState<ChamadoResumo[]>([]);
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(true);
+
+  /* Sem isso, cada tecla digitada na busca disparava uma requisição imediata. */
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setBusca(buscaDigitada);
+      setPaginaLista(1);
+    }, 400);
+
+    return () => clearTimeout(temporizador);
+  }, [buscaDigitada]);
 
   useEffect(() => {
     let cancelado = false;
@@ -144,6 +158,13 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
     };
   }, [status, prioridade, setorId, empresa, busca]);
 
+  const itensVisiveis = useMemo(
+    () => (ocultarFechados ? itens.filter((item) => item.status !== "fechado") : itens),
+    [itens, ocultarFechados]
+  );
+
+  const buscaTruncada = itens.length >= LIMITE_BUSCA && total > itens.length;
+
   const opcoesSetor = [
     { value: "", label: "Todos" },
     ...setores.map((setor) => ({ value: setor.id, label: setor.nome })),
@@ -154,37 +175,39 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
     ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
   ];
 
-  const totalPaginasLista = Math.max(1, Math.ceil(itens.length / ITENS_POR_PAGINA_LISTA));
-  const itensPaginaLista = itens.slice(
+  const totalPaginasLista = Math.max(1, Math.ceil(itensVisiveis.length / ITENS_POR_PAGINA_LISTA));
+  const itensPaginaLista = itensVisiveis.slice(
     (paginaLista - 1) * ITENS_POR_PAGINA_LISTA,
     paginaLista * ITENS_POR_PAGINA_LISTA
   );
 
   const colunasKanban = useMemo(() => {
-    return (Object.keys(STATUS_LABELS) as StatusChamado[]).map((statusColuna) => ({
-      status: statusColuna,
-      label: STATUS_LABELS[statusColuna].label,
-      itens: itens.filter((item) => item.status === statusColuna),
-    }));
-  }, [itens]);
+    return (Object.keys(STATUS_LABELS) as StatusChamado[])
+      .filter((statusColuna) => !ocultarFechados || statusColuna !== "fechado")
+      .map((statusColuna) => ({
+        status: statusColuna,
+        label: STATUS_LABELS[statusColuna].label,
+        itens: itensVisiveis.filter((item) => item.status === statusColuna),
+      }));
+  }, [itensVisiveis, ocultarFechados]);
 
   const dadosStatusGrafico = useMemo(() => {
     return (Object.keys(STATUS_LABELS) as StatusChamado[])
       .map((statusChave) => ({
         status: statusChave,
         label: STATUS_LABELS[statusChave].label,
-        total: itens.filter((item) => item.status === statusChave).length,
+        total: itensVisiveis.filter((item) => item.status === statusChave).length,
       }))
       .filter((item) => item.total > 0);
-  }, [itens]);
+  }, [itensVisiveis]);
 
   const dadosPrioridadeGrafico = useMemo(() => {
     return (Object.keys(PRIORIDADE_LABELS) as PrioridadeChamado[]).map((prioridadeChave) => ({
       prioridade: prioridadeChave,
       label: PRIORIDADE_LABELS[prioridadeChave].label,
-      total: itens.filter((item) => item.prioridade === prioridadeChave).length,
+      total: itensVisiveis.filter((item) => item.prioridade === prioridadeChave).length,
     }));
-  }, [itens]);
+  }, [itensVisiveis]);
 
   return (
     <PageContainer>
@@ -265,17 +288,30 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
           <div className={styles.filaFiltroCampo} style={{ flex: 1 }}>
             <Field label="Buscar">
               <Input
-                value={busca}
+                value={buscaDigitada}
                 placeholder="Título, solicitante ou número"
-                onChange={(event) => {
-                  setBusca(event.target.value);
-                  setPaginaLista(1);
-                }}
+                onChange={(event) => setBuscaDigitada(event.target.value)}
               />
             </Field>
           </div>
         </div>
+
+        <Checkbox
+          label="Ocultar chamados fechados"
+          checked={ocultarFechados}
+          onChange={(event) => {
+            setOcultarFechados(event.target.checked);
+            setPaginaLista(1);
+          }}
+        />
       </Card>
+
+      {buscaTruncada && (
+        <Alert variant="warning">
+          Mostrando os {itens.length} chamados mais recentes de {total} encontrados. Refine
+          os filtros para ver os demais.
+        </Alert>
+      )}
 
       <div className={styles.modoVisualizacao}>
         {MODOS_VISUALIZACAO.map((item) => {
@@ -295,14 +331,20 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
           );
         })}
 
-        {!carregando && <span className={styles.modoVisualizacaoTotal}>{total} chamado(s)</span>}
+        {!carregando && (
+          <span className={styles.modoVisualizacaoTotal}>
+            {itensVisiveis.length === total
+              ? `${total} chamado(s)`
+              : `${itensVisiveis.length} de ${total} chamado(s)`}
+          </span>
+        )}
       </div>
 
       {carregando ? (
         <Card>
           <Loader label="Carregando chamados..." />
         </Card>
-      ) : itens.length === 0 ? (
+      ) : itensVisiveis.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Headset size={28} />}

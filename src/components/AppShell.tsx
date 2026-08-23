@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import type { UsuarioLogado } from "@/components/Sidebar";
 import { RouteLoadingProvider } from "@/components/RouteLoadingProvider";
@@ -45,6 +46,22 @@ function PainelPortal({
         usuario={usuario}
       />
 
+      <button
+        type="button"
+        className={styles.menuGatilhoMobile}
+        onClick={() => setMenuOpen(true)}
+        aria-label="Abrir menu"
+        hidden={menuOpen}
+      >
+        <Menu size={20} />
+      </button>
+
+      <div
+        className={`${styles.menuBackdrop} ${menuOpen ? styles.aberto : ""}`}
+        onClick={() => setMenuOpen(false)}
+        aria-hidden="true"
+      />
+
       <main
         className={`${styles.content} ${
           menuOpen ? styles.contentOpen : styles.contentClosed
@@ -75,6 +92,43 @@ function AppShellConteudo(props: PainelPortalProps) {
 
 export default function AppShell(props: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const router = useRouter();
+
+  /*
+   * O layout raiz (setores/módulos liberados) só é buscado de
+   * novo em navegação client-side com router.refresh() — sem
+   * isso, se um admin mudar as permissões de alguém no meio da
+   * sessão, o menu lateral continua mostrando o acesso antigo
+   * até um reload completo. Atualizar ao voltar para a aba
+   * reduz essa janela de desatualização.
+   */
+  useEffect(() => {
+    function aoFicarVisivel() {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    }
+
+    document.addEventListener("visibilitychange", aoFicarVisivel);
+    return () => document.removeEventListener("visibilitychange", aoFicarVisivel);
+  }, [router]);
+
+  /*
+   * Sair em uma aba grava isso no localStorage — o evento
+   * "storage" só dispara nas OUTRAS abas do mesmo navegador,
+   * nunca na que fez a mudança. router.refresh() faz cada
+   * página reavaliar sua própria checagem de sessão no servidor.
+   */
+  useEffect(() => {
+    function aoDeslogarEmOutraAba(event: StorageEvent) {
+      if (event.key === "portal-logout-em") {
+        router.refresh();
+      }
+    }
+
+    window.addEventListener("storage", aoDeslogarEmOutraAba);
+    return () => window.removeEventListener("storage", aoDeslogarEmOutraAba);
+  }, [router]);
 
   return (
     <RouteLoadingProvider>

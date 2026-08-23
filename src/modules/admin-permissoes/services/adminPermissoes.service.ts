@@ -1,3 +1,5 @@
+import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
+
 import type {
   Atualizacao,
   AtualizacaoTag,
@@ -303,6 +305,43 @@ export async function atualizarAtualizacao(
 
 export async function excluirAtualizacao(id: string): Promise<ApiEnvelope<null>> {
   const response = await fetch(`/api/admin/atualizacoes/${id}`, {
+    method: "DELETE",
+  });
+  return parseResponse<null>(response);
+}
+
+export async function listarDownloadsAdmin(): Promise<DownloadAdmin[]> {
+  const response = await fetch("/api/admin/downloads");
+  const body = await parseResponse<DownloadAdmin[]>(response);
+  return body.data ?? [];
+}
+
+/*
+ * FormData (não JSON) porque o arquivo vai junto com os campos
+ * de texto — quem monta o FormData (nome, descrição, arquivo,
+ * instruções/funcionamento como JSON) é o próprio painel admin.
+ */
+export async function criarDownloadAdmin(dados: FormData): Promise<ApiEnvelope<DownloadAdmin>> {
+  const response = await fetch("/api/admin/downloads", {
+    method: "POST",
+    body: dados,
+  });
+  return parseResponse<DownloadAdmin>(response);
+}
+
+export async function atualizarDownloadAdmin(
+  id: string,
+  dados: FormData
+): Promise<ApiEnvelope<DownloadAdmin>> {
+  const response = await fetch(`/api/admin/downloads/${id}`, {
+    method: "PATCH",
+    body: dados,
+  });
+  return parseResponse<DownloadAdmin>(response);
+}
+
+export async function excluirDownloadAdmin(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/downloads/${id}`, {
     method: "DELETE",
   });
   return parseResponse<null>(response);

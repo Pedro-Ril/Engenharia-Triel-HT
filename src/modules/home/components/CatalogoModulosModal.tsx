@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Lock } from "lucide-react";
 
 import AppLink from "@/components/AppLink";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
+import { Stack } from "@/components/ui/Stack";
 import { resolverIcone } from "@/lib/icons/icon-registry";
 import type { SetorComStatusAcesso } from "@/lib/auth/autorizacao";
 import styles from "@/app/home.module.css";
@@ -22,12 +25,29 @@ export function CatalogoModulosModal({
   onClose,
 }: CatalogoModulosModalProps) {
   const [setores, setSetores] = useState<SetorComStatusAcesso[] | null>(null);
+  const [erro, setErro] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
     if (!open || setores !== null) return;
 
-    buscarCatalogoModulos().then(setSetores);
-  }, [open, setores]);
+    let cancelado = false;
+
+    buscarCatalogoModulos().then((resultado) => {
+      if (cancelado) return;
+
+      if (resultado === null) {
+        setErro(true);
+      } else {
+        setErro(false);
+        setSetores(resultado);
+      }
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [open, setores, tentativa]);
 
   const totalModulos = setores?.reduce(
     (total, setor) => total + setor.modulos.length,
@@ -42,7 +62,18 @@ export function CatalogoModulosModal({
       description="Todos os setores e módulos do portal — veja o que já está liberado para o seu usuário."
       size="large"
     >
-      {setores === null ? (
+      {erro ? (
+        <Alert variant="danger">
+          <Stack gap={12}>
+            <span>Não foi possível carregar o catálogo. Tente novamente.</span>
+            <Stack direction="row">
+              <Button variant="secondary" onClick={() => setTentativa((atual) => atual + 1)}>
+                Tentar novamente
+              </Button>
+            </Stack>
+          </Stack>
+        </Alert>
+      ) : setores === null ? (
         <Loader label="Carregando catálogo..." />
       ) : totalModulos === 0 ? (
         <p>Nenhum módulo cadastrado ainda.</p>

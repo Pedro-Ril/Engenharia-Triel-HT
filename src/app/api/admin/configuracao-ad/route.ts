@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import {
+  getConfiguracaoAd,
   getConfiguracaoAdSemSenha,
   salvarConfiguracaoAd,
 } from "@/lib/auth/configuracao-ad";
 import { ValidationError } from "@/lib/auth/errors";
+import { testarConexaoAd } from "@/lib/auth/ldap";
 import { isObject, optionalText, requiredText } from "@/lib/auth/validation";
 
 export const runtime = "nodejs";
@@ -77,6 +79,29 @@ export async function PUT(request: Request) {
       "grupo de usuários",
       300
     );
+
+    const configuracaoAtual = await getConfiguracaoAd();
+    const senhaParaTeste = senhaServico ?? configuracaoAtual?.senhaServico ?? null;
+
+    if (!senhaParaTeste) {
+      throw new ValidationError(
+        "Informe a senha da conta de serviço para validar a conexão com o AD."
+      );
+    }
+
+    const teste = await testarConexaoAd({
+      url,
+      usuarioServico,
+      senhaServico: senhaParaTeste,
+      grupoAdminDn,
+      grupoUsuariosDn,
+    });
+
+    if (!teste.conectou || !teste.grupoAdminExiste || (grupoUsuariosDn && !teste.grupoUsuariosExiste)) {
+      throw new ValidationError(
+        teste.mensagemErro ?? "Não foi possível validar a configuração do AD."
+      );
+    }
 
     const configuracao = await salvarConfiguracaoAd({
       url,

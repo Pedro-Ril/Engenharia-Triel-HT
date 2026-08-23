@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Clock3, Headset, Home, Inbox } from "lucide-react";
 import {
   Bar,
@@ -18,7 +18,9 @@ import {
   YAxis,
 } from "recharts";
 
+import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DateInput } from "@/components/ui/DateInput";
 import { Dropdown } from "@/components/ui/Dropdown";
@@ -93,25 +95,55 @@ export function DashboardChamadosPage({
 
   const [dados, setDados] = useState<EstatisticasChamados | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [recarregarChave, setRecarregarChave] = useState(0);
+  const temDadosRef = useRef(false);
 
+  /*
+   * Em modo TV (fullscreen) esta tela roda sem ninguém pra
+   * interagir e recarregar manualmente — precisa se atualizar
+   * sozinha. Fora do modo TV, quem está usando já reabre a
+   * página quando quer ver dados novos, então não vale a pena
+   * ficar buscando em segundo plano.
+   */
   useEffect(() => {
     let cancelado = false;
 
-    buscarEstatisticasChamados({
-      setorId: setorId || undefined,
-      empresa: empresa || undefined,
-      dataInicial: dataInicial || undefined,
-      dataFinal: dataFinal || undefined,
-    }).then((resultado) => {
-      if (cancelado) return;
-      if (resultado.ok && resultado.data) setDados(resultado.data);
-      setCarregando(false);
-    });
+    function buscar() {
+      buscarEstatisticasChamados({
+        setorId: setorId || undefined,
+        empresa: empresa || undefined,
+        dataInicial: dataInicial || undefined,
+        dataFinal: dataFinal || undefined,
+      }).then((resultado) => {
+        if (cancelado) return;
 
+        if (resultado.ok && resultado.data) {
+          setDados(resultado.data);
+          setErro(null);
+          temDadosRef.current = true;
+        } else if (!temDadosRef.current) {
+          setErro(resultado.message ?? "Não foi possível carregar os indicadores.");
+        }
+
+        setCarregando(false);
+      });
+    }
+
+    buscar();
+
+    if (!fullscreen) {
+      return () => {
+        cancelado = true;
+      };
+    }
+
+    const intervalo = setInterval(buscar, 120000);
     return () => {
       cancelado = true;
+      clearInterval(intervalo);
     };
-  }, [setorId, empresa, dataInicial, dataFinal]);
+  }, [setorId, empresa, dataInicial, dataFinal, fullscreen, recarregarChave]);
 
   const dadosStatus = useMemo(() => {
     if (!dados) return [];
@@ -163,20 +195,36 @@ export function DashboardChamadosPage({
     [setores, setorId]
   );
 
+  function tentarNovamente() {
+    setCarregando(true);
+    setRecarregarChave((atual) => atual + 1);
+  }
+
   if (carregando || !dados) {
+    const conteudo = erro ? (
+      <Alert variant="danger">
+        <Stack gap={12}>
+          <span>{erro}</span>
+          <Stack direction="row">
+            <Button variant="secondary" onClick={tentarNovamente}>
+              Tentar novamente
+            </Button>
+          </Stack>
+        </Stack>
+      </Alert>
+    ) : (
+      <Loader label="Carregando indicadores..." />
+    );
+
     return fullscreen ? (
-      <div className={styles.tvDashboard}>
-        <Loader label="Carregando indicadores..." />
-      </div>
+      <div className={styles.tvDashboard}>{conteudo}</div>
     ) : (
       <PageContainer>
         <PageHeader
           title="Dashboard de chamados"
           description="Indicadores consolidados dos setores que você atende."
         />
-        <Card>
-          <Loader label="Carregando indicadores..." />
-        </Card>
+        <Card>{conteudo}</Card>
       </PageContainer>
     );
   }

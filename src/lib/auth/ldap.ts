@@ -220,6 +220,89 @@ export async function buscarMembrosDoGrupo(
   }
 }
 
+/*
+ * Confere, antes de salvar a configuração do AD, que dá pra
+ * conectar com essas credenciais e que o(s) grupo(s) informados
+ * realmente existem no diretório. Um DN de grupo administrador
+ * digitado errado nunca deveria ser aceito — do contrário, no
+ * próximo login, TODOS os administradores perdem o acesso de
+ * uma vez, e a própria tela que corrigiria isso passa a exigir
+ * ser administrador.
+ */
+export interface ResultadoTesteConexaoAd {
+  conectou: boolean;
+  grupoAdminExiste: boolean;
+  grupoUsuariosExiste: boolean | null;
+  mensagemErro: string | null;
+}
+
+async function grupoExisteNoDiretorio(client: Client, grupoDn: string): Promise<boolean> {
+  try {
+    const { searchEntries } = await client.search(grupoDn, {
+      scope: "base",
+      filter: "(objectClass=group)",
+    });
+
+    return searchEntries.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function testarConexaoAd(config: {
+  url: string;
+  usuarioServico: string;
+  senhaServico: string;
+  grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
+}): Promise<ResultadoTesteConexaoAd> {
+  const client = new Client({ url: config.url });
+
+  try {
+    await client.bind(config.usuarioServico, config.senhaServico);
+  } catch {
+    return {
+      conectou: false,
+      grupoAdminExiste: false,
+      grupoUsuariosExiste: null,
+      mensagemErro:
+        "Não foi possível conectar ao Active Directory com essa URL, usuário e senha de serviço.",
+    };
+  }
+
+  try {
+    const grupoAdminExiste = await grupoExisteNoDiretorio(client, config.grupoAdminDn);
+
+    if (!grupoAdminExiste) {
+      return {
+        conectou: true,
+        grupoAdminExiste: false,
+        grupoUsuariosExiste: null,
+        mensagemErro:
+          "O grupo de administradores informado não foi encontrado no Active Directory. Confira o DN e tente novamente.",
+      };
+    }
+
+    const grupoUsuariosExiste = config.grupoUsuariosDn
+      ? await grupoExisteNoDiretorio(client, config.grupoUsuariosDn)
+      : null;
+
+    if (config.grupoUsuariosDn && !grupoUsuariosExiste) {
+      return {
+        conectou: true,
+        grupoAdminExiste: true,
+        grupoUsuariosExiste: false,
+        mensagemErro:
+          "O grupo de usuários informado não foi encontrado no Active Directory. Confira o DN e tente novamente.",
+      };
+    }
+
+    return { conectou: true, grupoAdminExiste: true, grupoUsuariosExiste, mensagemErro: null };
+  } finally {
+    await client.unbind();
+  }
+}
+
 export function ehMembroDoGrupoAdmin(
   memberOf: string[],
   grupoAdminDn: string

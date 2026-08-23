@@ -24,12 +24,13 @@ import {
   excluirUsuario,
   importarUsuariosAd,
 } from "../services/adminPermissoes.service";
-import type { PortalUsuarioAdmin } from "../types/adminPermissoes.types";
+import type { PortalPermissao, PortalUsuarioAdmin } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 import styles from "./AdminPermissoes.module.css";
 
 interface UsuariosPainelProps {
   usuarios: PortalUsuarioAdmin[];
+  permissoes: PortalPermissao[];
   onUsuarioAtualizado: (usuario: PortalUsuarioAdmin) => void;
   onUsuarioExcluido: (usuarioId: string) => void;
   onUsuariosImportados: (usuarios: PortalUsuarioAdmin[]) => void;
@@ -38,6 +39,7 @@ interface UsuariosPainelProps {
 
 export function UsuariosPainel({
   usuarios,
+  permissoes,
   onUsuarioAtualizado,
   onUsuarioExcluido,
   onUsuariosImportados,
@@ -51,8 +53,10 @@ export function UsuariosPainel({
     useState<PortalUsuarioAdmin | null>(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [confirmandoImportar, setConfirmandoImportar] = useState(false);
 
   async function handleImportarAd() {
+    setConfirmandoImportar(false);
     setImportando(true);
 
     try {
@@ -168,7 +172,7 @@ export function UsuariosPainel({
     <Stack direction="row" justify="end">
       <Button
         variant="secondary"
-        onClick={handleImportarAd}
+        onClick={() => setConfirmandoImportar(true)}
         loading={importando}
       >
         <Download size={16} />
@@ -286,9 +290,16 @@ export function UsuariosPainel({
         title="Excluir usuário"
         message={
           <>
-            Tem certeza que deseja excluir <strong>{usuarioExcluindo?.nomeExibicao}</strong>?
-            As permissões dele serão revogadas. Se a pessoa logar de novo, o
-            cadastro é recriado do zero (sem as permissões atuais).
+            Tem certeza que deseja excluir <strong>{usuarioExcluindo?.nomeExibicao}</strong>?{" "}
+            {(() => {
+              const total = usuarioExcluindo
+                ? permissoes.filter((p) => p.usuarioId === usuarioExcluindo.id).length
+                : 0;
+              return total > 0
+                ? `${total} permissão(ões) concedida(s) a essa pessoa serão revogadas.`
+                : "Essa pessoa não tem nenhuma permissão individual concedida.";
+            })()}{" "}
+            Se a pessoa logar de novo, o cadastro é recriado do zero (sem as permissões atuais).
           </>
         }
         confirmLabel="Excluir"
@@ -296,6 +307,16 @@ export function UsuariosPainel({
         loading={confirmandoExclusao}
         onClose={() => setUsuarioExcluindo(null)}
         onConfirm={handleConfirmarExclusao}
+      />
+
+      <ConfirmDialog
+        open={confirmandoImportar}
+        title="Importar usuários do AD?"
+        message="Isso atualiza nome, e-mail e status de administrador de todo usuário já cadastrado que também existir no grupo do Active Directory, além de trazer usuários novos."
+        confirmLabel="Importar"
+        loading={importando}
+        onClose={() => setConfirmandoImportar(false)}
+        onConfirm={handleImportarAd}
       />
     </Stack>
   );

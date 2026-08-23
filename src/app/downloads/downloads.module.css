@@ -55,8 +55,15 @@
 }
 
 .headerBadge {
+  display: inline-flex;
+  align-items: center;
   padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(183, 28, 28, 0.1);
+  color: #b71c1c;
+  font-weight: 600;
   font-size: 0.75rem;
+  letter-spacing: 0.01em;
 }
 
 /* ── TEXTOS ───────────────────────────────────────────── */
@@ -122,14 +129,36 @@
 }
 
 .sectionTitle {
-  font-size: 1.7rem;
+  margin: 0 0 14px;
   color: #111827;
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .sectionText {
   max-width: 560px;
   color: #6b7280;
   margin-top: 6px;
+}
+
+/* ── EMPTY STATE ──────────────────────────────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 56px 24px;
+  background: #fff;
+  border: 1px dashed rgba(183, 28, 28, 0.25);
+  border-radius: 20px;
+  color: #6b7280;
+}
+
+.emptyState svg {
+  color: #b71c1c;
+  opacity: 0.7;
 }
 
 /* ── CARDS ───────────────────────────────────────────── */
@@ -195,6 +224,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .primaryButton,
@@ -202,6 +232,16 @@
   background: linear-gradient(135deg, #b71c1c, #d32f2f);
   color: #fff;
   border: none;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+  box-shadow: 0 8px 20px rgba(183, 28, 28, 0.22);
+}
+
+.primaryButton:hover,
+.primaryBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(183, 28, 28, 0.28);
 }
 
 .secondaryButton {
@@ -210,8 +250,7 @@
   color: #b71c1c;
 }
 
-/* ── MODAL (IGUAL ATUALIZAÇÕES) ───────────────────────── */
-
+/* ── MODAL ────────────────────────────────────────────── */
 .overlay {
   position: fixed;
   inset: 0;
@@ -222,122 +261,6 @@
   justify-content: center;
   padding: 24px;
   z-index: 2200;
-}
-
-.modal {
-  width: min(620px, 100%);
-  max-height: 88vh;
-  background: #fff;
-  border-radius: 24px;
-  border: 1px solid rgba(229, 231, 235, 0.95);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 24px 24px 18px;
-  border-bottom: 1px solid #f0f1f3;
-  background:
-    radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 28%),
-    linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
-}
-
-.modalMeta {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.modalTitle {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #111827;
-}
-
-.modalSubtitle {
-  margin: 6px 0 0;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.closeBtn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: 1px solid #ececec;
-  background: #fff;
-  cursor: pointer;
-}
-
-.closeBtn:hover {
-  background: rgba(183, 28, 28, 0.06);
-}
-
-/* ── BODY ─────────────────────────────────────────────── */
-.modalBody {
-  padding: 20px 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.itensList {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.itemRow {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 12px;
-  border: 1px solid #f0f1f3;
-}
-
-.itemTexto {
-  color: #374151;
-}
-
-.headerBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(183, 28, 28, 0.1);
-  color: #b71c1c;
-  font-weight: 600;
-  font-size: 0.75rem;
-  letter-spacing: 0.01em;
-  margin-bottom: 0;
-}
-
-.modalMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2200;
-  padding: 24px;
 }
 
 .modal {
@@ -362,6 +285,14 @@
   background:
     radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 28%),
     linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
+}
+
+.modalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .modalTitle {
@@ -444,29 +375,10 @@
   padding: 16px 24px 22px;
   border-top: 1px solid #f0f1f3;
   background: #ffffff;
-  gap: 12px; /* 👈 ESSA LINHA RESOLVE */
+  gap: 12px;
 }
 
-.primaryBtn {
-  min-height: 44px;
-  padding: 0 24px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease;
-  box-shadow: 0 8px 20px rgba(183, 28, 28, 0.22);
-}
-
-.primaryBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(183, 28, 28, 0.28);
-}
+/* ── BLOCOS DE TEXTO / SUBCARDS (usados no corpo do modal) ── */
 .textBlock {
   margin-bottom: 22px;
 }
@@ -494,7 +406,7 @@
 .textBlock p:last-child {
   margin-bottom: 0;
 }
-/* ── SECTION TITLES (igual SKA Connector) ───────────── */
+
 .sectionBlock {
   margin-bottom: 26px;
 }
@@ -503,15 +415,6 @@
   margin-bottom: 0;
 }
 
-.sectionTitle {
-  margin: 0 0 14px;
-  color: #111827;
-  font-size: 1.2rem;   /* igual ao modalTitle */
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-/* ── SUB CARDS ─────────────────────────────────────── */
 .subCards {
   display: flex;
   flex-direction: column;
@@ -531,47 +434,14 @@
   border-color: rgba(183, 28, 28, 0.15);
 }
 
-/* TEXTO */
 .subCard p {
   margin: 0;
   color: #374151;
   font-size: 0.92rem;
   line-height: 1.6;
 }
-/* ── CARDS DE INFORMAÇÃO ───────────────────────────── */
-.infoCard {
-  background: #f9fafb;
-  border: 1px solid #f0f1f3;
-  border-radius: 16px;
-  padding: 18px 20px;
-  margin-bottom: 16px;
-}
 
-.infoCard:last-child {
-  margin-bottom: 0;
-}
-
-/* ── TITULO VERMELHO ───────────────────────────────── */
-.infoTitle {
-  margin: 0 0 10px;
-  color: #b71c1c;
-  font-size: 0.85rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* ── TEXTO ─────────────────────────────────────────── */
-.infoCard p {
-  margin: 0 0 8px;
-  color: #374151;
-  font-size: 0.92rem;
-  line-height: 1.6;
-}
-
-.infoCard p:last-child {
-  margin-bottom: 0;
-}
+/* ── CARDS DE INFORMAÇÃO (Instalação / Funcionamento) ─── */
 .infoCard {
   background: #f9fafb;
   border: 1px solid #f0f1f3;
@@ -594,4 +464,37 @@
 
 .infoCard:last-child {
   margin-bottom: 0;
+}
+
+.infoTitle {
+  margin: 0 0 10px;
+  color: #b71c1c;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.infoCard p {
+  margin: 0 0 8px;
+  color: #374151;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.infoCard p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .cardsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 20px;
+  }
 }

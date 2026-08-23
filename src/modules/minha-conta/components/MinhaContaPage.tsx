@@ -23,8 +23,12 @@ import {
   YAxis,
 } from "recharts";
 
+import Link from "next/link";
+
+import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { Loader } from "@/components/ui/Loader";
@@ -67,13 +71,28 @@ function formatarData(valorIso: string | null): string {
 
 export function MinhaContaPage() {
   const [dados, setDados] = useState<MinhaContaData | null>(null);
+  const [erro, setErro] = useState<"sessao_expirada" | "erro" | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
+    let cancelado = false;
+
     buscarMinhaConta().then((resultado) => {
-      setDados(resultado);
+      if (cancelado) return;
+
+      if (resultado.ok) {
+        setDados(resultado.data);
+        setErro(null);
+      } else {
+        setErro(resultado.motivo);
+      }
+
       setCarregando(false);
     });
+
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
   if (carregando) {
@@ -84,10 +103,30 @@ export function MinhaContaPage() {
     );
   }
 
+  if (erro === "sessao_expirada") {
+    return (
+      <PageContainer>
+        <Alert variant="warning" title="Sua sessão expirou">
+          <Stack gap={12}>
+            <span>Entre novamente para ver os dados da sua conta.</span>
+            <Stack direction="row">
+              <Link href="/login?next=/minha-conta">
+                <Button>Entrar novamente</Button>
+              </Link>
+            </Stack>
+          </Stack>
+        </Alert>
+      </PageContainer>
+    );
+  }
+
   if (!dados) {
     return (
       <PageContainer>
-        <p>Não foi possível carregar os dados da sua conta.</p>
+        <Alert variant="danger">
+          Não foi possível carregar os dados da sua conta. Verifique sua conexão e tente
+          novamente.
+        </Alert>
       </PageContainer>
     );
   }

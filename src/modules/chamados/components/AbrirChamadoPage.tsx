@@ -182,25 +182,33 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
           )}
 
           <Field label="Setor" required>
-            <Dropdown
-              value={setorId}
-              onValueChange={setSetorId}
-              placeholder="Selecione o setor"
-              options={setores.map((setor) => ({ value: setor.id, label: setor.nome }))}
-            />
+            {setores.length === 0 ? (
+              <Alert variant="warning">
+                Nenhum setor está aceitando chamados no momento. Tente novamente mais tarde.
+              </Alert>
+            ) : (
+              <Dropdown
+                value={setorId}
+                onValueChange={setSetorId}
+                placeholder="Selecione o setor"
+                options={setores.map((setor) => ({ value: setor.id, label: setor.nome }))}
+              />
+            )}
           </Field>
 
-          <Field label="Título" required>
+          <Field label="Título" required hint={`${titulo.length}/200 caracteres`}>
             <Input
               value={titulo}
+              maxLength={200}
               placeholder="Resuma o problema em poucas palavras"
               onChange={(event) => setTitulo(event.target.value)}
             />
           </Field>
 
-          <Field label="Descrição" required>
+          <Field label="Descrição" required hint={`${descricao.length}/4000 caracteres`}>
             <Textarea
               rows={6}
+              maxLength={4000}
               value={descricao}
               placeholder="Descreva com o máximo de detalhes possível: o que aconteceu, quando, e o que você esperava que acontecesse."
               onChange={(event) => setDescricao(event.target.value)}
@@ -217,7 +225,7 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
             <Button
               onClick={handleSubmit}
               loading={enviando}
-              disabled={!titulo.trim() || !descricao.trim()}
+              disabled={!setorId || !titulo.trim() || !descricao.trim()}
             >
               Abrir chamado
             </Button>

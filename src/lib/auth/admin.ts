@@ -341,6 +341,10 @@ export async function criarModulo(params: {
       throw new ValidationError("Já existe um módulo com esta chave.");
     }
 
+    if (error instanceof Error && /UQ_portal_modulos_path/i.test(error.message)) {
+      throw new ValidationError("Já existe um módulo com este caminho (path).");
+    }
+
     if (
       error instanceof Error &&
       /FK_portal_modulos_setores_setor/i.test(error.message)
@@ -419,6 +423,10 @@ export async function atualizarModulo(
     return { ...moduloAtualizado, setorIds: params.setorIds };
   } catch (error) {
     await transaction.rollback();
+
+    if (error instanceof Error && /UQ_portal_modulos_path/i.test(error.message)) {
+      throw new ValidationError("Já existe um módulo com este caminho (path).");
+    }
 
     if (
       error instanceof Error &&

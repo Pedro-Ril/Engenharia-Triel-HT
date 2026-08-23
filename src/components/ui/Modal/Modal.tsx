@@ -1,11 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import styles from "./Modal.module.css";
+
+const SELETOR_FOCAVEL =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type ModalSize = "small" | "medium" | "large";
 
@@ -33,6 +36,8 @@ export function Modal({
   onClose,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const elementoAnteriorRef = useRef<HTMLElement | null>(null);
 
   const titleId = useId();
   const descriptionId = useId();
@@ -48,9 +53,40 @@ export function Modal({
 
     document.body.style.overflow = "hidden";
 
+    /*
+     * Sem isso, o teclado continua no elemento que abriu o
+     * modal (geralmente atrás dele, visualmente encoberto) em
+     * vez de entrar no diálogo — e nunca volta pra lá ao fechar.
+     */
+    elementoAnteriorRef.current = document.activeElement as HTMLElement | null;
+
+    const primeiroFoco =
+      dialogRef.current?.querySelector<HTMLElement>(SELETOR_FOCAVEL) ??
+      dialogRef.current;
+    primeiroFoco?.focus();
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const focaveis = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(SELETOR_FOCAVEL)
+      );
+      if (focaveis.length === 0) return;
+
+      const primeiro = focaveis[0];
+      const ultimo = focaveis[focaveis.length - 1];
+
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault();
+        ultimo.focus();
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault();
+        primeiro.focus();
       }
     }
 
@@ -59,6 +95,7 @@ export function Modal({
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
+      elementoAnteriorRef.current?.focus();
     };
   }, [open, onClose]);
 
@@ -79,6 +116,7 @@ export function Modal({
       }}
     >
       <section
+        ref={dialogRef}
         className={`${styles.modal} ${styles[size]}`}
         role="dialog"
         aria-modal="true"
@@ -86,6 +124,7 @@ export function Modal({
         aria-describedby={
           description ? descriptionId : undefined
         }
+        tabIndex={-1}
       >
         <header className={styles.header}>
           <div className={styles.heading}>

@@ -34,7 +34,16 @@ export default function AppLink({
 
     if (event.defaultPrevented) return;
 
-    if (targetUrl && targetUrl !== currentUrl) {
+    /*
+     * Ctrl/Cmd/Shift+clique ou o botão do meio abrem em nova
+     * aba — a navegação não acontece nesta aba, então a barra
+     * de progresso nunca deveria começar (senão fica girando
+     * pra sempre, já que o pathname desta aba nunca muda).
+     */
+    const abreEmOutraAba =
+      event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0;
+
+    if (!abreEmOutraAba && targetUrl && targetUrl !== currentUrl) {
       startLoading();
     }
   };

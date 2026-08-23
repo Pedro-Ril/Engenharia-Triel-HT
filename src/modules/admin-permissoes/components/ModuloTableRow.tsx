@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Pencil, Trash2 } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/Checkbox";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import { Stack } from "@/components/ui/Stack";
 import { TableCell, TableRow } from "@/components/ui/Table";
@@ -36,6 +38,8 @@ export function ModuloTableRow({
   onEditar,
   onExcluir,
 }: ModuloTableRowProps) {
+  const [confirmandoPublico, setConfirmandoPublico] = useState(false);
+
   const {
     attributes,
     listeners,
@@ -52,6 +56,7 @@ export function ModuloTableRow({
   };
 
   return (
+    <>
     <TableRow ref={setNodeRef} style={style}>
       <TableCell align="center">
         <div className={adminStyles.checkboxCentro}>
@@ -74,9 +79,13 @@ export function ModuloTableRow({
           <Checkbox
             label=""
             checked={modulo.publicoSemLogin}
-            onChange={(event) =>
-              onAtualizar({ publicoSemLogin: event.target.checked })
-            }
+            onChange={(event) => {
+              if (event.target.checked) {
+                setConfirmandoPublico(true);
+              } else {
+                onAtualizar({ publicoSemLogin: false });
+              }
+            }}
           />
         </div>
       </TableCell>
@@ -134,5 +143,19 @@ export function ModuloTableRow({
         </Stack>
       </TableCell>
     </TableRow>
+
+    <ConfirmDialog
+      open={confirmandoPublico}
+      title="Tornar público sem login?"
+      variant="warning"
+      message={`"${modulo.nome}" fica acessível a qualquer pessoa, sem precisar entrar no portal.`}
+      confirmLabel="Tornar público"
+      onConfirm={() => {
+        onAtualizar({ publicoSemLogin: true });
+        setConfirmandoPublico(false);
+      }}
+      onClose={() => setConfirmandoPublico(false)}
+    />
+    </>
   );
 }
