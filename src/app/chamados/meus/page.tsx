@@ -36,17 +36,17 @@ export default async function Page() {
 
   return (
     <PageContainer>
+      <PageHeader
+        title="Meus chamados"
+        description="Todos os chamados que você abriu, autenticado nesta conta."
+      />
+
       <Breadcrumb
         items={[
           { label: "Início", href: "/", icon: <Home size={14} /> },
           { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
           { label: "Meus chamados", current: true },
         ]}
-      />
-
-      <PageHeader
-        title="Meus chamados"
-        description="Todos os chamados que você abriu, autenticado nesta conta."
       />
 
       {!usuario ? (
@@ -92,6 +92,7 @@ async function ListaChamados({ usuarioId }: { usuarioId: string }) {
             <TableHeaderCell>Nº</TableHeaderCell>
             <TableHeaderCell>Título</TableHeaderCell>
             <TableHeaderCell>Setor</TableHeaderCell>
+            <TableHeaderCell>Categoria</TableHeaderCell>
             <TableHeaderCell>Status</TableHeaderCell>
             <TableHeaderCell>Prioridade</TableHeaderCell>
             <TableHeaderCell>Atualizado em</TableHeaderCell>
@@ -106,6 +107,7 @@ async function ListaChamados({ usuarioId }: { usuarioId: string }) {
               </TableCell>
               <TableCell>{chamado.titulo}</TableCell>
               <TableCell>{chamado.setorNome}</TableCell>
+              <TableCell>{chamado.categoriaNome ?? "—"}</TableCell>
               <TableCell>
                 <StatusBadge status={chamado.status} />
               </TableCell>

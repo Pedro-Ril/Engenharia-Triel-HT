@@ -1,0 +1,189 @@
+.wrapper {
+  width: 100%;
+  min-width: 0;
+
+  border: 1px solid var(--border-input);
+  border-radius: 12px;
+  background: var(--bg-surface);
+
+  overflow: hidden;
+}
+
+.wrapper:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+
+  padding: 8px;
+
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface-soft);
+}
+
+.separador {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.toolbarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.toolbarButton:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.toolbarButtonAtivo {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.toolbarButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/*
+ * Estilo do texto formatado — usado tanto no editor (dentro do
+ * Tiptap) quanto na visualização pública (RichTextViewer), pra
+ * o artigo renderizar exatamente igual nos dois lugares.
+ */
+.conteudo {
+  min-height: 220px;
+  padding: 16px 18px;
+
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+
+  outline: none;
+}
+
+.conteudo :global(p) {
+  margin: 0 0 12px;
+}
+
+.conteudo :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.conteudo :global(h2) {
+  margin: 20px 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.conteudo :global(h2:first-child) {
+  margin-top: 0;
+}
+
+.conteudo :global(h3) {
+  margin: 16px 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.conteudo :global(ul),
+.conteudo :global(ol) {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.conteudo :global(li) {
+  margin-bottom: 4px;
+}
+
+.conteudo :global(blockquote) {
+  margin: 0 0 12px;
+  padding: 4px 14px;
+
+  border-left: 3px solid var(--primary-soft-border);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.conteudo :global(pre) {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+
+  border-radius: 10px;
+  background: var(--tooltip-bg);
+
+  color: var(--tooltip-text);
+  font-size: 13px;
+  font-family: "Consolas", "Menlo", monospace;
+  line-height: 1.5;
+
+  overflow-x: auto;
+}
+
+.conteudo :global(code) {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--bg-surface-muted);
+  font-family: "Consolas", "Menlo", monospace;
+  font-size: 0.92em;
+}
+
+.conteudo :global(pre code) {
+  padding: 0;
+  background: none;
+}
+
+.conteudo :global(a) {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.conteudo :global(img) {
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 4px 0 12px;
+}
+
+.conteudo :global(hr) {
+  margin: 18px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.conteudo :global(.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--text-faint);
+  pointer-events: none;
+}

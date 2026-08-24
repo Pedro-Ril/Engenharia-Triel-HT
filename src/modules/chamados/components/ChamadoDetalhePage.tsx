@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Home, LifeBuoy, Lock, Paperclip, RotateCcw, UserCheck } from "lucide-react";
+import {
+  ArrowRightLeft,
+  CheckCircle2,
+  Home,
+  LifeBuoy,
+  Lock,
+  Paperclip,
+  RotateCcw,
+  UserCheck,
+} from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -14,6 +23,7 @@ import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { FormGrid } from "@/components/ui/FormGrid";
+import { Modal } from "@/components/ui/Modal";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Stack } from "@/components/ui/Stack";
@@ -25,10 +35,17 @@ import {
   confirmarResolucaoChamado,
   enviarMensagemChamado,
   fecharChamado,
+  listarAtendentesDoSetor,
   marcarChamadoComoResolvido,
   reabrirChamado,
+  transferirChamado,
 } from "../services/chamados.service";
-import type { Chamado, ChamadosAtendente, PrioridadeChamado } from "../types/chamados.types";
+import type {
+  Chamado,
+  ChamadosAtendente,
+  PrioridadeChamado,
+  SetorChamado,
+} from "../types/chamados.types";
 import { PrioridadeBadge, PRIORIDADE_LABELS, StatusBadge } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
 
@@ -36,6 +53,9 @@ interface ChamadoDetalhePageProps {
   chamado: Chamado;
   nomeConfirmado: string | null;
   atendentesDoSetor: ChamadosAtendente[];
+  setoresParaTransferir: SetorChamado[];
+  /* false quando o acesso só foi liberado por o chamado ser público (visitante sem sessão/dono/atendente) — esconde ações e resposta. */
+  podeResponder: boolean;
 }
 
 function formatarData(valorIso: string): string {
@@ -59,6 +79,8 @@ export function ChamadoDetalhePage({
   chamado,
   nomeConfirmado,
   atendentesDoSetor,
+  setoresParaTransferir,
+  podeResponder,
 }: ChamadoDetalhePageProps) {
   const router = useRouter();
 
@@ -70,6 +92,63 @@ export function ChamadoDetalhePage({
   const [salvandoControle, setSalvandoControle] = useState(false);
   const [executandoAcao, setExecutandoAcao] = useState<string | null>(null);
   const [confirmandoReabrir, setConfirmandoReabrir] = useState(false);
+
+  const [transferenciaAberta, setTransferenciaAberta] = useState(false);
+  const [novoSetorId, setNovoSetorId] = useState("");
+  const [novoAtendenteId, setNovoAtendenteId] = useState("");
+  const [atendentesParaTransferir, setAtendentesParaTransferir] =
+    useState<ChamadosAtendente[]>(atendentesDoSetor);
+  const [carregandoAtendentesTransferir, setCarregandoAtendentesTransferir] = useState(false);
+  const [transferindo, setTransferindo] = useState(false);
+  const [erroTransferencia, setErroTransferencia] = useState<string | null>(null);
+
+  function abrirTransferencia() {
+    setNovoSetorId(chamado.setorId);
+    setNovoAtendenteId(chamado.atendenteUsuarioId ?? "");
+    setAtendentesParaTransferir(atendentesDoSetor);
+    setErroTransferencia(null);
+    setTransferenciaAberta(true);
+  }
+
+  async function handleTrocarSetorTransferencia(setorId: string) {
+    setNovoSetorId(setorId);
+    setNovoAtendenteId("");
+
+    if (setorId === chamado.setorId) {
+      setAtendentesParaTransferir(atendentesDoSetor);
+      return;
+    }
+
+    setCarregandoAtendentesTransferir(true);
+
+    try {
+      const atendentes = await listarAtendentesDoSetor(setorId);
+      setAtendentesParaTransferir(atendentes);
+    } finally {
+      setCarregandoAtendentesTransferir(false);
+    }
+  }
+
+  async function handleConfirmarTransferencia() {
+    setErroTransferencia(null);
+    setTransferindo(true);
+
+    try {
+      const resultado = await transferirChamado(chamado.numero, {
+        setorId: novoSetorId,
+        atendenteUsuarioId: novoAtendenteId || null,
+      });
+
+      if (resultado.ok) {
+        setTransferenciaAberta(false);
+        router.refresh();
+      } else {
+        setErroTransferencia(resultado.message ?? "Não foi possível transferir o chamado.");
+      }
+    } finally {
+      setTransferindo(false);
+    }
+  }
 
   async function handleEnviarMensagem() {
     if (!texto.trim()) {
@@ -102,7 +181,10 @@ export function ChamadoDetalhePage({
     }
   }
 
-  async function handleAtualizar(campo: "prioridade" | "atendenteUsuarioId", valor: string) {
+  async function handleAtualizar(
+    campo: "prioridade" | "atendenteUsuarioId" | "publico",
+    valor: string | boolean
+  ) {
     setErro(null);
     setSalvandoControle(true);
 
@@ -110,7 +192,9 @@ export function ChamadoDetalhePage({
       const dados =
         campo === "prioridade"
           ? { prioridade: valor as PrioridadeChamado }
-          : { atendenteUsuarioId: valor || null };
+          : campo === "atendenteUsuarioId"
+            ? { atendenteUsuarioId: (valor as string) || null }
+            : { publico: valor as boolean };
 
       const resultado = await atualizarChamado(chamado.numero, dados);
 
@@ -160,19 +244,18 @@ export function ChamadoDetalhePage({
 
   const podeReabrir = ["aguardando_confirmacao", "resolvido", "fechado"].includes(chamado.status);
 
+  const podeTransferir = chamado.ehAtendente && chamado.status !== "fechado";
+
+  /* Atendente não pode responder antes de aceitar o chamado (ver POST .../mensagens). */
+  const precisaAceitarAntes = chamado.ehAtendente && !chamado.atendenteUsuarioId;
+
   return (
     <PageContainer>
-      <Breadcrumb
-        items={[
-          { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
-          { label: `Nº ${chamado.numero}`, current: true },
-        ]}
-      />
-
       <PageHeader
         title={chamado.titulo}
         description={`Nº ${chamado.numero} · ${chamado.setorNome}${
+          chamado.categoriaNome ? ` · ${chamado.categoriaNome}` : ""
+        }${
           chamado.empresa ? ` · ${chamado.empresa}` : ""
         } · aberto por ${chamado.solicitanteNome} em ${formatarData(chamado.criadoEm)}`}
         actions={
@@ -181,6 +264,14 @@ export function ChamadoDetalhePage({
             <PrioridadeBadge prioridade={chamado.prioridade} />
           </Stack>
         }
+      />
+
+      <Breadcrumb
+        items={[
+          { label: "Início", href: "/", icon: <Home size={14} /> },
+          { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
+          { label: `Nº ${chamado.numero}`, current: true },
+        ]}
       />
 
       {erro && <Alert variant="danger">{erro}</Alert>}
@@ -192,7 +283,13 @@ export function ChamadoDetalhePage({
         </Alert>
       )}
 
-      {(podeAceitar || podeMarcarResolvido || aguardandoConfirmacao || podeFechar || podeReabrir) && (
+      {podeResponder &&
+        (podeAceitar ||
+          podeMarcarResolvido ||
+          aguardandoConfirmacao ||
+          podeFechar ||
+          podeReabrir ||
+          podeTransferir) && (
         <Card title="Ações">
           <Stack direction="row" gap={10} wrap>
             {podeAceitar && (
@@ -246,37 +343,54 @@ export function ChamadoDetalhePage({
                 Fechar chamado
               </Button>
             )}
+
+            {podeTransferir && (
+              <Button variant="secondary" onClick={abrirTransferencia}>
+                <ArrowRightLeft size={16} />
+                Transferir chamado
+              </Button>
+            )}
           </Stack>
         </Card>
       )}
 
       {chamado.ehAtendente && (
         <Card title="Atribuição e prioridade">
-          <FormGrid columns={2}>
-            <Field label="Prioridade">
-              <Dropdown
-                value={chamado.prioridade}
-                options={OPCOES_PRIORIDADE}
-                disabled={salvandoControle}
-                onValueChange={(valor) => handleAtualizar("prioridade", valor)}
-              />
-            </Field>
+          <Stack gap={16}>
+            <FormGrid columns={2}>
+              <Field label="Prioridade">
+                <Dropdown
+                  value={chamado.prioridade}
+                  options={OPCOES_PRIORIDADE}
+                  disabled={salvandoControle}
+                  onValueChange={(valor) => handleAtualizar("prioridade", valor)}
+                />
+              </Field>
 
-            <Field label="Atendente responsável">
-              <Dropdown
-                value={chamado.atendenteUsuarioId ?? ""}
-                disabled={salvandoControle}
-                onValueChange={(valor) => handleAtualizar("atendenteUsuarioId", valor)}
-                options={[
-                  { value: "", label: "Sem atendente definido" },
-                  ...atendentesDoSetor.map((atendente) => ({
-                    value: atendente.usuarioId,
-                    label: atendente.usuarioNome,
-                  })),
-                ]}
-              />
-            </Field>
-          </FormGrid>
+              <Field label="Atendente responsável">
+                <Dropdown
+                  value={chamado.atendenteUsuarioId ?? ""}
+                  disabled={salvandoControle}
+                  onValueChange={(valor) => handleAtualizar("atendenteUsuarioId", valor)}
+                  options={[
+                    { value: "", label: "Sem atendente definido" },
+                    ...atendentesDoSetor.map((atendente) => ({
+                      value: atendente.usuarioId,
+                      label: atendente.usuarioNome,
+                    })),
+                  ]}
+                />
+              </Field>
+            </FormGrid>
+
+            <Checkbox
+              label="Chamado público"
+              hint='Aparece na busca por título/descrição de "Consultar chamado", mesmo para quem não abriu o chamado nem está logado.'
+              checked={chamado.publico}
+              disabled={salvandoControle}
+              onChange={(event) => handleAtualizar("publico", event.target.checked)}
+            />
+          </Stack>
         </Card>
       )}
 
@@ -340,35 +454,47 @@ export function ChamadoDetalhePage({
             )}
           </div>
 
-          <Field label="Responder" hint={`${texto.length}/4000 caracteres`}>
-            <Textarea
-              rows={4}
-              maxLength={4000}
-              value={texto}
-              onChange={(event) => setTexto(event.target.value)}
-            />
-          </Field>
+          {!podeResponder ? (
+            <Alert variant="info">
+              Este chamado é público e está disponível apenas para consulta.
+            </Alert>
+          ) : precisaAceitarAntes ? (
+            <Alert variant="warning">
+              Aceite o chamado (no botão acima) antes de responder.
+            </Alert>
+          ) : (
+            <>
+              <Field label="Responder" hint={`${texto.length}/4000 caracteres`}>
+                <Textarea
+                  rows={4}
+                  maxLength={4000}
+                  value={texto}
+                  onChange={(event) => setTexto(event.target.value)}
+                />
+              </Field>
 
-          <Field label="Anexos" hint="até 10 MB por arquivo">
-            <FileUpload multiple maxSizeMB={10} files={anexos} onFilesChange={setAnexos} />
-          </Field>
+              <Field label="Anexos" hint="até 10 MB por arquivo">
+                <FileUpload multiple maxSizeMB={10} files={anexos} onFilesChange={setAnexos} />
+              </Field>
 
-          {chamado.ehAtendente && (
-            <Checkbox
-              label="Nota interna"
-              hint="visível só para atendentes/administradores, não para quem abriu o chamado"
-              checked={interno}
-              onChange={(event) => setInterno(event.target.checked)}
-            />
+              {chamado.ehAtendente && (
+                <Checkbox
+                  label="Nota interna"
+                  hint="visível só para atendentes/administradores, não para quem abriu o chamado"
+                  checked={interno}
+                  onChange={(event) => setInterno(event.target.checked)}
+                />
+              )}
+
+              {erro && <Alert variant="danger">{erro}</Alert>}
+
+              <Stack direction="row" justify="end">
+                <Button onClick={handleEnviarMensagem} loading={enviando}>
+                  Enviar
+                </Button>
+              </Stack>
+            </>
           )}
-
-          {erro && <Alert variant="danger">{erro}</Alert>}
-
-          <Stack direction="row" justify="end">
-            <Button onClick={handleEnviarMensagem} loading={enviando}>
-              Enviar
-            </Button>
-          </Stack>
         </Stack>
       </Card>
 
@@ -385,6 +511,67 @@ export function ChamadoDetalhePage({
         }}
         onClose={() => setConfirmandoReabrir(false)}
       />
+
+      <Modal
+        open={transferenciaAberta}
+        title="Transferir chamado"
+        size="small"
+        onClose={() => setTransferenciaAberta(false)}
+        footer={
+          <Stack direction="row" justify="end" gap={10}>
+            <Button variant="secondary" onClick={() => setTransferenciaAberta(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarTransferencia}
+              loading={transferindo}
+              disabled={!novoSetorId}
+            >
+              Transferir
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack gap={16}>
+          <Field label="Setor">
+            <Dropdown
+              value={novoSetorId}
+              onValueChange={handleTrocarSetorTransferencia}
+              options={setoresParaTransferir.map((setor) => ({
+                value: setor.id,
+                label: setor.nome,
+              }))}
+            />
+          </Field>
+
+          <Field
+            label="Novo atendente"
+            hint={
+              novoSetorId !== chamado.setorId
+                ? "categoria será limpa — categorias pertencem a um setor específico"
+                : undefined
+            }
+          >
+            {carregandoAtendentesTransferir ? (
+              <Alert variant="info">Carregando atendentes...</Alert>
+            ) : (
+              <Dropdown
+                value={novoAtendenteId}
+                onValueChange={setNovoAtendenteId}
+                options={[
+                  { value: "", label: "Sem atendente definido" },
+                  ...atendentesParaTransferir.map((atendente) => ({
+                    value: atendente.usuarioId,
+                    label: atendente.usuarioNome,
+                  })),
+                ]}
+              />
+            )}
+          </Field>
+
+          {erroTransferencia && <Alert variant="danger">{erroTransferencia}</Alert>}
+        </Stack>
+      </Modal>
     </PageContainer>
   );
 }

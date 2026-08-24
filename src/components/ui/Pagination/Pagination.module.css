@@ -23,11 +23,11 @@
   align-items: center;
   justify-content: center;
 
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--bg-surface);
 
-  color: #4b5563;
+  color: var(--text-soft);
   font-size: 13px;
   font-weight: 700;
 
@@ -51,23 +51,23 @@
 
 .navigationButton:hover:not(:disabled),
 .pageButton:hover:not(:disabled):not(.active) {
-  border-color: rgba(183, 28, 28, 0.28);
-  background: rgba(183, 28, 28, 0.06);
-  color: #b71c1c;
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
   transform: translateY(-1px);
 }
 
 .pageButton.active {
-  border-color: #b71c1c;
-  background: #b71c1c;
-  color: #ffffff;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--text-inverse);
 
   box-shadow: 0 6px 14px rgba(183, 28, 28, 0.18);
 }
 
 .navigationButton:focus-visible,
 .pageButton:focus-visible {
-  outline: 3px solid rgba(183, 28, 28, 0.12);
+  outline: 3px solid var(--primary-ring);
   outline-offset: 2px;
 }
 
@@ -86,7 +86,7 @@
   align-items: center;
   justify-content: center;
 
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 14px;
 }
 

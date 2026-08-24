@@ -1,14 +1,18 @@
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
+import type { WikiArtigo } from "@/modules/wiki/types/wiki.types";
 
 import type {
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
   ConfiguracaoAd,
+  ConfiguracaoDb,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
   PortalUsuarioAdmin,
+  ResultadoTesteConexaoAd,
+  ResultadoTesteConexaoDb,
   ResumoBuscasTerminalFabrica,
   TipoAtualizacaoItem,
 } from "../types/adminPermissoes.types";
@@ -159,6 +163,22 @@ export async function importarUsuariosAd(): Promise<
   return parseResponse<ResultadoImportacaoAd>(response);
 }
 
+export interface ResultadoAtualizacaoAd {
+  verificados: number;
+  atualizados: number;
+  naoEncontrados: number;
+  usuarios: PortalUsuarioAdmin[];
+}
+
+export async function atualizarUsuariosDoAd(): Promise<
+  ApiEnvelope<ResultadoAtualizacaoAd>
+> {
+  const response = await fetch("/api/admin/usuarios/atualizar-ad", {
+    method: "POST",
+  });
+  return parseResponse<ResultadoAtualizacaoAd>(response);
+}
+
 export async function listarPermissoes(): Promise<PortalPermissao[]> {
   const response = await fetch("/api/admin/permissoes");
   const body = await parseResponse<PortalPermissao[]>(response);
@@ -204,6 +224,69 @@ export async function salvarConfiguracaoAd(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfiguracaoAd>(response);
+}
+
+export async function testarConexaoAd(dados: {
+  url: string;
+  usuarioServico: string;
+  senhaServico: string | null;
+  grupoAdminDn: string;
+  grupoUsuariosDn: string | null;
+}): Promise<ApiEnvelope<ResultadoTesteConexaoAd>> {
+  const response = await fetch("/api/admin/configuracao-ad/testar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ResultadoTesteConexaoAd>(response);
+}
+
+/* =========================================================
+   Configuração — Banco de dados (.env)
+   ========================================================= */
+
+export async function buscarConfiguracaoDb(): Promise<ConfiguracaoDb | null> {
+  const response = await fetch("/api/admin/configuracao-db");
+  const body = await parseResponse<ConfiguracaoDb | null>(response);
+  return body.data ?? null;
+}
+
+export interface DadosConfiguracaoDb {
+  server: string;
+  database: string;
+  user: string;
+  senha: string | null;
+  encrypt: boolean;
+  trustServerCertificate: boolean;
+}
+
+export async function testarConexaoDb(
+  dados: DadosConfiguracaoDb
+): Promise<ApiEnvelope<ResultadoTesteConexaoDb>> {
+  const response = await fetch("/api/admin/configuracao-db/testar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ResultadoTesteConexaoDb>(response);
+}
+
+export async function salvarConfiguracaoDb(
+  dados: DadosConfiguracaoDb
+): Promise<ApiEnvelope<ConfiguracaoDb>> {
+  const response = await fetch("/api/admin/configuracao-db", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfiguracaoDb>(response);
+}
+
+export async function reiniciarAplicacao(): Promise<ApiEnvelope<null>> {
+  const response = await fetch("/api/admin/configuracao-db/reiniciar", {
+    method: "POST",
+  });
+  return parseResponse<null>(response);
 }
 
 export interface BuscasTerminalFabricaData {
@@ -342,6 +425,54 @@ export async function atualizarDownloadAdmin(
 
 export async function excluirDownloadAdmin(id: string): Promise<ApiEnvelope<null>> {
   const response = await fetch(`/api/admin/downloads/${id}`, {
+    method: "DELETE",
+  });
+  return parseResponse<null>(response);
+}
+
+/* =========================================================
+   ADMIN — wiki
+   ========================================================= */
+
+export async function listarWikiArtigosAdmin(): Promise<WikiArtigo[]> {
+  const response = await fetch("/api/admin/wiki");
+  const body = await parseResponse<WikiArtigo[]>(response);
+  return body.data ?? [];
+}
+
+export interface DadosWikiArtigo {
+  titulo: string;
+  conteudo: string;
+  moduloId: string | null;
+  privadoAdmin: boolean;
+  ativo: boolean;
+}
+
+export async function criarWikiArtigo(
+  dados: DadosWikiArtigo
+): Promise<ApiEnvelope<WikiArtigo>> {
+  const response = await fetch("/api/admin/wiki", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<WikiArtigo>(response);
+}
+
+export async function atualizarWikiArtigo(
+  id: string,
+  dados: Partial<DadosWikiArtigo> & { ordem?: number }
+): Promise<ApiEnvelope<WikiArtigo>> {
+  const response = await fetch(`/api/admin/wiki/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<WikiArtigo>(response);
+}
+
+export async function excluirWikiArtigo(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/wiki/${id}`, {
     method: "DELETE",
   });
   return parseResponse<null>(response);

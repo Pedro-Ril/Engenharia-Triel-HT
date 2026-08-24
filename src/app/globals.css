@@ -15,38 +15,252 @@ body {
   min-height: 100%;
 }
 
-html {
-  color-scheme: light;
-}
-
+/*
+ * Sistema de tokens de cor. Todo componente deve consumir estas
+ * variáveis em vez de hexadecimais soltos — é o que permite o modo
+ * noturno funcionar como "trocar uma folha" em vez de reescrever
+ * cada arquivo. Os valores abaixo (modo claro) são os mesmos já
+ * usados no portal antes deste sistema existir; o objetivo aqui é
+ * consolidar, não mudar a aparência em modo claro.
+ *
+ * Resolução de tema (3 estados, igual ao padrão usado em artifacts):
+ * - Sem atributo `data-theme` no <html>: decide via prefers-color-scheme
+ *   do sistema operacional (preferência "sistema" ou visitante sem login).
+ * - `data-theme="light"`: força claro mesmo com SO em modo escuro.
+ * - `data-theme="dark"`: força escuro mesmo com SO em modo claro.
+ */
 :root {
-  --background: #0b1220;
-  --foreground: #171717;
+  color-scheme: light;
 
-  --surface: #ffffff;
-  --surface-soft: #f8fafc;
-  --surface-muted: #f3f4f6;
-
-  --text: #171717;
-  --text-soft: #4b5563;
-  --text-muted: #6b7280;
+  --bg-page: #f8f9fb;
+  --bg-surface: #ffffff;
+  --bg-surface-soft: #f8fafc;
+  --bg-surface-muted: #f3f4f6;
+  --bg-hover-brand: #fff1f1;
+  --bg-hover-neutral: rgba(15, 23, 42, 0.06);
 
   --border: #e5e7eb;
+  --border-soft: #ececec;
   --border-strong: #d1d5db;
+  --border-input: #d8d8d8;
+  --border-input-hover: #c7c7c7;
+
+  --text: #171717;
+  --text-soft: #374151;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --text-inverse: #ffffff;
 
   --primary: #b71c1c;
   --primary-hover: #9f1717;
+  --primary-active: #861313;
   --primary-soft: rgba(183, 28, 28, 0.08);
-  --primary-soft-border: rgba(183, 28, 28, 0.18);
+  --primary-soft-strong: rgba(183, 28, 28, 0.13);
+  --primary-soft-border: rgba(183, 28, 28, 0.2);
+  --primary-ring: rgba(183, 28, 28, 0.12);
 
-  --danger: #c62828;
-  --danger-soft: rgba(198, 40, 40, 0.12);
-  --danger-soft-border: rgba(198, 40, 40, 0.2);
+  --sidebar-gradient: linear-gradient(180deg, #b71c1c 0%, #9f1717 55%, #861313 100%);
 
-  --success: #2e7d32;
-  --success-soft: #edf7ee;
+  --overlay: rgba(15, 23, 42, 0.48);
 
-  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.05);
+  --tooltip-bg: #111827;
+  --tooltip-text: #ffffff;
+
+  --neutral-border: #e5e7eb;
+  --neutral-bg: #f3f4f6;
+  --neutral-bg-strong: #e5e7eb;
+  --neutral-text: #4b5563;
+
+  --info-border: #bfdbfe;
+  --info-bg: #eff6ff;
+  --info-bg-strong: #e8f1ff;
+  --info-text: #1d4ed8;
+
+  --success-border: #bbf7d0;
+  --success-bg: #ecfdf3;
+  --success-bg-strong: #dcfce7;
+  --success-text: #166534;
+
+  --warning-border: #fed7aa;
+  --warning-bg: #fff7ed;
+  --warning-bg-strong: #ffedd5;
+  --warning-text: #9a3412;
+
+  --danger-border: #f3c3c3;
+  --danger-bg: #fdecec;
+  --danger-bg-strong: #fde2e2;
+  --danger-text: #b71c1c;
+
+  /* Paleta decorativa das tags de Atualizações (10 cores fixas) */
+  --tag-emerald-dot: #059669; --tag-emerald-bg: #d1fae5; --tag-emerald-text: #065f46; --tag-emerald-border: #a7f3d0;
+  --tag-blue-dot: #2563eb; --tag-blue-bg: #dbeafe; --tag-blue-text: #1e3a8a; --tag-blue-border: #bfdbfe;
+  --tag-purple-dot: #7c3aed; --tag-purple-bg: #f3e8ff; --tag-purple-text: #6b21a8; --tag-purple-border: #e9d5ff;
+  --tag-orange-dot: #ea580c; --tag-orange-bg: #ffedd5; --tag-orange-text: #9a3412; --tag-orange-border: #fed7aa;
+  --tag-cyan-dot: #0891b2; --tag-cyan-bg: #cffafe; --tag-cyan-text: #155e75; --tag-cyan-border: #a5f3fc;
+  --tag-rose-dot: #e11d48; --tag-rose-bg: #fee2e2; --tag-rose-text: #b91c1c; --tag-rose-border: #fecaca;
+  --tag-red-dot: #b71c1c; --tag-red-bg: rgba(183, 28, 28, 0.08); --tag-red-text: #b71c1c; --tag-red-border: rgba(183, 28, 28, 0.2);
+  --tag-amber-dot: #d97706; --tag-amber-bg: #fef3c7; --tag-amber-text: #92400e; --tag-amber-border: #fde68a;
+  --tag-slate-dot: #64748b; --tag-slate-bg: #f1f5f9; --tag-slate-text: #334155; --tag-slate-border: #e2e8f0;
+  --tag-teal-dot: #0d9488; --tag-teal-bg: #ccfbf1; --tag-teal-text: #115e59; --tag-teal-border: #99f6e4;
+
+  --background: var(--bg-page);
+  --foreground: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg-page: #17181b;
+    --bg-surface: #1f2124;
+    --bg-surface-soft: #25272b;
+    --bg-surface-muted: #2b2d31;
+    --bg-hover-brand: rgba(183, 28, 28, 0.16);
+    --bg-hover-neutral: rgba(255, 255, 255, 0.06);
+
+    --border: #34363b;
+    --border-soft: #2c2e33;
+    --border-strong: #45474d;
+    --border-input: #3d3f45;
+    --border-input-hover: #4c4e55;
+
+    --text: #f3f4f6;
+    --text-soft: #d1d5db;
+    --text-muted: #9ca3af;
+    --text-faint: #71727a;
+    --text-inverse: #ffffff;
+
+    --primary: #e04545;
+    --primary-hover: #c62828;
+    --primary-active: #b71c1c;
+    --primary-soft: rgba(224, 69, 69, 0.16);
+    --primary-soft-strong: rgba(224, 69, 69, 0.24);
+    --primary-soft-border: rgba(224, 69, 69, 0.35);
+    --primary-ring: rgba(224, 69, 69, 0.28);
+
+    --sidebar-gradient: linear-gradient(180deg, #3a0f0f 0%, #2a0a0a 55%, #180505 100%);
+
+    --overlay: rgba(0, 0, 0, 0.6);
+
+    --tooltip-bg: #34363b;
+    --tooltip-text: #f3f4f6;
+
+    --neutral-border: #3a3c42;
+    --neutral-bg: #2b2d31;
+    --neutral-bg-strong: #34363b;
+    --neutral-text: #cbd0d8;
+
+    --info-border: #2c5282;
+    --info-bg: #16233e;
+    --info-bg-strong: #1e3a5f;
+    --info-text: #93c5fd;
+
+    --success-border: #1f6f43;
+    --success-bg: #122a1c;
+    --success-bg-strong: #14532d;
+    --success-text: #86efac;
+
+    --warning-border: #92400e;
+    --warning-bg: #2c1c0d;
+    --warning-bg-strong: #422006;
+    --warning-text: #fdba74;
+
+    --danger-border: #7f1d1d;
+    --danger-bg: #2a1414;
+    --danger-bg-strong: #450a0a;
+    --danger-text: #f87171;
+
+    --tag-emerald-dot: #34d399; --tag-emerald-bg: #0e2b1f; --tag-emerald-text: #6ee7b7; --tag-emerald-border: #1f6f43;
+    --tag-blue-dot: #60a5fa; --tag-blue-bg: #16233e; --tag-blue-text: #93c5fd; --tag-blue-border: #2c5282;
+    --tag-purple-dot: #a78bfa; --tag-purple-bg: #271a45; --tag-purple-text: #d8b4fe; --tag-purple-border: #4c2d82;
+    --tag-orange-dot: #fb923c; --tag-orange-bg: #2c1c0d; --tag-orange-text: #fdba74; --tag-orange-border: #92400e;
+    --tag-cyan-dot: #22d3ee; --tag-cyan-bg: #0e2b30; --tag-cyan-text: #67e8f9; --tag-cyan-border: #0e6b7d;
+    --tag-rose-dot: #fb7185; --tag-rose-bg: #2e1214; --tag-rose-text: #fca5a5; --tag-rose-border: #7f1d1d;
+    --tag-red-dot: #e04545; --tag-red-bg: rgba(224, 69, 69, 0.16); --tag-red-text: #f87171; --tag-red-border: rgba(224, 69, 69, 0.35);
+    --tag-amber-dot: #fbbf24; --tag-amber-bg: #2c2108; --tag-amber-text: #fcd34d; --tag-amber-border: #92700e;
+    --tag-slate-dot: #94a3b8; --tag-slate-bg: #26292e; --tag-slate-text: #cbd5e1; --tag-slate-border: #3f434b;
+    --tag-teal-dot: #2dd4bf; --tag-teal-bg: #0e2b28; --tag-teal-text: #5eead4; --tag-teal-border: #0f6b60;
+
+    --background: var(--bg-page);
+    --foreground: var(--text);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-page: #17181b;
+  --bg-surface: #1f2124;
+  --bg-surface-soft: #25272b;
+  --bg-surface-muted: #2b2d31;
+  --bg-hover-brand: rgba(183, 28, 28, 0.16);
+  --bg-hover-neutral: rgba(255, 255, 255, 0.06);
+
+  --border: #34363b;
+  --border-soft: #2c2e33;
+  --border-strong: #45474d;
+  --border-input: #3d3f45;
+  --border-input-hover: #4c4e55;
+
+  --text: #f3f4f6;
+  --text-soft: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-faint: #71727a;
+  --text-inverse: #ffffff;
+
+  --primary: #e04545;
+  --primary-hover: #c62828;
+  --primary-active: #b71c1c;
+  --primary-soft: rgba(224, 69, 69, 0.16);
+  --primary-soft-strong: rgba(224, 69, 69, 0.24);
+  --primary-soft-border: rgba(224, 69, 69, 0.35);
+  --primary-ring: rgba(224, 69, 69, 0.28);
+
+  --sidebar-gradient: linear-gradient(180deg, #3a0f0f 0%, #2a0a0a 55%, #180505 100%);
+
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  --tooltip-bg: #34363b;
+  --tooltip-text: #f3f4f6;
+
+  --neutral-border: #3a3c42;
+  --neutral-bg: #2b2d31;
+  --neutral-bg-strong: #34363b;
+  --neutral-text: #cbd0d8;
+
+  --info-border: #2c5282;
+  --info-bg: #16233e;
+  --info-bg-strong: #1e3a5f;
+  --info-text: #93c5fd;
+
+  --success-border: #1f6f43;
+  --success-bg: #122a1c;
+  --success-bg-strong: #14532d;
+  --success-text: #86efac;
+
+  --warning-border: #92400e;
+  --warning-bg: #2c1c0d;
+  --warning-bg-strong: #422006;
+  --warning-text: #fdba74;
+
+  --danger-border: #7f1d1d;
+  --danger-bg: #2a1414;
+  --danger-bg-strong: #450a0a;
+  --danger-text: #f87171;
+
+  --tag-emerald-dot: #34d399; --tag-emerald-bg: #0e2b1f; --tag-emerald-text: #6ee7b7; --tag-emerald-border: #1f6f43;
+  --tag-blue-dot: #60a5fa; --tag-blue-bg: #16233e; --tag-blue-text: #93c5fd; --tag-blue-border: #2c5282;
+  --tag-purple-dot: #a78bfa; --tag-purple-bg: #271a45; --tag-purple-text: #d8b4fe; --tag-purple-border: #4c2d82;
+  --tag-orange-dot: #fb923c; --tag-orange-bg: #2c1c0d; --tag-orange-text: #fdba74; --tag-orange-border: #92400e;
+  --tag-cyan-dot: #22d3ee; --tag-cyan-bg: #0e2b30; --tag-cyan-text: #67e8f9; --tag-cyan-border: #0e6b7d;
+  --tag-rose-dot: #fb7185; --tag-rose-bg: #2e1214; --tag-rose-text: #fca5a5; --tag-rose-border: #7f1d1d;
+  --tag-red-dot: #e04545; --tag-red-bg: rgba(224, 69, 69, 0.16); --tag-red-text: #f87171; --tag-red-border: rgba(224, 69, 69, 0.35);
+  --tag-amber-dot: #fbbf24; --tag-amber-bg: #2c2108; --tag-amber-text: #fcd34d; --tag-amber-border: #92700e;
+  --tag-slate-dot: #94a3b8; --tag-slate-bg: #26292e; --tag-slate-text: #cbd5e1; --tag-slate-border: #3f434b;
+  --tag-teal-dot: #2dd4bf; --tag-teal-bg: #0e2b28; --tag-teal-text: #5eead4; --tag-teal-border: #0f6b60;
+
+  --background: var(--bg-page);
+  --foreground: var(--text);
 }
 
 @theme inline {
@@ -57,12 +271,13 @@ html {
 }
 
 body {
-  background: var(--background);
+  background: var(--bg-page);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 button,
@@ -84,4 +299,30 @@ video,
 canvas {
   display: block;
   max-width: 100%;
+}
+
+/*
+ * Transição "gota d'água" ao trocar de tema — um círculo cresce
+ * a partir do ponto clicado (--tema-origem-x/y, setados em JS
+ * antes de chamar startViewTransition) até cobrir a tela
+ * (--tema-raio). O snapshot antigo fica parado por baixo; só o
+ * novo tema é revelado dentro do círculo em expansão. Ver
+ * src/lib/tema/aplicar-tema.ts.
+ */
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: tema-gota-dagua 0.6s ease-in-out;
+}
+
+@keyframes tema-gota-dagua {
+  from {
+    clip-path: circle(0px at var(--tema-origem-x, 50%) var(--tema-origem-y, 50%));
+  }
+
+  to {
+    clip-path: circle(var(--tema-raio, 150%) at var(--tema-origem-x, 50%) var(--tema-origem-y, 50%));
+  }
 }

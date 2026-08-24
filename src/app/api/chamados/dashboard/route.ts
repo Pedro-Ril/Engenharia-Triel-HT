@@ -15,6 +15,8 @@ export async function GET(request: Request) {
 
   const setorId = url.searchParams.get("setorId") ?? undefined;
   const empresa = url.searchParams.get("empresa") ?? undefined;
+  const departamento = url.searchParams.get("departamento") ?? undefined;
+  const categoriaId = url.searchParams.get("categoriaId") ?? undefined;
   const dataInicial = url.searchParams.get("dataInicial") ?? undefined;
   const dataFinal = url.searchParams.get("dataFinal") ?? undefined;
 
@@ -23,6 +25,8 @@ export async function GET(request: Request) {
       setorIds,
       setorId,
       empresa,
+      departamento,
+      categoriaId,
       dataInicial,
       dataFinal,
     });

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import {
+  Activity,
+  BookOpen,
   Boxes,
   Download,
   Factory,
@@ -19,21 +21,26 @@ import { FormGrid } from "@/components/ui/FormGrid";
 import { Loader } from "@/components/ui/Loader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import { Toast } from "@/components/ui/Toast";
 
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
+import type { WikiArtigo } from "@/modules/wiki/types/wiki.types";
 
 import {
   buscarConfiguracaoAd,
+  buscarConfiguracaoDb,
   listarDownloadsAdmin,
   listarModulos,
   listarPermissoes,
   listarSetores,
   listarUsuarios,
+  listarWikiArtigosAdmin,
 } from "../services/adminPermissoes.service";
 import type {
   ConfiguracaoAd,
+  ConfiguracaoDb,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
@@ -46,11 +53,14 @@ import styles from "./AdminPermissoes.module.css";
 import { AtendentesChamadosPainel } from "./AtendentesChamadosPainel";
 import { AtualizacoesPainel } from "./AtualizacoesPainel";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
+import { ConfiguracaoDbPainel } from "./ConfiguracaoDbPainel";
 import { DownloadsPainel } from "./DownloadsPainel";
+import { MonitoramentoPainel } from "./MonitoramentoPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
+import { WikiPainel } from "./WikiPainel";
 
 const toastInicial: ToastState = {
   open: false,
@@ -100,6 +110,16 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         label: "Chamados",
         icon: <Headset size={16} />,
       },
+      {
+        valor: "monitoramento",
+        label: "Monitoramento",
+        icon: <Activity size={16} />,
+      },
+      {
+        valor: "wiki",
+        label: "Wiki",
+        icon: <BookOpen size={16} />,
+      },
     ],
   },
 ];
@@ -116,7 +136,9 @@ export function AdminPermissoesPage() {
   const [configuracaoAd, setConfiguracaoAd] = useState<ConfiguracaoAd | null>(
     null
   );
+  const [configuracaoDb, setConfiguracaoDb] = useState<ConfiguracaoDb | null>(null);
   const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
+  const [wikiArtigos, setWikiArtigos] = useState<WikiArtigo[]>([]);
 
   function mostrarFeedback(
     variant: ToastState["variant"],
@@ -136,14 +158,18 @@ export function AdminPermissoesPage() {
         usuariosData,
         permissoesData,
         configuracaoAdData,
+        configuracaoDbData,
         downloadsData,
+        wikiArtigosData,
       ] = await Promise.all([
         listarSetores(),
         listarModulos(),
         listarUsuarios(),
         listarPermissoes(),
         buscarConfiguracaoAd(),
+        buscarConfiguracaoDb(),
         listarDownloadsAdmin(),
+        listarWikiArtigosAdmin(),
       ]);
 
       setSetores(setoresData);
@@ -151,7 +177,9 @@ export function AdminPermissoesPage() {
       setUsuarios(usuariosData);
       setPermissoes(permissoesData);
       setConfiguracaoAd(configuracaoAdData);
+      setConfiguracaoDb(configuracaoDbData);
       setDownloads(downloadsData);
+      setWikiArtigos(wikiArtigosData);
       setCarregando(false);
     }
 
@@ -315,11 +343,19 @@ export function AdminPermissoesPage() {
           )}
 
           {secao === "configuracoes" && (
-            <ConfiguracaoAdPainel
-              configuracaoAd={configuracaoAd}
-              onFeedback={mostrarFeedback}
-              onConfiguracaoAtualizada={setConfiguracaoAd}
-            />
+            <Stack gap={20}>
+              <ConfiguracaoAdPainel
+                configuracaoAd={configuracaoAd}
+                onFeedback={mostrarFeedback}
+                onConfiguracaoAtualizada={setConfiguracaoAd}
+              />
+
+              <ConfiguracaoDbPainel
+                configuracaoDb={configuracaoDb}
+                onFeedback={mostrarFeedback}
+                onConfiguracaoAtualizada={setConfiguracaoDb}
+              />
+            </Stack>
           )}
 
           {secao === "terminal-fabrica" && <TerminalFabricaPainel />}
@@ -349,6 +385,28 @@ export function AdminPermissoesPage() {
 
           {secao === "chamados" && (
             <AtendentesChamadosPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "monitoramento" && (
+            <MonitoramentoPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "wiki" && (
+            <WikiPainel
+              artigos={wikiArtigos}
+              modulos={modulos}
+              onFeedback={mostrarFeedback}
+              onArtigoCriado={(artigo) => setWikiArtigos((atual) => [...atual, artigo])}
+              onArtigoAtualizado={(artigo) =>
+                setWikiArtigos((atual) =>
+                  atual.map((item) => (item.id === artigo.id ? artigo : item))
+                )
+              }
+              onArtigoExcluido={(id) =>
+                setWikiArtigos((atual) => atual.filter((item) => item.id !== id))
+              }
+              onArtigosRecarregados={setWikiArtigos}
+            />
           )}
         </div>
       </div>

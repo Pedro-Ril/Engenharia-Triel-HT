@@ -20,7 +20,7 @@
   overflow-x: auto;
   overflow-y: hidden;
 
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 
   scrollbar-width: thin;
 }
@@ -41,7 +41,7 @@
   border-radius: 10px;
   background: transparent;
 
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
@@ -76,8 +76,8 @@
 }
 
 .trigger:hover:not(:disabled) {
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .trigger:active:not(:disabled) {
@@ -85,7 +85,7 @@
 }
 
 .trigger:focus-visible {
-  outline: 3px solid rgba(183, 28, 28, 0.12);
+  outline: 3px solid var(--primary-ring);
   outline-offset: -2px;
 }
 
@@ -95,12 +95,12 @@
 }
 
 .active {
-  color: #b71c1c;
-  background: rgba(183, 28, 28, 0.05);
+  color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .active::after {
-  background: #b71c1c;
+  background: var(--primary);
   opacity: 1;
   transform: scaleX(1);
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BookOpen,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -268,6 +269,23 @@ export default function Sidebar({
               </AppLink>
             );
           })}
+
+          {usuario && (
+            <AppLink
+              href="/wiki"
+              className={`${styles.menuItem} ${
+                pathname === "/wiki" || pathname?.startsWith("/wiki/") ? styles.active : ""
+              }`}
+              title="Wiki"
+              aria-label="Wiki"
+            >
+              <span className={styles.menuIcon}>
+                <BookOpen size={18} />
+              </span>
+
+              {open && <span className={styles.menuText}>Wiki</span>}
+            </AppLink>
+          )}
 
           {usuario?.ehAdministrador && (
             <AppLink

@@ -11,9 +11,9 @@
   align-items: center;
   justify-content: center;
 
-  border: 1.5px dashed #d1d5db;
+  border: 1.5px dashed var(--border-strong);
   border-radius: 14px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
 
   transition:
     border-color 0.18s ease,
@@ -23,15 +23,15 @@
 
 .upload:hover:not(.disabled) {
   border-color: rgba(183, 28, 28, 0.45);
-  background: #fffafa;
+  background: var(--primary-soft);
 }
 
 .dragging {
-  border-color: #b71c1c;
-  background: #fff5f5;
+  border-color: var(--primary);
+  background: var(--primary-soft);
 
   box-shadow:
-    0 0 0 3px rgba(183, 28, 28, 0.1);
+    0 0 0 3px var(--primary-ring);
 }
 
 .input {
@@ -65,7 +65,7 @@
 }
 
 .selectButton:focus-visible {
-  outline: 3px solid rgba(183, 28, 28, 0.13);
+  outline: 3px solid var(--primary-ring);
   outline-offset: 3px;
 }
 
@@ -78,8 +78,8 @@
   justify-content: center;
 
   border-radius: 13px;
-  background: #fdecec;
-  color: #b71c1c;
+  background: var(--danger-bg);
+  color: var(--primary);
 }
 
 .uploadIcon svg {
@@ -97,14 +97,14 @@
 }
 
 .label {
-  color: #333333;
+  color: var(--text-soft);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
 }
 
 .description {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -112,7 +112,7 @@
 .rules {
   margin-top: 3px;
 
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -133,9 +133,9 @@
   align-items: center;
   gap: 10px;
 
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 11px;
-  background: #ffffff;
+  background: var(--bg-surface);
 
   transition:
     border-color 0.18s ease,
@@ -143,8 +143,8 @@
 }
 
 .fileItem:hover {
-  border-color: #ead1d1;
-  background: #fffafa;
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
 }
 
 .fileIcon {
@@ -157,8 +157,8 @@
   justify-content: center;
 
   border-radius: 9px;
-  background: #fdecec;
-  color: #b71c1c;
+  background: var(--danger-bg);
+  color: var(--primary);
 }
 
 .fileIcon svg {
@@ -178,7 +178,7 @@
 .fileName {
   overflow: hidden;
 
-  color: #333333;
+  color: var(--text-soft);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
@@ -188,7 +188,7 @@
 }
 
 .fileSize {
-  color: #858c97;
+  color: var(--text-faint);
   font-size: 11px;
 }
 
@@ -207,7 +207,7 @@
   border-radius: 8px;
   background: transparent;
 
-  color: #6b7280;
+  color: var(--text-muted);
   cursor: pointer;
 
   transition:
@@ -216,12 +216,12 @@
 }
 
 .removeButton:hover:not(:disabled) {
-  color: #b71c1c;
-  background: #fdecec;
+  color: var(--primary);
+  background: var(--danger-bg);
 }
 
 .removeButton:focus-visible {
-  outline: 3px solid rgba(183, 28, 28, 0.12);
+  outline: 3px solid var(--primary-ring);
 }
 
 .removeButton svg {
@@ -231,7 +231,7 @@
 
 .error {
   border-color: #d9534f;
-  background: #fff5f5;
+  background: var(--primary-soft);
 }
 
 .errorMessage {
@@ -241,7 +241,7 @@
   align-items: flex-start;
   gap: 7px;
 
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -256,7 +256,7 @@
 
 .disabled {
   cursor: not-allowed;
-  background: #f3f4f6;
+  background: var(--bg-surface-muted);
   opacity: 0.65;
 }
 

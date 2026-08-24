@@ -28,6 +28,7 @@ export interface PortalUsuarioAdmin {
   nomeExibicao: string;
   email: string | null;
   codigoEmpresa: string | null;
+  departamento: string | null;
   ehAdministrador: boolean;
   ativo: boolean;
   sessaoInvalidadaEm: string | null;
@@ -66,6 +67,27 @@ export interface ConfiguracaoAd {
   grupoUsuariosDn: string | null;
   atualizadoEm: string;
   atualizadoPor: string | null;
+}
+
+export interface ResultadoTesteConexaoAd {
+  conectou: boolean;
+  grupoAdminExiste: boolean;
+  grupoUsuariosExiste: boolean | null;
+  mensagemErro: string | null;
+}
+
+export interface ConfiguracaoDb {
+  server: string;
+  database: string;
+  user: string;
+  senhaConfigurada: boolean;
+  encrypt: boolean;
+  trustServerCertificate: boolean;
+}
+
+export interface ResultadoTesteConexaoDb {
+  conectou: boolean;
+  mensagemErro: string | null;
 }
 
 export type TipoAtualizacaoItem = "novo" | "melhoria" | "correcao";

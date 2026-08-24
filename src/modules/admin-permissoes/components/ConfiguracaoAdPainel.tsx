@@ -10,7 +10,7 @@ import { FormGrid } from "@/components/ui/FormGrid";
 import { Input } from "@/components/ui/Input";
 import { Stack } from "@/components/ui/Stack";
 
-import { salvarConfiguracaoAd } from "../services/adminPermissoes.service";
+import { salvarConfiguracaoAd, testarConexaoAd } from "../services/adminPermissoes.service";
 import type { ConfiguracaoAd } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 
@@ -39,9 +39,49 @@ export function ConfiguracaoAdPainel({
   const [formulario, setFormulario] = useState(formularioInicial(configuracaoAd));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [testando, setTestando] = useState(false);
+  const [resultadoTeste, setResultadoTeste] = useState<{
+    sucesso: boolean;
+    mensagem: string;
+  } | null>(null);
+
+  async function handleTestar() {
+    setErro(null);
+    setResultadoTeste(null);
+    setTestando(true);
+
+    try {
+      const resultado = await testarConexaoAd({
+        url: formulario.url,
+        usuarioServico: formulario.usuarioServico,
+        senhaServico: formulario.senhaServico.trim() || null,
+        grupoAdminDn: formulario.grupoAdminDn,
+        grupoUsuariosDn: formulario.grupoUsuariosDn.trim() || null,
+      });
+
+      if (resultado.ok && resultado.data) {
+        setResultadoTeste(
+          resultado.data.conectou
+            ? { sucesso: true, mensagem: "Conexão com o Active Directory bem-sucedida." }
+            : {
+                sucesso: false,
+                mensagem: resultado.data.mensagemErro ?? "Não foi possível conectar.",
+              }
+        );
+      } else {
+        setResultadoTeste({
+          sucesso: false,
+          mensagem: resultado.message ?? "Não foi possível testar a conexão.",
+        });
+      }
+    } finally {
+      setTestando(false);
+    }
+  }
 
   async function handleSalvar() {
     setErro(null);
+    setResultadoTeste(null);
     setSalvando(true);
 
     try {
@@ -176,6 +216,12 @@ export function ConfiguracaoAdPainel({
 
           {erro && <Alert variant="danger">{erro}</Alert>}
 
+          {resultadoTeste && (
+            <Alert variant={resultadoTeste.sucesso ? "success" : "danger"}>
+              {resultadoTeste.mensagem}
+            </Alert>
+          )}
+
           {configuracaoAd?.atualizadoEm && (
             <p>
               Última atualização em{" "}
@@ -188,6 +234,20 @@ export function ConfiguracaoAdPainel({
           )}
 
           <Stack direction="row" justify="end" gap={10}>
+            <Button
+              variant="secondary"
+              onClick={handleTestar}
+              loading={testando}
+              disabled={
+                !formulario.url ||
+                !formulario.usuarioServico ||
+                !formulario.grupoAdminDn ||
+                (!configuracaoAd && !formulario.senhaServico)
+              }
+            >
+              Testar conexão
+            </Button>
+
             <Button
               onClick={handleSalvar}
               loading={salvando}

@@ -2,8 +2,12 @@ import "server-only";
 
 import { getConfiguracaoAd } from "./configuracao-ad";
 import { ValidationError } from "./errors";
-import { buscarMembrosDoGrupo } from "./ldap";
-import { upsertUsuarioImportado } from "./usuarios";
+import { buscarMembrosDoGrupo, buscarUsuariosNoDiretorioPorSamAccountNames } from "./ldap";
+import {
+  atualizarDadosUsuarioDoAd,
+  listarTodosSamAccountNames,
+  upsertUsuarioImportado,
+} from "./usuarios";
 
 export interface ResultadoImportacaoAd {
   encontrados: number;
@@ -65,5 +69,63 @@ export async function importarUsuariosDoGrupoAd(): Promise<ResultadoImportacaoAd
     encontrados: candidatos.length,
     criados,
     atualizados,
+  };
+}
+
+export interface ResultadoAtualizacaoAd {
+  verificados: number;
+  atualizados: number;
+  naoEncontrados: number;
+}
+
+/*
+ * "Atualizar Usuário AD" (botão na tela Usuários) — diferente de
+ * importarUsuariosDoGrupoAd: aqui o ponto de partida é quem JÁ
+ * está cadastrado no portal_usuarios (login anterior ou
+ * importação), não o grupo configurado. Útil para quando alguém
+ * mudou de setor no AD (grupo "GRUPO X") ou virou/deixou de ser
+ * admin, e não vai logar de novo tão cedo pra isso se atualizar
+ * sozinho. Nunca cria usuário novo — só atualiza quem já existe
+ * e ainda for encontrado no AD.
+ */
+export async function atualizarUsuariosExistentesComAd(): Promise<ResultadoAtualizacaoAd> {
+  const config = await getConfiguracaoAd();
+
+  if (!config) {
+    throw new ValidationError(
+      "Configure a conexão com o Active Directory antes de atualizar usuários."
+    );
+  }
+
+  const samAccountNames = await listarTodosSamAccountNames();
+
+  if (samAccountNames.length === 0) {
+    return { verificados: 0, atualizados: 0, naoEncontrados: 0 };
+  }
+
+  const encontrados = await buscarUsuariosNoDiretorioPorSamAccountNames(
+    config,
+    samAccountNames
+  );
+
+  let atualizados = 0;
+  let naoEncontrados = 0;
+
+  for (const samAccountName of samAccountNames) {
+    const diretorioUsuario = encontrados.get(samAccountName.toLowerCase());
+
+    if (!diretorioUsuario) {
+      naoEncontrados += 1;
+      continue;
+    }
+
+    await atualizarDadosUsuarioDoAd(samAccountName, diretorioUsuario);
+    atualizados += 1;
+  }
+
+  return {
+    verificados: samAccountNames.length,
+    atualizados,
+    naoEncontrados,
   };
 }

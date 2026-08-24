@@ -483,6 +483,7 @@ const usuarioSelectColumns = `
   [nome_exibicao],
   [email],
   [codigo_empresa],
+  [departamento],
   CAST([eh_administrador] AS BIT) AS [eh_administrador],
   CAST([ativo] AS BIT) AS [ativo],
   CONVERT(VARCHAR(33), [sessao_invalidada_em], 126) AS [sessao_invalidada_em],
@@ -495,6 +496,7 @@ const usuarioOutputColumns = `
   INSERTED.[nome_exibicao],
   INSERTED.[email],
   INSERTED.[codigo_empresa],
+  INSERTED.[departamento],
   CAST(INSERTED.[eh_administrador] AS BIT) AS [eh_administrador],
   CAST(INSERTED.[ativo] AS BIT) AS [ativo],
   CONVERT(VARCHAR(33), INSERTED.[sessao_invalidada_em], 126) AS [sessao_invalidada_em],
@@ -507,6 +509,7 @@ function mapUsuarioRow(row: {
   nome_exibicao: string;
   email: string | null;
   codigo_empresa: string | null;
+  departamento: string | null;
   eh_administrador: boolean;
   ativo: boolean;
   sessao_invalidada_em: string | null;
@@ -518,6 +521,7 @@ function mapUsuarioRow(row: {
     nomeExibicao: row.nome_exibicao,
     email: row.email,
     codigoEmpresa: row.codigo_empresa,
+    departamento: row.departamento,
     ehAdministrador: row.eh_administrador,
     ativo: row.ativo,
     sessaoInvalidadaEm: row.sessao_invalidada_em,

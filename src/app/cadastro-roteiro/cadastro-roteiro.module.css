@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: #f8f9fb;
+  background: var(--bg-page);
   min-height: 100%;
 }
 
@@ -17,19 +17,19 @@
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .subtitle {
   margin: 6px 0 0;
-  color: #555;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .searchCard,
 .leftPanel {
-  background: #fff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
 }
@@ -57,22 +57,24 @@
 .label {
   font-size: 13px;
   font-weight: 600;
-  color: #444;
+  color: var(--text-soft);
 }
 
 .input {
   height: 44px;
-  border: 1px solid #d8d8d8;
+  border: 1px solid var(--border-input);
   border-radius: 12px;
   padding: 0 14px;
   font-size: 15px;
   outline: none;
   transition: 0.2s ease;
+  background: var(--bg-surface);
+  color: var(--text);
 }
 
 .input:focus {
-  border-color: #b71c1c;
-  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .searchButton {
@@ -80,8 +82,8 @@
   min-width: 140px;
   border: none;
   border-radius: 12px;
-  background: #b71c1c;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-inverse);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -95,9 +97,9 @@
 .errorBox {
   padding: 12px 14px;
   border-radius: 12px;
-  background: #fdecec;
-  color: #b71c1c;
-  border: 1px solid #f5c8c8;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
   font-size: 14px;
 }
 
@@ -108,10 +110,10 @@
 }
 
 .summaryCard {
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 12px 14px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -119,12 +121,12 @@
 
 .summaryLabel {
   font-size: 12px;
-  color: #777;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .warningText {
-  color: #c62828;
+  color: var(--primary-hover);
   font-weight: 700;
 }
 
@@ -134,9 +136,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   flex-wrap: wrap;
 }
 
@@ -147,18 +149,18 @@
   cursor: pointer;
   user-select: none;
   font-weight: 600;
-  color: #333;
+  color: var(--text-soft);
 }
 
 .filterToggle input {
   width: 16px;
   height: 16px;
-  accent-color: #b71c1c;
+  accent-color: var(--primary);
 }
 
 .filterHint {
   font-size: 12px;
-  color: #777;
+  color: var(--text-muted);
 }
 
 .leftPanel {
@@ -168,14 +170,14 @@
 
 .panelHeader {
   padding-bottom: 12px;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid var(--border-soft);
   margin-bottom: 16px;
 }
 
 .panelHeader h2 {
   margin: 0;
   font-size: 18px;
-  color: #222;
+  color: var(--text);
 }
 
 .treeWrapper {
@@ -192,7 +194,7 @@
 
 .treeChildren {
   margin-left: 18px;
-  border-left: 1px dashed #dddddd;
+  border-left: 1px dashed var(--border-strong);
   padding-left: 14px;
 }
 
@@ -207,7 +209,7 @@
 }
 
 .treeRow:hover {
-  background: #f6f6f6;
+  background: var(--bg-surface-muted);
 }
 
 .treeRowWarning {
@@ -227,7 +229,7 @@
   min-width: 24px;
   height: 24px;
   cursor: pointer;
-  color: #444;
+  color: var(--text-soft);
   font-size: 14px;
 }
 
@@ -246,12 +248,12 @@
 
 .nodeCode {
   font-size: 14px;
-  color: #222;
+  color: var(--text);
 }
 
 .nodeDescription {
   font-size: 13px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .badgeSuccess,
@@ -267,15 +269,15 @@
 }
 
 .badgeSuccess {
-  background: #ecfdf3;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
 }
 
 .badgeWarning {
-  background: #fdecec;
-  color: #b71c1c;
-  border: 1px solid #f5c8c8;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
 }
 
 .roteiroList {
@@ -289,21 +291,21 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(150px, 1fr));
   gap: 8px;
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #fff;
+  background: var(--bg-surface);
   padding: 10px;
   font-size: 12px;
-  color: #444;
+  color: var(--text-soft);
 }
 
 .emptyState {
   padding: 30px 20px;
   text-align: center;
-  color: #777;
-  border: 1px dashed #ddd;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
   border-radius: 12px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
 }
 
 @media (max-width: 1100px) {
@@ -329,9 +331,9 @@
   margin-top: 2px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  border: 1px solid var(--neutral-border);
   font-size: 11px;
   font-weight: 700;
 }
@@ -346,22 +348,22 @@
 .filterSelectLabel {
   font-size: 12px;
   font-weight: 700;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .filterSelect {
   height: 40px;
-  border: 1px solid #d8d8d8;
+  border: 1px solid var(--border-input);
   border-radius: 10px;
   padding: 0 12px;
-  background: #fff;
+  background: var(--bg-surface);
   font-size: 14px;
   outline: none;
 }
 
 .filterSelect:focus {
-  border-color: #b71c1c;
-  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 .tipoCheckboxList {
   display: flex;
@@ -374,17 +376,17 @@
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--bg-surface);
   font-size: 13px;
   font-weight: 700;
-  color: #444;
+  color: var(--text-soft);
   cursor: pointer;
 }
 
 .tipoCheckboxItem input {
-  accent-color: #b71c1c;
+  accent-color: var(--primary);
 }
 .treeRow {
   cursor: pointer;
@@ -394,9 +396,9 @@
   margin-top: 8px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
   font-size: 13px;
   font-weight: 600;
 }
@@ -405,9 +407,9 @@
 }
 
 .filtersCard {
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   overflow: hidden;
 }
 
@@ -430,23 +432,23 @@
 }
 
 .filtersHeader strong {
-  color: #222;
+  color: var(--text);
   font-size: 14px;
 }
 
 .filtersHeader span {
-  color: #777;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .filtersChevron {
   font-size: 18px !important;
-  color: #b71c1c !important;
+  color: var(--primary) !important;
   font-weight: 800;
 }
 
 .filtersBody {
-  border-top: 1px solid #eeeeee;
+  border-top: 1px solid var(--border-soft);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -456,24 +458,24 @@
   width: fit-content;
   padding: 6px 10px;
   border-radius: 999px;
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  border: 1px solid var(--neutral-border);
   font-size: 12px;
   font-weight: 700;
 }
 
 .roteiroGrupoCard {
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #fff;
+  background: var(--bg-surface);
   overflow: hidden;
 }
 
 .roteiroGrupoHeader {
   width: 100%;
   border: none;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   padding: 10px 12px;
   display: flex;
   justify-content: space-between;
@@ -489,17 +491,17 @@
 }
 
 .roteiroGrupoHeader strong {
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 13px;
 }
 
 .roteiroGrupoHeader span {
-  color: #777;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .roteiroGrupoChevron {
-  color: #b71c1c !important;
+  color: var(--primary) !important;
   font-size: 18px;
   font-weight: 800;
 }
@@ -509,7 +511,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-top: 1px solid #eeeeee;
+  border-top: 1px solid var(--border-soft);
 }
 .clearFilterButton {
   width: fit-content;
@@ -518,16 +520,16 @@
   height: 38px;
   padding: 0 16px;
 
-  border: 1px solid rgba(183, 28, 28, 0.18);
+  border: 1px solid var(--primary-soft-border);
   border-radius: 10px;
 
   background: linear-gradient(
     135deg,
-    rgba(183, 28, 28, 0.08),
+    var(--primary-soft),
     rgba(183, 28, 28, 0.04)
   );
 
-  color: #b71c1c;
+  color: var(--primary);
 
   font-size: 13px;
   font-weight: 700;
@@ -544,8 +546,8 @@
 .clearFilterButton:hover {
   background: linear-gradient(
     135deg,
-    rgba(183, 28, 28, 0.14),
-    rgba(183, 28, 28, 0.08)
+    var(--primary-soft-strong),
+    var(--primary-soft)
   );
 
   border-color: rgba(183, 28, 28, 0.3);
@@ -586,7 +588,7 @@
 }
 
 .summaryCardClickable:hover {
-  border-color: rgba(183, 28, 28, 0.25);
+  border-color: var(--primary-soft-border);
   box-shadow: 0 6px 18px rgba(183, 28, 28, 0.08);
   transform: translateY(-1px);
 }
@@ -594,7 +596,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -608,7 +610,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg-surface);
   border-radius: 18px;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
 }
@@ -618,26 +620,26 @@
   justify-content: space-between;
   gap: 16px;
   padding: 22px 24px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .modalTitle {
   margin: 0;
   font-size: 22px;
   font-weight: 800;
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .modalSubtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .modalCloseButton {
   border: none;
   background: transparent;
-  color: #374151;
+  color: var(--text-soft);
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
@@ -654,31 +656,31 @@
 }
 
 .modalTable th {
-  background: #f8fafc;
-  color: #374151;
+  background: var(--bg-surface-soft);
+  color: var(--text-soft);
   font-size: 13px;
   font-weight: 700;
   text-align: left;
   padding: 12px 10px;
-  border-bottom: 1px solid #d1d5db;
+  border-bottom: 1px solid var(--border-strong);
 }
 
 .modalTable td {
   padding: 11px 10px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   font-size: 13px;
 }
 
 .modalTable tr:hover {
-  background: #fff8f8;
+  background: var(--bg-hover-brand);
 }
 .createRouteButton {
   margin-top: 8px;
   width: fit-content;
   border: none;
   border-radius: 10px;
-  background: #b71c1c;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-inverse);
   padding: 9px 14px;
   font-size: 13px;
   font-weight: 700;
@@ -695,7 +697,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg-surface);
   border-radius: 18px;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
 }
@@ -705,19 +707,19 @@
   justify-content: space-between;
   gap: 16px;
   padding: 20px 24px 14px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .operacaoModalTitle {
   margin: 0;
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 22px;
   font-weight: 800;
 }
 
 .operacaoModalSubtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -730,24 +732,24 @@
 }
 
 .formSection {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
 }
 
 .formFieldset {
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--border-strong);
   border-radius: 14px;
   padding: 16px 14px 14px;
-  background: #fff;
+  background: var(--bg-surface);
 }
 
 .formFieldset legend {
   padding: 0 8px;
   font-size: 13px;
   font-weight: 800;
-  color: #333;
+  color: var(--text-soft);
 }
 
 .formGrid {
@@ -771,19 +773,19 @@
 .formLabel {
   font-size: 12px;
   font-weight: 800;
-  color: #333;
+  color: var(--text-soft);
 }
 
 .required {
-  color: #b71c1c;
+  color: var(--primary);
   margin-left: 2px;
 }
 
 .formInput,
 .formTextarea {
-  border: 1px solid #d8d8d8;
+  border: 1px solid var(--border-input);
   border-radius: 10px;
-  background: #fff;
+  background: var(--bg-surface);
   padding: 9px 10px;
   font-size: 13px;
   outline: none;
@@ -791,8 +793,8 @@
 
 .formInput:focus,
 .formTextarea:focus {
-  border-color: #b71c1c;
-  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .formTextarea {
@@ -808,8 +810,8 @@
   z-index: 20;
   max-height: 220px;
   overflow: auto;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
 }
@@ -817,7 +819,7 @@
 .searchOption {
   width: 100%;
   border: none;
-  background: #fff;
+  background: var(--bg-surface);
   padding: 9px 10px;
   display: flex;
   flex-direction: column;
@@ -827,16 +829,16 @@
 }
 
 .searchOption:hover {
-  background: #fff8f8;
+  background: var(--bg-hover-brand);
 }
 
 .searchOption strong {
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 12px;
 }
 
 .searchOption span {
-  color: #444;
+  color: var(--text-soft);
   font-size: 12px;
 }
 
@@ -845,13 +847,13 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px 20px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 .modalPrimaryButton {
   border: none;
-  background: #c81e1e;
-  color: #ffffff;
+  background: var(--primary-hover);
+  color: var(--text-inverse);
   border-radius: 12px;
   padding: 11px 18px;
   min-height: 42px;
@@ -867,7 +869,7 @@
 }
 
 .modalPrimaryButton:hover {
-  background: #b71c1c;
+  background: var(--primary);
 }
 
 @media (max-width: 900px) {
@@ -904,7 +906,7 @@
 .formTextarea {
   font-size: 14px;
   font-weight: 500;
-  color: #222;
+  color: var(--text);
 }
 
 .formLabel {
@@ -926,16 +928,16 @@
   line-height: 1.35;
 }
 .operacoesAdicionadasBox {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   padding: 14px;
 }
 
 .operacoesAdicionadasBox h4 {
   margin: 0 0 10px;
   font-size: 14px;
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .operacoesAdicionadasList {
@@ -949,24 +951,24 @@
   grid-template-columns: 100px 1fr 1fr;
   gap: 10px;
   padding: 10px;
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
-  background: #fff;
+  background: var(--bg-surface);
   font-size: 13px;
 }
 
 .operacaoAdicionadaCard strong {
-  color: #222;
+  color: var(--text);
 }
 
 .operacaoAdicionadaCard span {
-  color: #555;
+  color: var(--text-muted);
 }
 .modalSecondaryButton {
   font-family: inherit;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #374151;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-soft);
   border-radius: 12px;
   padding: 11px 16px;
   font-size: 14px;
@@ -976,8 +978,8 @@
 }
 
 .modalSecondaryButton:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--bg-surface-soft);
+  border-color: var(--border-strong);
 }
 
 .operacaoModalFooter {
@@ -986,8 +988,8 @@
   align-items: center;
   gap: 10px;
   padding: 16px 24px 20px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
 }
 
 .modalPrimaryButton,
@@ -1000,30 +1002,30 @@
   grid-template-columns: 90px 1.4fr 1.4fr 160px 160px;
   gap: 10px;
   padding: 12px;
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
-  background: #fff;
+  background: var(--bg-surface);
   font-size: 13px;
   align-items: center;
 }
 
 .operacaoAdicionadaCard strong {
-  color: #222;
+  color: var(--text);
 }
 
 .operacaoAdicionadaCard span {
-  color: #555;
+  color: var(--text-muted);
 }
 
 .operacaoAdicionadaCard b {
-  color: #333;
+  color: var(--text-soft);
   font-weight: 700;
 }
 .editRouteButton {
   width: fit-content;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #b71c1c;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--primary);
   border-radius: 10px;
   padding: 8px 12px;
   font-size: 13px;
@@ -1032,13 +1034,13 @@
 }
 
 .editRouteButton:hover {
-  background: #fff5f5;
+  background: var(--bg-hover-brand);
   border-color: rgba(183, 28, 28, 0.35);
 }
 .successBox {
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-  color: #166534;
+  border: 1px solid var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 13px;
@@ -1055,25 +1057,25 @@
 
 .deleteModalQuestion {
   margin: 0 0 14px;
-  color: #374151;
+  color: var(--text-soft);
   font-size: 14px;
   line-height: 1.45;
 }
 
 .deleteModalInfoBox {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 12px;
   font-size: 14px;
   display: grid;
   gap: 8px;
-  color: #111827;
+  color: var(--text);
 }
 
 .deleteModalInfoBox strong {
   font-weight: 800;
-  color: #111827;
+  color: var(--text);
 }
 
 .deleteModalFooter {
@@ -1082,14 +1084,14 @@
   align-items: center;
   gap: 10px;
   padding: 16px 22px 20px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
 }
 
 .deleteConfirmButton {
   border: none;
-  background: #b71c1c;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-inverse);
   border-radius: 10px;
   padding: 11px 16px;
   min-height: 42px;
@@ -1101,7 +1103,7 @@
 }
 
 .deleteConfirmButton:hover {
-  background: #9f1717;
+  background: var(--primary-hover);
 }
 
 .deleteConfirmButton:disabled {
@@ -1142,7 +1144,7 @@
 .roteiroListTitle {
   font-size: 13px;
   font-weight: 800;
-  color: #374151;
+  color: var(--text-soft);
 }
 
 .routeIconActions {
@@ -1154,9 +1156,9 @@
 .routeIconButton {
   width: 34px;
   height: 34px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #b71c1c;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--primary);
   border-radius: 10px;
   font-size: 15px;
   font-weight: 800;
@@ -1168,19 +1170,19 @@
 }
 
 .routeIconButton:hover {
-  background: #fff5f5;
+  background: var(--bg-hover-brand);
   border-color: rgba(183, 28, 28, 0.35);
 }
 
 .routeIconButtonDanger {
-  background: #b71c1c;
-  border-color: #b71c1c;
-  color: #ffffff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-inverse);
 }
 
 .routeIconButtonDanger:hover {
-  background: #9f1717;
-  border-color: #9f1717;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 .routeIconActions {
   display: flex;
@@ -1191,9 +1193,9 @@
 .routeIconButton {
   width: 34px;
   height: 34px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #b71c1c;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--primary);
   border-radius: 10px;
   cursor: pointer;
 
@@ -1212,20 +1214,20 @@
 }
 
 .routeIconButton:hover {
-  background: #fff5f5;
+  background: var(--bg-hover-brand);
   border-color: rgba(183, 28, 28, 0.35);
   transform: translateY(-1px);
 }
 
 .routeIconButtonDanger {
-  background: #b71c1c;
-  border-color: #b71c1c;
-  color: #ffffff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-inverse);
 }
 
 .routeIconButtonDanger:hover {
-  background: #9f1717;
-  border-color: #9f1717;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .routeSvgIcon {
@@ -1274,9 +1276,9 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  background: #ffedd5;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
 }
 
 .attentionText {
@@ -1291,24 +1293,23 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  background: #ffedd5;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
   cursor: pointer;
   font-family: inherit;
 }
 
 .badgeAttentionButton:hover {
-  background: #fed7aa;
-  border-color: #fdba74;
+  background: var(--warning-border);
 }
 .pdfItemButton {
     margin-left: auto;
     height: 30px;
     min-width: 42px;
-    border: 1px solid #fecaca;
-    background: #fff;
-    color: #b71c1c;
+    border: 1px solid var(--danger-border);
+    background: var(--bg-surface);
+    color: var(--primary);
     border-radius: 8px;
     font-size: 12px;
     font-weight: 700;
@@ -1316,8 +1317,8 @@
 }
 
 .pdfItemButton:hover {
-    background: #fff1f2;
-    border-color: #b71c1c;
+    background: var(--bg-hover-brand);
+    border-color: var(--primary);
 }
 .pdfItemButton {
     position: relative;
@@ -1325,9 +1326,9 @@
     width: 46px;
     height: 38px;
     overflow: hidden;
-    border: 1px solid #fecaca;
-    background: #fff;
-    color: #b71c1c;
+    border: 1px solid var(--danger-border);
+    background: var(--bg-surface);
+    color: var(--primary);
     border-radius: 10px;
     font-size: 12px;
     font-weight: 800;
@@ -1343,14 +1344,14 @@
 }
 
 .pdfItemButton:hover:not(:disabled) {
-    background: #fff1f2;
-    border-color: #b71c1c;
+    background: var(--bg-hover-brand);
+    border-color: var(--primary);
 }
 
 .pdfItemButtonProgress {
     position: absolute;
     inset: 0 auto 0 0;
-    background: #fecaca;
+    background: var(--danger-border);
     transition: width 0.2s ease;
 }
 
@@ -1369,9 +1370,9 @@
 .play3DButton {
     width: 46px;
     height: 38px;
-    border: 1px solid #dbeafe;
-    background: #fff;
-    color: #1d4ed8;
+    border: 1px solid var(--info-border);
+    background: var(--bg-surface);
+    color: var(--info-text);
     border-radius: 10px;
     cursor: pointer;
     display: inline-flex;
@@ -1380,8 +1381,8 @@
 }
 
 .play3DButton:hover {
-    background: #eff6ff;
-    border-color: #1d4ed8;
+    background: var(--info-bg);
+    border-color: var(--info-text);
 }
 
 .play3DIcon {
@@ -1393,9 +1394,9 @@
     justify-content: space-between;
     gap: 16px;
     padding: 14px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 12px;
-    background: #fff;
+    background: var(--bg-surface);
     margin-bottom: 12px;
 }
 
@@ -1406,12 +1407,12 @@
 }
 
 .modelo3DCard strong {
-    color: #111827;
+    color: var(--text);
     font-size: 14px;
 }
 
 .modelo3DCard span {
-    color: #4b5563;
+    color: var(--text-soft);
     font-size: 13px;
 }
 .modelo3DCard {
@@ -1420,9 +1421,9 @@
     justify-content: space-between;
     gap: 18px;
     padding: 14px 16px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 12px;
-    background: #fff;
+    background: var(--bg-surface);
     margin-bottom: 10px;
 }
 
@@ -1434,7 +1435,7 @@
 }
 
 .modelo3DInfo strong {
-    color: #111827;
+    color: var(--text);
     font-size: 14px;
     font-weight: 700;
     line-height: 1.2;
@@ -1442,16 +1443,16 @@
 }
 
 .modelo3DInfo span {
-    color: #6b7280;
+    color: var(--text-muted);
     font-size: 13px;
 }
 
 .modelo3DOpenButton {
     height: 38px;
     min-width: 92px;
-    border: 1px solid #bfdbfe;
-    background: #eff6ff;
-    color: #1d4ed8;
+    border: 1px solid var(--info-border);
+    background: var(--info-bg);
+    color: var(--info-text);
     border-radius: 10px;
     font-size: 13px;
     font-weight: 700;
@@ -1460,6 +1461,6 @@
 }
 
 .modelo3DOpenButton:hover {
-    background: #dbeafe;
-    border-color: #60a5fa;
+    background: var(--info-bg-strong);
+    border-color: var(--info-text);
 }

@@ -9,11 +9,11 @@
   justify-content: center;
   gap: 14px;
 
-  border: 1px dashed #dddddd;
+  border: 1px dashed var(--border-strong);
   border-radius: 12px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
 
-  color: #777777;
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -26,8 +26,8 @@
   justify-content: center;
 
   border-radius: 12px;
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .icon svg {
@@ -42,7 +42,7 @@
 .title {
   margin: 0;
 
-  color: #333333;
+  color: var(--text);
   font-size: 16px;
   font-weight: 700;
   line-height: 1.4;
@@ -51,7 +51,7 @@
 .description {
   margin: 6px 0 0;
 
-  color: #777777;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.6;
 }

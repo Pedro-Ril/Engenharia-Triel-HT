@@ -38,6 +38,47 @@ export async function listarAtendentes(): Promise<ChamadosAtendente[]> {
   return result.recordset;
 }
 
+/*
+ * Quem pode efetivamente ser escolhido como "atendente
+ * responsável" de um chamado deste setor: quem está cadastrado em
+ * portal_chamados_atendentes para ele, OU qualquer administrador
+ * (que atende todo setor sem precisar de cadastro — ver
+ * getSetoresQueAtende em autorizacao-chamados.ts). Sem essa união,
+ * um chamado aceito por um administrador não cadastrado mostra o
+ * Dropdown de "Atendente responsável" em branco, porque o valor
+ * selecionado (o id do admin) não bate com nenhuma opção da lista.
+ */
+export async function listarAtendentesDisponiveisParaSetor(
+  setorId: string
+): Promise<ChamadosAtendente[]> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("setorId", sql.UniqueIdentifier, setorId);
+
+  const result = await request.query<ChamadosAtendente>(`
+    SELECT
+      CONVERT(VARCHAR(36), u.[id]) AS [id],
+      CONVERT(VARCHAR(36), u.[id]) AS [usuarioId],
+      u.[nome_exibicao] AS [usuarioNome],
+      @setorId AS [setorId],
+      s.[nome] AS [setorNome]
+    FROM dbo.portal_usuarios AS u
+    INNER JOIN dbo.portal_setores AS s ON s.[id] = @setorId
+    WHERE u.[ativo] = 1
+      AND (
+        u.[eh_administrador] = 1
+        OR EXISTS (
+          SELECT 1 FROM dbo.portal_chamados_atendentes AS a
+          WHERE a.[usuario_id] = u.[id] AND a.[setor_id] = @setorId
+        )
+      )
+    ORDER BY u.[nome_exibicao];
+  `);
+
+  return result.recordset;
+}
+
 export async function concederAtendente(params: {
   usuarioId: string;
   setorId: string;

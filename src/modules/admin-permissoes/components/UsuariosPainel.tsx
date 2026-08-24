@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { Download, RefreshCw, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +21,7 @@ import {
 
 import {
   atualizarUsuario,
+  atualizarUsuariosDoAd,
   excluirUsuario,
   importarUsuariosAd,
 } from "../services/adminPermissoes.service";
@@ -54,6 +55,8 @@ export function UsuariosPainel({
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [importando, setImportando] = useState(false);
   const [confirmandoImportar, setConfirmandoImportar] = useState(false);
+  const [atualizandoAd, setAtualizandoAd] = useState(false);
+  const [confirmandoAtualizarAd, setConfirmandoAtualizarAd] = useState(false);
 
   async function handleImportarAd() {
     setConfirmandoImportar(false);
@@ -78,6 +81,32 @@ export function UsuariosPainel({
       }
     } finally {
       setImportando(false);
+    }
+  }
+
+  async function handleAtualizarAd() {
+    setConfirmandoAtualizarAd(false);
+    setAtualizandoAd(true);
+
+    try {
+      const resultado = await atualizarUsuariosDoAd();
+
+      if (resultado.ok && resultado.data) {
+        onUsuariosImportados(resultado.data.usuarios);
+        onFeedback(
+          "success",
+          "Usuários atualizados",
+          resultado.message ?? "Dados atualizados a partir do Active Directory."
+        );
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível atualizar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setAtualizandoAd(false);
     }
   }
 
@@ -169,7 +198,16 @@ export function UsuariosPainel({
   }
 
   const botaoImportar = (
-    <Stack direction="row" justify="end">
+    <Stack direction="row" justify="end" gap={10}>
+      <Button
+        variant="secondary"
+        onClick={() => setConfirmandoAtualizarAd(true)}
+        loading={atualizandoAd}
+      >
+        <RefreshCw size={16} />
+        Atualizar Usuário AD
+      </Button>
+
       <Button
         variant="secondary"
         onClick={() => setConfirmandoImportar(true)}
@@ -198,11 +236,12 @@ export function UsuariosPainel({
     <Stack gap={16}>
       {botaoImportar}
 
-      <Table minWidth={900}>
+      <Table minWidth={1020}>
         <TableHead>
           <TableRow>
             <TableHeaderCell>Usuário</TableHeaderCell>
             <TableHeaderCell>E-mail</TableHeaderCell>
+            <TableHeaderCell>Setor</TableHeaderCell>
             <TableHeaderCell>Código de empresa</TableHeaderCell>
             <TableHeaderCell>Perfil</TableHeaderCell>
             <TableHeaderCell align="center">Ativo</TableHeaderCell>
@@ -225,6 +264,8 @@ export function UsuariosPainel({
                 </TableCell>
 
                 <TableCell>{usuario.email ?? "—"}</TableCell>
+
+                <TableCell>{usuario.departamento ?? "—"}</TableCell>
 
                 <TableCell>
                   <Input
@@ -317,6 +358,16 @@ export function UsuariosPainel({
         loading={importando}
         onClose={() => setConfirmandoImportar(false)}
         onConfirm={handleImportarAd}
+      />
+
+      <ConfirmDialog
+        open={confirmandoAtualizarAd}
+        title="Atualizar usuários a partir do AD?"
+        message="Isso confere todo usuário já cadastrado no portal diretamente no Active Directory e atualiza nome, e-mail, setor e status de administrador — sem criar cadastros novos."
+        confirmLabel="Atualizar"
+        loading={atualizandoAd}
+        onClose={() => setConfirmandoAtualizarAd(false)}
+        onConfirm={handleAtualizarAd}
       />
     </Stack>
   );

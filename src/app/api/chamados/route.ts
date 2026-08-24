@@ -5,7 +5,7 @@ import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { ValidationError } from "@/lib/auth/errors";
 import { optionalText, requiredText } from "@/lib/auth/validation";
 import { criarChamado } from "@/lib/chamados/chamados";
-import { parseAnexosFormData } from "@/lib/chamados/validacao";
+import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,8 @@ export async function POST(request: Request) {
     const usuario = await getUsuarioAutenticado();
 
     const setorId = requiredText(formData.get("setorId"), "setor", 60);
+    const categoriaId = requiredText(formData.get("categoriaId"), "categoria", 60);
+    const prioridade = requiredPrioridade(formData.get("prioridade"));
     const titulo = requiredText(formData.get("titulo"), "título", 200);
     const descricao = requiredText(formData.get("descricao"), "descrição", 4000);
 
@@ -47,12 +49,15 @@ export async function POST(request: Request) {
 
     const { numero } = await criarChamado({
       setorId,
+      categoriaId,
+      prioridade,
       titulo,
       descricao,
       solicitanteUsuarioId: usuario?.id ?? null,
       solicitanteNome,
       solicitanteContato,
       empresa: usuario?.codigoEmpresa ?? null,
+      solicitanteDepartamento: usuario?.departamento ?? null,
       ipOrigem: extrairIpOrigem(request),
       anexos,
     });

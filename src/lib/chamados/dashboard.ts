@@ -10,6 +10,8 @@ export interface FiltrosDashboard {
   /* Setor escolhido no filtro da tela — sempre aplicado por cima da restrição de acesso acima. */
   setorId?: string;
   empresa?: string;
+  departamento?: string;
+  categoriaId?: string;
   dataInicial?: string;
   dataFinal?: string;
 }
@@ -49,6 +51,16 @@ export interface ContagemEmpresa {
   total: number;
 }
 
+export interface ContagemDepartamento {
+  departamento: string;
+  total: number;
+}
+
+export interface ContagemCategoria {
+  categoria: string;
+  total: number;
+}
+
 export interface EstatisticasChamados {
   totais: TotaisPorStatus;
   tempoMedioResolucaoHoras: number | null;
@@ -57,6 +69,8 @@ export interface EstatisticasChamados {
   porDia: ContagemDia[];
   porAtendente: ContagemAtendente[];
   porEmpresa: ContagemEmpresa[];
+  porDepartamento: ContagemDepartamento[];
+  porCategoria: ContagemCategoria[];
 }
 
 type AplicarInput = (request: InstanceType<typeof sql.Request>) => void;
@@ -100,6 +114,20 @@ function construirFiltro(filtros: FiltrosDashboard) {
     );
   }
 
+  if (filtros.departamento) {
+    condicoes.push("c.[solicitante_departamento] = @departamentoFiltro");
+    inputs.push((request) =>
+      request.input("departamentoFiltro", sql.NVarChar(200), filtros.departamento)
+    );
+  }
+
+  if (filtros.categoriaId) {
+    condicoes.push("c.[categoria_id] = @categoriaIdFiltro");
+    inputs.push((request) =>
+      request.input("categoriaIdFiltro", sql.UniqueIdentifier, filtros.categoriaId)
+    );
+  }
+
   if (filtros.dataInicial) {
     condicoes.push("c.[criado_em] >= @dataInicial");
     inputs.push((request) => request.input("dataInicial", sql.DateTime2, filtros.dataInicial));
@@ -135,6 +163,8 @@ export async function buscarEstatisticasChamados(
     diaResult,
     atendenteResult,
     empresaResult,
+    departamentoResult,
+    categoriaResult,
   ] = await Promise.all([
       (async () => {
         const request = await criarRequestFiltrado(inputs);
@@ -225,6 +255,31 @@ export async function buscarEstatisticasChamados(
           ORDER BY COUNT(*) DESC;
         `);
       })(),
+      (async () => {
+        const request = await criarRequestFiltrado(inputs);
+        return request.query<{ departamento: string | null; total: number }>(`
+          SELECT
+            COALESCE(NULLIF(c.[solicitante_departamento], ''), 'Sem departamento') AS [departamento],
+            COUNT(*) AS [total]
+          FROM dbo.portal_chamados AS c
+          ${clausulaWhere}
+          GROUP BY c.[solicitante_departamento]
+          ORDER BY COUNT(*) DESC;
+        `);
+      })(),
+      (async () => {
+        const request = await criarRequestFiltrado(inputs);
+        return request.query<{ categoria: string | null; total: number }>(`
+          SELECT
+            COALESCE(cat.[nome], 'Sem categoria') AS [categoria],
+            COUNT(*) AS [total]
+          FROM dbo.portal_chamados AS c
+          LEFT JOIN dbo.portal_chamados_categorias AS cat ON cat.[id] = c.[categoria_id]
+          ${clausulaWhere}
+          GROUP BY cat.[nome]
+          ORDER BY COUNT(*) DESC;
+        `);
+      })(),
     ]);
 
   const totaisRow = totaisResult.recordset[0];
@@ -255,6 +310,14 @@ export async function buscarEstatisticasChamados(
     })),
     porEmpresa: empresaResult.recordset.map((row) => ({
       empresa: row.empresa ?? "Sem empresa",
+      total: row.total,
+    })),
+    porDepartamento: departamentoResult.recordset.map((row) => ({
+      departamento: row.departamento ?? "Sem departamento",
+      total: row.total,
+    })),
+    porCategoria: categoriaResult.recordset.map((row) => ({
+      categoria: row.categoria ?? "Sem categoria",
       total: row.total,
     })),
   };

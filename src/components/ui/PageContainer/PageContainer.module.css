@@ -10,8 +10,8 @@
 
   overflow-x: hidden;
 
-  background: #f8f9fb;
-  color: #171717;
+  background: var(--bg-page);
+  color: var(--text);
 }
 
 @media (max-width: 640px) {

@@ -29,7 +29,7 @@
   height: 14px;
   flex: 0 0 14px;
 
-  color: #a3a8b0;
+  color: var(--text-faint);
 }
 
 .link,
@@ -50,7 +50,7 @@
 }
 
 .link {
-  color: #666f7c;
+  color: var(--text-muted);
 
   transition:
     color 0.18s ease,
@@ -58,22 +58,22 @@
 }
 
 .link:hover {
-  color: #b71c1c;
-  background: #fff1f1;
+  color: var(--primary);
+  background: var(--bg-hover-brand);
 }
 
 .link:focus-visible {
-  outline: 3px solid rgba(183, 28, 28, 0.12);
+  outline: 3px solid var(--primary-ring);
   outline-offset: 1px;
 }
 
 .text {
-  color: #777f8b;
+  color: var(--text-muted);
 }
 
 .current {
-  color: #b71c1c;
-  background: #fff5f5;
+  color: var(--primary);
+  background: var(--primary-soft);
   font-weight: 600;
 }
 

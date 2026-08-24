@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircle2, Home, LifeBuoy } from "lucide-react";
 import Link from "next/link";
 
@@ -19,16 +19,24 @@ import { Stack } from "@/components/ui/Stack";
 import { Textarea } from "@/components/ui/Textarea";
 
 import { abrirChamado } from "../services/chamados.service";
-import type { SetorChamado } from "../types/chamados.types";
+import type { CategoriaChamado, PrioridadeChamado, SetorChamado } from "../types/chamados.types";
+import { PRIORIDADE_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
+
+const OPCOES_PRIORIDADE = (Object.keys(PRIORIDADE_LABELS) as PrioridadeChamado[]).map(
+  (prioridade) => ({ value: prioridade, label: PRIORIDADE_LABELS[prioridade].label })
+);
 
 interface AbrirChamadoPageProps {
   setores: SetorChamado[];
+  categorias: CategoriaChamado[];
   usuarioLogado: { nomeExibicao: string; email: string | null } | null;
 }
 
-export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPageProps) {
-  const [setorId, setSetorId] = useState(setores[0]?.id ?? "");
+export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirChamadoPageProps) {
+  const [setorId, setSetorId] = useState("");
+  const [categoriaId, setCategoriaId] = useState("");
+  const [prioridade, setPrioridade] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [nome, setNome] = useState("");
@@ -39,11 +47,40 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
   const [erro, setErro] = useState<string | null>(null);
   const [numeroCriado, setNumeroCriado] = useState<number | null>(null);
 
+  const categoriasDoSetor = useMemo(
+    () => categorias.filter((categoria) => categoria.setorId === setorId),
+    [categorias, setorId]
+  );
+
+  /*
+   * Limpa a categoria escolhida ao trocar de setor (nunca
+   * pré-seleciona a primeira — a pessoa que abre o chamado tem
+   * que escolher). Ajuste durante a renderização (não em
+   * useEffect) porque é reagir a uma mudança de estado/prop, não
+   * sincronizar com um sistema externo. Ver "Adjusting state when
+   * a prop changes" na doc do React.
+   */
+  const [setorIdAnterior, setSetorIdAnterior] = useState(setorId);
+  if (setorId !== setorIdAnterior) {
+    setSetorIdAnterior(setorId);
+    setCategoriaId("");
+  }
+
   async function handleSubmit() {
     setErro(null);
 
     if (!setorId) {
       setErro("Selecione um setor.");
+      return;
+    }
+
+    if (!categoriaId) {
+      setErro("Selecione uma categoria.");
+      return;
+    }
+
+    if (!prioridade) {
+      setErro("Selecione a prioridade.");
       return;
     }
 
@@ -57,6 +94,8 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
     try {
       const formData = new FormData();
       formData.append("setorId", setorId);
+      formData.append("categoriaId", categoriaId);
+      formData.append("prioridade", prioridade);
       formData.append("titulo", titulo);
       formData.append("descricao", descricao);
 
@@ -138,13 +177,6 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
 
   return (
     <PageContainer>
-      <Breadcrumb
-        items={[
-          { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "Chamados", current: true, icon: <LifeBuoy size={14} /> },
-        ]}
-      />
-
       <PageHeader
         title="Abrir chamado"
         description="Conte o que está acontecendo — o time responsável pelo setor vai te responder por aqui."
@@ -161,6 +193,13 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
             )}
           </Stack>
         }
+      />
+
+      <Breadcrumb
+        items={[
+          { label: "Início", href: "/", icon: <Home size={14} /> },
+          { label: "Chamados", current: true, icon: <LifeBuoy size={14} /> },
+        ]}
       />
 
       <Card>
@@ -181,20 +220,55 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
             </FormGrid>
           )}
 
-          <Field label="Setor" required>
-            {setores.length === 0 ? (
-              <Alert variant="warning">
-                Nenhum setor está aceitando chamados no momento. Tente novamente mais tarde.
-              </Alert>
-            ) : (
+          <FormGrid columns={3}>
+            <Field label="Setor" required>
+              {setores.length === 0 ? (
+                <Alert variant="warning">
+                  Nenhum setor está aceitando chamados no momento. Tente novamente mais tarde.
+                </Alert>
+              ) : (
+                <Dropdown
+                  value={setorId}
+                  onValueChange={setSetorId}
+                  placeholder="Selecione o setor"
+                  options={setores.map((setor) => ({ value: setor.id, label: setor.nome }))}
+                />
+              )}
+            </Field>
+
+            <Field label="Categoria" required>
+              {!setorId ? (
+                <Alert variant="warning">Escolha um setor antes.</Alert>
+              ) : categoriasDoSetor.length === 0 ? (
+                <Alert variant="warning">
+                  Nenhuma categoria cadastrada para este setor ainda.
+                </Alert>
+              ) : (
+                <Dropdown
+                  value={categoriaId}
+                  onValueChange={setCategoriaId}
+                  placeholder="Selecione a categoria"
+                  options={categoriasDoSetor.map((categoria) => ({
+                    value: categoria.id,
+                    label: categoria.nome,
+                  }))}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Prioridade"
+              required
+              hint="sua percepção — o atendente pode ajustar depois"
+            >
               <Dropdown
-                value={setorId}
-                onValueChange={setSetorId}
-                placeholder="Selecione o setor"
-                options={setores.map((setor) => ({ value: setor.id, label: setor.nome }))}
+                value={prioridade}
+                onValueChange={setPrioridade}
+                placeholder="Selecione a prioridade"
+                options={OPCOES_PRIORIDADE}
               />
-            )}
-          </Field>
+            </Field>
+          </FormGrid>
 
           <Field label="Título" required hint={`${titulo.length}/200 caracteres`}>
             <Input
@@ -225,7 +299,9 @@ export function AbrirChamadoPage({ setores, usuarioLogado }: AbrirChamadoPagePro
             <Button
               onClick={handleSubmit}
               loading={enviando}
-              disabled={!setorId || !titulo.trim() || !descricao.trim()}
+              disabled={
+                !setorId || !categoriaId || !prioridade || !titulo.trim() || !descricao.trim()
+              }
             >
               Abrir chamado
             </Button>

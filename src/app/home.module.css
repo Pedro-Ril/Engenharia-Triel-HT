@@ -3,8 +3,8 @@
   width: 100%;
   padding: 36px;
   background:
-    radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 20%),
-    linear-gradient(180deg, #f7f8fa 0%, #eef1f5 100%);
+    radial-gradient(circle at top right, var(--primary-soft), transparent 20%),
+    var(--bg-page);
 }
 
 .hero {
@@ -16,8 +16,8 @@
 }
 
 .heroContent {
-  background: linear-gradient(135deg, #ffffff 0%, #fcfcfd 100%);
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 22px;
   padding: 32px;
   box-shadow:
@@ -30,8 +30,8 @@
   align-items: center;
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(183, 28, 28, 0.12);
-  color: #b71c1c;
+  background: var(--primary-soft-strong);
+  color: var(--primary);
   font-weight: 700;
   font-size: 0.84rem;
   margin-bottom: 16px;
@@ -40,7 +40,7 @@
 .title {
   font-size: clamp(2rem, 3vw, 3rem);
   line-height: 1.08;
-  color: #111827;
+  color: var(--text);
   margin-bottom: 16px;
   max-width: 760px;
 }
@@ -48,7 +48,7 @@
 .description {
   font-size: 1rem;
   line-height: 1.7;
-  color: #4b5563;
+  color: var(--text-soft);
   max-width: 760px;
   margin-bottom: 24px;
 }
@@ -73,8 +73,8 @@
 }
 
 .primaryButton {
-  background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: var(--text-inverse);
   box-shadow: 0 10px 20px rgba(183, 28, 28, 0.2);
 }
 
@@ -83,13 +83,13 @@
 }
 
 .secondaryButton {
-  background: #fff;
-  color: #b71c1c;
-  border: 1px solid rgba(183, 28, 28, 0.25);
+  background: var(--bg-surface);
+  color: var(--primary);
+  border: 1px solid var(--primary-soft-border);
 }
 
 .secondaryButton:hover {
-  background: rgba(183, 28, 28, 0.06);
+  background: var(--primary-soft);
 }
 
 .heroPanel {
@@ -99,8 +99,8 @@
 }
 
 .panelCard {
-  background: linear-gradient(160deg, #b71c1c 0%, #8e1616 100%);
-  color: #fff;
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-active) 100%);
+  color: var(--text-inverse);
   border-radius: 22px;
   padding: 24px;
   box-shadow: 0 14px 32px rgba(183, 28, 28, 0.18);
@@ -123,8 +123,8 @@
 }
 
 .statCard {
-  background: #fff;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 18px;
   box-shadow:
@@ -135,7 +135,7 @@
 .statLabel {
   display: block;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
 
@@ -145,7 +145,7 @@
 }
 
 .statOperacional {
-  color: #16a34a;
+  color: var(--success-text);
 }
 
 .statCardClicavel {
@@ -162,7 +162,7 @@
 
 .statCardClicavel:hover {
   transform: translateY(-2px);
-  border-color: rgba(183, 28, 28, 0.3);
+  border-color: var(--primary-soft-border);
   box-shadow:
     0 14px 28px rgba(15, 23, 42, 0.07),
     0 3px 10px rgba(15, 23, 42, 0.04);
@@ -184,7 +184,7 @@
   display: block;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 6px;
@@ -192,12 +192,12 @@
 
 .sectionTitle {
   font-size: 1.7rem;
-  color: #111827;
+  color: var(--text);
 }
 
 .sectionText {
   max-width: 480px;
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.6;
 }
 
@@ -226,23 +226,23 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
   flex-shrink: 0;
 }
 
 .setorSectionTitle {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
 }
 
 .recentesCard {
   display: flex;
   flex-direction: column;
 
-  background: #fff;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 18px;
   overflow: hidden;
 
@@ -260,7 +260,7 @@
   text-decoration: none;
   color: inherit;
 
-  border-bottom: 1px solid rgba(229, 231, 235, 0.7);
+  border-bottom: 1px solid var(--border-soft);
   transition: background-color 0.15s ease;
 }
 
@@ -269,7 +269,7 @@
 }
 
 .recentesItem:hover {
-  background: rgba(183, 28, 28, 0.04);
+  background: var(--primary-soft);
 }
 
 .recentesItemIcon {
@@ -281,8 +281,8 @@
   flex-shrink: 0;
 
   border-radius: 10px;
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .recentesItemNome {
@@ -291,7 +291,7 @@
 
   font-size: 0.92rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
 
   overflow: hidden;
   text-overflow: ellipsis;
@@ -305,7 +305,7 @@
   flex-shrink: 0;
 
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .catalogoLista {
@@ -324,7 +324,7 @@
   display: flex;
   flex-direction: column;
 
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
 }
@@ -352,13 +352,13 @@
 }
 
 .catalogoStatusLiberado {
-  background: #ecfdf3;
-  color: #166534;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .catalogoStatusBloqueado {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
 }
 
 .moduleGrid {
@@ -373,8 +373,8 @@
   gap: 14px;
 
   text-decoration: none;
-  background: #fff;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
   color: inherit;
@@ -391,7 +391,7 @@
 
 .moduleCard:hover {
   transform: translateY(-2px);
-  border-color: rgba(183, 28, 28, 0.3);
+  border-color: var(--primary-soft-border);
   box-shadow:
     0 14px 28px rgba(15, 23, 42, 0.07),
     0 3px 10px rgba(15, 23, 42, 0.04);
@@ -406,8 +406,8 @@
   flex-shrink: 0;
 
   border-radius: 12px;
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .moduleCardBody {
@@ -422,7 +422,7 @@
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.3;
-  color: #111827;
+  color: var(--text);
 
   overflow: hidden;
 }
@@ -432,8 +432,8 @@
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(183, 28, 28, 0.1);
-  color: #b71c1c;
+  background: var(--primary-soft-strong);
+  color: var(--primary);
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.03em;
@@ -444,7 +444,7 @@
   display: block;
   margin-top: 2px;
   font-size: 0.8rem;
-  color: #b71c1c;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -453,8 +453,8 @@
   align-items: center;
   gap: 20px;
 
-  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
-  border: 1px solid rgba(183, 28, 28, 0.16);
+  background: linear-gradient(135deg, var(--primary-soft) 0%, var(--bg-surface) 100%);
+  border: 1px solid var(--primary-soft-border);
   border-radius: 20px;
   padding: 24px 28px;
 
@@ -472,8 +472,8 @@
   flex-shrink: 0;
 
   border-radius: 14px;
-  background: rgba(183, 28, 28, 0.1);
-  color: #b71c1c;
+  background: var(--primary-soft-strong);
+  color: var(--primary);
 }
 
 .suporteBannerTexto {
@@ -483,12 +483,12 @@
 
 .suporteBannerTitulo {
   font-size: 1.1rem;
-  color: #111827;
+  color: var(--text);
   margin-bottom: 4px;
 }
 
 .suporteBannerDescricao {
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.6;
 }
 
@@ -523,8 +523,8 @@
 }
 
 .infoCard {
-  background: #fff;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 22px;
   box-shadow:
@@ -534,12 +534,12 @@
 
 .infoTitle {
   font-size: 1.05rem;
-  color: #111827;
+  color: var(--text);
   margin-bottom: 10px;
 }
 
 .infoText {
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.7;
 }
 

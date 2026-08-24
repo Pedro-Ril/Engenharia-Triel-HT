@@ -1,15 +1,15 @@
 /* ── PAGE ─────────────────────────────────────────────── */
 .page {
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--bg-page);
 }
 
 /* ── HEADER ───────────────────────────────────────────── */
 .header {
   background:
-    radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 30%),
-    linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
-  border-bottom: 1px solid #f0f1f3;
+    radial-gradient(circle at top right, var(--primary-soft), transparent 30%),
+    var(--bg-surface);
+  border-bottom: 1px solid var(--border-soft);
   padding: 40px 0 32px;
 }
 
@@ -24,8 +24,8 @@
   align-items: center;
   padding: 4px 12px;        /* igual ao badgeModulo */
   border-radius: 999px;
-  background: rgba(183, 28, 28, 0.1);
-  color: #b71c1c;
+  background: var(--primary-soft-strong);
+  color: var(--primary);
   font-weight: 600;
   font-size: 0.75rem;       /* igual ao badgeModulo */
   letter-spacing: 0.01em;
@@ -34,7 +34,7 @@
 
 .headerTitle {
   margin: 0;
-  color: #111827;
+  color: var(--text);
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.2;
@@ -42,7 +42,7 @@
 
 .headerSubtitle {
   margin: 8px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.95rem;
   line-height: 1.6;
 }
@@ -80,7 +80,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0 0 0 2px;
 }
 
@@ -91,8 +91,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: #ffffff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
 }
@@ -113,7 +113,7 @@
 }
 
 .sidebarItem:hover {
-  background: rgba(183, 28, 28, 0.05);
+  background: var(--primary-soft);
 }
 
 .sidebarItemLeft {
@@ -126,13 +126,13 @@
 .sidebarVersao {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
   letter-spacing: 0.03em;
 }
 
 .sidebarTitulo {
   font-size: 0.73rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   line-height: 1.3;
   white-space: normal;
   overflow: hidden;
@@ -155,8 +155,8 @@
 
 /* ── LEGENDA ──────────────────────────────────────────── */
 .legenda {
-  background: #ffffff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 10px 12px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
@@ -170,7 +170,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0 0 2px 0;
 }
 
@@ -189,7 +189,7 @@
 
 .legendaTexto {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.3;
 }
 
@@ -208,7 +208,7 @@
   border: none;
   background: none;
   padding: 0;
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -217,7 +217,7 @@
 }
 
 .limparFiltros:hover {
-  color: #7f1313;
+  color: var(--primary-active);
   text-decoration: underline;
 }
 
@@ -233,10 +233,10 @@
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #ffffff;
-  color: #6b7280;
+  background: var(--bg-surface);
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -249,7 +249,7 @@
 
 .filtroChip:hover {
   transform: translateY(-1px);
-  border-color: #d1d5db;
+  border-color: var(--border-strong);
 }
 
 .filtroChip[aria-pressed="true"] {
@@ -258,7 +258,7 @@
 
 .semResultado {
   padding: 10px 4px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -270,18 +270,18 @@
   gap: 10px;
   padding: 28px 24px;
   margin-bottom: 16px;
-  background: #ffffff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.92rem;
 }
 
 /* ── CORES DAS BOLINHAS ───────────────────────────────── */
-.dotAgro     { background: #059669; }
-.dotViaturas { background: #2563eb; }
-.dotSistema  { background: #7c3aed; }
-.dotRoteiroFabricacao  { background: #d11121; }
+.dotAgro     { background: var(--tag-emerald-dot); }
+.dotViaturas { background: var(--tag-blue-dot); }
+.dotSistema  { background: var(--tag-purple-dot); }
+.dotRoteiroFabricacao  { background: var(--tag-rose-dot); }
 
 /* ── TIMELINE ─────────────────────────────────────────── */
 .timeline {
@@ -309,9 +309,9 @@
   height: 14px;
   min-height: 14px;
   border-radius: 50%;
-  background: #b71c1c;
-  border: 3px solid #f9fafb;
-  box-shadow: 0 0 0 2px #b71c1c;
+  background: var(--primary);
+  border: 3px solid var(--bg-page);
+  box-shadow: 0 0 0 2px var(--primary);
   z-index: 1;
 }
 
@@ -319,7 +319,7 @@
   width: 2px;
   flex: 1;
   min-height: 32px;
-  background: linear-gradient(180deg, #e5e7eb 0%, #e5e7eb 100%);
+  background: var(--border);
   margin-top: 4px;
   margin-bottom: 4px;
 }
@@ -327,8 +327,8 @@
 /* ── CARD ─────────────────────────────────────────────── */
 .card {
   flex: 1;
-  background: #ffffff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   padding: 20px 22px;
   margin-bottom: 16px;
@@ -344,7 +344,7 @@
 .card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.09);
-  border-color: rgba(183, 28, 28, 0.2);
+  border-color: var(--primary-soft-border);
 }
 
 .cardTop {
@@ -357,14 +357,14 @@
 .cardVersao {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .cardData {
   font-size: 0.82rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .cardModulos {
@@ -376,7 +376,7 @@
 
 .cardTitulo {
   margin: 0 0 6px;
-  color: #111827;
+  color: var(--text);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1.3;
@@ -384,7 +384,7 @@
 
 .cardDesc {
   margin: 0 0 14px;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -407,18 +407,18 @@
 }
 
 .badgeNovo {
-  background: rgba(15, 118, 110, 0.1);
-  color: #0f766e;
+  background: var(--success-bg-strong);
+  color: var(--success-text);
 }
 
 .badgeMelhoria {
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .badgeCorrecao {
-  background: rgba(146, 64, 14, 0.1);
-  color: #92400e;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text);
 }
 
 /* ── BADGES (módulo) ──────────────────────────────────── */
@@ -434,27 +434,27 @@
 }
 
 .moduloAgro {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #a7f3d0;
+  background: var(--tag-emerald-bg);
+  color: var(--tag-emerald-text);
+  border-color: var(--tag-emerald-border);
 }
 
 .moduloViaturas {
-  background: #dbeafe;
-  color: #1e3a8a;
-  border-color: #bfdbfe;
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-text);
+  border-color: var(--tag-blue-border);
 }
 
 .moduloSistema {
-  background: #f3e8ff;
-  color: #6b21a8;
-  border-color: #e9d5ff;
+  background: var(--tag-purple-bg);
+  color: var(--tag-purple-text);
+  border-color: var(--tag-purple-border);
 }
 
 .moduloRoteiroFabricacao {
-  background: #f3e8ff;
-  color: #d11121;
-  border-color: #e9d5ff;
+  background: var(--tag-purple-bg);
+  color: var(--primary);
+  border-color: var(--tag-purple-border);
 }
 
 /* ── MODAL META (versão + módulos no header) ──────────── */
@@ -470,7 +470,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -482,9 +482,9 @@
 .modal {
   width: min(620px, 100%);
   max-height: 88vh;
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 24px;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  border: 1px solid var(--border-soft);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
   overflow: hidden;
   display: flex;
@@ -497,15 +497,15 @@
   align-items: flex-start;
   gap: 16px;
   padding: 24px 24px 18px;
-  border-bottom: 1px solid #f0f1f3;
+  border-bottom: 1px solid var(--border-soft);
   background:
-    radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 28%),
-    linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
+    radial-gradient(circle at top right, var(--primary-soft), transparent 28%),
+    var(--bg-surface);
 }
 
 .modalTitle {
   margin: 0;
-  color: #111827;
+  color: var(--text);
   font-size: 1.2rem;
   font-weight: 700;
   line-height: 1.25;
@@ -513,7 +513,7 @@
 
 .modalSubtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -522,10 +522,10 @@
   width: 42px;
   height: 42px;
   min-width: 42px;
-  border: 1px solid #ececec;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #ffffff;
-  color: #6b7280;
+  background: var(--bg-surface);
+  color: var(--text-muted);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -540,9 +540,9 @@
 }
 
 .closeBtn:hover {
-  background: rgba(183, 28, 28, 0.06);
-  color: #b71c1c;
-  border-color: rgba(183, 28, 28, 0.2);
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft-border);
   transform: translateY(-1px);
 }
 
@@ -584,13 +584,13 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: #f9fafb;
-  border: 1px solid #f0f1f3;
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
 }
 
 .itemTexto {
-  color: #374151;
+  color: var(--text-soft);
   font-size: 0.92rem;
   line-height: 1.5;
 }
@@ -600,8 +600,8 @@
   display: flex;
   justify-content: flex-end;
   padding: 16px 24px 22px;
-  border-top: 1px solid #f0f1f3;
-  background: #ffffff;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-surface);
 }
 
 .primaryBtn {
@@ -609,8 +609,8 @@
   padding: 0 24px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
-  color: #ffffff;
+  background: var(--primary);
+  color: var(--text-inverse);
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
@@ -647,7 +647,7 @@
   .sidebarItem {
     width: auto;
     padding: 6px 10px;
-    border: 1px solid #ececec;
+    border: 1px solid var(--border-soft);
     border-radius: 10px;
   }
 
@@ -708,45 +708,45 @@
   animation: pulsoBorda 1.4s ease-out forwards;
 }
 /* ── CORES DAS BOLINHAS ───────────────────────────────── */
-.dotAgro     { background: #059669; }
-.dotViaturas { background: #2563eb; }
-.dotSistema  { background: #7c3aed; }
-.dotDownloads { background: #ea580c; }
-.dotBI        { background: #0891b2; }
-.dotRoteiroFabricacao        { background: #e75662; }
+.dotAgro     { background: var(--tag-emerald-dot); }
+.dotViaturas { background: var(--tag-blue-dot); }
+.dotSistema  { background: var(--tag-purple-dot); }
+.dotDownloads { background: var(--tag-orange-dot); }
+.dotBI        { background: var(--tag-cyan-dot); }
+.dotRoteiroFabricacao        { background: var(--tag-rose-dot); }
 
 /* ── BADGES (módulo) ──────────────────────────────────── */
 .moduloAgro {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #a7f3d0;
+  background: var(--tag-emerald-bg);
+  color: var(--tag-emerald-text);
+  border-color: var(--tag-emerald-border);
 }
 
 .moduloViaturas {
-  background: #dbeafe;
-  color: #1e3a8a;
-  border-color: #bfdbfe;
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-text);
+  border-color: var(--tag-blue-border);
 }
 
 .moduloSistema {
-  background: #f3e8ff;
-  color: #6b21a8;
-  border-color: #e9d5ff;
+  background: var(--tag-purple-bg);
+  color: var(--tag-purple-text);
+  border-color: var(--tag-purple-border);
 }
 
 .moduloDownloads {
-  background: #ffedd5;
-  color: #9a3412;
-  border-color: #fed7aa;
+  background: var(--tag-orange-bg);
+  color: var(--tag-orange-text);
+  border-color: var(--tag-orange-border);
 }
 
 .moduloBI {
-  background: #cffafe;
-  color: #155e75;
-  border-color: #a5f3fc;
+  background: var(--tag-cyan-bg);
+  color: var(--tag-cyan-text);
+  border-color: var(--tag-cyan-border);
 }
 .moduloRoteiroFabricacao {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fecaca;
+  background: var(--tag-rose-bg);
+  color: var(--tag-rose-text);
+  border-color: var(--tag-rose-border);
 }

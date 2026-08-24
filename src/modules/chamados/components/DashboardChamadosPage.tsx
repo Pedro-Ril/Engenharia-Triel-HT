@@ -33,20 +33,24 @@ import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 
 import { buscarEstatisticasChamados } from "../services/chamados.service";
-import type { EstatisticasChamados, SetorChamado } from "../types/chamados.types";
+import type { CategoriaChamado, EstatisticasChamados, SetorChamado } from "../types/chamados.types";
 import { PRIORIDADE_LABELS, STATUS_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
 
 interface FiltrosDashboard {
   setorId: string;
   empresa: string;
+  departamento: string;
+  categoriaId: string;
   dataInicial: string;
   dataFinal: string;
 }
 
 interface DashboardChamadosPageProps {
   setores: SetorChamado[];
+  categorias: CategoriaChamado[];
   empresas: string[];
+  departamentos: string[];
   fullscreen?: boolean;
   filtrosIniciais?: FiltrosDashboard;
 }
@@ -84,12 +88,16 @@ function formatarHoras(horas: number | null): string {
 
 export function DashboardChamadosPage({
   setores,
+  categorias,
   empresas,
+  departamentos,
   fullscreen = false,
   filtrosIniciais,
 }: DashboardChamadosPageProps) {
   const [setorId, setSetorId] = useState(filtrosIniciais?.setorId ?? "");
   const [empresa, setEmpresa] = useState(filtrosIniciais?.empresa ?? "");
+  const [departamento, setDepartamento] = useState(filtrosIniciais?.departamento ?? "");
+  const [categoriaId, setCategoriaId] = useState(filtrosIniciais?.categoriaId ?? "");
   const [dataInicial, setDataInicial] = useState(filtrosIniciais?.dataInicial ?? "");
   const [dataFinal, setDataFinal] = useState(filtrosIniciais?.dataFinal ?? "");
 
@@ -113,6 +121,8 @@ export function DashboardChamadosPage({
       buscarEstatisticasChamados({
         setorId: setorId || undefined,
         empresa: empresa || undefined,
+        departamento: departamento || undefined,
+        categoriaId: categoriaId || undefined,
         dataInicial: dataInicial || undefined,
         dataFinal: dataFinal || undefined,
       }).then((resultado) => {
@@ -143,7 +153,16 @@ export function DashboardChamadosPage({
       cancelado = true;
       clearInterval(intervalo);
     };
-  }, [setorId, empresa, dataInicial, dataFinal, fullscreen, recarregarChave]);
+  }, [
+    setorId,
+    empresa,
+    departamento,
+    categoriaId,
+    dataInicial,
+    dataFinal,
+    fullscreen,
+    recarregarChave,
+  ]);
 
   const dadosStatus = useMemo(() => {
     if (!dados) return [];
@@ -188,6 +207,25 @@ export function DashboardChamadosPage({
       ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
     ],
     [empresas]
+  );
+
+  const opcoesDepartamento = useMemo(
+    () => [
+      { value: "", label: "Todos" },
+      ...departamentos.map((nome) => ({ value: nome, label: nome })),
+    ],
+    [departamentos]
+  );
+
+  const opcoesCategoria = useMemo(
+    () => [
+      { value: "", label: "Todas" },
+      ...categorias.map((categoria) => ({
+        value: categoria.id,
+        label: `${categoria.nome} (${categoria.setorNome})`,
+      })),
+    ],
+    [categorias]
   );
 
   const setorFiltradoNome = useMemo(
@@ -307,14 +345,34 @@ export function DashboardChamadosPage({
     </BarChart>
   );
 
+  const graficoPorDepartamento = (
+    <BarChart data={dados.porDepartamento} layout="vertical" margin={{ left: 24 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" allowDecimals={false} />
+      <YAxis type="category" dataKey="departamento" width={160} tick={{ fontSize: 12 }} />
+      <Tooltip />
+      <Bar dataKey="total" name="Chamados" fill="#5e35b1" radius={[0, 8, 8, 0]} />
+    </BarChart>
+  );
+
+  const graficoPorCategoria = (
+    <BarChart data={dados.porCategoria} layout="vertical" margin={{ left: 24 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" allowDecimals={false} />
+      <YAxis type="category" dataKey="categoria" width={160} tick={{ fontSize: 12 }} />
+      <Tooltip />
+      <Bar dataKey="total" name="Chamados" fill="#fb8c00" radius={[0, 8, 8, 0]} />
+    </BarChart>
+  );
+
   if (fullscreen) {
     return (
       <div className={styles.tvDashboard}>
         <div className={styles.tvHeader}>
           <h1 className={styles.tvTitulo}>Dashboard de chamados</h1>
-          {(setorFiltradoNome || empresa) && (
+          {(setorFiltradoNome || empresa || departamento) && (
             <span className={styles.tvSubtitulo}>
-              {[setorFiltradoNome, empresa].filter(Boolean).join(" · ")}
+              {[setorFiltradoNome, empresa, departamento].filter(Boolean).join(" · ")}
             </span>
           )}
         </div>
@@ -402,6 +460,24 @@ export function DashboardChamadosPage({
               </ResponsiveContainer>
             </div>
           </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por departamento</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPorDepartamento}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={styles.tvChartTile}>
+            <h2 className={styles.tvChartTitulo}>Chamados por categoria</h2>
+            <div className={styles.tvChartBody}>
+              <ResponsiveContainer width="100%" height="100%">
+                {graficoPorCategoria}
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -409,17 +485,17 @@ export function DashboardChamadosPage({
 
   return (
     <PageContainer>
+      <PageHeader
+        title="Dashboard de chamados"
+        description="Indicadores consolidados dos setores que você atende."
+      />
+
       <Breadcrumb
         items={[
           { label: "Início", href: "/", icon: <Home size={14} /> },
           { label: "Atender chamados", href: "/chamados/atender", icon: <Headset size={14} /> },
           { label: "Dashboard", current: true },
         ]}
-      />
-
-      <PageHeader
-        title="Dashboard de chamados"
-        description="Indicadores consolidados dos setores que você atende."
       />
 
       <Card>
@@ -430,6 +506,22 @@ export function DashboardChamadosPage({
 
           <Field label="Empresa">
             <Dropdown value={empresa} options={opcoesEmpresa} onValueChange={setEmpresa} />
+          </Field>
+
+          <Field label="Departamento">
+            <Dropdown
+              value={departamento}
+              options={opcoesDepartamento}
+              onValueChange={setDepartamento}
+            />
+          </Field>
+
+          <Field label="Categoria">
+            <Dropdown
+              value={categoriaId}
+              options={opcoesCategoria}
+              onValueChange={setCategoriaId}
+            />
           </Field>
 
           <Field label="Data inicial">
@@ -524,6 +616,22 @@ export function DashboardChamadosPage({
           <div className={styles.chartWrapper}>
             <ResponsiveContainer width="100%" height={280}>
               {graficoPorEmpresa}
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card title="Chamados por departamento">
+          <div className={styles.chartWrapper}>
+            <ResponsiveContainer width="100%" height={280}>
+              {graficoPorDepartamento}
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card title="Chamados por categoria">
+          <div className={styles.chartWrapper}>
+            <ResponsiveContainer width="100%" height={280}>
+              {graficoPorCategoria}
             </ResponsiveContainer>
           </div>
         </Card>

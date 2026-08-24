@@ -28,7 +28,7 @@
 }
 
 .button:focus-visible {
-  outline: 3px solid rgba(183, 28, 28, 0.12);
+  outline: 3px solid var(--primary-ring);
   outline-offset: 2px;
 }
 
@@ -76,37 +76,37 @@
 }
 
 .neutral {
-  border-color: #e5e7eb;
-  background: #ffffff;
-  color: #4b5563;
+  border-color: var(--border);
+  background: var(--bg-surface);
+  color: var(--text-soft);
 }
 
 .neutral:hover:not(:disabled) {
-  border-color: rgba(183, 28, 28, 0.25);
-  background: rgba(183, 28, 28, 0.06);
-  color: #b71c1c;
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .primary {
-  border-color: rgba(183, 28, 28, 0.22);
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .primary:hover:not(:disabled) {
   border-color: rgba(183, 28, 28, 0.34);
-  background: rgba(183, 28, 28, 0.13);
+  background: var(--primary-soft-strong);
 }
 
 .danger {
-  border-color: #f3c3c3;
-  background: #fdecec;
-  color: #b71c1c;
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .danger:hover:not(:disabled) {
-  border-color: #e9a9a9;
-  background: #f9dada;
+  border-color: rgba(183, 28, 28, 0.4);
+  background: var(--danger-bg-strong);
 }
 
 .loading {
@@ -119,5 +119,5 @@
 
 .primary .loader,
 .danger .loader {
-  color: #b71c1c;
+  color: var(--primary);
 }

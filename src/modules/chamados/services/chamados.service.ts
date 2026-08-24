@@ -1,4 +1,5 @@
 import type {
+  CategoriaChamado,
   Chamado,
   ChamadoMensagem,
   ChamadosAtendente,
@@ -54,6 +55,7 @@ export async function atualizarChamado(
   dados: {
     prioridade?: PrioridadeChamado;
     atendenteUsuarioId?: string | null;
+    publico?: boolean;
   }
 ): Promise<ApiEnvelope<Chamado>> {
   const response = await fetch(`/api/chamados/${numero}`, {
@@ -103,6 +105,36 @@ export function fecharChamado(numero: number, nome?: string | null) {
   return postAcaoChamado(numero, "fechar", nome);
 }
 
+export async function transferirChamado(
+  numero: number,
+  dados: { setorId: string; atendenteUsuarioId: string | null }
+): Promise<ApiEnvelope<Chamado>> {
+  const response = await fetch(`/api/chamados/${numero}/transferir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse(response);
+}
+
+export async function listarAtendentesDoSetor(setorId: string): Promise<ChamadosAtendente[]> {
+  const response = await fetch(`/api/chamados/atendentes?setorId=${encodeURIComponent(setorId)}`);
+  const body = await parseResponse<ChamadosAtendente[]>(response);
+  return body.data ?? [];
+}
+
+/*
+ * Busca por título/descrição usada em /chamados/consultar — sem
+ * sessão só traz chamados marcados como públicos; logado, também
+ * traz os do próprio usuário (ver pesquisarChamados no backend).
+ */
+export async function pesquisarChamados(
+  termo: string
+): Promise<ApiEnvelope<ChamadoResumo[]>> {
+  const response = await fetch(`/api/chamados/pesquisar?q=${encodeURIComponent(termo)}`);
+  return parseResponse(response);
+}
+
 export interface FilaAtendimentoData {
   itens: ChamadoResumo[];
   total: number;
@@ -116,6 +148,8 @@ export async function listarFilaAtendimento(params: {
   busca?: string;
   setorId?: string;
   empresa?: string;
+  departamento?: string;
+  categoriaId?: string;
   pagina?: number;
   porPagina?: number;
 }): Promise<ApiEnvelope<FilaAtendimentoData>> {
@@ -125,6 +159,8 @@ export async function listarFilaAtendimento(params: {
   if (params.busca) query.set("busca", params.busca);
   if (params.setorId) query.set("setorId", params.setorId);
   if (params.empresa) query.set("empresa", params.empresa);
+  if (params.departamento) query.set("departamento", params.departamento);
+  if (params.categoriaId) query.set("categoriaId", params.categoriaId);
   if (params.pagina) query.set("pagina", String(params.pagina));
   if (params.porPagina) query.set("porPagina", String(params.porPagina));
 
@@ -135,12 +171,16 @@ export async function listarFilaAtendimento(params: {
 export async function buscarEstatisticasChamados(params: {
   setorId?: string;
   empresa?: string;
+  departamento?: string;
+  categoriaId?: string;
   dataInicial?: string;
   dataFinal?: string;
 }): Promise<ApiEnvelope<EstatisticasChamados>> {
   const query = new URLSearchParams();
   if (params.setorId) query.set("setorId", params.setorId);
   if (params.empresa) query.set("empresa", params.empresa);
+  if (params.departamento) query.set("departamento", params.departamento);
+  if (params.categoriaId) query.set("categoriaId", params.categoriaId);
   if (params.dataInicial) query.set("dataInicial", params.dataInicial);
   if (params.dataFinal) query.set("dataFinal", params.dataFinal);
 
@@ -191,6 +231,48 @@ export async function atualizarAceiteChamadosSetor(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ aceitaChamados }),
+  });
+  return parseResponse(response);
+}
+
+/* =========================================================
+   ADMIN — categorias de chamados
+   ========================================================= */
+
+export async function listarCategoriasChamados(): Promise<CategoriaChamado[]> {
+  const response = await fetch("/api/admin/chamados/categorias");
+  const body = await parseResponse<CategoriaChamado[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarCategoriaChamados(dados: {
+  setorId: string;
+  nome: string;
+  ordem: number;
+}): Promise<ApiEnvelope<CategoriaChamado>> {
+  const response = await fetch("/api/admin/chamados/categorias", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse(response);
+}
+
+export async function atualizarCategoriaChamados(
+  id: string,
+  dados: { nome?: string; ordem?: number; ativo?: boolean }
+): Promise<ApiEnvelope<CategoriaChamado>> {
+  const response = await fetch(`/api/admin/chamados/categorias/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse(response);
+}
+
+export async function excluirCategoriaChamados(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/chamados/categorias/${id}`, {
+    method: "DELETE",
   });
   return parseResponse(response);
 }

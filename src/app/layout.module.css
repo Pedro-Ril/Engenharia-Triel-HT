@@ -57,8 +57,8 @@
     height: 40px;
     border-radius: 10px;
     border: none;
-    background: #b71c1c;
-    color: #fff;
+    background: var(--primary);
+    color: var(--text-inverse);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   }
 
@@ -67,6 +67,6 @@
     position: fixed;
     inset: 0;
     z-index: 95;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--overlay);
   }
 }

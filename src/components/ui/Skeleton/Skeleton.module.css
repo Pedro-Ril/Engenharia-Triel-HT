@@ -4,7 +4,7 @@
 
   display: block;
 
-  background: #e9ecf1;
+  background: var(--bg-surface-muted);
 }
 
 .rectangle {
@@ -34,7 +34,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.68) 50%,
+    rgba(255, 255, 255, 0.32) 50%,
     transparent 100%
   );
 

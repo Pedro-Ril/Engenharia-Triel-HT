@@ -31,6 +31,7 @@ import { Loader } from "@/components/ui/Loader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Pagination } from "@/components/ui/Pagination";
+import { Stack } from "@/components/ui/Stack";
 import {
   Table,
   TableBody,
@@ -42,6 +43,7 @@ import {
 
 import { listarFilaAtendimento } from "../services/chamados.service";
 import type {
+  CategoriaChamado,
   ChamadoResumo,
   PrioridadeChamado,
   SetorChamado,
@@ -52,7 +54,9 @@ import styles from "./Chamados.module.css";
 
 interface FilaAtendimentoPageProps {
   setores: SetorChamado[];
+  categorias: CategoriaChamado[];
   empresas: string[];
+  departamentos: string[];
 }
 
 const ITENS_POR_PAGINA_LISTA = 25;
@@ -104,7 +108,12 @@ const MODOS_VISUALIZACAO = [
 
 type ModoVisualizacao = (typeof MODOS_VISUALIZACAO)[number]["value"];
 
-export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPageProps) {
+export function FilaAtendimentoPage({
+  setores,
+  categorias,
+  empresas,
+  departamentos,
+}: FilaAtendimentoPageProps) {
   const router = useRouter();
 
   const [modo, setModo] = useState<ModoVisualizacao>("lista");
@@ -112,6 +121,8 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
   const [prioridade, setPrioridade] = useState("");
   const [setorId, setSetorId] = useState("");
   const [empresa, setEmpresa] = useState("");
+  const [departamento, setDepartamento] = useState("");
+  const [categoriaId, setCategoriaId] = useState("");
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [busca, setBusca] = useState("");
   const [paginaLista, setPaginaLista] = useState(1);
@@ -139,6 +150,8 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
       prioridade: (prioridade as PrioridadeChamado) || undefined,
       setorId: setorId || undefined,
       empresa: empresa || undefined,
+      departamento: departamento || undefined,
+      categoriaId: categoriaId || undefined,
       busca: busca || undefined,
       pagina: 1,
       porPagina: LIMITE_BUSCA,
@@ -156,7 +169,7 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
     return () => {
       cancelado = true;
     };
-  }, [status, prioridade, setorId, empresa, busca]);
+  }, [status, prioridade, setorId, empresa, departamento, categoriaId, busca]);
 
   const itensVisiveis = useMemo(
     () => (ocultarFechados ? itens.filter((item) => item.status !== "fechado") : itens),
@@ -173,6 +186,19 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
   const opcoesEmpresa = [
     { value: "", label: "Todas" },
     ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
+  ];
+
+  const opcoesDepartamento = [
+    { value: "", label: "Todos" },
+    ...departamentos.map((nome) => ({ value: nome, label: nome })),
+  ];
+
+  const opcoesCategoria = [
+    { value: "", label: "Todas" },
+    ...categorias.map((categoria) => ({
+      value: categoria.id,
+      label: `${categoria.nome} (${categoria.setorNome})`,
+    })),
   ];
 
   const totalPaginasLista = Math.max(1, Math.ceil(itensVisiveis.length / ITENS_POR_PAGINA_LISTA));
@@ -211,13 +237,6 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
 
   return (
     <PageContainer>
-      <Breadcrumb
-        items={[
-          { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "Atender chamados", current: true, icon: <Headset size={14} /> },
-        ]}
-      />
-
       <PageHeader
         title="Atender chamados"
         description="Fila de chamados dos setores que você atende."
@@ -231,79 +250,114 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
         }
       />
 
+      <Breadcrumb
+        items={[
+          { label: "Início", href: "/", icon: <Home size={14} /> },
+          { label: "Atender chamados", current: true, icon: <Headset size={14} /> },
+        ]}
+      />
+
       <Card>
-        <div className={styles.filaFiltros}>
-          <div className={styles.filaFiltroCampo}>
-            <Field label="Setor">
-              <Dropdown
-                value={setorId}
-                options={opcoesSetor}
-                onValueChange={(valor) => {
-                  setSetorId(valor);
-                  setPaginaLista(1);
-                }}
-              />
-            </Field>
+        <Stack gap={16}>
+          <div className={styles.filaFiltros}>
+            <div className={styles.filaFiltroCampo}>
+              <Field label="Setor">
+                <Dropdown
+                  value={setorId}
+                  options={opcoesSetor}
+                  onValueChange={(valor) => {
+                    setSetorId(valor);
+                    setPaginaLista(1);
+                  }}
+                />
+              </Field>
+            </div>
+
+            <div className={styles.filaFiltroCampo}>
+              <Field label="Empresa">
+                <Dropdown
+                  value={empresa}
+                  options={opcoesEmpresa}
+                  onValueChange={(valor) => {
+                    setEmpresa(valor);
+                    setPaginaLista(1);
+                  }}
+                />
+              </Field>
+            </div>
+
+            <div className={styles.filaFiltroCampo}>
+              <Field label="Departamento">
+                <Dropdown
+                  value={departamento}
+                  options={opcoesDepartamento}
+                  onValueChange={(valor) => {
+                    setDepartamento(valor);
+                    setPaginaLista(1);
+                  }}
+                />
+              </Field>
+            </div>
+
+            <div className={styles.filaFiltroCampo}>
+              <Field label="Status">
+                <Dropdown
+                  value={status}
+                  options={OPCOES_STATUS}
+                  onValueChange={(valor) => {
+                    setStatus(valor);
+                    setPaginaLista(1);
+                  }}
+                />
+              </Field>
+            </div>
+
+            <div className={styles.filaFiltroCampo}>
+              <Field label="Prioridade">
+                <Dropdown
+                  value={prioridade}
+                  options={OPCOES_PRIORIDADE}
+                  onValueChange={(valor) => {
+                    setPrioridade(valor);
+                    setPaginaLista(1);
+                  }}
+                />
+              </Field>
+            </div>
+
+            <div className={styles.filaFiltroCampo}>
+              <Field label="Categoria">
+                <Dropdown
+                  value={categoriaId}
+                  options={opcoesCategoria}
+                  onValueChange={(valor) => {
+                    setCategoriaId(valor);
+                    setPaginaLista(1);
+                  }}
+                />
+              </Field>
+            </div>
+
+            <div className={styles.filaFiltroCampo} style={{ flex: 1 }}>
+              <Field label="Buscar">
+                <Input
+                  value={buscaDigitada}
+                  placeholder="Título, solicitante ou número"
+                  onChange={(event) => setBuscaDigitada(event.target.value)}
+                />
+              </Field>
+            </div>
           </div>
 
-          <div className={styles.filaFiltroCampo}>
-            <Field label="Empresa">
-              <Dropdown
-                value={empresa}
-                options={opcoesEmpresa}
-                onValueChange={(valor) => {
-                  setEmpresa(valor);
-                  setPaginaLista(1);
-                }}
-              />
-            </Field>
-          </div>
-
-          <div className={styles.filaFiltroCampo}>
-            <Field label="Status">
-              <Dropdown
-                value={status}
-                options={OPCOES_STATUS}
-                onValueChange={(valor) => {
-                  setStatus(valor);
-                  setPaginaLista(1);
-                }}
-              />
-            </Field>
-          </div>
-
-          <div className={styles.filaFiltroCampo}>
-            <Field label="Prioridade">
-              <Dropdown
-                value={prioridade}
-                options={OPCOES_PRIORIDADE}
-                onValueChange={(valor) => {
-                  setPrioridade(valor);
-                  setPaginaLista(1);
-                }}
-              />
-            </Field>
-          </div>
-
-          <div className={styles.filaFiltroCampo} style={{ flex: 1 }}>
-            <Field label="Buscar">
-              <Input
-                value={buscaDigitada}
-                placeholder="Título, solicitante ou número"
-                onChange={(event) => setBuscaDigitada(event.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
-
-        <Checkbox
-          label="Ocultar chamados fechados"
-          checked={ocultarFechados}
-          onChange={(event) => {
-            setOcultarFechados(event.target.checked);
-            setPaginaLista(1);
-          }}
-        />
+          <Checkbox
+            label="Ocultar chamados fechados"
+            checked={ocultarFechados}
+            onChange={(event) => {
+              setOcultarFechados(event.target.checked);
+              setPaginaLista(1);
+            }}
+          />
+        </Stack>
       </Card>
 
       {buscaTruncada && (
@@ -354,51 +408,57 @@ export function FilaAtendimentoPage({ setores, empresas }: FilaAtendimentoPagePr
         </Card>
       ) : modo === "lista" ? (
         <Card>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Nº</TableHeaderCell>
-                <TableHeaderCell>Título</TableHeaderCell>
-                <TableHeaderCell>Setor</TableHeaderCell>
-                <TableHeaderCell>Empresa</TableHeaderCell>
-                <TableHeaderCell>Solicitante</TableHeaderCell>
-                <TableHeaderCell>Atendente</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Prioridade</TableHeaderCell>
-                <TableHeaderCell>Atualizado em</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {itensPaginaLista.map((chamado) => (
-                <TableRow
-                  key={chamado.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => router.push(`/chamados/${chamado.numero}`)}
-                >
-                  <TableCell>#{chamado.numero}</TableCell>
-                  <TableCell>{chamado.titulo}</TableCell>
-                  <TableCell>{chamado.setorNome}</TableCell>
-                  <TableCell>{chamado.empresa ?? "—"}</TableCell>
-                  <TableCell>{chamado.solicitanteNome}</TableCell>
-                  <TableCell>{chamado.atendenteNome ?? "—"}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={chamado.status} />
-                  </TableCell>
-                  <TableCell>
-                    <PrioridadeBadge prioridade={chamado.prioridade} />
-                  </TableCell>
-                  <TableCell>{formatarData(chamado.atualizadoEm)}</TableCell>
+          <Stack gap={16}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Nº</TableHeaderCell>
+                  <TableHeaderCell>Título</TableHeaderCell>
+                  <TableHeaderCell>Setor</TableHeaderCell>
+                  <TableHeaderCell>Categoria</TableHeaderCell>
+                  <TableHeaderCell>Empresa</TableHeaderCell>
+                  <TableHeaderCell>Solicitante</TableHeaderCell>
+                  <TableHeaderCell>Departamento</TableHeaderCell>
+                  <TableHeaderCell>Atendente</TableHeaderCell>
+                  <TableHeaderCell>Status</TableHeaderCell>
+                  <TableHeaderCell>Prioridade</TableHeaderCell>
+                  <TableHeaderCell>Atualizado em</TableHeaderCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
 
-          <Pagination
-            page={paginaLista}
-            totalPages={totalPaginasLista}
-            onPageChange={setPaginaLista}
-          />
+              <TableBody>
+                {itensPaginaLista.map((chamado) => (
+                  <TableRow
+                    key={chamado.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => router.push(`/chamados/${chamado.numero}`)}
+                  >
+                    <TableCell>#{chamado.numero}</TableCell>
+                    <TableCell>{chamado.titulo}</TableCell>
+                    <TableCell>{chamado.setorNome}</TableCell>
+                    <TableCell>{chamado.categoriaNome ?? "—"}</TableCell>
+                    <TableCell>{chamado.empresa ?? "—"}</TableCell>
+                    <TableCell>{chamado.solicitanteNome}</TableCell>
+                    <TableCell>{chamado.solicitanteDepartamento ?? "—"}</TableCell>
+                    <TableCell>{chamado.atendenteNome ?? "—"}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={chamado.status} />
+                    </TableCell>
+                    <TableCell>
+                      <PrioridadeBadge prioridade={chamado.prioridade} />
+                    </TableCell>
+                    <TableCell>{formatarData(chamado.atualizadoEm)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            <Pagination
+              page={paginaLista}
+              totalPages={totalPaginasLista}
+              onPageChange={setPaginaLista}
+            />
+          </Stack>
         </Card>
       ) : modo === "grafico" ? (
         <div className={styles.filaGraficoGrid}>

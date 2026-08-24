@@ -28,6 +28,8 @@ export async function GET(request: Request) {
   const busca = url.searchParams.get("busca") ?? undefined;
   const setorId = url.searchParams.get("setorId") ?? undefined;
   const empresa = url.searchParams.get("empresa") ?? undefined;
+  const departamento = url.searchParams.get("departamento") ?? undefined;
+  const categoriaId = url.searchParams.get("categoriaId") ?? undefined;
   const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
   /* Visões de gráfico/kanban pedem um lote maior (sem paginação de servidor) para agrupar tudo de uma vez. */
   const porPagina = Math.min(500, Math.max(1, Number(url.searchParams.get("porPagina")) || 20));
@@ -37,6 +39,8 @@ export async function GET(request: Request) {
       setorIds,
       setorId,
       empresa,
+      departamento,
+      categoriaId,
       status: statusValidos.includes(statusParam as StatusChamado)
         ? (statusParam as StatusChamado)
         : undefined,

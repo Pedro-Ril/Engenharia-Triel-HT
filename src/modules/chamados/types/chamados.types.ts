@@ -12,6 +12,15 @@ export interface SetorChamado {
   nome: string;
 }
 
+export interface CategoriaChamado {
+  id: string;
+  setorId: string;
+  setorNome: string;
+  nome: string;
+  ativo: boolean;
+  ordem: number;
+}
+
 export interface ChamadoAnexo {
   id: string;
   nomeArquivo: string;
@@ -41,6 +50,10 @@ export interface ChamadoResumo {
   solicitanteNome: string;
   atendenteNome: string | null;
   empresa: string | null;
+  solicitanteDepartamento: string | null;
+  categoriaId: string | null;
+  categoriaNome: string | null;
+  publico: boolean;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -104,6 +117,16 @@ export interface ContagemEmpresa {
   total: number;
 }
 
+export interface ContagemDepartamento {
+  departamento: string;
+  total: number;
+}
+
+export interface ContagemCategoria {
+  categoria: string;
+  total: number;
+}
+
 export interface EstatisticasChamados {
   totais: TotaisPorStatus;
   tempoMedioResolucaoHoras: number | null;
@@ -112,4 +135,6 @@ export interface EstatisticasChamados {
   porDia: ContagemDia[];
   porAtendente: ContagemAtendente[];
   porEmpresa: ContagemEmpresa[];
+  porDepartamento: ContagemDepartamento[];
+  porCategoria: ContagemCategoria[];
 }

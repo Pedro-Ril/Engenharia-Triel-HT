@@ -8,8 +8,8 @@
   width: 100%;
   padding: 36px;
   background:
-    radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 20%),
-    linear-gradient(180deg, #f7f8fa 0%, #eef1f5 100%);
+    radial-gradient(circle at top right, var(--primary-soft), transparent 20%),
+    var(--bg-page);
 }
 
 /* ── HERO ─────────────────────────────────────────────── */
@@ -22,8 +22,8 @@
 }
 
 .heroContent {
-  background: linear-gradient(135deg, #ffffff 0%, #fcfcfd 100%);
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 22px;
   padding: 32px;
   box-shadow:
@@ -38,8 +38,8 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: rgba(183, 28, 28, 0.1);
-  color: #b71c1c;
+  background: var(--primary-soft-strong);
+  color: var(--primary);
   font-weight: 700;
 }
 
@@ -59,8 +59,8 @@
   align-items: center;
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgba(183, 28, 28, 0.1);
-  color: #b71c1c;
+  background: var(--primary-soft-strong);
+  color: var(--primary);
   font-weight: 600;
   font-size: 0.75rem;
   letter-spacing: 0.01em;
@@ -70,7 +70,7 @@
 .title {
   font-size: clamp(2rem, 3vw, 3rem);
   line-height: 1.08;
-  color: #111827;
+  color: var(--text);
   margin-bottom: 16px;
 }
 
@@ -84,7 +84,7 @@
 
 .description {
   font-size: 1rem;
-  color: #4b5563;
+  color: var(--text-soft);
   max-width: 760px;
 }
 
@@ -95,8 +95,8 @@
 }
 
 .panelCard {
-  background: linear-gradient(160deg, #b71c1c 0%, #8e1616 100%);
-  color: #fff;
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-active) 100%);
+  color: var(--text-inverse);
   border-radius: 22px;
   padding: 24px;
   box-shadow: 0 14px 32px rgba(183, 28, 28, 0.18);
@@ -124,13 +124,13 @@
   display: block;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
   text-transform: uppercase;
 }
 
 .sectionTitle {
   margin: 0 0 14px;
-  color: #111827;
+  color: var(--text);
   font-size: 1.7rem;
   font-weight: 700;
   line-height: 1.25;
@@ -138,7 +138,7 @@
 
 .sectionText {
   max-width: 560px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-top: 6px;
 }
 
@@ -150,14 +150,14 @@
   justify-content: center;
   gap: 12px;
   padding: 56px 24px;
-  background: #fff;
-  border: 1px dashed rgba(183, 28, 28, 0.25);
+  background: var(--bg-surface);
+  border: 1px dashed var(--primary-soft-border);
   border-radius: 20px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .emptyState svg {
-  color: #b71c1c;
+  color: var(--primary);
   opacity: 0.7;
 }
 
@@ -169,8 +169,8 @@
 }
 
 .moduleCard {
-  background: #fff;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 22px;
   cursor: pointer;
@@ -181,7 +181,7 @@
 
 .moduleCard:hover {
   transform: translateY(-2px);
-  border-color: rgba(183, 28, 28, 0.18);
+  border-color: var(--primary-soft-border);
 }
 
 .cardHeader {
@@ -192,17 +192,17 @@
 
 .cardTitle {
   font-size: 1.25rem;
-  color: #111827;
+  color: var(--text);
 }
 
 .cardDescription {
-  color: #6b7280;
+  color: var(--text-muted);
   margin-bottom: 14px;
 }
 
 .cardHint {
-  background: rgba(183, 28, 28, 0.06);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
   padding: 7px 12px;
   border-radius: 999px;
   font-weight: 700;
@@ -229,8 +229,8 @@
 
 .primaryButton,
 .primaryBtn {
-  background: linear-gradient(135deg, #b71c1c, #d32f2f);
-  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: var(--text-inverse);
   border: none;
   transition:
     transform 0.18s ease,
@@ -245,16 +245,16 @@
 }
 
 .secondaryButton {
-  background: #fff;
-  border: 1px solid rgba(183, 28, 28, 0.25);
-  color: #b71c1c;
+  background: var(--bg-surface);
+  border: 1px solid var(--primary-soft-border);
+  color: var(--primary);
 }
 
 /* ── MODAL ────────────────────────────────────────────── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -266,9 +266,9 @@
 .modal {
   width: min(620px, 100%);
   max-height: 88vh;
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 24px;
-  border: 1px solid rgba(229, 231, 235, 0.95);
+  border: 1px solid var(--border);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
   overflow: hidden;
   display: flex;
@@ -281,10 +281,10 @@
   align-items: flex-start;
   gap: 16px;
   padding: 24px 24px 18px;
-  border-bottom: 1px solid #f0f1f3;
+  border-bottom: 1px solid var(--border-soft);
   background:
-    radial-gradient(circle at top right, rgba(183, 28, 28, 0.08), transparent 28%),
-    linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
+    radial-gradient(circle at top right, var(--primary-soft), transparent 28%),
+    var(--bg-surface);
 }
 
 .modalMeta {
@@ -297,7 +297,7 @@
 
 .modalTitle {
   margin: 0;
-  color: #111827;
+  color: var(--text);
   font-size: 1.2rem;
   font-weight: 700;
   line-height: 1.25;
@@ -305,7 +305,7 @@
 
 .modalSubtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -314,10 +314,10 @@
   width: 42px;
   height: 42px;
   min-width: 42px;
-  border: 1px solid #ececec;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #ffffff;
-  color: #6b7280;
+  background: var(--bg-surface);
+  color: var(--text-muted);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -332,9 +332,9 @@
 }
 
 .closeBtn:hover {
-  background: rgba(183, 28, 28, 0.06);
-  color: #b71c1c;
-  border-color: rgba(183, 28, 28, 0.2);
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft-border);
   transform: translateY(-1px);
 }
 
@@ -358,13 +358,13 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: #f9fafb;
-  border: 1px solid #f0f1f3;
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
 }
 
 .itemTexto {
-  color: #374151;
+  color: var(--text-soft);
   font-size: 0.92rem;
   line-height: 1.5;
 }
@@ -373,8 +373,8 @@
   display: flex;
   justify-content: flex-end;
   padding: 16px 24px 22px;
-  border-top: 1px solid #f0f1f3;
-  background: #ffffff;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-surface);
   gap: 12px;
 }
 
@@ -389,7 +389,7 @@
 
 .textBlock h3 {
   margin: 0 0 10px;
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 0.82rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -398,7 +398,7 @@
 
 .textBlock p {
   margin: 0 0 10px;
-  color: #374151;
+  color: var(--text-soft);
   font-size: 0.92rem;
   line-height: 1.65;
 }
@@ -422,29 +422,29 @@
 }
 
 .subCard {
-  background: #f9fafb;
-  border: 1px solid #f0f1f3;
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 14px 16px;
   transition: all 0.15s ease;
 }
 
 .subCard:hover {
-  background: #f3f4f6;
+  background: var(--bg-surface-muted);
   border-color: rgba(183, 28, 28, 0.15);
 }
 
 .subCard p {
   margin: 0;
-  color: #374151;
+  color: var(--text-soft);
   font-size: 0.92rem;
   line-height: 1.6;
 }
 
 /* ── CARDS DE INFORMAÇÃO (Instalação / Funcionamento) ─── */
 .infoCard {
-  background: #f9fafb;
-  border: 1px solid #f0f1f3;
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
   padding: 18px 20px;
   margin-bottom: 16px;
@@ -457,8 +457,8 @@
 
 .infoCard:hover {
   transform: translateY(-2px);
-  background: #ffffff;
-  border-color: rgba(183, 28, 28, 0.2);
+  background: var(--bg-surface);
+  border-color: var(--primary-soft-border);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.09);
 }
 
@@ -468,7 +468,7 @@
 
 .infoTitle {
   margin: 0 0 10px;
-  color: #b71c1c;
+  color: var(--primary);
   font-size: 0.85rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -477,7 +477,7 @@
 
 .infoCard p {
   margin: 0 0 8px;
-  color: #374151;
+  color: var(--text-soft);
   font-size: 0.92rem;
   line-height: 1.6;
 }

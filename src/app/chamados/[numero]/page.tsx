@@ -7,9 +7,9 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Card } from "@/components/ui/Card";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
-import { listarAtendentes } from "@/lib/chamados/atendentes";
+import { listarAtendentesDisponiveisParaSetor } from "@/lib/chamados/atendentes";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
-import { buscarChamadoPorNumero } from "@/lib/chamados/chamados";
+import { buscarChamadoPorNumero, listarSetoresParaChamado } from "@/lib/chamados/chamados";
 import { ChamadoDetalhePage } from "@/modules/chamados/components/ChamadoDetalhePage";
 
 interface PageProps {
@@ -41,7 +41,15 @@ export default async function Page({ params, searchParams }: PageProps) {
     nomeConfirmado
   );
 
-  if (!podeVer) {
+  /*
+   * Chamado marcado como público (ver atualizarPublico) pode ser
+   * visto por qualquer um, mesmo sem sessão/nome — mas só em modo
+   * leitura: `podeVer` continua com o significado original (dono
+   * por sessão, nome confirmado ou atendente do setor) e é isso
+   * que controla se a pessoa pode responder/agir sobre o chamado,
+   * não `chamado.publico`.
+   */
+  if (!podeVer && !chamado.publico) {
     return (
       <PageContainer>
         <Breadcrumb
@@ -73,15 +81,20 @@ export default async function Page({ params, searchParams }: PageProps) {
     ? chamado.mensagens
     : chamado.mensagens.filter((mensagem) => !mensagem.interno);
 
-  const atendentesDoSetor = ehAtendente
-    ? (await listarAtendentes()).filter((atendente) => atendente.setorId === chamado.setorId)
-    : [];
+  const [atendentesDoSetor, setoresParaTransferir] = ehAtendente
+    ? await Promise.all([
+        listarAtendentesDisponiveisParaSetor(chamado.setorId),
+        listarSetoresParaChamado(),
+      ])
+    : [[], []];
 
   return (
     <ChamadoDetalhePage
       chamado={{ ...chamado, mensagens: mensagensVisiveis, ehAtendente }}
       nomeConfirmado={nomeConfirmado}
       atendentesDoSetor={atendentesDoSetor}
+      setoresParaTransferir={setoresParaTransferir}
+      podeResponder={podeVer}
     />
   );
 }

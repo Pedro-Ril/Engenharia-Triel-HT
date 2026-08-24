@@ -1,3 +1,5 @@
+export type TemaPreferencia = "claro" | "escuro" | "sistema";
+
 export interface PerfilUsuario {
   samAccountName: string;
   nomeExibicao: string;
@@ -5,6 +7,7 @@ export interface PerfilUsuario {
   codigoEmpresa: string | null;
   ehAdministrador: boolean;
   ultimoLoginEm: string | null;
+  tema: TemaPreferencia;
 }
 
 export interface TentativaLoginHistorico {

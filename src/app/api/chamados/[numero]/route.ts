@@ -7,6 +7,7 @@ import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import {
   atribuirAtendente,
   atualizarPrioridade,
+  atualizarPublico,
   buscarChamadoPorNumero,
 } from "@/lib/chamados/chamados";
 import { optionalUuid, requiredPrioridade } from "@/lib/chamados/validacao";
@@ -53,7 +54,7 @@ export async function GET(request: Request, context: RouteContext) {
       nomeConfirmado
     );
 
-    if (!podeVer) {
+    if (!podeVer && !chamado.publico) {
       return NextResponse.json(
         { ok: false, message: "Você não tem acesso a este chamado." },
         { status: 403 }
@@ -109,16 +110,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    if (chamado.status === "fechado") {
+    const parsedBody: unknown = await request.json();
+    if (!isObject(parsedBody)) {
+      throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");
+    }
+
+    const alterandoPrioridadeOuAtendente =
+      parsedBody.prioridade !== undefined || parsedBody.atendenteUsuarioId !== undefined;
+
+    if (alterandoPrioridadeOuAtendente && chamado.status === "fechado") {
       return NextResponse.json(
         { ok: false, message: "Este chamado está fechado — reabra-o antes de alterar prioridade ou atendente." },
         { status: 409 }
       );
-    }
-
-    const parsedBody: unknown = await request.json();
-    if (!isObject(parsedBody)) {
-      throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");
     }
 
     if (parsedBody.prioridade !== undefined) {
@@ -130,6 +134,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         chamado.id,
         optionalUuid(parsedBody.atendenteUsuarioId, "atendente")
       );
+    }
+
+    if (parsedBody.publico !== undefined) {
+      if (typeof parsedBody.publico !== "boolean") {
+        throw new ValidationError("O campo publico deve ser verdadeiro ou falso.");
+      }
+      await atualizarPublico(chamado.id, parsedBody.publico);
     }
 
     const atualizado = await buscarChamadoPorNumero(numero);

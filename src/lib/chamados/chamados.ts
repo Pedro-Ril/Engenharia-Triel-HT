@@ -62,6 +62,26 @@ export async function listarEmpresasComChamados(): Promise<string[]> {
   return result.recordset.map((row) => row.empresa);
 }
 
+/*
+ * Mesma ideia de listarEmpresasComChamados, mas para o
+ * departamento do solicitante — foto do grupo "GRUPO X" do AD no
+ * momento da abertura (ver src/lib/auth/ldap.ts,
+ * extrairDepartamentoDoMemberOf), usada nos relatórios de
+ * chamados por setor de origem.
+ */
+export async function listarDepartamentosComChamados(): Promise<string[]> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool.request().query<{ solicitante_departamento: string }>(`
+    SELECT DISTINCT [solicitante_departamento]
+    FROM dbo.portal_chamados
+    WHERE [solicitante_departamento] IS NOT NULL AND [solicitante_departamento] <> ''
+    ORDER BY [solicitante_departamento];
+  `);
+
+  return result.recordset.map((row) => row.solicitante_departamento);
+}
+
 export interface ChamadoAnexo {
   id: string;
   nomeArquivo: string;
@@ -91,6 +111,10 @@ export interface ChamadoResumo {
   solicitanteNome: string;
   atendenteNome: string | null;
   empresa: string | null;
+  solicitanteDepartamento: string | null;
+  categoriaId: string | null;
+  categoriaNome: string | null;
+  publico: boolean;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -125,6 +149,10 @@ const colunasChamado = `
   CONVERT(VARCHAR(36), c.[atendente_usuario_id]) AS [atendente_usuario_id],
   atendente.[nome_exibicao] AS [atendente_nome],
   c.[empresa],
+  c.[solicitante_departamento],
+  CONVERT(VARCHAR(36), c.[categoria_id]) AS [categoria_id],
+  categoria.[nome] AS [categoria_nome],
+  CAST(c.[publico] AS BIT) AS [publico],
   CONVERT(VARCHAR(33), c.[criado_em], 126) AS [criado_em],
   CONVERT(VARCHAR(33), c.[atualizado_em], 126) AS [atualizado_em],
   CONVERT(VARCHAR(33), c.[resolvido_em], 126) AS [resolvido_em],
@@ -136,6 +164,7 @@ const juncoesChamado = `
   INNER JOIN dbo.portal_setores AS s ON s.[id] = c.[setor_id]
   LEFT JOIN dbo.portal_usuarios AS solicitante ON solicitante.[id] = c.[solicitante_usuario_id]
   LEFT JOIN dbo.portal_usuarios AS atendente ON atendente.[id] = c.[atendente_usuario_id]
+  LEFT JOIN dbo.portal_chamados_categorias AS categoria ON categoria.[id] = c.[categoria_id]
 `;
 
 interface ChamadoRow {
@@ -152,6 +181,10 @@ interface ChamadoRow {
   atendente_usuario_id: string | null;
   atendente_nome: string | null;
   empresa: string | null;
+  solicitante_departamento: string | null;
+  categoria_id: string | null;
+  categoria_nome: string | null;
+  publico: boolean;
   criado_em: string;
   atualizado_em: string;
   resolvido_em: string | null;
@@ -173,6 +206,10 @@ function mapChamadoRow(row: ChamadoRow): Chamado {
     atendenteUsuarioId: row.atendente_usuario_id,
     atendenteNome: row.atendente_nome,
     empresa: row.empresa,
+    solicitanteDepartamento: row.solicitante_departamento,
+    categoriaId: row.categoria_id,
+    categoriaNome: row.categoria_nome,
+    publico: row.publico,
     criadoEm: row.criado_em,
     atualizadoEm: row.atualizado_em,
     resolvidoEm: row.resolvido_em,
@@ -205,6 +242,10 @@ async function inserirAnexos(
 
 export interface CriarChamadoParams {
   setorId: string;
+  /* Obrigatório na abertura (ver src/app/api/chamados/route.ts) — null só é aceito para não quebrar chamados antigos, nunca gerado por uma abertura nova. */
+  categoriaId: string | null;
+  /* Percepção de quem abre o chamado — o atendente pode ajustar depois (ver atualizarPrioridade). */
+  prioridade: PrioridadeChamado;
   titulo: string;
   descricao: string;
   solicitanteUsuarioId: string | null;
@@ -212,6 +253,8 @@ export interface CriarChamadoParams {
   solicitanteContato: string | null;
   /* Foto do codigoEmpresa do usuário no momento da abertura — null se anônimo ou sem empresa cadastrada. */
   empresa: string | null;
+  /* Foto do departamento (grupo "GRUPO X" do AD) do usuário no momento da abertura — null se anônimo ou sem grupo de setor. */
+  solicitanteDepartamento: string | null;
   ipOrigem: string | null;
   anexos: NovoAnexo[];
 }
@@ -228,6 +271,8 @@ export async function criarChamado(
     const insertChamado = new sql.Request(transaction);
 
     insertChamado.input("setorId", sql.UniqueIdentifier, params.setorId);
+    insertChamado.input("categoriaId", sql.UniqueIdentifier, params.categoriaId);
+    insertChamado.input("prioridade", sql.VarChar(10), params.prioridade);
     insertChamado.input("titulo", sql.NVarChar(200), params.titulo);
     insertChamado.input(
       "solicitanteUsuarioId",
@@ -241,6 +286,11 @@ export async function criarChamado(
       params.solicitanteContato
     );
     insertChamado.input("empresa", sql.NVarChar(30), params.empresa);
+    insertChamado.input(
+      "solicitanteDepartamento",
+      sql.NVarChar(200),
+      params.solicitanteDepartamento
+    );
     insertChamado.input("ipOrigem", sql.VarChar(64), params.ipOrigem);
 
     let chamadoResult;
@@ -248,15 +298,18 @@ export async function criarChamado(
     try {
       chamadoResult = await insertChamado.query<{ id: string; numero: number }>(`
         INSERT INTO dbo.portal_chamados
-          ([setor_id], [titulo], [solicitante_usuario_id], [solicitante_nome], [solicitante_contato], [empresa], [ip_origem])
+          ([setor_id], [categoria_id], [prioridade], [titulo], [solicitante_usuario_id], [solicitante_nome], [solicitante_contato], [empresa], [solicitante_departamento], [ip_origem])
         OUTPUT
           CONVERT(VARCHAR(36), INSERTED.[id]) AS [id],
           INSERTED.[numero] AS [numero]
-        VALUES (@setorId, @titulo, @solicitanteUsuarioId, @solicitanteNome, @solicitanteContato, @empresa, @ipOrigem);
+        VALUES (@setorId, @categoriaId, @prioridade, @titulo, @solicitanteUsuarioId, @solicitanteNome, @solicitanteContato, @empresa, @solicitanteDepartamento, @ipOrigem);
       `);
     } catch (error) {
       if (error instanceof Error && /FK_portal_chamados_setor/i.test(error.message)) {
         throw new ValidationError("O setor selecionado não existe.");
+      }
+      if (error instanceof Error && /FK_portal_chamados_categoria/i.test(error.message)) {
+        throw new ValidationError("A categoria selecionada não existe.");
       }
       throw error;
     }
@@ -493,6 +546,8 @@ export interface FiltrosFila {
   /* Setor escolhido no filtro da tela — sempre aplicado por cima da restrição de acesso acima. */
   setorId?: string;
   empresa?: string;
+  departamento?: string;
+  categoriaId?: string;
   status?: StatusChamado;
   prioridade?: PrioridadeChamado;
   busca?: string;
@@ -529,6 +584,16 @@ export async function listarFilaAtendimento(
   if (filtros.empresa) {
     request.input("empresaFiltro", sql.NVarChar(30), filtros.empresa);
     condicoes.push(`c.[empresa] = @empresaFiltro`);
+  }
+
+  if (filtros.departamento) {
+    request.input("departamentoFiltro", sql.NVarChar(200), filtros.departamento);
+    condicoes.push(`c.[solicitante_departamento] = @departamentoFiltro`);
+  }
+
+  if (filtros.categoriaId) {
+    request.input("categoriaIdFiltro", sql.UniqueIdentifier, filtros.categoriaId);
+    condicoes.push(`c.[categoria_id] = @categoriaIdFiltro`);
   }
 
   if (filtros.status) {
@@ -665,6 +730,65 @@ export async function atualizarPrioridade(
   `);
 
   return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+export async function atualizarPublico(chamadoId: string, publico: boolean): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("publico", sql.Bit, publico);
+
+  const result = await request.query(`
+    UPDATE dbo.portal_chamados
+    SET [publico] = @publico, [atualizado_em] = SYSDATETIME()
+    WHERE [id] = @chamadoId;
+  `);
+
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/*
+ * Busca por palavra-chave usada em /chamados/consultar (pública,
+ * sem exigir número+nome) — cada chamado só entra no resultado se
+ * for do próprio usuário logado OU tiver sido marcado como
+ * `publico` por um atendente (ver atualizarPublico). Sem sessão,
+ * só os públicos aparecem. Casa contra o título e a descrição
+ * (primeira mensagem da thread — ver criarChamado), sempre com
+ * LIKE '%termo%' para achar "Como criar um chamado" ao digitar só
+ * "chamado".
+ */
+export async function pesquisarChamados(
+  termo: string,
+  usuarioId: string | null
+): Promise<ChamadoResumo[]> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("termo", sql.NVarChar(200), `%${termo}%`);
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+
+  const result = await request.query<ChamadoRow>(`
+    SELECT TOP (30) ${colunasChamado}
+    ${juncoesChamado}
+    WHERE
+      (c.[publico] = 1 OR (@usuarioId IS NOT NULL AND c.[solicitante_usuario_id] = @usuarioId))
+      AND (
+        c.[titulo] LIKE @termo
+        OR EXISTS (
+          SELECT 1 FROM (
+            SELECT TOP (1) m.[texto]
+            FROM dbo.portal_chamados_mensagens AS m
+            WHERE m.[chamado_id] = c.[id]
+            ORDER BY m.[criado_em] ASC
+          ) AS primeiraMensagem
+          WHERE primeiraMensagem.[texto] LIKE @termo
+        )
+      )
+    ORDER BY c.[criado_em] DESC;
+  `);
+
+  return result.recordset.map(mapChamadoRow);
 }
 
 export async function atribuirAtendente(
@@ -886,4 +1010,63 @@ export async function fecharChamado(chamadoId: string, autorNome: string): Promi
     novoStatus: "fechado",
     mensagemSistema: `${autorNome} fechou o chamado.`,
   });
+}
+
+/*
+ * Transferir para outro atendente do mesmo setor OU para outro
+ * setor inteiro (com ou sem atendente já escolhido lá). Se o setor
+ * mudar de fato, a categoria é zerada — categorias pertencem a um
+ * setor específico (ver portal_chamados_categorias), então uma
+ * categoria do setor antigo não faz sentido no novo.
+ */
+export async function transferirChamado(params: {
+  chamadoId: string;
+  novoSetorId: string;
+  novoAtendenteUsuarioId: string | null;
+  autorNome: string;
+  setorAnteriorNome: string;
+  setorNovoNome: string;
+}): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const request = new sql.Request(transaction);
+    request.input("chamadoId", sql.UniqueIdentifier, params.chamadoId);
+    request.input("novoSetorId", sql.UniqueIdentifier, params.novoSetorId);
+    request.input(
+      "novoAtendenteUsuarioId",
+      sql.UniqueIdentifier,
+      params.novoAtendenteUsuarioId
+    );
+
+    const result = await request.query(`
+      UPDATE dbo.portal_chamados
+      SET
+        [categoria_id] = CASE WHEN [setor_id] = @novoSetorId THEN [categoria_id] ELSE NULL END,
+        [setor_id] = @novoSetorId,
+        [atendente_usuario_id] = @novoAtendenteUsuarioId,
+        [atualizado_em] = SYSDATETIME()
+      WHERE [id] = @chamadoId
+        AND [status] <> 'fechado';
+    `);
+
+    const sucesso = (result.rowsAffected[0] ?? 0) > 0;
+
+    if (sucesso) {
+      const mensagemSistema =
+        params.setorAnteriorNome === params.setorNovoNome
+          ? `${params.autorNome} transferiu o chamado para outro atendente.`
+          : `${params.autorNome} transferiu o chamado do setor "${params.setorAnteriorNome}" para "${params.setorNovoNome}".`;
+
+      await registrarMensagemSistema(transaction, params.chamadoId, mensagemSistema);
+    }
+
+    await transaction.commit();
+    return sucesso;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }

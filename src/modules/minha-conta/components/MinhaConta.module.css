@@ -33,7 +33,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 16px;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.9rem;
   text-align: center;
 }

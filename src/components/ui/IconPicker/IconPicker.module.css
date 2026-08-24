@@ -7,12 +7,12 @@
   align-items: center;
   gap: 10px;
 
-  border: 1px solid #d8d8d8;
+  border: 1px solid var(--border-input);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--bg-surface);
 
   font-size: 15px;
-  color: #171717;
+  color: var(--text);
   text-align: left;
   cursor: pointer;
 
@@ -20,26 +20,26 @@
 }
 
 .trigger:hover {
-  border-color: #b8b8b8;
+  border-color: var(--border-input-hover);
 }
 
 .trigger:focus-visible {
-  border-color: #b71c1c;
-  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
   outline: none;
 }
 
 .trigger:disabled {
   cursor: not-allowed;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--bg-surface-muted);
+  color: var(--text-muted);
   opacity: 0.8;
 }
 
 .triggerIcon {
   flex: 0 0 auto;
   display: inline-flex;
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .triggerLabel {
@@ -53,7 +53,7 @@
 
 .chevron {
   flex: 0 0 auto;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .grid {
@@ -75,10 +75,10 @@
 
   padding: 12px 6px;
 
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #ffffff;
-  color: #374151;
+  background: var(--bg-surface);
+  color: var(--text-soft);
 
   cursor: pointer;
   transition:
@@ -88,14 +88,14 @@
 }
 
 .iconButton:hover {
-  border-color: rgba(183, 28, 28, 0.3);
-  background: rgba(183, 28, 28, 0.04);
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
 }
 
 .iconButton.selected {
-  border-color: #b71c1c;
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .iconName {
@@ -109,6 +109,6 @@
 
 .semResultado {
   margin-top: 14px;
-  color: #6b7280;
+  color: var(--text-muted);
   text-align: center;
 }

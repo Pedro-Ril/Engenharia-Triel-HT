@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: #f8f9fb;
+  background: var(--bg-page);
   min-height: 100%;
 }
 
@@ -17,20 +17,20 @@
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .subtitle {
   margin: 6px 0 0;
-  color: #555;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .searchCard,
 .leftPanel,
 .rightPanel {
-  background: #fff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
 }
@@ -58,12 +58,12 @@
 .label {
   font-size: 13px;
   font-weight: 600;
-  color: #444;
+  color: var(--text-soft);
 }
 
 .input {
   height: 44px;
-  border: 1px solid #d8d8d8;
+  border: 1px solid var(--border-input);
   border-radius: 12px;
   padding: 0 14px;
   font-size: 15px;
@@ -72,8 +72,8 @@
 }
 
 .input:focus {
-  border-color: #b71c1c;
-  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .fileInputWrapper {
@@ -82,25 +82,25 @@
 
 .fileInputLabel {
   height: 44px;
-  border: 1px solid #d8d8d8;
+  border: 1px solid var(--border-input);
   border-radius: 12px;
   padding: 0 14px;
   font-size: 15px;
   outline: none;
   transition: 0.2s ease;
-  background: #fff;
+  background: var(--bg-surface);
   display: flex;
   align-items: center;
   cursor: pointer;
-  color: #333;
+  color: var(--text-soft);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .fileInputLabel:hover {
-  border-color: #b71c1c;
-  box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.08);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .hiddenFileInput {
@@ -112,8 +112,8 @@
   min-width: 140px;
   border: none;
   border-radius: 12px;
-  background: #b71c1c;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-inverse);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -132,9 +132,9 @@
 .errorBox {
   padding: 12px 14px;
   border-radius: 12px;
-  background: #fdecec;
-  color: #b71c1c;
-  border: 1px solid #f5c8c8;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
   font-size: 14px;
 }
 
@@ -147,9 +147,9 @@
   max-width: 420px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #ecfdf3;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
   font-size: 14px;
   font-weight: 600;
@@ -175,10 +175,10 @@
 }
 
 .summaryCard {
-  border: 1px solid #eeeeee;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 12px 14px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -186,7 +186,7 @@
 
 .summaryLabel {
   font-size: 12px;
-  color: #777;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
@@ -205,14 +205,14 @@
 
 .panelHeader {
   padding-bottom: 12px;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid var(--border-soft);
   margin-bottom: 16px;
 }
 
 .panelHeader h2 {
   margin: 0;
   font-size: 18px;
-  color: #222;
+  color: var(--text);
 }
 
 .treeWrapper {
@@ -229,7 +229,7 @@
 
 .treeChildren {
   margin-left: 18px;
-  border-left: 1px dashed #dddddd;
+  border-left: 1px dashed var(--border-strong);
   padding-left: 14px;
 }
 
@@ -246,12 +246,12 @@
 }
 
 .treeRow:hover {
-  background: #f6f6f6;
+  background: var(--bg-surface-muted);
 }
 
 .treeRowSelected {
-  background: rgba(183, 28, 28, 0.08);
-  border: 1px solid rgba(183, 28, 28, 0.18);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-soft-border);
 }
 
 .expandButton {
@@ -261,7 +261,7 @@
   min-width: 24px;
   height: 24px;
   cursor: pointer;
-  color: #444;
+  color: var(--text-soft);
   font-size: 14px;
 }
 
@@ -271,7 +271,7 @@
   min-width: 10px;
   border-radius: 50%;
   margin-right: 2px;
-  background: #bdbdbd;
+  background: var(--border-strong);
 }
 
 .treeContent {
@@ -292,12 +292,12 @@
 .nodeCode {
   font-size: 14px;
   font-weight: 700;
-  color: #222;
+  color: var(--text);
 }
 
 .nodeDescription {
   font-size: 13px;
-  color: #666;
+  color: var(--text-muted);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -315,8 +315,8 @@
   height: 26px;
   padding: 0 8px;
   border-radius: 999px;
-  background: #f1f1f1;
-  color: #444;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -339,29 +339,29 @@
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  border: 1px solid #efefef;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
 }
 
 .detailLabel {
   font-size: 12px;
   text-transform: uppercase;
-  color: #777;
+  color: var(--text-muted);
 }
 
 .validText {
-  color: #2e7d32;
+  color: var(--success-text);
   font-weight: 700;
 }
 
 .emptyState {
   padding: 30px 20px;
   text-align: center;
-  color: #777;
-  border: 1px dashed #ddd;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
   border-radius: 12px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
 }
 
 .actions {
@@ -371,9 +371,9 @@
 }
 
 .modalSecondaryButton {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-soft);
   border-radius: 12px;
   padding: 12px 16px;
   font-weight: 700;
@@ -414,7 +414,7 @@
 .nodeCode {
   font-size: 14px;
   font-weight: 700;
-  color: #222;
+  color: var(--text);
   font-family: inherit;
   line-height: 1.2;
 }
@@ -424,14 +424,14 @@
   font-weight: inherit;
   font-family: inherit;
   line-height: inherit;
-  color: #b71c1c;
+  color: var(--primary);
 }
 /* Modal - Escolher Item FOCCO */
 
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -445,7 +445,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg-surface);
   border-radius: 18px;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
 }
@@ -456,21 +456,21 @@
   align-items: flex-start;
   gap: 16px;
   padding: 22px 24px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .modalTitle {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #b71c1c;
+  color: var(--primary);
   font-family: inherit;
   line-height: 1.25;
 }
 
 .modalSubtitle {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -478,7 +478,7 @@
 .modalCloseButton {
   border: none;
   background: transparent;
-  color: #374151;
+  color: var(--text-soft);
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
@@ -486,7 +486,7 @@
 }
 
 .modalCloseButton:hover {
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .modalBody {
@@ -499,7 +499,7 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 18px 24px 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 /* Opções do FOCCO */
@@ -511,16 +511,16 @@
 }
 
 .foccoOptionCard {
-  border: 1px solid #ececec;
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
-  background: #fff;
+  background: var(--bg-surface);
   padding: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
   transition: 0.2s ease;
 }
 
 .foccoOptionCard:hover {
-  border-color: rgba(183, 28, 28, 0.22);
+  border-color: var(--primary-soft-border);
   box-shadow: 0 10px 28px rgba(183, 28, 28, 0.08);
 }
 
@@ -531,7 +531,7 @@
   gap: 14px;
   padding-bottom: 12px;
   margin-bottom: 14px;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .foccoOptionLabel,
@@ -539,7 +539,7 @@
   display: block;
   font-size: 12px;
   text-transform: uppercase;
-  color: #777;
+  color: var(--text-muted);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -548,7 +548,7 @@
   display: block;
   font-size: 14px;
   font-weight: 700;
-  color: #222;
+  color: var(--text);
   font-family: inherit;
   line-height: 1.2;
 }
@@ -560,9 +560,9 @@
   width: fit-content;
   padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
-  border: 1px solid rgba(183, 28, 28, 0.18);
+  background: var(--primary-soft);
+  color: var(--primary);
+  border: 1px solid var(--primary-soft-border);
   font-size: 12px;
   font-weight: 700;
   font-family: inherit;
@@ -577,15 +577,15 @@
 }
 
 .foccoInfoBlock {
-  border: 1px solid #efefef;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
-  background: #fafafa;
+  background: var(--bg-surface-soft);
   padding: 12px;
 }
 
 .foccoInfoBlock strong {
   font-size: 14px;
-  color: #222;
+  color: var(--text);
   line-height: 1.4;
 }
 
@@ -627,12 +627,12 @@
 }
 
 .summaryCardClickable:hover {
-  border-color: rgba(183, 28, 28, 0.22);
+  border-color: var(--primary-soft-border);
   box-shadow: 0 8px 24px rgba(183, 28, 28, 0.08);
 }
 
 .warningText {
-  color: #b71c1c;
+  color: var(--primary);
   font-weight: 700;
 }
 
@@ -643,9 +643,9 @@
 }
 
 .foccoResumoCard {
-  border: 1px solid #ececec;
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
-  background: #fff;
+  background: var(--bg-surface);
   padding: 16px;
   display: flex;
   justify-content: space-between;
@@ -665,7 +665,7 @@
   display: block;
   font-size: 14px;
   font-weight: 700;
-  color: #222;
+  color: var(--text);
 }
 
 
@@ -701,8 +701,8 @@
 .contextMenu {
   position: fixed;
   width: 280px;
-  background: #fff;
-  border: 1px solid #ececec;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
   padding: 8px;
@@ -714,7 +714,7 @@
 .contextMenuItem {
   border: none;
   background: transparent;
-  color: #222;
+  color: var(--text);
   text-align: left;
   padding: 10px 12px;
   border-radius: 9px;
@@ -727,17 +727,17 @@
 }
 
 .contextMenuItem:hover {
-  background: rgba(183, 28, 28, 0.08);
-  color: #b71c1c;
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .contextMenuItemDanger {
-  color: #b71c1c;
+  color: var(--primary);
 }
 
 .contextMenuSeparator {
   height: 1px;
-  background: #eeeeee;
+  background: var(--border-soft);
   margin: 6px 4px;
 }
 
@@ -746,7 +746,7 @@
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #777;
+  color: var(--text-muted);
   font-family: inherit;
   line-height: 1.2;
 }
@@ -754,12 +754,12 @@
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(183, 28, 28, 0.06);
-  border: 1px solid rgba(183, 28, 28, 0.16);
-  color: #374151;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-soft-border);
+  color: var(--text-soft);
   font-size: 13px;
 }
 
 .filterInfoBox strong {
-  color: #b71c1c;
+  color: var(--primary);
 }

@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Building2,
   CheckCircle2,
   Clock3,
   Home,
+  Monitor,
+  Moon,
+  Settings,
   ShieldCheck,
+  Sun,
   User,
   XCircle,
 } from "lucide-react";
@@ -34,6 +38,7 @@ import { FormGrid } from "@/components/ui/FormGrid";
 import { Loader } from "@/components/ui/Loader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RadioGroup } from "@/components/ui/RadioGroup";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import {
@@ -44,11 +49,35 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/Table";
+import { Tabs } from "@/components/ui/Tabs";
+import { Toast } from "@/components/ui/Toast";
 import { resolverIcone } from "@/lib/icons/icon-registry";
+import { aplicarTemaComTransicao } from "@/lib/tema/aplicar-tema";
 
-import { buscarMinhaConta } from "../services/minhaConta.service";
-import type { MinhaContaData } from "../types/minhaConta.types";
+import { atualizarTemaUsuario, buscarMinhaConta } from "../services/minhaConta.service";
+import type { MinhaContaData, TemaPreferencia } from "../types/minhaConta.types";
 import styles from "./MinhaConta.module.css";
+
+const OPCOES_TEMA = [
+  {
+    value: "claro" as const,
+    label: "Claro",
+    description: "Fundo claro, sempre.",
+    icon: <Sun size={17} />,
+  },
+  {
+    value: "escuro" as const,
+    label: "Escuro",
+    description: "Fundo escuro, sempre.",
+    icon: <Moon size={17} />,
+  },
+  {
+    value: "sistema" as const,
+    label: "Sistema",
+    description: "Segue o tema do seu dispositivo.",
+    icon: <Monitor size={17} />,
+  },
+];
 
 const motivosFalha: Record<string, string> = {
   credenciais_invalidas: "Usuário ou senha em branco",
@@ -73,6 +102,16 @@ export function MinhaContaPage() {
   const [dados, setDados] = useState<MinhaContaData | null>(null);
   const [erro, setErro] = useState<"sessao_expirada" | "erro" | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [aba, setAba] = useState("geral");
+  const [tema, setTema] = useState<TemaPreferencia>("sistema");
+  const [salvandoTema, setSalvandoTema] = useState(false);
+  const ultimoCliqueTemaRef = useRef({ x: 0, y: 0 });
+  const [toast, setToast] = useState({
+    open: false,
+    variant: "success" as "success" | "danger",
+    title: "",
+    description: "",
+  });
 
   useEffect(() => {
     let cancelado = false;
@@ -82,6 +121,7 @@ export function MinhaContaPage() {
 
       if (resultado.ok) {
         setDados(resultado.data);
+        setTema(resultado.data.perfil.tema);
         setErro(null);
       } else {
         setErro(resultado.motivo);
@@ -94,6 +134,40 @@ export function MinhaContaPage() {
       cancelado = true;
     };
   }, []);
+
+  async function handleAlterarTema(
+    novoTema: TemaPreferencia,
+    origem: { x: number; y: number }
+  ) {
+    const temaAnterior = tema;
+
+    setTema(novoTema);
+    aplicarTemaComTransicao(novoTema, origem);
+    setSalvandoTema(true);
+
+    const resultado = await atualizarTemaUsuario(novoTema);
+
+    setSalvandoTema(false);
+
+    if (!resultado.ok) {
+      setTema(temaAnterior);
+      aplicarTemaComTransicao(temaAnterior, origem);
+      setToast({
+        open: true,
+        variant: "danger",
+        title: "Não foi possível salvar",
+        description: resultado.message ?? "Tente novamente em instantes.",
+      });
+      return;
+    }
+
+    setToast({
+      open: true,
+      variant: "success",
+      title: "Aparência atualizada",
+      description: "Sua preferência foi salva.",
+    });
+  }
 
   if (carregando) {
     return (
@@ -157,7 +231,16 @@ export function MinhaContaPage() {
         ]}
       />
 
-      <FormGrid columns={4}>
+      <Tabs
+        value={aba}
+        onValueChange={setAba}
+        items={[
+          {
+            value: "geral",
+            label: "Visão geral",
+            content: (
+              <Stack gap={20}>
+                <FormGrid columns={4}>
         <StatCard
           label="Usuário"
           value={perfil.nomeExibicao}
@@ -352,7 +435,52 @@ export function MinhaContaPage() {
             )}
           </div>
         </Card>
-      </FormGrid>
+                </FormGrid>
+              </Stack>
+            ),
+          },
+          {
+            value: "configuracoes",
+            label: (
+              <Stack direction="row" gap={6} align="center">
+                <Settings size={15} />
+                Configurações
+              </Stack>
+            ),
+            content: (
+              <Card
+                title="Aparência"
+                description="Escolha como o portal deve aparecer para você. A preferência é salva na sua conta e vale em qualquer dispositivo."
+              >
+                <div
+                  onClickCapture={(event) => {
+                    ultimoCliqueTemaRef.current = { x: event.clientX, y: event.clientY };
+                  }}
+                >
+                  <RadioGroup
+                    name="tema"
+                    orientation="horizontal"
+                    options={OPCOES_TEMA}
+                    value={tema}
+                    disabled={salvandoTema}
+                    onValueChange={(valor) =>
+                      handleAlterarTema(valor as TemaPreferencia, ultimoCliqueTemaRef.current)
+                    }
+                  />
+                </div>
+              </Card>
+            ),
+          },
+        ]}
+      />
+
+      <Toast
+        open={toast.open}
+        variant={toast.variant}
+        title={toast.title}
+        description={toast.description}
+        onClose={() => setToast((atual) => ({ ...atual, open: false }))}
+      />
     </PageContainer>
   );
 }

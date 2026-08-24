@@ -67,6 +67,13 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
+    if (ehAtendente && !chamado.atendenteUsuarioId) {
+      return NextResponse.json(
+        { ok: false, message: "Aceite o chamado antes de responder." },
+        { status: 409 }
+      );
+    }
+
     const texto = requiredText(formData.get("texto"), "mensagem", 4000);
     const interno = ehAtendente && formData.get("interno") === "true";
     const anexos = await parseAnexosFormData(formData, "anexos");

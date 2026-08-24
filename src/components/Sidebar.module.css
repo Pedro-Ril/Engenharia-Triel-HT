@@ -3,8 +3,7 @@
   top: 0;
   left: 0;
   height: 100vh;
-  background:
-    linear-gradient(180deg, #b71c1c 0%, #9f1717 55%, #861313 100%);
+  background: var(--sidebar-gradient);
   color: #fff;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 8px 0 28px rgba(40, 10, 10, 0.18);
@@ -83,8 +82,8 @@
   border-radius: 8px;
   border: none;
 
-  background: #ffffff;
-  color: #b71c1c;
+  background: var(--bg-surface);
+  color: var(--primary);
 
   display: flex;
   align-items: center;

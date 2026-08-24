@@ -1,0 +1,40 @@
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+
+  text-align: left;
+  cursor: pointer;
+
+  transition: background-color 0.15s ease;
+}
+
+.item:hover {
+  background: var(--bg-hover-brand);
+}
+
+.itemTitulo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
