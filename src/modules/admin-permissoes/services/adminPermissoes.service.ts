@@ -7,6 +7,7 @@ import type {
   BuscaTerminalFabrica,
   ConfiguracaoAd,
   ConfiguracaoDb,
+  Empresa,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
@@ -145,6 +146,44 @@ export async function excluirUsuario(id: string): Promise<ApiEnvelope<null>> {
     method: "DELETE",
   });
   return parseResponse<null>(response);
+}
+
+export async function listarEmpresas(): Promise<Empresa[]> {
+  const response = await fetch("/api/admin/empresas");
+  const body = await parseResponse<Empresa[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarEmpresa(dados: {
+  nome: string;
+  codigo?: string | null;
+  corPrimariaClara: string;
+  corPrimariaEscura: string;
+}): Promise<ApiEnvelope<Empresa>> {
+  const response = await fetch("/api/admin/empresas", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<Empresa>(response);
+}
+
+export async function atualizarEmpresa(
+  id: string,
+  dados: {
+    nome?: string;
+    codigo?: string | null;
+    corPrimariaClara?: string;
+    corPrimariaEscura?: string;
+    ativa?: boolean;
+  }
+): Promise<ApiEnvelope<Empresa>> {
+  const response = await fetch(`/api/admin/empresas/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<Empresa>(response);
 }
 
 export interface ResultadoImportacaoAd {
@@ -291,15 +330,24 @@ export async function reiniciarAplicacao(): Promise<ApiEnvelope<null>> {
 
 export interface BuscasTerminalFabricaData {
   buscas: BuscaTerminalFabrica[];
+  total: number;
   resumo: ResumoBuscasTerminalFabrica;
 }
 
-export async function buscarBuscasTerminalFabrica(): Promise<BuscasTerminalFabricaData> {
-  const response = await fetch("/api/admin/terminal-fabrica/buscas");
+export async function buscarBuscasTerminalFabrica(params: {
+  pagina: number;
+  porPagina: number;
+}): Promise<BuscasTerminalFabricaData> {
+  const query = new URLSearchParams({
+    pagina: String(params.pagina),
+    porPagina: String(params.porPagina),
+  });
+  const response = await fetch(`/api/admin/terminal-fabrica/buscas?${query.toString()}`);
   const body = await parseResponse<BuscasTerminalFabricaData>(response);
   return (
     body.data ?? {
       buscas: [],
+      total: 0,
       resumo: { totalBuscas: 0, buscasHoje: 0, naoEncontrados: 0 },
     }
   );

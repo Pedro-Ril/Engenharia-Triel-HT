@@ -138,7 +138,7 @@ export default function Sidebar({
 
           {open && (
             <div className={styles.brandText}>
-              <strong className={styles.brandTitle}>Triel-HT</strong>
+              <strong className={styles.brandTitle}>Grupo Triel-HT</strong>
               <span className={styles.brandSubtitle}>Portal</span>
             </div>
           )}

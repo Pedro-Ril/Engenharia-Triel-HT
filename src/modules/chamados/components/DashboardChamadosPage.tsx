@@ -307,7 +307,7 @@ export function DashboardChamadosPage({
       <XAxis dataKey="dia" />
       <YAxis allowDecimals={false} />
       <Tooltip />
-      <Line type="monotone" dataKey="total" name="Chamados" stroke="#b71c1c" strokeWidth={3} />
+      <Line type="monotone" dataKey="total" name="Chamados" stroke="var(--primary)" strokeWidth={3} />
     </LineChart>
   );
 

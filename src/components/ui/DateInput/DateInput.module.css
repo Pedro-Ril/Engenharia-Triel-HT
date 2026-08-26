@@ -231,7 +231,7 @@
   background: var(--primary);
   font-weight: 700;
 
-  box-shadow: 0 3px 8px rgba(183, 28, 28, 0.24);
+  box-shadow: 0 3px 8px rgba(var(--primary-rgb), 0.24);
 }
 
 .unavailable {

@@ -213,8 +213,8 @@ export function MinhaContaPage() {
     .map((item) => ({ nome: item.moduloNome, total: item.totalAcessos }));
 
   const dadosLoginGrafico = [
-    { label: "Sucesso", total: totalSucessos, cor: "#166534" },
-    { label: "Falha", total: historico.length - totalSucessos, cor: "#b71c1c" },
+    { label: "Sucesso", total: totalSucessos, cor: "var(--success-text)" },
+    { label: "Falha", total: historico.length - totalSucessos, cor: "var(--danger-text)" },
   ].filter((item) => item.total > 0);
 
   return (
@@ -288,7 +288,7 @@ export function MinhaContaPage() {
                   <XAxis type="number" allowDecimals={false} />
                   <YAxis type="category" dataKey="nome" width={150} tick={{ fontSize: 12 }} />
                   <Tooltip cursor={false} />
-                  <Bar dataKey="total" name="Acessos" fill="#b71c1c" radius={[0, 8, 8, 0]} />
+                  <Bar dataKey="total" name="Acessos" fill="var(--primary)" radius={[0, 8, 8, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

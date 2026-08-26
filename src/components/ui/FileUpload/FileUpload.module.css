@@ -22,7 +22,7 @@
 }
 
 .upload:hover:not(.disabled) {
-  border-color: rgba(183, 28, 28, 0.45);
+  border-color: rgba(var(--primary-rgb), 0.45);
   background: var(--primary-soft);
 }
 

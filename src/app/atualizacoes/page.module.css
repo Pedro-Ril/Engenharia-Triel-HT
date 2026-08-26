@@ -561,12 +561,12 @@
 }
 
 .modalBody::-webkit-scrollbar-thumb {
-  background: rgba(183, 28, 28, 0.22);
+  background: rgba(var(--primary-rgb), 0.22);
   border-radius: 999px;
 }
 
 .modalBody::-webkit-scrollbar-thumb:hover {
-  background: rgba(183, 28, 28, 0.4);
+  background: rgba(var(--primary-rgb), 0.4);
 }
 
 /* ── ITENS LIST ───────────────────────────────────────── */
@@ -617,12 +617,12 @@
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease;
-  box-shadow: 0 8px 20px rgba(183, 28, 28, 0.22);
+  box-shadow: 0 8px 20px rgba(var(--primary-rgb), 0.22);
 }
 
 .primaryBtn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(183, 28, 28, 0.28);
+  box-shadow: 0 12px 24px rgba(var(--primary-rgb), 0.28);
 }
 
 /* ── RESPONSIVE ───────────────────────────────────────── */
@@ -697,14 +697,14 @@
 }
 /* ── CARD ATIVO (pulso ao navegar pela sidebar) ───────── */
 @keyframes pulsoBorda {
-  0%   { box-shadow: 0 0 0 0px rgba(183, 28, 28, 0.4), 0 4px 16px rgba(15, 23, 42, 0.04); }
-  40%  { box-shadow: 0 0 0 8px rgba(183, 28, 28, 0.15), 0 4px 16px rgba(15, 23, 42, 0.04); }
-  70%  { box-shadow: 0 0 0 14px rgba(183, 28, 28, 0.05), 0 4px 16px rgba(15, 23, 42, 0.04); }
-  100% { box-shadow: 0 0 0 0px rgba(183, 28, 28, 0), 0 4px 16px rgba(15, 23, 42, 0.04); }
+  0%   { box-shadow: 0 0 0 0px rgba(var(--primary-rgb), 0.4), 0 4px 16px rgba(15, 23, 42, 0.04); }
+  40%  { box-shadow: 0 0 0 8px rgba(var(--primary-rgb), 0.15), 0 4px 16px rgba(15, 23, 42, 0.04); }
+  70%  { box-shadow: 0 0 0 14px rgba(var(--primary-rgb), 0.05), 0 4px 16px rgba(15, 23, 42, 0.04); }
+  100% { box-shadow: 0 0 0 0px rgba(var(--primary-rgb), 0), 0 4px 16px rgba(15, 23, 42, 0.04); }
 }
 
 .cardAtivo {
-  border-color: rgba(183, 28, 28, 0.5);
+  border-color: rgba(var(--primary-rgb), 0.5);
   animation: pulsoBorda 1.4s ease-out forwards;
 }
 /* ── CORES DAS BOLINHAS ───────────────────────────────── */

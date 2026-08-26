@@ -66,6 +66,7 @@ export interface Chamado extends ChamadoResumo {
   fechadoEm: string | null;
   mensagens: ChamadoMensagem[];
   ehAtendente: boolean;
+  ehDono: boolean;
 }
 
 export interface ChamadosAtendente {

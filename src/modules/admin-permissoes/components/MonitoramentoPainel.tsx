@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { Pagination } from "@/components/ui/Pagination";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import {
@@ -170,29 +171,23 @@ export function MonitoramentoPainel({ onFeedback }: MonitoramentoPainelProps) {
 
   return (
     <Stack gap={20}>
-      <div className={styles.abas}>
-        {ABAS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.valor}
-              type="button"
-              className={`${styles.abaBtn} ${aba === item.valor ? styles.abaBtnAtiva : ""}`}
-              onClick={() => setAba(item.valor)}
-            >
-              <Icon size={15} />
-              {item.label}
-            </button>
-          );
-        })}
-
-        {ultimaAtualizacao && (
-          <span className={styles.ultimaAtualizacao}>
-            <RotateCw size={12} />
-            Atualizado {formatarTempoRelativo(ultimaAtualizacao.toISOString())}
-          </span>
-        )}
-      </div>
+      <SegmentedTabs
+        itens={ABAS.map((item) => ({
+          valor: item.valor,
+          label: item.label,
+          icon: <item.icon size={15} />,
+        }))}
+        ativo={aba}
+        onSelecionar={setAba}
+        extra={
+          ultimaAtualizacao && (
+            <span className={styles.ultimaAtualizacao}>
+              <RotateCw size={12} />
+              Atualizado {formatarTempoRelativo(ultimaAtualizacao.toISOString())}
+            </span>
+          )
+        }
+      />
 
       {carregandoResumo ? (
         <Card>
@@ -411,7 +406,7 @@ function AbaBancoDeDados({ resumo }: { resumo: ResumoMonitoramento }) {
                 <Tooltip
                   formatter={(value) => [`${Number(value).toLocaleString("pt-BR")} MB`, "Tamanho"]}
                 />
-                <Bar dataKey="tamanhoMB" name="Tamanho" fill="#b71c1c" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="tamanhoMB" name="Tamanho" fill="var(--primary)" radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

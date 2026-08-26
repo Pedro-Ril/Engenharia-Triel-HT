@@ -45,3 +45,10 @@
   border-color: var(--info-border);
   color: var(--info-text);
 }
+
+/* Pra destaque ligado à marca (ex: "item selecionado") — não é um status semântico como os outros. */
+.primary {
+  background: var(--primary-soft);
+  border-color: var(--primary-soft-border);
+  color: var(--primary);
+}

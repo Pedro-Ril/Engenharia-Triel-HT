@@ -146,7 +146,7 @@
 
 .mensagemAtendente {
   background: var(--bg-hover-brand);
-  border-color: rgba(183, 28, 28, 0.14);
+  border-color: rgba(var(--primary-rgb), 0.14);
 }
 
 .mensagemInterna {
@@ -330,7 +330,7 @@
 }
 
 .kanbanCard:hover {
-  border-color: rgba(183, 28, 28, 0.3);
+  border-color: rgba(var(--primary-rgb), 0.3);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
@@ -394,7 +394,7 @@
 }
 
 .resultadoBusca:hover {
-  border-color: rgba(183, 28, 28, 0.3);
+  border-color: rgba(var(--primary-rgb), 0.3);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 

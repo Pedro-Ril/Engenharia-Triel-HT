@@ -1,62 +1,57 @@
 const API_BASE = "/api/terminal-fabrica";
 
 /*
- * Mesma lógica de src/modules/cadastro-roteiro/services/itemPdf.service.ts
- * (XHR com progresso + blob), mas aponta para a rota pública do
- * terminal e devolve a URL do blob para ser embutida num
- * <iframe> na própria tela — o terminal não pode abrir nova
- * guia.
+ * Busca os bytes do PDF já montado (todas as folhas juntas — ver
+ * src/lib/pdf/roteiro-pdf.ts) pra renderizar com o visualizador
+ * próprio do terminal (ver PdfViewerKiosk.tsx). O tempo de espera
+ * aqui é quase todo do servidor (ler a pasta de rede + juntar as
+ * folhas) — a transferência do PDF em si é rápida, então não faz
+ * sentido medir "progresso de download" (não existe uma fase
+ * lenta de download pra acompanhar).
  */
-export async function buscarPdfDetalhamentoItem(
-  codigo: string,
-  onProgress?: (percentual: number) => void
-): Promise<string> {
+export async function buscarPdfDetalhamentoItem(codigo: string): Promise<ArrayBuffer> {
   const codigoLimpo = String(codigo || "").trim();
 
   if (!codigoLimpo) {
     throw new Error("Código do item inválido.");
   }
 
-  const url = `${API_BASE}/item-pdf/${encodeURIComponent(codigoLimpo)}`;
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.open("GET", url, true);
-    xhr.responseType = "blob";
-
-    xhr.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percentual = Math.round((event.loaded / event.total) * 100);
-        onProgress?.(percentual);
-      } else {
-        onProgress?.(50);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status === 404) {
-        reject(new Error("Não localizou PDFs para este item."));
-        return;
-      }
-
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error("Erro ao abrir PDF do item."));
-        return;
-      }
-
-      onProgress?.(100);
-
-      const blob = xhr.response;
-      const pdfUrl = window.URL.createObjectURL(blob);
-
-      resolve(pdfUrl);
-    };
-
-    xhr.onerror = () => {
-      reject(new Error("Erro de comunicação com a API de PDFs."));
-    };
-
-    xhr.send();
+  const response = await fetch(`${API_BASE}/item-pdf/${encodeURIComponent(codigoLimpo)}`, {
+    cache: "no-store",
   });
+
+  if (response.status === 404) {
+    throw new Error("Não localizou PDFs para este item.");
+  }
+
+  if (!response.ok) {
+    throw new Error("Erro ao abrir PDF do item.");
+  }
+
+  return response.arrayBuffer();
+}
+
+/*
+ * Checagem leve de disponibilidade (só lista a pasta, sem juntar
+ * as folhas) — usada pra decidir se o botão "Ver desenho" fica
+ * habilitado, já que nem todo item tem 2D e 3D ao mesmo tempo.
+ */
+export async function verificarPdfDisponivel(codigo: string): Promise<boolean> {
+  const codigoLimpo = String(codigo || "").trim();
+
+  if (!codigoLimpo) {
+    throw new Error("Código do item inválido.");
+  }
+
+  const response = await fetch(
+    `${API_BASE}/item-pdf/${encodeURIComponent(codigoLimpo)}/existe`,
+    { cache: "no-store" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Erro ao verificar disponibilidade do desenho.");
+  }
+
+  const json = await response.json();
+  return Boolean(json?.data?.disponivel);
 }

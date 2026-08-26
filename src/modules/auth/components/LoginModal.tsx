@@ -54,7 +54,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Entrar no Portal Triel-HT"
+      title="Entrar no Portal Grupo Triel-HT"
       description="Use o seu usuário e senha de rede."
     >
       <form className={styles.form} onSubmit={handleSubmit}>

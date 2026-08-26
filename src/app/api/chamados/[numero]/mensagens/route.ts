@@ -54,7 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const { podeVer, ehAtendente } = await verificarAcessoChamado(
+    const { podeVer, ehAtendente, ehDono } = await verificarAcessoChamado(
       chamado,
       usuario,
       typeof nomeConfirmado === "string" ? nomeConfirmado : null
@@ -67,7 +67,8 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    if (ehAtendente && !chamado.atendenteUsuarioId) {
+    /* Dono do próprio chamado sempre pode responder, mesmo sendo também atendente do setor (ver ChamadoDetalhePage.tsx). */
+    if (ehAtendente && !ehDono && !chamado.atendenteUsuarioId) {
       return NextResponse.json(
         { ok: false, message: "Aceite o chamado antes de responder." },
         { status: 409 }

@@ -35,7 +35,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   }
 
   const nomeConfirmado = nome ?? null;
-  const { podeVer, ehAtendente, bloqueadoPorTentativas } = await verificarAcessoChamado(
+  const { podeVer, ehAtendente, ehDono, bloqueadoPorTentativas } = await verificarAcessoChamado(
     chamado,
     usuario,
     nomeConfirmado
@@ -90,7 +90,7 @@ export default async function Page({ params, searchParams }: PageProps) {
 
   return (
     <ChamadoDetalhePage
-      chamado={{ ...chamado, mensagens: mensagensVisiveis, ehAtendente }}
+      chamado={{ ...chamado, mensagens: mensagensVisiveis, ehAtendente, ehDono }}
       nomeConfirmado={nomeConfirmado}
       atendentesDoSetor={atendentesDoSetor}
       setoresParaTransferir={setoresParaTransferir}

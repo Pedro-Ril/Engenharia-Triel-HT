@@ -526,7 +526,7 @@
   background: linear-gradient(
     135deg,
     var(--primary-soft),
-    rgba(183, 28, 28, 0.04)
+    rgba(var(--primary-rgb), 0.04)
   );
 
   color: var(--primary);
@@ -550,9 +550,9 @@
     var(--primary-soft)
   );
 
-  border-color: rgba(183, 28, 28, 0.3);
+  border-color: rgba(var(--primary-rgb), 0.3);
 
-  box-shadow: 0 4px 14px rgba(183, 28, 28, 0.12);
+  box-shadow: 0 4px 14px rgba(var(--primary-rgb), 0.12);
 
   transform: translateY(-1px);
 }
@@ -589,7 +589,7 @@
 
 .summaryCardClickable:hover {
   border-color: var(--primary-soft-border);
-  box-shadow: 0 6px 18px rgba(183, 28, 28, 0.08);
+  box-shadow: 0 6px 18px rgba(var(--primary-rgb), 0.08);
   transform: translateY(-1px);
 }
 
@@ -1035,7 +1035,7 @@
 
 .editRouteButton:hover {
   background: var(--bg-hover-brand);
-  border-color: rgba(183, 28, 28, 0.35);
+  border-color: rgba(var(--primary-rgb), 0.35);
 }
 .successBox {
   border: 1px solid var(--success-border);
@@ -1171,7 +1171,7 @@
 
 .routeIconButton:hover {
   background: var(--bg-hover-brand);
-  border-color: rgba(183, 28, 28, 0.35);
+  border-color: rgba(var(--primary-rgb), 0.35);
 }
 
 .routeIconButtonDanger {
@@ -1215,7 +1215,7 @@
 
 .routeIconButton:hover {
   background: var(--bg-hover-brand);
-  border-color: rgba(183, 28, 28, 0.35);
+  border-color: rgba(var(--primary-rgb), 0.35);
   transform: translateY(-1px);
 }
 

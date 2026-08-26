@@ -742,7 +742,7 @@ export default function BIPage() {
                     return (
                       <Cell
                         key={`mes-${index}`}
-                        fill="#b71c1c"
+                        fill="var(--primary)"
                         fillOpacity={ativo ? 1 : 0.28}
                         stroke={
                           filtrosInterativos.periodo === entry.periodoOriginal

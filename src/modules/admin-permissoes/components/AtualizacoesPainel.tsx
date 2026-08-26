@@ -73,8 +73,8 @@ const TIPO_ESTILOS: Record<
   novo: { label: "Novo", bg: "rgba(15, 118, 110, 0.1)", texto: "#0f766e" },
   melhoria: {
     label: "Melhoria",
-    bg: "rgba(183, 28, 28, 0.08)",
-    texto: "#b71c1c",
+    bg: "var(--tag-red-bg)",
+    texto: "var(--tag-red-text)",
   },
   correcao: { label: "Correção", bg: "rgba(146, 64, 14, 0.1)", texto: "#92400e" },
 };

@@ -196,7 +196,7 @@ export function PermissoesPainel({
                 {usuario.nomeExibicao}
               </span>
 
-              <Badge variant={ativo ? "danger" : "neutral"}>{total}</Badge>
+              <Badge variant={ativo ? "primary" : "neutral"}>{total}</Badge>
             </button>
           );
         })}

@@ -77,7 +77,7 @@
   border: none;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: var(--text-inverse);
-  box-shadow: 0 10px 20px rgba(183, 28, 28, 0.2);
+  box-shadow: 0 10px 20px rgba(var(--primary-rgb), 0.2);
 }
 
 .primaryButton:hover {
@@ -105,7 +105,7 @@
   color: var(--text-inverse);
   border-radius: 22px;
   padding: 24px;
-  box-shadow: 0 14px 32px rgba(183, 28, 28, 0.18);
+  box-shadow: 0 14px 32px rgba(var(--primary-rgb), 0.18);
 }
 
 .panelTitle {
@@ -265,7 +265,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(183, 28, 28, 0.16);
+  border: 1px solid rgba(var(--primary-rgb), 0.16);
   background: var(--primary-soft);
   color: var(--text-soft);
   border-radius: 999px;
@@ -280,7 +280,7 @@
 
 .filterChip:hover {
   background: var(--primary-soft-strong);
-  border-color: rgba(183, 28, 28, 0.28);
+  border-color: rgba(var(--primary-rgb), 0.28);
   transform: translateY(-1px);
 }
 
@@ -450,7 +450,7 @@
 }
 
 .table tbody tr:hover td {
-  background: rgba(183, 28, 28, 0.03);
+  background: rgba(var(--primary-rgb), 0.03);
 }
 
 .loadingCard,

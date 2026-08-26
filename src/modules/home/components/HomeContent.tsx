@@ -98,12 +98,12 @@ export function HomeContent({
     <main className={styles.page}>
       <section className={styles.hero}>
         <div className={styles.heroContent}>
-          <span className={styles.badge}>Portal Triel-HT</span>
+          <span className={styles.badge}>Portal Grupo Triel-HT</span>
 
           <h1 className={styles.title}>
             {usuario
               ? `Bem-vindo de volta, ${usuario.nomeExibicao.split(" ")[0]}`
-              : "Bem-vindo ao portal de ferramentas Triel-HT"}
+              : "Bem-vindo ao portal de ferramentas do Grupo Triel-HT"}
           </h1>
 
           <p className={styles.description}>

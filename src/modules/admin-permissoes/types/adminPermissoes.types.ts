@@ -35,6 +35,15 @@ export interface PortalUsuarioAdmin {
   ultimoLoginEm: string | null;
 }
 
+export interface Empresa {
+  id: string;
+  nome: string;
+  codigo: string | null;
+  corPrimariaClara: string;
+  corPrimariaEscura: string;
+  ativa: boolean;
+}
+
 export interface PortalPermissao {
   id: string;
   usuarioId: string;

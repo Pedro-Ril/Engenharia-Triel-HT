@@ -58,7 +58,7 @@
 }
 
 .option:hover {
-  border-color: rgba(183, 28, 28, 0.3);
+  border-color: var(--primary-soft-border);
   background: var(--primary-soft);
 }
 
@@ -159,7 +159,7 @@
   background: var(--primary-soft);
 
   box-shadow:
-    0 0 0 2px rgba(183, 28, 28, 0.07);
+    0 0 0 2px var(--primary-ring);
 }
 
 .option:has(.input:checked) .indicator {
@@ -173,7 +173,7 @@
 }
 
 .option:has(.input:checked) .icon {
-  background: var(--danger-bg-strong);
+  background: var(--primary-soft-strong);
   color: var(--primary);
 }
 

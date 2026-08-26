@@ -37,8 +37,8 @@ const TIPO_CONFIG = {
   melhoria: {
     label: "Melhoria",
     className: styles.badgeMelhoria,
-    bg: "rgba(183, 28, 28, 0.08)",
-    texto: "#b71c1c",
+    bg: "var(--tag-red-bg)",
+    texto: "var(--tag-red-text)",
   },
   correcao: {
     label: "Correção",
@@ -210,7 +210,7 @@ export default function AtualizacoesPage({
           </span>
 
           <h1 className={styles.headerTitle}>
-            Atualizações do Portal Triel-HT
+            Atualizações do Portal Grupo Triel-HT
           </h1>
 
           <p className={styles.headerSubtitle}>

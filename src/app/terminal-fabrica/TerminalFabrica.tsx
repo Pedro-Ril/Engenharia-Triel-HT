@@ -22,16 +22,18 @@ import {
 } from "@/modules/cadastro-roteiro/services/threeDPlay.service";
 import type { Modelo3DPlay } from "@/modules/cadastro-roteiro/services/threeDPlay.service";
 import type { RoteiroTreeNode } from "@/modules/cadastro-roteiro/types/cadastroRoteiro.types";
+import { PdfViewerKiosk } from "@/modules/terminal-fabrica/components/PdfViewerKiosk";
 import { buscarItemInfo } from "@/modules/terminal-fabrica/services/itemInfo.service";
 import type { ItemInfoTerminal } from "@/modules/terminal-fabrica/services/itemInfo.service";
-import { buscarPdfDetalhamentoItem } from "@/modules/terminal-fabrica/services/pdfKiosk.service";
+import {
+  buscarPdfDetalhamentoItem,
+  verificarPdfDisponivel,
+} from "@/modules/terminal-fabrica/services/pdfKiosk.service";
 import { registrarBuscaTerminal } from "@/modules/terminal-fabrica/services/registrarBusca.service";
 
 import styles from "./terminal-fabrica.module.css";
 
-type Overlay =
-  | { tipo: "pdf"; url: string }
-  | { tipo: "3d"; url: string; titulo: string };
+type Overlay = { tipo: "pdf"; data: ArrayBuffer };
 
 function itemParaBusca3D(item: ItemInfoTerminal): RoteiroTreeNode {
   return {
@@ -56,31 +58,64 @@ export default function TerminalFabrica() {
   const [item, setItem] = useState<ItemInfoTerminal | null>(null);
 
   const [carregandoPdf, setCarregandoPdf] = useState(false);
-  const [progressoPdf, setProgressoPdf] = useState(0);
+  const [pdfDisponivel, setPdfDisponivel] = useState<boolean | null>(null);
 
   const [buscando3D, setBuscando3D] = useState(false);
   const [modelos3D, setModelos3D] = useState<Modelo3DPlay[]>([]);
+  const [modelos3DCache, setModelos3DCache] = useState<Modelo3DPlay[] | null>(null);
 
   const [overlay, setOverlay] = useState<Overlay | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const janela3DRef = useRef<Window | null>(null);
+  const timeoutFechar3DRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  function fecharJanela3DSeAberta() {
+    if (timeoutFechar3DRef.current) {
+      clearTimeout(timeoutFechar3DRef.current);
+      timeoutFechar3DRef.current = null;
+    }
+
+    if (janela3DRef.current && !janela3DRef.current.closed) {
+      janela3DRef.current.close();
+    }
+
+    janela3DRef.current = null;
+  }
+
+  /*
+   * O 3DEXPERIENCE não pode ser embutido em iframe (ver
+   * abrirModelo3D) — abre numa aba própria. Pra não deixar essa
+   * aba acumulando no kiosk, ela fecha sozinha assim que o
+   * operador volta a atenção pro terminal (aba/janela original
+   * ganha foco de novo), e tem um limite de segurança caso esse
+   * evento não dispare por algum motivo.
+   */
+  useEffect(() => {
+    function aoVoltarFoco() {
+      if (document.visibilityState === "visible") {
+        fecharJanela3DSeAberta();
+      }
+    }
+
+    window.addEventListener("focus", fecharJanela3DSeAberta);
+    document.addEventListener("visibilitychange", aoVoltarFoco);
+
+    return () => {
+      window.removeEventListener("focus", fecharJanela3DSeAberta);
+      document.removeEventListener("visibilitychange", aoVoltarFoco);
+      if (timeoutFechar3DRef.current) clearTimeout(timeoutFechar3DRef.current);
+    };
   }, []);
 
   useEffect(() => {
     if (!overlay) {
       inputRef.current?.focus();
     }
-  }, [overlay]);
-
-  useEffect(() => {
-    return () => {
-      if (overlay?.tipo === "pdf") {
-        window.URL.revokeObjectURL(overlay.url);
-      }
-    };
   }, [overlay]);
 
   /*
@@ -135,11 +170,14 @@ export default function TerminalFabrica() {
     setBuscando(true);
     setErro(null);
     setModelos3D([]);
+    setPdfDisponivel(null);
+    setModelos3DCache(null);
 
     try {
       const resultado = await buscarItemInfo(codigoLimpo);
       setItem(resultado);
       registrarBuscaTerminal(codigoLimpo, true);
+      verificarDisponibilidade(resultado);
     } catch (error) {
       setItem(null);
       setErro(
@@ -151,11 +189,33 @@ export default function TerminalFabrica() {
     }
   }
 
+  /*
+   * Nem todo item tem 2D e 3D ao mesmo tempo — verifica os dois em
+   * paralelo, em segundo plano, pra já mostrar ao operador qual
+   * opção não está disponível em vez de deixar ele clicar e só
+   * descobrir depois. Falha na própria checagem (rede instável,
+   * etc.) não desabilita o botão — só fica "desconhecido" e deixa
+   * o clique normal (com seu próprio tratamento de erro) decidir.
+   */
+  function verificarDisponibilidade(itemEncontrado: ItemInfoTerminal) {
+    verificarPdfDisponivel(itemEncontrado.codigo)
+      .then(setPdfDisponivel)
+      .catch(() => setPdfDisponivel(null));
+
+    if (itemEncontrado.revisao) {
+      buscarModelos3DPlay(itemParaBusca3D(itemEncontrado))
+        .then(setModelos3DCache)
+        .catch(() => setModelos3DCache(null));
+    }
+  }
+
   function handleNovaConsulta() {
     setCodigo("");
     setItem(null);
     setErro(null);
     setModelos3D([]);
+    setPdfDisponivel(null);
+    setModelos3DCache(null);
     inputRef.current?.focus();
   }
 
@@ -164,11 +224,10 @@ export default function TerminalFabrica() {
 
     setErro(null);
     setCarregandoPdf(true);
-    setProgressoPdf(0);
 
     try {
-      const url = await buscarPdfDetalhamentoItem(item.codigo, setProgressoPdf);
-      setOverlay({ tipo: "pdf", url });
+      const data = await buscarPdfDetalhamentoItem(item.codigo);
+      setOverlay({ tipo: "pdf", data });
     } catch (error) {
       setErro(
         error instanceof Error ? error.message : "Não foi possível abrir o PDF."
@@ -182,23 +241,20 @@ export default function TerminalFabrica() {
     if (!item) return;
 
     setErro(null);
+
+    /* A verificação de disponibilidade em segundo plano já buscou isso — reaproveita em vez de consultar de novo. */
+    if (modelos3DCache !== null) {
+      abrirOuListarModelos3D(modelos3DCache);
+      return;
+    }
+
     setBuscando3D(true);
     setModelos3D([]);
 
     try {
       const resultados = await buscarModelos3DPlay(itemParaBusca3D(item));
-
-      if (resultados.length === 0) {
-        setErro("Nenhum modelo 3D encontrado para este item e revisão.");
-        return;
-      }
-
-      if (resultados.length === 1) {
-        abrirModelo3D(resultados[0]);
-        return;
-      }
-
-      setModelos3D(resultados);
+      setModelos3DCache(resultados);
+      abrirOuListarModelos3D(resultados);
     } catch (error) {
       setErro(
         error instanceof Error
@@ -210,14 +266,53 @@ export default function TerminalFabrica() {
     }
   }
 
+  function abrirOuListarModelos3D(resultados: Modelo3DPlay[]) {
+    if (resultados.length === 0) {
+      setErro("Nenhum modelo 3D encontrado para este item e revisão.");
+      return;
+    }
+
+    if (resultados.length === 1) {
+      abrirModelo3D(resultados[0]);
+      return;
+    }
+
+    setModelos3D(resultados);
+  }
+
+  /*
+   * Nunca embutir o 3DEXPERIENCE num iframe — o login dele usa CAS
+   * (SSO), que grava cookie de sessão a cada ticket validado; num
+   * iframe (contexto de terceiro) o navegador bloqueia esse
+   * cookie, e o login entra num loop infinito (dashboard → login
+   * → dashboard → ...) até cair numa tela em branco, sem nenhum
+   * erro visível. Abrindo numa aba de verdade (contexto de
+   * primeira parte) o mesmo login funciona normalmente — testado e
+   * confirmado.
+   */
   function abrirModelo3D(modelo: Modelo3DPlay) {
     const url = montarUrl3DPlay(modelo);
     setModelos3D([]);
-    setOverlay({
-      tipo: "3d",
-      url,
-      titulo: modelo.titulo || modelo.codigo || "Modelo 3D",
-    });
+
+    /*
+     * Nunca embutir o 3DEXPERIENCE num iframe — testado e
+     * confirmado: mesmo com uma sessão já autenticada, o cookie de
+     * sessão dele (SameSite=Lax) nunca é enviado numa requisição
+     * de iframe vindo de outra origem, então o login entra num
+     * loop infinito (dashboard → login → dashboard → ...) até
+     * sobrar uma tela em branco, sem erro nenhum. Abrindo numa aba
+     * de verdade (contexto de primeira parte) o mesmo login
+     * funciona normalmente.
+     *
+     * Sem `noopener`, de propósito — precisamos da referência pra
+     * fechar essa aba sozinha quando o operador voltar a atenção
+     * pro terminal (ver fecharJanela3DSeAberta), já que o objetivo
+     * é kiosk/tela cheia sem abas acumulando.
+     */
+    fecharJanela3DSeAberta();
+    janela3DRef.current = window.open(url, "_blank");
+
+    timeoutFechar3DRef.current = setTimeout(fecharJanela3DSeAberta, 5 * 60 * 1000);
   }
 
   function fecharOverlay() {
@@ -233,7 +328,7 @@ export default function TerminalFabrica() {
       <div className={styles.marca}>
         <span className={styles.marcaLogo}>HT</span>
         <div className={styles.marcaTextos}>
-          <strong>Portal Triel-HT</strong>
+          <strong>Portal Grupo Triel-HT</strong>
           <span>Terminal de Fábrica</span>
         </div>
       </div>
@@ -305,9 +400,9 @@ export default function TerminalFabrica() {
           <span className={styles.itemEyebrow}>Código do item</span>
           <div className={styles.itemCodigo}>{item.codigo}</div>
 
-          {(item.titulo || item.descricao) && (
+          {(item.descricao || item.titulo) && (
             <p className={styles.itemDescricao}>
-              {item.titulo || item.descricao}
+              {item.descricao || item.titulo}
             </p>
           )}
 
@@ -329,7 +424,7 @@ export default function TerminalFabrica() {
               type="button"
               className={styles.acaoBotao}
               onClick={handleVerPdf}
-              disabled={carregandoPdf}
+              disabled={carregandoPdf || pdfDisponivel === false}
             >
               <span className={styles.acaoIconWrap}>
                 {carregandoPdf ? (
@@ -340,14 +435,12 @@ export default function TerminalFabrica() {
               </span>
 
               <span className={styles.acaoTextos}>
-                <strong>
-                  {carregandoPdf
-                    ? progressoPdf > 0
-                      ? `Abrindo ${progressoPdf}%`
-                      : "Abrindo..."
-                    : "Ver desenho"}
-                </strong>
-                <span>Todas as folhas em PDF</span>
+                <strong>{carregandoPdf ? "Abrindo..." : "Ver desenho"}</strong>
+                <span>
+                  {pdfDisponivel === false
+                    ? "Nenhum desenho disponível para este item"
+                    : "Todas as folhas em PDF"}
+                </span>
               </span>
             </button>
 
@@ -355,7 +448,7 @@ export default function TerminalFabrica() {
               type="button"
               className={styles.acaoBotao}
               onClick={handleVer3D}
-              disabled={buscando3D}
+              disabled={buscando3D || modelos3DCache?.length === 0}
             >
               <span className={styles.acaoIconWrap}>
                 {buscando3D ? (
@@ -367,19 +460,14 @@ export default function TerminalFabrica() {
 
               <span className={styles.acaoTextos}>
                 <strong>{buscando3D ? "Buscando..." : "Ver modelo 3D"}</strong>
-                <span>Abrir no 3DEXPERIENCE</span>
+                <span>
+                  {modelos3DCache?.length === 0
+                    ? "Nenhum modelo 3D disponível para este item"
+                    : "Abre em nova aba no 3DEXPERIENCE"}
+                </span>
               </span>
             </button>
           </div>
-
-          {carregandoPdf && (
-            <div className={styles.progressoBarra}>
-              <div
-                className={styles.progressoPreenchimento}
-                style={{ width: `${progressoPdf}%` }}
-              />
-            </div>
-          )}
 
           {erro && (
             <div className={styles.erroBox}>
@@ -438,33 +526,7 @@ export default function TerminalFabrica() {
       )}
 
       {overlay && (
-        <div className={styles.overlay}>
-          <div className={styles.overlayBarra}>
-            <span className={styles.overlayTitulo}>
-              {overlay.tipo === "pdf"
-                ? `Desenho — ${item?.codigo}`
-                : overlay.titulo}
-            </span>
-
-            <button
-              type="button"
-              className={styles.overlayFecharBotao}
-              onClick={fecharOverlay}
-            >
-              <X size={20} />
-              Fechar
-            </button>
-          </div>
-
-          <div className={styles.overlayConteudo}>
-            <iframe
-              key={overlay.url}
-              src={overlay.url}
-              className={styles.overlayIframe}
-              title={overlay.tipo === "pdf" ? "Desenho do item" : "Modelo 3D"}
-            />
-          </div>
-        </div>
+        <PdfViewerKiosk data={overlay.data} itemCodigo={item?.codigo} onFechar={fecharOverlay} />
       )}
     </div>
   );

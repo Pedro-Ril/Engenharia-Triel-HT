@@ -246,8 +246,15 @@ export function ChamadoDetalhePage({
 
   const podeTransferir = chamado.ehAtendente && chamado.status !== "fechado";
 
-  /* Atendente não pode responder antes de aceitar o chamado (ver POST .../mensagens). */
-  const precisaAceitarAntes = chamado.ehAtendente && !chamado.atendenteUsuarioId;
+  /*
+   * Atendente não pode responder antes de aceitar o chamado (ver
+   * POST .../mensagens) — mas isso não vale para quem é dono do
+   * próprio chamado (ex: admin que abriu um chamado para si
+   * mesmo): a pessoa sempre pode responder ao que ela mesma abriu,
+   * mesmo sendo também atendente do setor.
+   */
+  const precisaAceitarAntes =
+    chamado.ehAtendente && !chamado.ehDono && !chamado.atendenteUsuarioId;
 
   return (
     <PageContainer>

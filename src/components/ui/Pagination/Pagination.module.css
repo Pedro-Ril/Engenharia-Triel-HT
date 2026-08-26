@@ -62,7 +62,7 @@
   background: var(--primary);
   color: var(--text-inverse);
 
-  box-shadow: 0 6px 14px rgba(183, 28, 28, 0.18);
+  box-shadow: 0 6px 14px rgba(var(--primary-rgb), 0.18);
 }
 
 .navigationButton:focus-visible,

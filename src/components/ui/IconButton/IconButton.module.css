@@ -94,7 +94,7 @@
 }
 
 .primary:hover:not(:disabled) {
-  border-color: rgba(183, 28, 28, 0.34);
+  border-color: rgba(var(--primary-rgb), 0.34);
   background: var(--primary-soft-strong);
 }
 
@@ -105,7 +105,7 @@
 }
 
 .danger:hover:not(:disabled) {
-  border-color: rgba(183, 28, 28, 0.4);
+  border-color: rgba(var(--primary-rgb), 0.4);
   background: var(--danger-bg-strong);
 }
 

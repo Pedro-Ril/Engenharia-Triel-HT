@@ -1,0 +1,177 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #0b1220;
+  animation: entrar 0.2s ease;
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.overlayBarra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+
+  padding: 14px 26px;
+  background: linear-gradient(90deg, #1f2937, #111827);
+  color: #fff;
+  flex-shrink: 0;
+
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.overlayTitulo {
+  flex-shrink: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.overlayFecharBotao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  min-height: 52px;
+  padding: 0 22px;
+
+  border: none;
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+
+  font-size: 1.05rem;
+  font-weight: 800;
+
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.overlayFecharBotao:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.controles {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.grupo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  height: 38px;
+
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.botao:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.botao:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.paginaTexto {
+  min-width: 92px;
+  text-align: center;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.overlayConteudo {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+
+  display: flex;
+  /* "safe" faz cair pro alinhamento inicial quando o conteúdo passa do tamanho do container — sem isso, o navegador trava a rolagem e não deixa alcançar a borda do desenho em zoom alto. */
+  align-items: safe center;
+  justify-content: safe center;
+
+  cursor: grab;
+  user-select: none;
+}
+
+.overlayConteudo.arrastando {
+  cursor: grabbing;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.spin {
+  animation: girar 0.8s linear infinite;
+}
+
+@keyframes girar {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.paginaWrapper {
+  position: relative;
+  padding: 24px;
+}
+
+.statusSobreposto {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 18, 32, 0.5);
+  color: #fff;
+}
+
+.canvas {
+  display: block;
+  /* Sobrescreve o reset global de `canvas { max-width: 100% }` (globals.css) — aqui o canvas precisa crescer de verdade além do container em zoom alto, senão só a largura fica presa (a altura não tem esse limite) e o desenho sai esticado/distorcido. */
+  max-width: none;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+}

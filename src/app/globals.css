@@ -54,6 +54,7 @@ body {
   --primary: #b71c1c;
   --primary-hover: #9f1717;
   --primary-active: #861313;
+  --primary-rgb: 183, 28, 28;
   --primary-soft: rgba(183, 28, 28, 0.08);
   --primary-soft-strong: rgba(183, 28, 28, 0.13);
   --primary-soft-border: rgba(183, 28, 28, 0.2);
@@ -133,6 +134,7 @@ body {
     --primary: #e04545;
     --primary-hover: #c62828;
     --primary-active: #b71c1c;
+    --primary-rgb: 224, 69, 69;
     --primary-soft: rgba(224, 69, 69, 0.16);
     --primary-soft-strong: rgba(224, 69, 69, 0.24);
     --primary-soft-border: rgba(224, 69, 69, 0.35);
@@ -211,6 +213,7 @@ body {
   --primary: #e04545;
   --primary-hover: #c62828;
   --primary-active: #b71c1c;
+  --primary-rgb: 224, 69, 69;
   --primary-soft: rgba(224, 69, 69, 0.16);
   --primary-soft-strong: rgba(224, 69, 69, 0.24);
   --primary-soft-border: rgba(224, 69, 69, 0.35);

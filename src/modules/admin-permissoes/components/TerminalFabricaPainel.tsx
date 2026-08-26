@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { Loader } from "@/components/ui/Loader";
+import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import {
@@ -29,22 +30,38 @@ function formatarData(valorIso: string): string {
   });
 }
 
+const POR_PAGINA_BUSCAS = 25;
+
 export function TerminalFabricaPainel() {
   const [dados, setDados] = useState<BuscasTerminalFabricaData | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
-    buscarBuscasTerminalFabrica().then((resultado) => {
+    let cancelado = false;
+
+    buscarBuscasTerminalFabrica({ pagina, porPagina: POR_PAGINA_BUSCAS }).then((resultado) => {
+      if (cancelado) return;
       setDados(resultado);
       setCarregando(false);
     });
-  }, []);
+
+    return () => {
+      cancelado = true;
+    };
+  }, [pagina]);
+
+  function handleMudarPagina(novaPagina: number) {
+    setCarregando(true);
+    setPagina(novaPagina);
+  }
 
   if (carregando || !dados) {
     return <Loader label="Carregando buscas do terminal..." />;
   }
 
-  const { buscas, resumo } = dados;
+  const { buscas, total, resumo } = dados;
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA_BUSCAS));
 
   return (
     <Card
@@ -77,57 +94,61 @@ export function TerminalFabricaPainel() {
         {buscas.length === 0 ? (
           <p>Nenhuma busca registrada no terminal ainda.</p>
         ) : (
-          <Table minWidth={740}>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell align="center">Status</TableHeaderCell>
-                <TableHeaderCell>Código buscado</TableHeaderCell>
-                <TableHeaderCell>Usuário</TableHeaderCell>
-                <TableHeaderCell>Origem</TableHeaderCell>
-                <TableHeaderCell>Data</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {buscas.map((busca) => (
-                <TableRow key={busca.id}>
-                  <TableCell align="center">
-                    <div className={adminStyles.checkboxCentro}>
-                      {busca.encontrado ? (
-                        <CheckCircle2
-                          size={18}
-                          color="#16a34a"
-                          aria-label="Item encontrado"
-                        />
-                      ) : (
-                        <XCircle
-                          size={18}
-                          color="#c62828"
-                          aria-label="Item não encontrado"
-                        />
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <strong>{busca.codigoBuscado}</strong>
-                  </TableCell>
-
-                  <TableCell>
-                    {busca.usuarioNome ? (
-                      busca.usuarioNome
-                    ) : (
-                      <Badge variant="neutral">Anônimo</Badge>
-                    )}
-                  </TableCell>
-
-                  <TableCell>{busca.ipOrigem ?? "—"}</TableCell>
-
-                  <TableCell>{formatarData(busca.buscadoEm)}</TableCell>
+          <>
+            <Table minWidth={740}>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell align="center">Status</TableHeaderCell>
+                  <TableHeaderCell>Código buscado</TableHeaderCell>
+                  <TableHeaderCell>Usuário</TableHeaderCell>
+                  <TableHeaderCell>Origem</TableHeaderCell>
+                  <TableHeaderCell>Data</TableHeaderCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+
+              <TableBody>
+                {buscas.map((busca) => (
+                  <TableRow key={busca.id}>
+                    <TableCell align="center">
+                      <div className={adminStyles.checkboxCentro}>
+                        {busca.encontrado ? (
+                          <CheckCircle2
+                            size={18}
+                            color="#16a34a"
+                            aria-label="Item encontrado"
+                          />
+                        ) : (
+                          <XCircle
+                            size={18}
+                            color="#c62828"
+                            aria-label="Item não encontrado"
+                          />
+                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <strong>{busca.codigoBuscado}</strong>
+                    </TableCell>
+
+                    <TableCell>
+                      {busca.usuarioNome ? (
+                        busca.usuarioNome
+                      ) : (
+                        <Badge variant="neutral">Anônimo</Badge>
+                      )}
+                    </TableCell>
+
+                    <TableCell>{busca.ipOrigem ?? "—"}</TableCell>
+
+                    <TableCell>{formatarData(busca.buscadoEm)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            <Pagination page={pagina} totalPages={totalPaginas} onPageChange={handleMudarPagina} />
+          </>
         )}
       </Stack>
     </Card>

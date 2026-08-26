@@ -21,8 +21,8 @@
 }
 
 .container:hover {
-  border-color: rgba(183, 28, 28, 0.24);
-  background: rgba(183, 28, 28, 0.025);
+  border-color: rgba(var(--primary-rgb), 0.24);
+  background: rgba(var(--primary-rgb), 0.025);
 }
 
 .compact {

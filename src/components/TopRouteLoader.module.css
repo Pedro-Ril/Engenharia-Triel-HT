@@ -11,8 +11,8 @@
 .loaderBar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #ff6b6b 0%, #b71c1c 45%, #7f1010 100%);
-  box-shadow: 0 0 10px rgba(183, 28, 28, 0.4);
+  background: linear-gradient(90deg, var(--primary-hover) 0%, var(--primary) 45%, var(--primary-active) 100%);
+  box-shadow: 0 0 10px var(--primary-ring);
   opacity: 1;
   transition:
     width 0.28s ease,

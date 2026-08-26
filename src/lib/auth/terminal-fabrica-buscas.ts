@@ -44,43 +44,57 @@ export async function registrarBuscaTerminalFabrica(params: {
   `);
 }
 
-export async function listarBuscasTerminalFabrica(
-  limite = 100
-): Promise<BuscaTerminalFabrica[]> {
+export async function listarBuscasTerminalFabrica(params: {
+  pagina: number;
+  porPagina: number;
+}): Promise<{ itens: BuscaTerminalFabrica[]; total: number }> {
   const pool = await getSqlServerPool();
-  const request = pool.request();
+  const offset = (params.pagina - 1) * params.porPagina;
 
-  request.input("limite", sql.Int, limite);
+  const requestItens = pool.request();
+  requestItens.input("offset", sql.Int, offset);
+  requestItens.input("porPagina", sql.Int, params.porPagina);
 
-  const result = await request.query<{
-    id: string;
-    codigo_buscado: string;
-    encontrado: boolean;
-    buscado_em: string;
-    usuario_nome: string | null;
-    ip_origem: string | null;
-  }>(`
-    SELECT TOP (@limite)
-      CONVERT(VARCHAR(36), b.[id]) AS [id],
-      b.[codigo_buscado],
-      CAST(b.[encontrado] AS BIT) AS [encontrado],
-      CONVERT(VARCHAR(33), b.[buscado_em], 126) AS [buscado_em],
-      u.[nome_exibicao] AS [usuario_nome],
-      b.[ip_origem]
-    FROM dbo.portal_terminal_fabrica_buscas AS b
-    LEFT JOIN dbo.portal_usuarios AS u
-      ON u.[id] = b.[usuario_id]
-    ORDER BY b.[buscado_em] DESC;
-  `);
+  const requestTotal = pool.request();
 
-  return result.recordset.map((row) => ({
-    id: row.id,
-    codigoBuscado: row.codigo_buscado,
-    encontrado: row.encontrado,
-    buscadoEm: row.buscado_em,
-    usuarioNome: row.usuario_nome,
-    ipOrigem: row.ip_origem,
-  }));
+  const [resultItens, resultTotal] = await Promise.all([
+    requestItens.query<{
+      id: string;
+      codigo_buscado: string;
+      encontrado: boolean;
+      buscado_em: string;
+      usuario_nome: string | null;
+      ip_origem: string | null;
+    }>(`
+      SELECT
+        CONVERT(VARCHAR(36), b.[id]) AS [id],
+        b.[codigo_buscado],
+        CAST(b.[encontrado] AS BIT) AS [encontrado],
+        CONVERT(VARCHAR(33), b.[buscado_em], 126) AS [buscado_em],
+        u.[nome_exibicao] AS [usuario_nome],
+        b.[ip_origem]
+      FROM dbo.portal_terminal_fabrica_buscas AS b
+      LEFT JOIN dbo.portal_usuarios AS u
+        ON u.[id] = b.[usuario_id]
+      ORDER BY b.[buscado_em] DESC
+      OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
+    `),
+    requestTotal.query<{ total: number }>(
+      `SELECT COUNT(*) AS [total] FROM dbo.portal_terminal_fabrica_buscas;`
+    ),
+  ]);
+
+  return {
+    itens: resultItens.recordset.map((row) => ({
+      id: row.id,
+      codigoBuscado: row.codigo_buscado,
+      encontrado: row.encontrado,
+      buscadoEm: row.buscado_em,
+      usuarioNome: row.usuario_nome,
+      ipOrigem: row.ip_origem,
+    })),
+    total: resultTotal.recordset[0]?.total ?? 0,
+  };
 }
 
 export interface ResumoBuscasTerminalFabrica {

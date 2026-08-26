@@ -20,6 +20,16 @@
   justify-content: center;
 }
 
+.corInput {
+  width: 40px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
 .alcaArrastar {
   cursor: grab;
   touch-action: none;

@@ -133,7 +133,18 @@ direto via `setAttribute` fora dali.
   `Modal`/`Drawer`, `ConfirmDialog`, `Toast`, `Badge`, `StatCard`,
   `EmptyState`, `Loader`, `Pagination`, `IconButton`, `Switch`,
   `Checkbox`, `RadioGroup`, `Breadcrumb`, `PageContainer`/`PageHeader`,
-  `RichTextEditor`/`RichTextViewer`.
+  `RichTextEditor`/`RichTextViewer`, `SegmentedTabs`.
+- Uma tela de admin com mais de uma "sub-visão" relacionada (ex:
+  Monitoramento: Visão geral/Banco de dados/Logs; Configurações: Active
+  Directory/Banco de dados) segmenta por abas com `SegmentedTabs`
+  (`src/components/ui/SegmentedTabs/`) — pilulas dentro de um container
+  arredondado, aba ativa preenchida com `--primary`. Cada painel guarda seu
+  próprio estado de aba internamente (`useState` no próprio componente,
+  não no pai) — ver `MonitoramentoPainel.tsx`/`ConfiguracoesPainel.tsx`
+  como referência. Não é o mesmo componente que `Tabs`
+  (`src/components/ui/Tabs/`, estilo sublinhado) — `Tabs` é para abas
+  dentro do conteúdo de uma página (ex: Minha Conta); `SegmentedTabs` é
+  para sub-navegação dentro de uma seção de admin.
 - `Card` com mais de uma seção de conteúdo **precisa** de um `<Stack gap={16}>`
   (ou 20) envolvendo os filhos — o `.content` do Card não tem gap
   próprio, então uma tabela seguida de paginação, ou um filtro seguido

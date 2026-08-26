@@ -521,7 +521,7 @@
 
 .foccoOptionCard:hover {
   border-color: var(--primary-soft-border);
-  box-shadow: 0 10px 28px rgba(183, 28, 28, 0.08);
+  box-shadow: 0 10px 28px rgba(var(--primary-rgb), 0.08);
 }
 
 .foccoOptionHeader {
@@ -628,7 +628,7 @@
 
 .summaryCardClickable:hover {
   border-color: var(--primary-soft-border);
-  box-shadow: 0 8px 24px rgba(183, 28, 28, 0.08);
+  box-shadow: 0 8px 24px rgba(var(--primary-rgb), 0.08);
 }
 
 .warningText {

@@ -22,7 +22,7 @@ export function DownloadsPageClient({ downloads }: DownloadsPageClientProps) {
     <div className={styles.page}>
       <div className={styles.hero}>
         <div className={styles.heroContent}>
-          <span className={styles.badge}>Portal Triel-HT</span>
+          <span className={styles.badge}>Portal Grupo Triel-HT</span>
 
           <h1 className={styles.title}>Central de Downloads</h1>
 

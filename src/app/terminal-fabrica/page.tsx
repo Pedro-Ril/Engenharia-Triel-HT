@@ -5,7 +5,7 @@ import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import TerminalFabrica from "./TerminalFabrica";
 
 export const metadata = {
-  title: "Terminal de Fábrica — Portal Triel-HT",
+  title: "Terminal de Fábrica — Portal Grupo Triel-HT",
 };
 
 /*

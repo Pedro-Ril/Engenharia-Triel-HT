@@ -5,6 +5,7 @@ import {
   Activity,
   BookOpen,
   Boxes,
+  Building2,
   Download,
   Factory,
   Headset,
@@ -21,7 +22,6 @@ import { FormGrid } from "@/components/ui/FormGrid";
 import { Loader } from "@/components/ui/Loader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import { Toast } from "@/components/ui/Toast";
 
@@ -32,6 +32,7 @@ import {
   buscarConfiguracaoAd,
   buscarConfiguracaoDb,
   listarDownloadsAdmin,
+  listarEmpresas,
   listarModulos,
   listarPermissoes,
   listarSetores,
@@ -41,6 +42,7 @@ import {
 import type {
   ConfiguracaoAd,
   ConfiguracaoDb,
+  Empresa,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
@@ -52,9 +54,9 @@ import type { GrupoNavegacaoAdmin } from "./AdminNavegacao";
 import styles from "./AdminPermissoes.module.css";
 import { AtendentesChamadosPainel } from "./AtendentesChamadosPainel";
 import { AtualizacoesPainel } from "./AtualizacoesPainel";
-import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
-import { ConfiguracaoDbPainel } from "./ConfiguracaoDbPainel";
+import { ConfiguracoesPainel } from "./ConfiguracoesPainel";
 import { DownloadsPainel } from "./DownloadsPainel";
+import { EmpresasPainel } from "./EmpresasPainel";
 import { MonitoramentoPainel } from "./MonitoramentoPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
@@ -79,6 +81,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "setores",
         label: "Setores e módulos",
         icon: <Layers size={16} />,
+      },
+      {
+        valor: "empresas",
+        label: "Empresas",
+        icon: <Building2 size={16} />,
       },
     ],
   },
@@ -139,6 +146,7 @@ export function AdminPermissoesPage() {
   const [configuracaoDb, setConfiguracaoDb] = useState<ConfiguracaoDb | null>(null);
   const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
   const [wikiArtigos, setWikiArtigos] = useState<WikiArtigo[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
   function mostrarFeedback(
     variant: ToastState["variant"],
@@ -161,6 +169,7 @@ export function AdminPermissoesPage() {
         configuracaoDbData,
         downloadsData,
         wikiArtigosData,
+        empresasData,
       ] = await Promise.all([
         listarSetores(),
         listarModulos(),
@@ -170,6 +179,7 @@ export function AdminPermissoesPage() {
         buscarConfiguracaoDb(),
         listarDownloadsAdmin(),
         listarWikiArtigosAdmin(),
+        listarEmpresas(),
       ]);
 
       setSetores(setoresData);
@@ -180,6 +190,7 @@ export function AdminPermissoesPage() {
       setConfiguracaoDb(configuracaoDbData);
       setDownloads(downloadsData);
       setWikiArtigos(wikiArtigosData);
+      setEmpresas(empresasData);
       setCarregando(false);
     }
 
@@ -342,20 +353,27 @@ export function AdminPermissoesPage() {
             />
           )}
 
-          {secao === "configuracoes" && (
-            <Stack gap={20}>
-              <ConfiguracaoAdPainel
-                configuracaoAd={configuracaoAd}
-                onFeedback={mostrarFeedback}
-                onConfiguracaoAtualizada={setConfiguracaoAd}
-              />
+          {secao === "empresas" && (
+            <EmpresasPainel
+              empresas={empresas}
+              onFeedback={mostrarFeedback}
+              onEmpresaCriada={(empresa) => setEmpresas((atual) => [...atual, empresa])}
+              onEmpresaAtualizada={(empresa) =>
+                setEmpresas((atual) =>
+                  atual.map((item) => (item.id === empresa.id ? empresa : item))
+                )
+              }
+            />
+          )}
 
-              <ConfiguracaoDbPainel
-                configuracaoDb={configuracaoDb}
-                onFeedback={mostrarFeedback}
-                onConfiguracaoAtualizada={setConfiguracaoDb}
-              />
-            </Stack>
+          {secao === "configuracoes" && (
+            <ConfiguracoesPainel
+              configuracaoAd={configuracaoAd}
+              configuracaoDb={configuracaoDb}
+              onFeedback={mostrarFeedback}
+              onConfiguracaoAdAtualizada={setConfiguracaoAd}
+              onConfiguracaoDbAtualizada={setConfiguracaoDb}
+            />
           )}
 
           {secao === "terminal-fabrica" && <TerminalFabricaPainel />}

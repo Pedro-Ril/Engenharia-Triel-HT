@@ -75,7 +75,7 @@
 .primaryButton {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: var(--text-inverse);
-  box-shadow: 0 10px 20px rgba(183, 28, 28, 0.2);
+  box-shadow: 0 10px 20px rgba(var(--primary-rgb), 0.2);
 }
 
 .primaryButton:hover {
@@ -103,7 +103,7 @@
   color: var(--text-inverse);
   border-radius: 22px;
   padding: 24px;
-  box-shadow: 0 14px 32px rgba(183, 28, 28, 0.18);
+  box-shadow: 0 14px 32px rgba(var(--primary-rgb), 0.18);
 }
 
 .panelTitle {
