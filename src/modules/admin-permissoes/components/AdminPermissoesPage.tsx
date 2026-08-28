@@ -31,6 +31,7 @@ import type { WikiArtigo } from "@/modules/wiki/types/wiki.types";
 import {
   buscarConfiguracaoAd,
   buscarConfiguracaoDb,
+  buscarTemaPadrao,
   listarDownloadsAdmin,
   listarEmpresas,
   listarModulos,
@@ -47,6 +48,7 @@ import type {
   PortalPermissao,
   PortalSetor,
   PortalUsuarioAdmin,
+  TemaPadrao,
 } from "../types/adminPermissoes.types";
 import type { ToastState } from "../types/toast.types";
 import { AdminNavegacao } from "./AdminNavegacao";
@@ -147,6 +149,7 @@ export function AdminPermissoesPage() {
   const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
   const [wikiArtigos, setWikiArtigos] = useState<WikiArtigo[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [temaPadrao, setTemaPadrao] = useState<TemaPadrao | null>(null);
 
   function mostrarFeedback(
     variant: ToastState["variant"],
@@ -170,6 +173,7 @@ export function AdminPermissoesPage() {
         downloadsData,
         wikiArtigosData,
         empresasData,
+        temaPadraoData,
       ] = await Promise.all([
         listarSetores(),
         listarModulos(),
@@ -180,6 +184,7 @@ export function AdminPermissoesPage() {
         listarDownloadsAdmin(),
         listarWikiArtigosAdmin(),
         listarEmpresas(),
+        buscarTemaPadrao(),
       ]);
 
       setSetores(setoresData);
@@ -191,6 +196,7 @@ export function AdminPermissoesPage() {
       setDownloads(downloadsData);
       setWikiArtigos(wikiArtigosData);
       setEmpresas(empresasData);
+      setTemaPadrao(temaPadraoData);
       setCarregando(false);
     }
 
@@ -356,6 +362,7 @@ export function AdminPermissoesPage() {
           {secao === "empresas" && (
             <EmpresasPainel
               empresas={empresas}
+              temaPadrao={temaPadrao}
               onFeedback={mostrarFeedback}
               onEmpresaCriada={(empresa) => setEmpresas((atual) => [...atual, empresa])}
               onEmpresaAtualizada={(empresa) =>
@@ -363,6 +370,7 @@ export function AdminPermissoesPage() {
                   atual.map((item) => (item.id === empresa.id ? empresa : item))
                 )
               }
+              onTemaPadraoAtualizado={setTemaPadrao}
             />
           )}
 

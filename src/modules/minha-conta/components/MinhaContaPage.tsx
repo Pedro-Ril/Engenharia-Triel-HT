@@ -402,13 +402,13 @@ export function MinhaContaPage() {
                         {item.sucesso ? (
                           <CheckCircle2
                             size={18}
-                            color="#16a34a"
+                            color="var(--success-text)"
                             aria-label="Login bem-sucedido"
                           />
                         ) : (
                           <XCircle
                             size={18}
-                            color="#c62828"
+                            color="var(--danger-text)"
                             aria-label="Login com falha"
                           />
                         )}

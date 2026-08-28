@@ -44,6 +44,11 @@ export interface Empresa {
   ativa: boolean;
 }
 
+export interface TemaPadrao {
+  corPrimariaClara: string;
+  corPrimariaEscura: string;
+}
+
 export interface PortalPermissao {
   id: string;
   usuarioId: string;

@@ -175,13 +175,12 @@ function blocoTokens(tokens: TokensDeCor): string {
 }
 
 /*
- * Usa o seletor `html[data-empresa="..."]` (em vez de `:root[...]`, que é
- * o que globals.css usa) de propósito — tem mais especificidade que os
+ * Usa um seletor de atributo em `html` (em vez de `:root[...]`, que é o
+ * que globals.css usa) de propósito — tem mais especificidade que os
  * tokens padrão (`:root`/`:root[data-theme]`), então essa sobrescrita
  * sempre vence independente da ordem de carregamento do <style>.
  */
-export function montarCssEmpresa(empresaId: string, corClara: string, corEscura: string): string {
-  const seletor = `html[data-empresa="${empresaId}"]`;
+function montarCssComSeletor(seletor: string, corClara: string, corEscura: string): string {
   const tokensClaro = derivarTokensDeCor(corClara);
   const tokensEscuro = derivarTokensDeCor(corEscura);
 
@@ -198,4 +197,19 @@ ${seletor}[data-theme="dark"] {
   ${blocoTokens(tokensEscuro)}
 }
 `.trim();
+}
+
+export function montarCssEmpresa(empresaId: string, corClara: string, corEscura: string): string {
+  return montarCssComSeletor(`html[data-empresa="${empresaId}"]`, corClara, corEscura);
+}
+
+/*
+ * Mesma mecânica de montarCssEmpresa, só que pro tema padrão do portal
+ * (quando o usuário não está vinculado a nenhuma empresa) — ver
+ * src/lib/tema/tema-padrao.ts e resolverEmpresaDoUsuario. Escopado por
+ * `data-tema-padrao` em vez de `data-empresa` pra nunca colidir com uma
+ * sobrescrita de empresa aplicada ao mesmo <html>.
+ */
+export function montarCssTemaPadrao(corClara: string, corEscura: string): string {
+  return montarCssComSeletor(`html[data-tema-padrao="custom"]`, corClara, corEscura);
 }

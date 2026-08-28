@@ -235,18 +235,18 @@
 .treeRowInvalid {
   background: linear-gradient(
     90deg,
-    rgba(211, 47, 47, 0.08) 0%,
-    rgba(211, 47, 47, 0.03) 100%
+    var(--danger-bg-strong) 0%,
+    var(--danger-bg) 100%
   );
-  border: 1px solid rgba(211, 47, 47, 0.15);
-  box-shadow: inset 4px 0 0 #d32f2f;
+  border: 1px solid var(--danger-border);
+  box-shadow: inset 4px 0 0 var(--danger-text);
 }
 
 .treeRowInvalid:hover {
   background: linear-gradient(
     90deg,
-    rgba(211, 47, 47, 0.12) 0%,
-    rgba(211, 47, 47, 0.05) 100%
+    var(--danger-bg-strong) 0%,
+    var(--danger-bg-strong) 100%
   );
 }
 
@@ -275,8 +275,8 @@
 }
 
 .nodeStatusDotInvalid {
-  background: #d32f2f;
-  box-shadow: 0 0 0 4px rgba(211, 47, 47, 0.12);
+  background: var(--danger-text);
+  box-shadow: 0 0 0 4px var(--danger-bg-strong);
 }
 
 .treeContent {
@@ -310,9 +310,9 @@
   justify-content: center;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(211, 47, 47, 0.12);
+  background: var(--danger-bg-strong);
   color: var(--danger-text);
-  border: 1px solid rgba(211, 47, 47, 0.2);
+  border: 1px solid var(--danger-border);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -497,9 +497,9 @@
   height: 26px;
   padding: 0 8px;
   border-radius: 999px;
-  background: rgba(211, 47, 47, 0.12);
+  background: var(--danger-bg-strong);
   color: var(--danger-text);
-  border: 1px solid rgba(211, 47, 47, 0.2);
+  border: 1px solid var(--danger-border);
   display: inline-flex;
   align-items: center;
   justify-content: center;

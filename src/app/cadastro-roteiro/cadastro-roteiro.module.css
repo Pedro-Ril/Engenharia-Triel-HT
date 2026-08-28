@@ -215,11 +215,11 @@
 .treeRowWarning {
   background: linear-gradient(
     90deg,
-    rgba(211, 47, 47, 0.08) 0%,
-    rgba(211, 47, 47, 0.03) 100%
+    var(--danger-bg-strong) 0%,
+    var(--danger-bg) 100%
   );
-  border: 1px solid rgba(211, 47, 47, 0.15);
-  box-shadow: inset 4px 0 0 #d32f2f;
+  border: 1px solid var(--danger-border);
+  box-shadow: inset 4px 0 0 var(--danger-text);
 }
 
 .expandButton {
@@ -1160,43 +1160,6 @@
   background: var(--bg-surface);
   color: var(--primary);
   border-radius: 10px;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.2s ease;
-}
-
-.routeIconButton:hover {
-  background: var(--bg-hover-brand);
-  border-color: rgba(var(--primary-rgb), 0.35);
-}
-
-.routeIconButtonDanger {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--text-inverse);
-}
-
-.routeIconButtonDanger:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-}
-.routeIconActions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.routeIconButton {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-  color: var(--primary);
-  border-radius: 10px;
   cursor: pointer;
 
   display: inline-flex;
@@ -1261,11 +1224,11 @@
 .treeRowAttention {
   background: linear-gradient(
     90deg,
-    rgba(249, 115, 22, 0.1) 0%,
-    rgba(249, 115, 22, 0.04) 100%
+    var(--warning-bg-strong) 0%,
+    var(--warning-bg) 100%
   );
-  border: 1px solid rgba(249, 115, 22, 0.22);
-  box-shadow: inset 4px 0 0 #f97316;
+  border: 1px solid var(--warning-border);
+  box-shadow: inset 4px 0 0 var(--warning-text);
 }
 
 .badgeAttention {
@@ -1282,7 +1245,7 @@
 }
 
 .attentionText {
-  color: #ea580c;
+  color: var(--warning-text);
   font-weight: 700;
 }
 .badgeAttentionButton {

@@ -469,7 +469,7 @@
 }
 
 .errorBox {
-  border: 1px solid rgba(220, 38, 38, 0.18);
+  border: 1px solid var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger-text);
   margin-bottom: 18px;

@@ -92,12 +92,22 @@ const NIVEL_CONFIG: Record<
 
 const EVENTO_CONFIG: Record<
   EventoAtividade["tipo"],
-  { label: string; icon: typeof LogIn; cor: string }
+  { label: string; icon: typeof LogIn; cor: string; fundo: string }
 > = {
-  login_sucesso: { label: "Login", icon: LogIn, cor: "#166534" },
-  login_falha: { label: "Falha de login", icon: XCircle, cor: "#b71c1c" },
-  chamado_bloqueio_nome: { label: "Bloqueio em chamado", icon: Headset, cor: "#b45309" },
-  terminal_busca_falha: { label: "Busca sem resultado", icon: Search, cor: "#6b7280" },
+  login_sucesso: { label: "Login", icon: LogIn, cor: "var(--success-text)", fundo: "var(--success-bg)" },
+  login_falha: { label: "Falha de login", icon: XCircle, cor: "var(--danger-text)", fundo: "var(--danger-bg)" },
+  chamado_bloqueio_nome: {
+    label: "Bloqueio em chamado",
+    icon: Headset,
+    cor: "var(--warning-text)",
+    fundo: "var(--warning-bg)",
+  },
+  terminal_busca_falha: {
+    label: "Busca sem resultado",
+    icon: Search,
+    cor: "var(--text-muted)",
+    fundo: "var(--bg-surface-muted)",
+  },
 };
 
 function formatarTempoRelativo(dataIso: string): string {
@@ -324,7 +334,7 @@ function AtividadeRecenteCard() {
                 <div key={indice} className={styles.atividadeItem}>
                   <span
                     className={styles.atividadeIcone}
-                    style={{ color: config.cor, background: `${config.cor}1a` }}
+                    style={{ color: config.cor, background: config.fundo }}
                   >
                     <Icon size={15} />
                   </span>

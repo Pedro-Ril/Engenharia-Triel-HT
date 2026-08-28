@@ -19,16 +19,23 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
-import { atualizarEmpresa, criarEmpresa } from "../services/adminPermissoes.service";
-import type { Empresa } from "../types/adminPermissoes.types";
+import {
+  atualizarEmpresa,
+  criarEmpresa,
+  restaurarTemaPadrao,
+  salvarTemaPadrao,
+} from "../services/adminPermissoes.service";
+import type { Empresa, TemaPadrao } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 import styles from "./AdminPermissoes.module.css";
 
 interface EmpresasPainelProps {
   empresas: Empresa[];
+  temaPadrao: TemaPadrao | null;
   onFeedback: FeedbackHandler;
   onEmpresaCriada: (empresa: Empresa) => void;
   onEmpresaAtualizada: (empresa: Empresa) => void;
+  onTemaPadraoAtualizado: (temaPadrao: TemaPadrao | null) => void;
 }
 
 const novaEmpresaInicial = {
@@ -38,16 +45,87 @@ const novaEmpresaInicial = {
   corPrimariaEscura: "#e04545",
 };
 
+const temaPadraoOriginal: TemaPadrao = {
+  corPrimariaClara: "#b71c1c",
+  corPrimariaEscura: "#e04545",
+};
+
 export function EmpresasPainel({
   empresas,
+  temaPadrao,
   onFeedback,
   onEmpresaCriada,
   onEmpresaAtualizada,
+  onTemaPadraoAtualizado,
 }: EmpresasPainelProps) {
   const [novaEmpresa, setNovaEmpresa] = useState(novaEmpresaInicial);
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvandoId, setSalvandoId] = useState<string | null>(null);
+
+  const [corPadraoClara, setCorPadraoClara] = useState(
+    temaPadrao?.corPrimariaClara ?? temaPadraoOriginal.corPrimariaClara
+  );
+  const [corPadraoEscura, setCorPadraoEscura] = useState(
+    temaPadrao?.corPrimariaEscura ?? temaPadraoOriginal.corPrimariaEscura
+  );
+  const [salvandoTemaPadrao, setSalvandoTemaPadrao] = useState(false);
+  const [restaurandoTemaPadrao, setRestaurandoTemaPadrao] = useState(false);
+
+  async function handleSalvarTemaPadrao() {
+    setSalvandoTemaPadrao(true);
+
+    try {
+      const resultado = await salvarTemaPadrao({
+        corPrimariaClara: corPadraoClara,
+        corPrimariaEscura: corPadraoEscura,
+      });
+
+      if (resultado.ok && resultado.data) {
+        onTemaPadraoAtualizado(resultado.data);
+        onFeedback(
+          "success",
+          "Tema padrão atualizado",
+          "Quem não estiver vinculado a nenhuma empresa passa a ver essa cor."
+        );
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível salvar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setSalvandoTemaPadrao(false);
+    }
+  }
+
+  async function handleRestaurarTemaPadrao() {
+    setRestaurandoTemaPadrao(true);
+
+    try {
+      const resultado = await restaurarTemaPadrao();
+
+      if (resultado.ok) {
+        onTemaPadraoAtualizado(null);
+        setCorPadraoClara(temaPadraoOriginal.corPrimariaClara);
+        setCorPadraoEscura(temaPadraoOriginal.corPrimariaEscura);
+        onFeedback(
+          "success",
+          "Tema padrão restaurado",
+          "Voltou para o vermelho original do portal."
+        );
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível restaurar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setRestaurandoTemaPadrao(false);
+    }
+  }
 
   async function handleCriar() {
     setErro(null);
@@ -99,6 +177,49 @@ export function EmpresasPainel({
 
   return (
     <Stack gap={20}>
+      <Card
+        title="Tema padrão do portal"
+        description="Cor principal usada por quem não está vinculado a nenhuma empresa (código de empresa sem correspondência cadastrada aqui)."
+      >
+        <Stack gap={16}>
+          <FormGrid columns={4}>
+            <Field label="Cor principal — modo claro">
+              <input
+                type="color"
+                className={styles.corInput}
+                value={corPadraoClara}
+                onChange={(event) => setCorPadraoClara(event.target.value)}
+              />
+            </Field>
+
+            <Field label="Cor principal — modo escuro">
+              <input
+                type="color"
+                className={styles.corInput}
+                value={corPadraoEscura}
+                onChange={(event) => setCorPadraoEscura(event.target.value)}
+              />
+            </Field>
+          </FormGrid>
+
+          <Stack direction="row" justify="end" gap={10}>
+            {temaPadrao && (
+              <Button
+                variant="secondary"
+                onClick={handleRestaurarTemaPadrao}
+                loading={restaurandoTemaPadrao}
+              >
+                Restaurar vermelho original
+              </Button>
+            )}
+
+            <Button onClick={handleSalvarTemaPadrao} loading={salvandoTemaPadrao}>
+              Salvar tema padrão
+            </Button>
+          </Stack>
+        </Stack>
+      </Card>
+
       <Card
         title="Nova empresa"
         description="Define uma cor principal própria (clara e escura) para os usuários atribuídos a ela — o resto do visual continua igual para todos."

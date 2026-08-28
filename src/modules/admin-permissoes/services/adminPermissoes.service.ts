@@ -15,6 +15,7 @@ import type {
   ResultadoTesteConexaoAd,
   ResultadoTesteConexaoDb,
   ResumoBuscasTerminalFabrica,
+  TemaPadrao,
   TipoAtualizacaoItem,
 } from "../types/adminPermissoes.types";
 
@@ -184,6 +185,29 @@ export async function atualizarEmpresa(
     body: JSON.stringify(dados),
   });
   return parseResponse<Empresa>(response);
+}
+
+export async function buscarTemaPadrao(): Promise<TemaPadrao | null> {
+  const response = await fetch("/api/admin/tema-padrao");
+  const body = await parseResponse<TemaPadrao | null>(response);
+  return body.data ?? null;
+}
+
+export async function salvarTemaPadrao(dados: {
+  corPrimariaClara: string;
+  corPrimariaEscura: string;
+}): Promise<ApiEnvelope<TemaPadrao>> {
+  const response = await fetch("/api/admin/tema-padrao", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<TemaPadrao>(response);
+}
+
+export async function restaurarTemaPadrao(): Promise<ApiEnvelope<null>> {
+  const response = await fetch("/api/admin/tema-padrao", { method: "DELETE" });
+  return parseResponse<null>(response);
 }
 
 export interface ResultadoImportacaoAd {

@@ -230,8 +230,8 @@
 }
 
 .error {
-  border-color: #d9534f;
-  background: var(--primary-soft);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
 }
 
 .errorMessage {

@@ -237,14 +237,14 @@ function ToastContainer({
                         animation: "toastIn 0.25s ease",
                         ...(toast.tipo === "sucesso"
                             ? {
-                                background: "#f0fdf4",
-                                color: "#166534",
-                                border: "1px solid #bbf7d0",
+                                background: "var(--success-bg)",
+                                color: "var(--success-text)",
+                                border: "1px solid var(--success-border)",
                             }
                             : {
-                                background: "#fdecec",
-                                color: "#b71c1c",
-                                border: "1px solid #f5c8c8",
+                                background: "var(--danger-bg)",
+                                color: "var(--danger-text)",
+                                border: "1px solid var(--danger-border)",
                             }),
                     }}
                     title={toast.retornoErp ? "Clique para ver o retorno completo do ERP" : ""}

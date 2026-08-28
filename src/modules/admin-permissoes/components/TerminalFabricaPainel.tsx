@@ -114,13 +114,13 @@ export function TerminalFabricaPainel() {
                         {busca.encontrado ? (
                           <CheckCircle2
                             size={18}
-                            color="#16a34a"
+                            color="var(--success-text)"
                             aria-label="Item encontrado"
                           />
                         ) : (
                           <XCircle
                             size={18}
-                            color="#c62828"
+                            color="var(--danger-text)"
                             aria-label="Item não encontrado"
                           />
                         )}

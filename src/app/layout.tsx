@@ -6,7 +6,8 @@ import {
 } from "@/lib/auth/autorizacao";
 import { resolverEmpresaDoUsuario } from "@/lib/empresas/empresas";
 import { buscarTemaUsuario } from "@/lib/preferencias/preferencias";
-import { montarCssEmpresa } from "@/lib/tema/paleta-empresa";
+import { montarCssEmpresa, montarCssTemaPadrao } from "@/lib/tema/paleta-empresa";
+import { buscarTemaPadrao } from "@/lib/tema/tema-padrao";
 
 export const metadata = {
   title: "Portal Grupo Triel-HT",
@@ -19,10 +20,11 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const usuario = await getUsuarioAutenticado();
-  const [setores, tema, empresa] = await Promise.all([
+  const [setores, tema, empresa, temaPadrao] = await Promise.all([
     getSetoresComModulosPermitidos(usuario),
     usuario ? buscarTemaUsuario(usuario.id) : Promise.resolve("sistema" as const),
     usuario ? resolverEmpresaDoUsuario(usuario) : Promise.resolve(null),
+    buscarTemaPadrao(),
   ]);
 
   /*
@@ -32,11 +34,26 @@ export default async function RootLayout({
    */
   const dataTheme = tema === "claro" ? "light" : tema === "escuro" ? "dark" : undefined;
 
+  /*
+   * Tema padrão personalizado só se aplica quando ninguém venceu por
+   * empresa — a empresa do usuário sempre tem prioridade sobre o
+   * padrão do portal.
+   */
+  const usarTemaPadraoCustom = !empresa && temaPadrao !== null;
+
   return (
-    <html lang="pt-BR" data-theme={dataTheme} data-empresa={empresa?.id}>
+    <html
+      lang="pt-BR"
+      data-theme={dataTheme}
+      data-empresa={empresa?.id}
+      data-tema-padrao={usarTemaPadraoCustom ? "custom" : undefined}
+    >
       <body>
         {empresa && (
           <style>{montarCssEmpresa(empresa.id, empresa.corPrimariaClara, empresa.corPrimariaEscura)}</style>
+        )}
+        {usarTemaPadraoCustom && temaPadrao && (
+          <style>{montarCssTemaPadrao(temaPadrao.corPrimariaClara, temaPadrao.corPrimariaEscura)}</style>
         )}
         <AppShell
           setores={setores}
