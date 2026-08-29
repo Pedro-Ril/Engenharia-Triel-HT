@@ -5,6 +5,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { optionalInteger, optionalText, requiredText } from "@/lib/auth/validation";
 import { atualizarDownload, excluirDownload } from "@/lib/downloads/downloads";
 import { parseArquivoFormData, parseListaTextoFormData } from "@/lib/downloads/validacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+async function handlePATCH(request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -79,7 +80,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export const PATCH = comMetricasApi("admin/downloads/[id]", handlePATCH);
+
+async function handleDELETE(_request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -111,3 +114,5 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
   }
 }
+
+export const DELETE = comMetricasApi("admin/downloads/[id]", handleDELETE);

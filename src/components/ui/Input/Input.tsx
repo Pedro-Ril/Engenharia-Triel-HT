@@ -1,13 +1,15 @@
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, Ref } from "react";
 import styles from "./Input.module.css";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   hasError?: boolean;
+  ref?: Ref<HTMLInputElement>;
 }
 
 export function Input({
   hasError = false,
   className = "",
+  ref,
   ...props
 }: InputProps) {
   const inputClassName = [
@@ -18,5 +20,5 @@ export function Input({
     .filter(Boolean)
     .join(" ");
 
-  return <input className={inputClassName} {...props} />;
+  return <input ref={ref} className={inputClassName} {...props} />;
 }

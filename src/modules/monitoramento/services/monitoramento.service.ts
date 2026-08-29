@@ -2,6 +2,7 @@ import type {
   LogSistema,
   NivelLog,
   ResultadoAtividade,
+  ResumoApis,
   ResumoMonitoramento,
 } from "../types/monitoramento.types";
 
@@ -75,6 +76,27 @@ export async function buscarLogs(filtros: FiltrosLogs): Promise<ResultadoLogs | 
 
 export async function limparLogsAntigos(dias: number): Promise<ApiEnvelope<{ removidos: number }>> {
   const response = await fetch("/api/admin/monitoramento/logs/limpar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dias }),
+  });
+  return parseResponse(response);
+}
+
+export async function buscarResumoApis(): Promise<ResumoApis | null> {
+  try {
+    const response = await fetch("/api/admin/monitoramento/apis");
+    const body = await parseResponse<ResumoApis>(response);
+    return body.ok && body.data ? body.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function limparRequisicoesAntigas(
+  dias: number
+): Promise<ApiEnvelope<{ removidos: number }>> {
+  const response = await fetch("/api/admin/monitoramento/requisicoes/limpar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dias }),

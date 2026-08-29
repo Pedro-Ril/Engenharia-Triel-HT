@@ -3,13 +3,14 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import type { NivelLog } from "@/lib/monitoramento/logs";
 import { listarLogs, listarOrigensDeLogs } from "@/lib/monitoramento/logs";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const NIVEIS_VALIDOS: NivelLog[] = ["info", "aviso", "erro"];
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -39,3 +40,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = comMetricasApi("admin/monitoramento/logs", handleGET);

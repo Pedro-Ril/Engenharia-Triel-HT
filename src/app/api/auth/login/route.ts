@@ -8,6 +8,8 @@ import {
   extrairIpOrigem,
   registrarTentativaLogin,
 } from "@/lib/auth/login-historico";
+import { registrarChamadaExternaSemFalhar } from "@/lib/monitoramento/chamadas-externas";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import {
   registrarTentativaFalha,
   limparTentativas,
@@ -35,7 +37,7 @@ function requiredText(value: unknown, fieldName: string): string {
   return value.trim();
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   let requestBody: LoginRequestBody;
 
   try {
@@ -125,10 +127,50 @@ export async function POST(request: Request) {
   }
 
   try {
-    const diretorioUsuario = await authenticateWithActiveDirectory(
-      usuarioDigitado,
-      senha
-    );
+    const inicioAd = performance.now();
+    let diretorioUsuario;
+
+    try {
+      diretorioUsuario = await authenticateWithActiveDirectory(usuarioDigitado, senha);
+
+      await registrarChamadaExternaSemFalhar({
+        servico: "active_directory",
+        origem: "uso_real",
+        sucesso: true,
+        duracaoMs: performance.now() - inicioAd,
+      });
+    } catch (erroAd) {
+      /*
+       * Só "erro_conexao_ad" indica que o AD em si está fora do ar —
+       * usuário/senha inválidos ou credenciais vazias significam que
+       * o AD respondeu normalmente, então não contam como falha de
+       * saúde do serviço (e "ad_nao_configurado"/"credenciais_invalidas"
+       * nem chegam a tentar contato com o AD, então não geram métrica).
+       */
+      if (erroAd instanceof AuthenticationError) {
+        if (erroAd.motivo === "erro_conexao_ad") {
+          await registrarChamadaExternaSemFalhar({
+            servico: "active_directory",
+            origem: "uso_real",
+            sucesso: false,
+            duracaoMs: performance.now() - inicioAd,
+            mensagemErro: erroAd.message,
+          });
+        } else if (
+          erroAd.motivo === "usuario_nao_encontrado" ||
+          erroAd.motivo === "senha_invalida"
+        ) {
+          await registrarChamadaExternaSemFalhar({
+            servico: "active_directory",
+            origem: "uso_real",
+            sucesso: true,
+            duracaoMs: performance.now() - inicioAd,
+          });
+        }
+      }
+
+      throw erroAd;
+    }
 
     const usuario = await upsertUsuarioLogin(diretorioUsuario);
 
@@ -213,3 +255,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("auth/login", handlePOST);

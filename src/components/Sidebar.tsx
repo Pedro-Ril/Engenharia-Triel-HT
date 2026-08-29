@@ -115,7 +115,7 @@ export default function Sidebar({
         /* localStorage indisponível (modo privado etc.) — não impede o logout desta aba. */
       }
 
-      router.push("/login");
+      router.push("/login?motivo=logout");
       router.refresh();
     } finally {
       setSaindo(false);

@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { listarAtividadeRecente } from "@/lib/monitoramento/atividade";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -25,3 +26,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = comMetricasApi("admin/monitoramento/atividade", handleGET);

@@ -11,6 +11,7 @@ import {
   buscarChamadoPorNumero,
 } from "@/lib/chamados/chamados";
 import { optionalUuid, requiredPrioridade } from "@/lib/chamados/validacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ function parseNumero(valor: string): number | null {
   return Number.isInteger(numero) && numero > 0 ? numero : null;
 }
 
-export async function GET(request: Request, context: RouteContext) {
+async function handleGET(request: Request, context: RouteContext) {
   const { numero: numeroParam } = await context.params;
   const numero = parseNumero(numeroParam);
 
@@ -78,7 +79,9 @@ export async function GET(request: Request, context: RouteContext) {
   }
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+export const GET = comMetricasApi("chamados/[numero]", handleGET);
+
+async function handlePATCH(request: Request, context: RouteContext) {
   const { numero: numeroParam } = await context.params;
   const numero = parseNumero(numeroParam);
 
@@ -158,3 +161,5 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const PATCH = comMetricasApi("chamados/[numero]", handlePATCH);

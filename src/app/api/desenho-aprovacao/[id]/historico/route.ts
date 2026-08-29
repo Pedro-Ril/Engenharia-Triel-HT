@@ -5,6 +5,7 @@ import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,7 +87,7 @@ function parseDadosJson(
    GET - LISTAR HISTÓRICO DO DESENHO
    ========================================================= */
 
-export async function GET(
+async function handleGET(
   _request: Request,
   context: RouteContext
 ) {
@@ -302,3 +303,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = comMetricasApi("desenho-aprovacao/[id]/historico", handleGET);

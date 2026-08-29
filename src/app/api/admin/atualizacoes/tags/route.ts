@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/validation";
 import { criarTag, listarTags } from "@/lib/atualizacoes/atualizacoes";
 import { CORES_TAG_DISPONIVEIS } from "@/lib/atualizacoes/cores-tag";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function requiredCor(value: unknown, fieldName: string): string {
   return texto;
 }
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -42,6 +43,8 @@ export async function GET() {
   }
 }
 
+export const GET = comMetricasApi("admin/atualizacoes/tags", handleGET);
+
 interface CreateTagBody {
   chave?: unknown;
   nome?: unknown;
@@ -49,7 +52,7 @@ interface CreateTagBody {
   ordem?: unknown;
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -95,3 +98,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/atualizacoes/tags", handlePOST);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { revogarAtendente } from "@/lib/chamados/atendentes";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+async function handleDELETE(_request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -45,3 +46,5 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
   }
 }
+
+export const DELETE = comMetricasApi("admin/chamados/atendentes/[id]", handleDELETE);

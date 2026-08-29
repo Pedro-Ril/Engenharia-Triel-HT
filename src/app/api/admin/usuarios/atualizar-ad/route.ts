@@ -4,11 +4,12 @@ import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { listarUsuarios } from "@/lib/auth/admin";
 import { ValidationError } from "@/lib/auth/errors";
 import { atualizarUsuariosExistentesComAd } from "@/lib/auth/importacao-usuarios";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+async function handlePOST() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -38,3 +39,5 @@ export async function POST() {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/usuarios/atualizar-ad", handlePOST);

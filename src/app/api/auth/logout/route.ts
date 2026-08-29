@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+async function handlePOST() {
   const response = NextResponse.json({
     ok: true,
     message: "Sessão encerrada.",
@@ -21,3 +22,5 @@ export async function POST() {
 
   return response;
 }
+
+export const POST = comMetricasApi("auth/logout", handlePOST);

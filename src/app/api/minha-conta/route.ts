@@ -8,12 +8,13 @@ import {
 import { ValidationError } from "@/lib/auth/errors";
 import { listarHistoricoDoUsuario } from "@/lib/auth/login-historico";
 import { isObject, requiredText } from "@/lib/auth/validation";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { buscarTemaUsuario, definirTemaUsuario, ehTemaValido } from "@/lib/preferencias/preferencias";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const usuario = await getUsuarioAutenticado();
 
   if (!usuario) {
@@ -71,7 +72,9 @@ export async function GET() {
   }
 }
 
-export async function PATCH(request: Request) {
+export const GET = comMetricasApi("minha-conta", handleGET);
+
+async function handlePATCH(request: Request) {
   const usuario = await getUsuarioAutenticado();
 
   if (!usuario) {
@@ -106,3 +109,5 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export const PATCH = comMetricasApi("minha-conta", handlePATCH);

@@ -1,11 +1,18 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
-import { History, LifeBuoy } from "lucide-react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, Download, History, LayoutGrid, LifeBuoy, Megaphone, User, Zap } from "lucide-react";
 
 import AppLink from "@/components/AppLink";
+import { Card } from "@/components/ui/Card";
+import { RadioGroup } from "@/components/ui/RadioGroup";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { resolverIcone } from "@/lib/icons/icon-registry";
+import { aplicarTemaComTransicao } from "@/lib/tema/aplicar-tema";
+import { OPCOES_TEMA } from "@/lib/tema/opcoes-tema";
 import { LoginModal } from "@/modules/auth/components/LoginModal";
+import { atualizarTemaUsuario } from "@/modules/minha-conta/services/minhaConta.service";
+import type { TemaPreferencia } from "@/modules/minha-conta/types/minhaConta.types";
 import type { ResumoAcessoModulo } from "@/lib/auth/acesso-modulo";
 import type { ModuloPermitido, SetorComModulos } from "@/lib/auth/autorizacao";
 import styles from "@/app/home.module.css";
@@ -53,6 +60,47 @@ export function HomeContent({
   const [loginAberto, setLoginAberto] = useState(abrirLoginInicial);
   const [catalogoAberto, setCatalogoAberto] = useState(false);
 
+  /*
+   * O tema já vem resolvido do servidor no atributo data-theme do
+   * <html> (ver src/app/layout.tsx) — lido aqui só pra inicializar o
+   * estado visual deste atalho, sem precisar buscar a preferência de
+   * novo. Ausência do atributo (usuário com preferência "sistema")
+   * só é lida depois do mount pra evitar mismatch de hidratação.
+   */
+  const [tema, setTema] = useState<TemaPreferencia>("sistema");
+  const [salvandoTema, setSalvandoTema] = useState(false);
+  const ultimoCliqueTemaRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    /*
+     * document não existe durante o SSR, então o estado inicial
+     * precisa ser um valor fixo ("sistema") pra bater com a marcação
+     * gerada pelo servidor — só depois de montado é seguro ler o
+     * data-theme real (já setado por src/app/layout.tsx) sem causar
+     * mismatch de hidratação.
+     */
+    const atributo = document.documentElement.getAttribute("data-theme");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTema(atributo === "dark" ? "escuro" : atributo === "light" ? "claro" : "sistema");
+  }, []);
+
+  async function handleAlterarTema(novoTema: TemaPreferencia, origem: { x: number; y: number }) {
+    const temaAnterior = tema;
+
+    setTema(novoTema);
+    aplicarTemaComTransicao(novoTema, origem);
+    setSalvandoTema(true);
+
+    const resultado = await atualizarTemaUsuario(novoTema);
+
+    setSalvandoTema(false);
+
+    if (!resultado.ok) {
+      setTema(temaAnterior);
+      aplicarTemaComTransicao(temaAnterior, origem);
+    }
+  }
+
   const totalModulos = setores.reduce(
     (total, setor) => total + setor.modulos.length,
     0
@@ -93,6 +141,54 @@ export function HomeContent({
   const moduloDestaque = maisAcessadoItem
     ? modulosPermitidosPorId.get(maisAcessadoItem.moduloId)
     : primeiroModulo;
+
+  /*
+   * Antes cada setor virava um bloco cheio (título + grade) empilhado
+   * um embaixo do outro — um setor com 1 módulo só ocupava uma linha
+   * inteira à toa, e muitos setores exigiam bastante scroll. Agora é
+   * navegação lateral: só o setor selecionado mostra sua grade.
+   * Estado guarda só o id escolhido explicitamente; o efetivo cai pro
+   * primeiro setor com módulos enquanto nada foi clicado ainda, sem
+   * precisar de useEffect pra sincronizar um valor inicial.
+   */
+  const setoresComModulos = setores.filter((setor) => setor.modulos.length > 0);
+  const [setorSelecionadoId, setSetorSelecionadoId] = useState<string | null>(null);
+  const setorAtivo =
+    setoresComModulos.find((setor) => setor.id === setorSelecionadoId) ??
+    setoresComModulos[0] ??
+    null;
+
+  /*
+   * "Suas ferramentas" (o motivo real de abrir o portal), Recentes e
+   * Acesso rápido viravam seções empilhadas demais — consolidadas em
+   * abas (mesmo SegmentedTabs de Monitoramento/Configurações) pra
+   * ocupar o espaço de uma seção só, com Ferramentas sempre em
+   * primeiro (aba padrão). Suporte fica de fora, fixo, por baixo —
+   * é o tipo de coisa que devia estar sempre visível, não escondida
+   * atrás de um clique de aba. Lista montada dinamicamente: um
+   * visitante anônimo só vê "Ferramentas do portal" — nesse caso a
+   * barra de abas nem aparece (não faz sentido abas com uma opção
+   * só), só o conteúdo direto.
+   */
+  const abasSecundarias = [
+    {
+      valor: "ferramentas" as const,
+      label: usuario ? "Suas ferramentas" : "Ferramentas do portal",
+      icon: LayoutGrid,
+    },
+    ...(usuario && recentes.length > 0
+      ? [{ valor: "recentes" as const, label: "Recentes", icon: History }]
+      : []),
+    ...(usuario
+      ? [{ valor: "acesso-rapido" as const, label: "Acesso rápido", icon: Zap }]
+      : []),
+  ];
+
+  type AbaSecundaria = (typeof abasSecundarias)[number]["valor"];
+
+  const [abaSecundaria, setAbaSecundaria] = useState<AbaSecundaria>(
+    abasSecundarias[0].valor
+  );
 
   return (
     <main className={styles.page}>
@@ -208,6 +304,198 @@ export function HomeContent({
       </section>
 
       <section className={styles.section}>
+        {abasSecundarias.length > 1 && (
+          <SegmentedTabs
+            itens={abasSecundarias.map((aba) => ({
+              valor: aba.valor,
+              label: aba.label,
+              icon: <aba.icon size={15} />,
+            }))}
+            ativo={abaSecundaria}
+            onSelecionar={(valor) => setAbaSecundaria(valor as AbaSecundaria)}
+          />
+        )}
+
+        <div className={abasSecundarias.length > 1 ? styles.abaSecundariaConteudo : undefined}>
+          {abaSecundaria === "ferramentas" && (
+            totalModulos > 0 && setorAtivo ? (
+              <div className={styles.ferramentasLayout}>
+                <nav className={styles.setoresNav}>
+                  {setoresComModulos.map((setor) => {
+                    const SetorIcon = resolverIcone(setor.icone);
+                    const ativo = setor.id === setorAtivo.id;
+
+                    return (
+                      <button
+                        key={setor.id}
+                        type="button"
+                        className={`${styles.setoresNavItem} ${ativo ? styles.setoresNavItemAtivo : ""}`}
+                        onClick={() => setSetorSelecionadoId(setor.id)}
+                      >
+                        <span className={styles.setoresNavIcon}>
+                          <SetorIcon size={16} />
+                        </span>
+                        <span className={styles.setoresNavNome}>{setor.nome}</span>
+                        <span className={styles.setoresNavContagem}>
+                          {setor.modulos.length}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                <div className={styles.moduleGrid}>
+                  {setorAtivo.modulos.map((modulo) => {
+                    const ModuloIcon = resolverIcone(modulo.icone);
+
+                    return (
+                      <AppLink
+                        key={modulo.id}
+                        href={modulo.path}
+                        className={styles.moduleCard}
+                      >
+                        <span className={styles.moduleCardIcon}>
+                          <ModuloIcon size={20} />
+                        </span>
+
+                        <span className={styles.moduleCardBody}>
+                          <span className={styles.moduleCardTitle}>
+                            {modulo.nome}
+                            {modulo.emDesenvolvimento && (
+                              <span
+                                className={styles.devBadge}
+                                title="Em desenvolvimento — só administradores veem"
+                              >
+                                DEV
+                              </span>
+                            )}
+                          </span>
+                          <span className={styles.moduleCardLink}>
+                            Abrir módulo
+                          </span>
+                        </span>
+                      </AppLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className={styles.infoCard}>
+                <h3 className={styles.infoTitle}>
+                  {usuario
+                    ? "Nenhuma ferramenta liberada ainda"
+                    : "Faça login para ver suas ferramentas"}
+                </h3>
+                <p className={styles.infoText}>
+                  {usuario
+                    ? "Fale com um administrador do portal para solicitar acesso às ferramentas do seu setor."
+                    : "Depois de entrar com o seu usuário corporativo, os módulos liberados para você aparecem aqui."}
+                </p>
+              </div>
+            )
+          )}
+
+          {abaSecundaria === "recentes" && usuario && recentes.length > 0 && (
+            <div className={styles.recentesCard}>
+              {recentes.map(({ modulo, ultimoAcesso }) => {
+                const ModuloIcon = resolverIcone(modulo.icone);
+
+                return (
+                  <AppLink
+                    key={modulo.id}
+                    href={modulo.path}
+                    className={styles.recentesItem}
+                  >
+                    <span className={styles.recentesItemIcon}>
+                      <ModuloIcon size={17} />
+                    </span>
+
+                    <span className={styles.recentesItemNome}>
+                      {modulo.nome}
+                    </span>
+
+                    <span className={styles.recentesItemTempo}>
+                      <History size={13} />
+                      {formatarTempoRelativo(ultimoAcesso)}
+                    </span>
+                  </AppLink>
+                );
+              })}
+            </div>
+          )}
+
+          {abaSecundaria === "acesso-rapido" && usuario && (
+            <div className={styles.quickAccessStack}>
+              <Card
+                title="Tema"
+                description="Escolha como o portal aparece pra você — vale em qualquer dispositivo."
+              >
+                <div
+                  onClickCapture={(event) => {
+                    ultimoCliqueTemaRef.current = { x: event.clientX, y: event.clientY };
+                  }}
+                >
+                  <RadioGroup
+                    name="tema-home"
+                    orientation="horizontal"
+                    options={OPCOES_TEMA}
+                    value={tema}
+                    disabled={salvandoTema}
+                    onValueChange={(valor) =>
+                      handleAlterarTema(valor as TemaPreferencia, ultimoCliqueTemaRef.current)
+                    }
+                  />
+                </div>
+              </Card>
+
+              <div className={styles.moduleGrid}>
+                <AppLink href="/minha-conta" className={styles.moduleCard}>
+                  <span className={styles.moduleCardIcon}>
+                    <User size={20} />
+                  </span>
+                  <span className={styles.moduleCardBody}>
+                    <span className={styles.moduleCardTitle}>Minha conta</span>
+                    <span className={styles.moduleCardLink}>Perfil e preferências</span>
+                  </span>
+                </AppLink>
+
+                <AppLink href="/wiki" className={styles.moduleCard}>
+                  <span className={styles.moduleCardIcon}>
+                    <BookOpen size={20} />
+                  </span>
+                  <span className={styles.moduleCardBody}>
+                    <span className={styles.moduleCardTitle}>Wiki</span>
+                    <span className={styles.moduleCardLink}>Abrir módulo</span>
+                  </span>
+                </AppLink>
+
+                <AppLink href="/downloads" className={styles.moduleCard}>
+                  <span className={styles.moduleCardIcon}>
+                    <Download size={20} />
+                  </span>
+                  <span className={styles.moduleCardBody}>
+                    <span className={styles.moduleCardTitle}>Downloads</span>
+                    <span className={styles.moduleCardLink}>Abrir módulo</span>
+                  </span>
+                </AppLink>
+
+                <AppLink href="/atualizacoes" className={styles.moduleCard}>
+                  <span className={styles.moduleCardIcon}>
+                    <Megaphone size={20} />
+                  </span>
+                  <span className={styles.moduleCardBody}>
+                    <span className={styles.moduleCardTitle}>Atualizações</span>
+                    <span className={styles.moduleCardLink}>Abrir módulo</span>
+                  </span>
+                </AppLink>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </section>
+
+      <section className={styles.section}>
         <div className={styles.suporteBanner}>
           <span className={styles.suporteBannerIcone}>
             <LifeBuoy size={26} />
@@ -231,127 +519,6 @@ export function HomeContent({
             </AppLink>
           </div>
         </div>
-      </section>
-
-      {usuario && recentes.length > 0 && (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <div>
-              <span className={styles.sectionMiniTitle}>Histórico</span>
-              <h2 className={styles.sectionTitle}>Acessados recentemente</h2>
-            </div>
-          </div>
-
-          <div className={styles.recentesCard}>
-            {recentes.map(({ modulo, ultimoAcesso }) => {
-              const ModuloIcon = resolverIcone(modulo.icone);
-
-              return (
-                <AppLink
-                  key={modulo.id}
-                  href={modulo.path}
-                  className={styles.recentesItem}
-                >
-                  <span className={styles.recentesItemIcon}>
-                    <ModuloIcon size={17} />
-                  </span>
-
-                  <span className={styles.recentesItemNome}>
-                    {modulo.nome}
-                  </span>
-
-                  <span className={styles.recentesItemTempo}>
-                    <History size={13} />
-                    {formatarTempoRelativo(ultimoAcesso)}
-                  </span>
-                </AppLink>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <span className={styles.sectionMiniTitle}>Acessos rápidos</span>
-            <h2 className={styles.sectionTitle}>
-              {usuario ? "Suas ferramentas" : "Ferramentas do portal"}
-            </h2>
-          </div>
-        </div>
-
-        {totalModulos > 0 ? (
-          <div className={styles.setoresList}>
-            {setores
-              .filter((setor) => setor.modulos.length > 0)
-              .map((setor) => {
-                const SetorIcon = resolverIcone(setor.icone);
-
-                return (
-                  <div key={setor.id} className={styles.setorSection}>
-                    <div className={styles.setorSectionHeader}>
-                      <span className={styles.setorSectionIcon}>
-                        <SetorIcon size={17} />
-                      </span>
-
-                      <h3 className={styles.setorSectionTitle}>
-                        {setor.nome}
-                      </h3>
-                    </div>
-
-                    <div className={styles.moduleGrid}>
-                      {setor.modulos.map((modulo) => {
-                        const ModuloIcon = resolverIcone(modulo.icone);
-
-                        return (
-                          <AppLink
-                            key={modulo.id}
-                            href={modulo.path}
-                            className={styles.moduleCard}
-                          >
-                            <span className={styles.moduleCardIcon}>
-                              <ModuloIcon size={20} />
-                            </span>
-
-                            <span className={styles.moduleCardBody}>
-                              <span className={styles.moduleCardTitle}>
-                                {modulo.nome}
-                                {modulo.emDesenvolvimento && (
-                                  <span
-                                    className={styles.devBadge}
-                                    title="Em desenvolvimento — só administradores veem"
-                                  >
-                                    DEV
-                                  </span>
-                                )}
-                              </span>
-                              <span className={styles.moduleCardLink}>
-                                Abrir módulo
-                              </span>
-                            </span>
-                          </AppLink>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        ) : (
-          <div className={styles.infoCard}>
-            <h3 className={styles.infoTitle}>
-              {usuario
-                ? "Nenhuma ferramenta liberada ainda"
-                : "Faça login para ver suas ferramentas"}
-            </h3>
-            <p className={styles.infoText}>
-              {usuario
-                ? "Fale com um administrador do portal para solicitar acesso às ferramentas do seu setor."
-                : "Depois de entrar com o seu usuário corporativo, os módulos liberados para você aparecem aqui."}
-            </p>
-          </div>
-        )}
       </section>
 
       <section className={styles.section}>

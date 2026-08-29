@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalBoolean, optionalText } from "@/lib/auth/validation";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { atualizarArtigo, excluirArtigo } from "@/lib/wiki/wiki";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function PATCH(request: Request, { params }: RouteParams) {
+async function handlePATCH(request: Request, { params }: RouteParams) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -64,7 +65,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteParams) {
+export const PATCH = comMetricasApi("admin/wiki/[id]", handlePATCH);
+
+async function handleDELETE(_request: Request, { params }: RouteParams) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -89,3 +92,5 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     );
   }
 }
+
+export const DELETE = comMetricasApi("admin/wiki/[id]", handleDELETE);

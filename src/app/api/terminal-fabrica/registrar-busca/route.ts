@@ -5,6 +5,7 @@ import { isObject, optionalBoolean, requiredText } from "@/lib/auth/validation";
 import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { registrarBuscaTerminalFabrica } from "@/lib/auth/terminal-fabrica-buscas";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ interface RegistrarBuscaBody {
  * contrário, fica anônima (uso comum num terminal
  * compartilhado de chão de fábrica).
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   let body: RegistrarBuscaBody;
 
   try {
@@ -66,3 +67,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("terminal-fabrica/registrar-busca", handlePOST);

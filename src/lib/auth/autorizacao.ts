@@ -1,15 +1,49 @@
 import "server-only";
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
 import { registrarAcessoModuloSemFalhar } from "./acesso-modulo";
+import { SESSION_COOKIE_NAME } from "./jwt";
+import type { SessionPayload } from "./jwt";
 import { getSessionUsuario } from "./session";
-import { getUsuarioBySamAccountName } from "./usuarios";
+import { getUsuarioBySamAccountName, registrarAtividadeSemFalhar } from "./usuarios";
 import type { PortalUsuario } from "./usuarios";
+
+/*
+ * Distingue "nunca logou" de "a sessão dele parou de valer" (token
+ * expirado, assinatura inválida, ou revogada por um admin) — nos
+ * três casos getUsuarioAutenticado() já devolve null igual, mas só
+ * faz sentido mostrar "sua sessão expirou" quando havia mesmo um
+ * cookie de sessão. Sem isso, alguém abrindo um link direto sem
+ * nunca ter logado veria essa mensagem sem sentido.
+ */
+async function tinhaCookieDeSessao(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return cookieStore.has(SESSION_COOKIE_NAME);
+}
+
+/*
+ * Devolve só o sufixo de query string (nunca a chamada de
+ * redirect() em si) de propósito: TypeScript só consegue enxergar
+ * que um `if (!usuario) { redirect(...) }` sempre termina a função
+ * quando `redirect(...)` é chamado direto e de forma síncrona
+ * naquele bloco — envolver a chamada de redirect() inteira numa
+ * função async quebra essa checagem de fluxo (o `await` de uma
+ * Promise<never> não é tratado como "nunca retorna" pelo
+ * compilador). Por isso cada chamador monta a URL e chama
+ * `redirect()` ele mesmo; isto aqui só decide o sufixo, e é
+ * reaproveitado pelos guards fora deste arquivo (wiki/page.tsx,
+ * autorizacao-chamados.ts) pra manter a mesma distinção "sessão
+ * expirada" vs "nunca logou" em todo lugar.
+ */
+export async function motivoLoginSuffix(): Promise<string> {
+  return (await tinhaCookieDeSessao()) ? "&motivo=sessao_expirada" : "";
+}
 
 export interface ModuloPermitido {
   id: string;
@@ -84,20 +118,14 @@ interface SetorModuloStatusAcessoRow {
  * confere se o cadastro local ainda existe, está ativo, e se
  * a sessão não foi invalidada manualmente por um admin depois
  * que este token foi emitido (revogação sem precisar esperar
- * o token expirar sozinho). Envolvido em `cache()` para não
- * repetir a mesma consulta quando layout.tsx e a page.tsx
- * chamam isto na mesma renderização (React dedupe por
- * requisição).
+ * o token expirar sozinho). Extraída como função simples (sem
+ * `cache()` do React) pra poder ser chamada também de fora de um
+ * render de Server Component — o proxy.ts (modo manutenção)
+ * roda antes disso existir, então usa esta versão direto.
  */
-export const getUsuarioAutenticado = cache(async (): Promise<
-  PortalUsuario | null
-> => {
-  const sessao = await getSessionUsuario();
-
-  if (!sessao) {
-    return null;
-  }
-
+export async function validarSessaoUsuario(
+  sessao: SessionPayload
+): Promise<PortalUsuario | null> {
   const usuario = await getUsuarioBySamAccountName(sessao.sub);
 
   if (!usuario || !usuario.ativo) {
@@ -114,7 +142,26 @@ export const getUsuarioAutenticado = cache(async (): Promise<
     }
   }
 
+  await registrarAtividadeSemFalhar(usuario.id);
+
   return usuario;
+}
+
+/*
+ * Envolvida em `cache()` pra não repetir a mesma consulta quando
+ * layout.tsx e a page.tsx chamam isto na mesma renderização (React
+ * dedupe por requisição).
+ */
+export const getUsuarioAutenticado = cache(async (): Promise<
+  PortalUsuario | null
+> => {
+  const sessao = await getSessionUsuario();
+
+  if (!sessao) {
+    return null;
+  }
+
+  return validarSessaoUsuario(sessao);
 });
 
 /*
@@ -186,7 +233,7 @@ export async function requireModuloAccess(
   const usuario = await getUsuarioAutenticado();
 
   if (!usuario) {
-    redirect(`/login?next=/${moduloChave}`);
+    redirect(`/login?next=/${moduloChave}${await motivoLoginSuffix()}`);
   }
 
   if (usuario.ehAdministrador) {
@@ -257,7 +304,7 @@ export async function requireAdmin(): Promise<PortalUsuario> {
   const usuario = await getUsuarioAutenticado();
 
   if (!usuario) {
-    redirect("/login?next=/admin/permissoes");
+    redirect(`/login?next=/admin/permissoes${await motivoLoginSuffix()}`);
   }
 
   if (!usuario.ehAdministrador) {

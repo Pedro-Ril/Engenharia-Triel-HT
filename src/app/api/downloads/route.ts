@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { listarDownloadsPublicos } from "@/lib/downloads/downloads";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   try {
     const downloads = await listarDownloadsPublicos();
     return NextResponse.json({ ok: true, data: downloads });
@@ -17,3 +18,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = comMetricasApi("downloads", handleGET);

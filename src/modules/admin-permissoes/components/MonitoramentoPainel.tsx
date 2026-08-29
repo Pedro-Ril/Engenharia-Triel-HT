@@ -9,7 +9,11 @@ import {
   Database,
   Headset,
   Info,
+  KeyRound,
   LogIn,
+  Mail,
+  Network,
+  PackageSearch,
   RotateCw,
   ScrollText,
   Search,
@@ -56,14 +60,19 @@ import {
 import {
   buscarAtividadeRecente,
   buscarLogs,
+  buscarResumoApis,
   buscarResumoMonitoramento,
   limparLogsAntigos,
+  limparRequisicoesAntigas,
 } from "@/modules/monitoramento/services/monitoramento.service";
 import type {
   EventoAtividade,
   LogSistema,
   NivelLog,
+  ResumoApis,
   ResumoMonitoramento,
+  ServicoExterno,
+  StatusServicoExterno,
 } from "@/modules/monitoramento/types/monitoramento.types";
 
 import type { FeedbackHandler } from "../types/toast.types";
@@ -73,13 +82,32 @@ interface MonitoramentoPainelProps {
   onFeedback: FeedbackHandler;
 }
 
-type AbaMonitoramento = "geral" | "banco" | "logs";
+type AbaMonitoramento = "geral" | "banco" | "logs" | "apis";
 
 const ABAS: { valor: AbaMonitoramento; label: string; icon: typeof ServerCog }[] = [
   { valor: "geral", label: "Visão geral", icon: ServerCog },
   { valor: "banco", label: "Banco de dados", icon: Database },
   { valor: "logs", label: "Logs", icon: ScrollText },
+  { valor: "apis", label: "APIs", icon: Network },
 ];
+
+const SERVICO_CONFIG: Record<
+  ServicoExterno,
+  { label: string; icon: typeof KeyRound }
+> = {
+  active_directory: { label: "Active Directory", icon: KeyRound },
+  erp_materia_prima: { label: "ERP · Matéria-Prima", icon: PackageSearch },
+  email: { label: "Envio de e-mail", icon: Mail },
+};
+
+const STATUS_SERVICO_CONFIG: Record<
+  StatusServicoExterno["status"],
+  { label: string; badge: "success" | "danger" | "neutral" }
+> = {
+  online: { label: "Online", badge: "success" },
+  offline: { label: "Offline", badge: "danger" },
+  sem_dados: { label: "Sem dados", badge: "neutral" },
+};
 
 const NIVEL_CONFIG: Record<
   NivelLog,
@@ -212,6 +240,7 @@ export function MonitoramentoPainel({ onFeedback }: MonitoramentoPainelProps) {
           {aba === "geral" && <AbaVisaoGeral resumo={resumo} />}
           {aba === "banco" && <AbaBancoDeDados resumo={resumo} />}
           {aba === "logs" && <AbaLogs onFeedback={onFeedback} />}
+          {aba === "apis" && <AbaApis onFeedback={onFeedback} />}
         </>
       ) : null}
     </Stack>
@@ -708,5 +737,230 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
         onConfirm={handleLimpar}
       />
     </Card>
+  );
+}
+
+function formatarPorcentagem(valor: number | null): string {
+  if (valor === null) return "—";
+  return `${Math.round(valor * 100)}%`;
+}
+
+function formatarLatencia(valorMs: number | null): string {
+  if (valorMs === null) return "—";
+  if (valorMs < 1000) return `${valorMs} ms`;
+  return `${(valorMs / 1000).toFixed(1)} s`;
+}
+
+function CardServicoExterno({ status }: { status: StatusServicoExterno }) {
+  const config = SERVICO_CONFIG[status.servico];
+  const statusConfig = STATUS_SERVICO_CONFIG[status.status];
+  const Icon = config.icon;
+
+  return (
+    <Card>
+      <Stack gap={14}>
+        <Stack direction="row" justify="between" align="center">
+          <Stack direction="row" gap={8} align="center">
+            <Icon size={17} />
+            <strong>{config.label}</strong>
+          </Stack>
+          <Badge variant={statusConfig.badge}>{statusConfig.label}</Badge>
+        </Stack>
+
+        <Stack gap={10}>
+          <LinhaInfo label="Latência média (24h)" valor={formatarLatencia(status.latenciaMediaMs)} />
+          <LinhaInfo label="Taxa de sucesso (24h)" valor={formatarPorcentagem(status.taxaSucesso24h)} />
+          <LinhaInfo label="Chamadas (24h)" valor={String(status.totalChamadas24h)} />
+          <LinhaInfo
+            label="Última atividade"
+            valor={status.ultimaChamadaEm ? formatarTempoRelativo(status.ultimaChamadaEm) : "—"}
+          />
+        </Stack>
+
+        {status.ultimaFalhaEm && (
+          <Alert variant="danger">
+            Última falha {formatarTempoRelativo(status.ultimaFalhaEm)}
+            {status.ultimaFalhaMensagem && `: ${status.ultimaFalhaMensagem}`}
+          </Alert>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+const POR_PAGINA_ROTAS = 15;
+
+function AbaApis({ onFeedback }: { onFeedback: FeedbackHandler }) {
+  const [dados, setDados] = useState<ResumoApis | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [pagina, setPagina] = useState(1);
+
+  const [confirmandoLimpeza, setConfirmandoLimpeza] = useState(false);
+  const [diasParaManter, setDiasParaManter] = useState("7");
+  const [limpando, setLimpando] = useState(false);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    buscarResumoApis().then((resultado) => {
+      if (cancelado) return;
+      setDados(resultado);
+      setCarregando(false);
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  async function handleLimpar() {
+    setLimpando(true);
+
+    try {
+      const resultado = await limparRequisicoesAntigas(Number(diasParaManter) || 7);
+
+      if (resultado.ok) {
+        onFeedback(
+          "success",
+          "Requisições antigas removidas",
+          resultado.message ?? "Limpeza concluída."
+        );
+        setConfirmandoLimpeza(false);
+
+        const atualizado = await buscarResumoApis();
+        setDados(atualizado);
+        setPagina(1);
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível limpar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setLimpando(false);
+    }
+  }
+
+  if (carregando) {
+    return (
+      <Card>
+        <Loader label="Carregando monitoramento de APIs..." />
+      </Card>
+    );
+  }
+
+  if (!dados) {
+    return (
+      <Card>
+        <Alert variant="danger">Não foi possível carregar o monitoramento de APIs.</Alert>
+      </Card>
+    );
+  }
+
+  const { chamadasExternas, requisicoes } = dados;
+  const totalPaginas = Math.max(1, Math.ceil(requisicoes.porRota.length / POR_PAGINA_ROTAS));
+  const inicio = (pagina - 1) * POR_PAGINA_ROTAS;
+  const rotasPagina = requisicoes.porRota.slice(inicio, inicio + POR_PAGINA_ROTAS);
+
+  return (
+    <Stack gap={20}>
+      <Card title="Integrações externas" description="Serviços de fora do portal dos quais ele depende.">
+        <FormGrid columns={3}>
+          {chamadasExternas.map((status) => (
+            <CardServicoExterno key={status.servico} status={status} />
+          ))}
+        </FormGrid>
+      </Card>
+
+      <Card
+        title="Tráfego das rotas internas"
+        description="Volume, latência e taxa de erro das rotas /api/** do próprio portal, nas últimas 24h."
+        actions={
+          <Button variant="danger" onClick={() => setConfirmandoLimpeza(true)}>
+            <Trash2 size={15} />
+            Limpar antigas
+          </Button>
+        }
+      >
+        <Stack gap={16}>
+          <FormGrid columns={3}>
+            <StatCard
+              label="Requisições (24h)"
+              value={requisicoes.totalChamadas24h.toLocaleString("pt-BR")}
+              icon={<Network />}
+            />
+            <StatCard
+              label="Taxa de erro (24h)"
+              value={formatarPorcentagem(requisicoes.taxaErro24h)}
+              icon={<XCircle />}
+              variant={requisicoes.taxaErro24h > 0.05 ? "danger" : "success"}
+            />
+            <StatCard
+              label="Latência média (24h)"
+              value={formatarLatencia(requisicoes.latenciaMedia24hMs)}
+              icon={<ServerCog />}
+            />
+          </FormGrid>
+
+          {requisicoes.porRota.length === 0 ? (
+            <EmptyState
+              icon={<Network size={26} />}
+              title="Nenhuma requisição registrada"
+              description="Sem dados de tráfego nas últimas 24h."
+            />
+          ) : (
+            <>
+              <Table minWidth={600}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Rota</TableHeaderCell>
+                    <TableHeaderCell align="center">Chamadas</TableHeaderCell>
+                    <TableHeaderCell align="center">Taxa de erro</TableHeaderCell>
+                    <TableHeaderCell align="center">Latência média</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rotasPagina.map((linha) => (
+                    <TableRow key={linha.rota}>
+                      <TableCell>{linha.rota}</TableCell>
+                      <TableCell align="center">
+                        {linha.totalChamadas.toLocaleString("pt-BR")}
+                      </TableCell>
+                      <TableCell align="center">{formatarPorcentagem(linha.taxaErro)}</TableCell>
+                      <TableCell align="center">{formatarLatencia(linha.latenciaMediaMs)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <Pagination page={pagina} totalPages={totalPaginas} onPageChange={setPagina} />
+            </>
+          )}
+        </Stack>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmandoLimpeza}
+        title="Limpar requisições antigas"
+        variant="warning"
+        message={
+          <Stack gap={12}>
+            <span>Remove permanentemente as métricas de requisição mais antigas que o período informado.</span>
+            <Field label="Manter os últimos (dias)">
+              <NumberInput
+                value={diasParaManter}
+                min={1}
+                onChange={(event) => setDiasParaManter(event.target.value)}
+              />
+            </Field>
+          </Stack>
+        }
+        confirmLabel="Limpar"
+        loading={limpando}
+        onClose={() => setConfirmandoLimpeza(false)}
+        onConfirm={handleLimpar}
+      />
+    </Stack>
   );
 }

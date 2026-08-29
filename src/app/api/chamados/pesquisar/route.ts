@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { pesquisarChamados } from "@/lib/chamados/chamados";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ const TAMANHO_MINIMO_TERMO = 2;
  * chamados marcados como `publico` aparecem; com sessão, também
  * entram os chamados do próprio usuário (ver pesquisarChamados).
  */
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const termo = new URL(request.url).searchParams.get("q")?.trim() ?? "";
 
   if (termo.length < TAMANHO_MINIMO_TERMO) {
@@ -34,3 +35,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = comMetricasApi("chamados/pesquisar", handleGET);

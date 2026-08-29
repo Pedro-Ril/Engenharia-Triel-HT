@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Database, KeyRound } from "lucide-react";
+import { Database, KeyRound, PackageSearch, Wrench } from "lucide-react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
@@ -9,6 +9,8 @@ import type { ConfiguracaoAd, ConfiguracaoDb } from "../types/adminPermissoes.ty
 import type { FeedbackHandler } from "../types/toast.types";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { ConfiguracaoDbPainel } from "./ConfiguracaoDbPainel";
+import { ManutencaoPainel } from "./ManutencaoPainel";
+import { MateriaPrimaConfigPainel } from "./MateriaPrimaConfigPainel";
 
 interface ConfiguracoesPainelProps {
   configuracaoAd: ConfiguracaoAd | null;
@@ -18,11 +20,13 @@ interface ConfiguracoesPainelProps {
   onConfiguracaoDbAtualizada: (configuracao: ConfiguracaoDb) => void;
 }
 
-type AbaConfiguracao = "ad" | "banco";
+type AbaConfiguracao = "ad" | "banco" | "materia-prima" | "manutencao";
 
 const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] = [
   { valor: "ad", label: "Active Directory", icon: KeyRound },
   { valor: "banco", label: "Banco de dados", icon: Database },
+  { valor: "manutencao", label: "Manutenção", icon: Wrench },
+  { valor: "materia-prima", label: "Matéria-Prima", icon: PackageSearch },
 ];
 
 export function ConfiguracoesPainel({
@@ -62,6 +66,10 @@ export function ConfiguracoesPainel({
             onConfiguracaoAtualizada={onConfiguracaoDbAtualizada}
           />
         )}
+
+        {aba === "materia-prima" && <MateriaPrimaConfigPainel onFeedback={onFeedback} />}
+
+        {aba === "manutencao" && <ManutencaoPainel onFeedback={onFeedback} />}
       </div>
     </>
   );

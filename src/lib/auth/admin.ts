@@ -487,7 +487,8 @@ const usuarioSelectColumns = `
   CAST([eh_administrador] AS BIT) AS [eh_administrador],
   CAST([ativo] AS BIT) AS [ativo],
   CONVERT(VARCHAR(33), [sessao_invalidada_em], 126) AS [sessao_invalidada_em],
-  CONVERT(VARCHAR(33), [ultimo_login_em], 126) AS [ultimo_login_em]
+  CONVERT(VARCHAR(33), [ultimo_login_em], 126) AS [ultimo_login_em],
+  CONVERT(VARCHAR(33), [ultima_atividade_em], 126) AS [ultima_atividade_em]
 `;
 
 const usuarioOutputColumns = `
@@ -500,7 +501,8 @@ const usuarioOutputColumns = `
   CAST(INSERTED.[eh_administrador] AS BIT) AS [eh_administrador],
   CAST(INSERTED.[ativo] AS BIT) AS [ativo],
   CONVERT(VARCHAR(33), INSERTED.[sessao_invalidada_em], 126) AS [sessao_invalidada_em],
-  CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em]
+  CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em],
+  CONVERT(VARCHAR(33), INSERTED.[ultima_atividade_em], 126) AS [ultima_atividade_em]
 `;
 
 function mapUsuarioRow(row: {
@@ -514,6 +516,7 @@ function mapUsuarioRow(row: {
   ativo: boolean;
   sessao_invalidada_em: string | null;
   ultimo_login_em: string | null;
+  ultima_atividade_em: string | null;
 }): PortalUsuario {
   return {
     id: row.id,
@@ -526,6 +529,7 @@ function mapUsuarioRow(row: {
     ativo: row.ativo,
     sessaoInvalidadaEm: row.sessao_invalidada_em,
     ultimoLoginEm: row.ultimo_login_em,
+    ultimaAtividadeEm: row.ultima_atividade_em,
   };
 }
 
@@ -613,6 +617,73 @@ export async function atualizarUsuarioAdmin(
   const row = result.recordset[0];
 
   return row ? mapUsuarioRow(row) : null;
+}
+
+/*
+ * Diferente de desativar: a conta continua ativa e a pessoa
+ * consegue logar de novo imediatamente — só o token que ela já
+ * tinha para de valer (ver getUsuarioAutenticado). Usado pelo
+ * botão "Forçar logout" da tela de Manutenção.
+ */
+export async function forcarLogoutUsuario(id: string): Promise<PortalUsuario | null> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("id", sql.UniqueIdentifier, id);
+
+  const result = await request.query(`
+    UPDATE dbo.portal_usuarios
+    SET [sessao_invalidada_em] = SYSDATETIME()
+    OUTPUT ${usuarioOutputColumns}
+    WHERE [id] = @id;
+  `);
+
+  const row = result.recordset[0];
+
+  return row ? mapUsuarioRow(row) : null;
+}
+
+/*
+ * Invalida a sessão de todo mundo de uma vez, exceto administradores
+ * — um admin nunca pode ficar sem acesso ao portal por causa deste
+ * botão (ele pode estar precisando dele bem nesse momento pra lidar
+ * com o que motivou o "derrubar todos"). Primeiro UPDATE
+ * genuinamente em massa deste arquivo (todo o resto sempre mira uma
+ * linha por [id]).
+ */
+export async function forcarLogoutTodos(): Promise<{ totalAfetados: number }> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool.request().query(`
+    UPDATE dbo.portal_usuarios
+    SET [sessao_invalidada_em] = SYSDATETIME()
+    WHERE [eh_administrador] = 0;
+  `);
+
+  return { totalAfetados: result.rowsAffected[0] ?? 0 };
+}
+
+/*
+ * Mesma ideia de forcarLogoutTodos, mas poupa uma sessão — usada ao
+ * ativar o modo manutenção, pra derrubar todo mundo sem deslogar o
+ * próprio admin que está ativando (senão ele perderia acesso pra
+ * gerenciar a manutenção que acabou de ligar).
+ */
+export async function forcarLogoutTodosExceto(
+  idExcluido: string
+): Promise<{ totalAfetados: number }> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("idExcluido", sql.UniqueIdentifier, idExcluido);
+
+  const result = await request.query(`
+    UPDATE dbo.portal_usuarios
+    SET [sessao_invalidada_em] = SYSDATETIME()
+    WHERE [id] <> @idExcluido;
+  `);
+
+  return { totalAfetados: result.rowsAffected[0] ?? 0 };
 }
 
 /* =========================================================

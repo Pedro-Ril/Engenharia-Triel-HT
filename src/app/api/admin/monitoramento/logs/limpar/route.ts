@@ -4,11 +4,12 @@ import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalInteger } from "@/lib/auth/validation";
 import { limparLogsAntigos } from "@/lib/monitoramento/logs";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -41,3 +42,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/monitoramento/logs/limpar", handlePOST);

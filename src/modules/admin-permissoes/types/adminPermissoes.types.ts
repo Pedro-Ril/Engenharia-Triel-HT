@@ -33,6 +33,7 @@ export interface PortalUsuarioAdmin {
   ativo: boolean;
   sessaoInvalidadaEm: string | null;
   ultimoLoginEm: string | null;
+  ultimaAtividadeEm: string | null;
 }
 
 export interface Empresa {
@@ -135,4 +136,48 @@ export interface Atualizacao {
   criadoEm: string;
   atualizadoEm: string;
   criadoPor: string | null;
+}
+
+export interface StatusManutencao {
+  ativo: boolean;
+  mensagem: string | null;
+  ativadoEm: string | null;
+  ativadoPor: string | null;
+}
+
+export interface ConfigMateriaPrima {
+  apiBaseUrl: string;
+  intervaloSincronizacaoMinutos: number | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
+export interface EmpresaComCatalogo {
+  codEmpresa: string;
+  totalItens: number;
+  ultimaSincronizacao: string | null;
+}
+
+export interface ItemMateriaPrimaCache {
+  codigo: string;
+  descricao: string;
+  descricaoResumida: string;
+  unidadeMedida: string | null;
+}
+
+export interface ItensMateriaPrimaCachePaginados {
+  itens: ItemMateriaPrimaCache[];
+  totalRegistros: number;
+  totalPaginas: number;
+}
+
+export interface LogSincronizacaoMateriaPrima {
+  id: string;
+  codEmpresa: string;
+  iniciadoEm: string;
+  finalizadoEm: string | null;
+  status: "sucesso" | "erro" | "em_andamento" | "cancelado";
+  totalItens: number | null;
+  mensagemErro: string | null;
+  disparadoPor: string | null;
 }

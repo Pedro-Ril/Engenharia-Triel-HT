@@ -5,6 +5,7 @@ import { getConfiguracaoAd } from "@/lib/auth/configuracao-ad";
 import { ValidationError } from "@/lib/auth/errors";
 import { testarConexaoAd } from "@/lib/auth/ldap";
 import { isObject, optionalText, requiredText } from "@/lib/auth/validation";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ interface TestarConfiguracaoAdBody {
  * precisar salvar nada. Útil pra validar credenciais novas antes
  * de confirmar a troca.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -71,3 +72,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/configuracao-ad/testar", handlePOST);

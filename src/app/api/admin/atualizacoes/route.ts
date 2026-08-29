@@ -8,11 +8,12 @@ import {
   listarAtualizacoes,
 } from "@/lib/atualizacoes/atualizacoes";
 import { parseCorpoAtualizacao } from "@/lib/atualizacoes/validacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -28,7 +29,9 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export const GET = comMetricasApi("admin/atualizacoes", handleGET);
+
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -74,3 +77,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/atualizacoes", handlePOST);

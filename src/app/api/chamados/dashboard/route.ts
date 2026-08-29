@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 
 import { requireAtendenteChamadosApi } from "@/lib/chamados/autorizacao-chamados";
 import { buscarEstatisticasChamados } from "@/lib/chamados/dashboard";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const resultadoAcesso = await requireAtendenteChamadosApi();
   if (resultadoAcesso.negado) return resultadoAcesso.negado;
 
@@ -40,3 +41,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = comMetricasApi("chamados/dashboard", handleGET);

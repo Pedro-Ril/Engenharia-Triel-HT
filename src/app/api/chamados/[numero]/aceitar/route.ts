@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { aceitarChamado, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
 import { carregarContextoAcao, lerNomeConfirmado } from "@/lib/chamados/api-helpers";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ interface RouteContext {
   params: Promise<{ numero: string }>;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+async function handlePOST(request: Request, context: RouteContext) {
   const { numero } = await context.params;
   const nomeConfirmado = await lerNomeConfirmado(request);
 
@@ -51,3 +52,5 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const POST = comMetricasApi("chamados/[numero]/aceitar", handlePOST);

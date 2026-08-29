@@ -6,6 +6,7 @@ import { requiredText } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import { adicionarMensagem, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
 import { parseAnexosFormData } from "@/lib/chamados/validacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ function parseNumero(valor: string): number | null {
   return Number.isInteger(numero) && numero > 0 ? numero : null;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+async function handlePOST(request: Request, context: RouteContext) {
   const { numero: numeroParam } = await context.params;
   const numero = parseNumero(numeroParam);
 
@@ -107,3 +108,5 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const POST = comMetricasApi("chamados/[numero]/mensagens", handlePOST);

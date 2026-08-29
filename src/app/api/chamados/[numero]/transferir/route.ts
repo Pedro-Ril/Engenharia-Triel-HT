@@ -5,6 +5,7 @@ import { isObject, requiredText } from "@/lib/auth/validation";
 import { carregarContextoAcao } from "@/lib/chamados/api-helpers";
 import { buscarChamadoPorNumero, listarSetoresParaChamado, transferirChamado } from "@/lib/chamados/chamados";
 import { optionalUuid } from "@/lib/chamados/validacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ interface RouteContext {
  * outro atendente do mesmo setor, ou pra outro setor inteiro (ver
  * transferirChamado em src/lib/chamados/chamados.ts).
  */
-export async function POST(request: Request, context: RouteContext) {
+async function handlePOST(request: Request, context: RouteContext) {
   const { numero } = await context.params;
 
   const { contexto, erro } = await carregarContextoAcao(numero, null);
@@ -86,3 +87,5 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const POST = comMetricasApi("chamados/[numero]/transferir", handlePOST);

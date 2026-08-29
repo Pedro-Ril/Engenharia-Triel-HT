@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   getSqlServerPool,
 } from "@/lib/database/sql-server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ interface DatabaseHealthResult {
   tabelaDesenhosExiste: boolean;
 }
 
-export async function GET() {
+async function handleGET() {
   try {
     const pool = await getSqlServerPool();
 
@@ -70,3 +71,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = comMetricasApi("health/database", handleGET);

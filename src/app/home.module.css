@@ -181,6 +181,16 @@
   margin-bottom: 18px;
 }
 
+.quickAccessStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.abaSecundariaConteudo {
+  margin-top: 20px;
+}
+
 .sectionMiniTitle {
   display: block;
   font-size: 0.82rem;
@@ -202,16 +212,99 @@
   line-height: 1.6;
 }
 
-.setoresList {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
+/*
+ * Navegação lateral de setores dentro da aba "Suas ferramentas" — só
+ * o setor selecionado mostra sua grade, em vez de empilhar um bloco
+ * por setor (um setor com 1 módulo só ocupava uma linha inteira à
+ * toa, e muitos setores exigiam scroll longo).
+ */
+.ferramentasLayout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: start;
 }
 
-.setorSection {
+.setoresNav {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
+
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px;
+}
+
+.setoresNavItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.setoresNavItem:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.setoresNavItemAtivo,
+.setoresNavItemAtivo:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.setoresNavIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.setoresNavItemAtivo .setoresNavIcon {
+  background: var(--primary);
+  color: var(--text-inverse);
+}
+
+.setoresNavNome {
+  flex: 1;
+  min-width: 0;
+
+  font-size: 0.88rem;
+  font-weight: 600;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setoresNavContagem {
+  flex-shrink: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
+.setoresNavItemAtivo .setoresNavContagem {
+  color: var(--primary);
 }
 
 .setorSectionHeader {
@@ -564,6 +657,21 @@
 
   .sectionText {
     max-width: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .ferramentasLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .setoresNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .setoresNavItem {
+    width: auto;
   }
 }
 

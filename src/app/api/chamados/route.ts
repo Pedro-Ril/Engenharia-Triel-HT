@@ -6,6 +6,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { optionalText, requiredText } from "@/lib/auth/validation";
 import { criarChamado } from "@/lib/chamados/chamados";
 import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
  * usuário não podem ser forjados pelo corpo da requisição); sem
  * sessão, o nome é obrigatório no formulário.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   let formData: FormData;
 
   try {
@@ -82,3 +83,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("chamados", handlePOST);

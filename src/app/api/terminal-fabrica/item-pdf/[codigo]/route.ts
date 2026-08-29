@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import {
   limparCodigoPdf,
   localizarPdfsDoItem,
@@ -13,7 +14,7 @@ import {
  * PDF do cadastro-roteiro, só que sem a checagem de permissão
  * por módulo.
  */
-export async function GET(
+async function handleGET(
   req: NextRequest,
   context: { params: Promise<{ codigo: string }> }
 ) {
@@ -69,3 +70,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = comMetricasApi("terminal-fabrica/item-pdf/[codigo]", handleGET);

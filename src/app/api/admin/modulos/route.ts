@@ -12,11 +12,12 @@ import {
   requiredText,
   requiredUuidArray,
 } from "@/lib/auth/validation";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -32,6 +33,8 @@ export async function GET() {
   }
 }
 
+export const GET = comMetricasApi("admin/modulos", handleGET);
+
 interface CreateModuloBody {
   setorIds?: unknown;
   chave?: unknown;
@@ -45,7 +48,7 @@ interface CreateModuloBody {
   ordem?: unknown;
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -124,3 +127,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/modulos", handlePOST);

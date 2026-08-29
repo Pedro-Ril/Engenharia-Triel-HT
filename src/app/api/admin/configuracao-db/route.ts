@@ -8,11 +8,12 @@ import {
   salvarConfiguracaoDbNoEnv,
   testarConexaoDb,
 } from "@/lib/database/configuracao-db";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -26,6 +27,8 @@ export async function GET() {
     );
   }
 }
+
+export const GET = comMetricasApi("admin/configuracao-db", handleGET);
 
 interface AtualizarConfiguracaoDbBody {
   server?: unknown;
@@ -42,7 +45,7 @@ interface AtualizarConfiguracaoDbBody {
  * nunca deixar o .env com credenciais que derrubariam o portal no
  * próximo restart.
  */
-export async function PUT(request: Request) {
+async function handlePUT(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -112,3 +115,5 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export const PUT = comMetricasApi("admin/configuracao-db", handlePUT);

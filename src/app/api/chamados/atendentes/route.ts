@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { listarAtendentesDisponiveisParaSetor } from "@/lib/chamados/atendentes";
 import { requireAtendenteChamadosApi } from "@/lib/chamados/autorizacao-chamados";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
  * troca o setor de destino e a lista de possíveis atendentes
  * daquele setor é buscada aqui (ver listarAtendentesDisponiveisParaSetor).
  */
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const resultadoAcesso = await requireAtendenteChamadosApi();
   if (resultadoAcesso.negado) return resultadoAcesso.negado;
 
@@ -32,3 +33,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = comMetricasApi("chamados/atendentes", handleGET);

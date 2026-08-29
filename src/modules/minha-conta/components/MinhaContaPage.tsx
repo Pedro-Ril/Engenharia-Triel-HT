@@ -6,11 +6,8 @@ import {
   CheckCircle2,
   Clock3,
   Home,
-  Monitor,
-  Moon,
   Settings,
   ShieldCheck,
-  Sun,
   User,
   XCircle,
 } from "lucide-react";
@@ -53,31 +50,11 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Toast } from "@/components/ui/Toast";
 import { resolverIcone } from "@/lib/icons/icon-registry";
 import { aplicarTemaComTransicao } from "@/lib/tema/aplicar-tema";
+import { OPCOES_TEMA } from "@/lib/tema/opcoes-tema";
 
 import { atualizarTemaUsuario, buscarMinhaConta } from "../services/minhaConta.service";
 import type { MinhaContaData, TemaPreferencia } from "../types/minhaConta.types";
 import styles from "./MinhaConta.module.css";
-
-const OPCOES_TEMA = [
-  {
-    value: "claro" as const,
-    label: "Claro",
-    description: "Fundo claro, sempre.",
-    icon: <Sun size={17} />,
-  },
-  {
-    value: "escuro" as const,
-    label: "Escuro",
-    description: "Fundo escuro, sempre.",
-    icon: <Moon size={17} />,
-  },
-  {
-    value: "sistema" as const,
-    label: "Sistema",
-    description: "Segue o tema do seu dispositivo.",
-    icon: <Monitor size={17} />,
-  },
-];
 
 const motivosFalha: Record<string, string> = {
   credenciais_invalidas: "Usuário ou senha em branco",
@@ -184,7 +161,7 @@ export function MinhaContaPage() {
           <Stack gap={12}>
             <span>Entre novamente para ver os dados da sua conta.</span>
             <Stack direction="row">
-              <Link href="/login?next=/minha-conta">
+              <Link href="/login?next=/minha-conta&motivo=sessao_expirada">
                 <Button>Entrar novamente</Button>
               </Link>
             </Stack>

@@ -3,12 +3,13 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, requiredText } from "@/lib/auth/validation";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { buscarTemaPadrao, removerTemaPadrao, salvarTemaPadrao } from "@/lib/tema/tema-padrao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -24,7 +25,9 @@ export async function GET() {
   }
 }
 
-export async function PATCH(request: Request) {
+export const GET = comMetricasApi("admin/tema-padrao", handleGET);
+
+async function handlePATCH(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -57,7 +60,9 @@ export async function PATCH(request: Request) {
   }
 }
 
-export async function DELETE() {
+export const PATCH = comMetricasApi("admin/tema-padrao", handlePATCH);
+
+async function handleDELETE() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -72,3 +77,5 @@ export async function DELETE() {
     );
   }
 }
+
+export const DELETE = comMetricasApi("admin/tema-padrao", handleDELETE);

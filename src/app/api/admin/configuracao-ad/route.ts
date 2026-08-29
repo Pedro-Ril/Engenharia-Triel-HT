@@ -9,11 +9,12 @@ import {
 import { ValidationError } from "@/lib/auth/errors";
 import { testarConexaoAd } from "@/lib/auth/ldap";
 import { isObject, optionalText, requiredText } from "@/lib/auth/validation";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -29,6 +30,8 @@ export async function GET() {
   }
 }
 
+export const GET = comMetricasApi("admin/configuracao-ad", handleGET);
+
 interface UpdateConfiguracaoAdBody {
   url?: unknown;
   baseDn?: unknown;
@@ -38,7 +41,7 @@ interface UpdateConfiguracaoAdBody {
   grupoUsuariosDn?: unknown;
 }
 
-export async function PUT(request: Request) {
+async function handlePUT(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -130,3 +133,5 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export const PUT = comMetricasApi("admin/configuracao-ad", handlePUT);

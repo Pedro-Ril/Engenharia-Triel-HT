@@ -4,11 +4,12 @@ import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalText, requiredText } from "@/lib/auth/validation";
 import { criarEmpresa, listarEmpresas } from "@/lib/empresas/empresas";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -24,7 +25,9 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export const GET = comMetricasApi("admin/empresas", handleGET);
+
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -57,3 +60,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/empresas", handlePOST);

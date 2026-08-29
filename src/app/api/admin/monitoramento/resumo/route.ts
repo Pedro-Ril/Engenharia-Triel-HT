@@ -3,12 +3,13 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { obterEstatisticasBanco } from "@/lib/monitoramento/banco";
 import { contarLogsPorNivel } from "@/lib/monitoramento/logs";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { obterEstatisticasSistema } from "@/lib/monitoramento/sistema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -34,3 +35,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = comMetricasApi("admin/monitoramento/resumo", handleGET);

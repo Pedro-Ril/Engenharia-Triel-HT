@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { buscarConteudoDownload } from "@/lib/downloads/downloads";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+async function handleGET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   if (!uniqueIdentifierPattern.test(id)) {
@@ -47,3 +48,5 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 }
+
+export const GET = comMetricasApi("downloads/[id]/arquivo", handleGET);

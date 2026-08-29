@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { listarSetoresComAceiteChamados } from "@/lib/chamados/atendentes";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -21,3 +22,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = comMetricasApi("admin/chamados/setores", handleGET);

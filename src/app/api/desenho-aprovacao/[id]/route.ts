@@ -8,6 +8,7 @@ import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -513,7 +514,7 @@ function getProjectSelectSql(
    GET - BUSCAR DESENHO POR ID
    ========================================================= */
 
-export async function GET(
+async function handleGET(
   _request: Request,
   context: RouteContext
 ) {
@@ -597,11 +598,13 @@ export async function GET(
   }
 }
 
+export const GET = comMetricasApi("desenho-aprovacao/[id]", handleGET);
+
 /* =========================================================
    PATCH - ATUALIZAR DADOS DO DESENHO
    ========================================================= */
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   context: RouteContext
 ) {
@@ -1386,11 +1389,13 @@ export async function PATCH(
   }
 }
 
+export const PATCH = comMetricasApi("desenho-aprovacao/[id]", handlePATCH);
+
 /* =========================================================
    DELETE - EXCLUSÃO LÓGICA
    ========================================================= */
 
-export async function DELETE(
+async function handleDELETE(
   request: Request,
   context: RouteContext
 ) {
@@ -1690,3 +1695,5 @@ export async function DELETE(
     );
   }
 }
+
+export const DELETE = comMetricasApi("desenho-aprovacao/[id]", handleDELETE);

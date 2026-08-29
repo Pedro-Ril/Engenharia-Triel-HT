@@ -15,6 +15,7 @@ export interface PortalUsuario {
   ativo: boolean;
   sessaoInvalidadaEm: string | null;
   ultimoLoginEm: string | null;
+  ultimaAtividadeEm: string | null;
 }
 
 interface PortalUsuarioRow {
@@ -28,6 +29,7 @@ interface PortalUsuarioRow {
   ativo: boolean;
   sessao_invalidada_em: string | null;
   ultimo_login_em: string | null;
+  ultima_atividade_em: string | null;
 }
 
 function mapRow(row: PortalUsuarioRow): PortalUsuario {
@@ -42,6 +44,7 @@ function mapRow(row: PortalUsuarioRow): PortalUsuario {
     ativo: row.ativo,
     sessaoInvalidadaEm: row.sessao_invalidada_em,
     ultimoLoginEm: row.ultimo_login_em,
+    ultimaAtividadeEm: row.ultima_atividade_em,
   };
 }
 
@@ -55,7 +58,8 @@ const usuarioSelectColumns = `
   CAST([eh_administrador] AS BIT) AS [eh_administrador],
   CAST([ativo] AS BIT) AS [ativo],
   CONVERT(VARCHAR(33), [sessao_invalidada_em], 126) AS [sessao_invalidada_em],
-  CONVERT(VARCHAR(33), [ultimo_login_em], 126) AS [ultimo_login_em]
+  CONVERT(VARCHAR(33), [ultimo_login_em], 126) AS [ultimo_login_em],
+  CONVERT(VARCHAR(33), [ultima_atividade_em], 126) AS [ultima_atividade_em]
 `;
 
 /*
@@ -121,7 +125,8 @@ export async function upsertUsuarioLogin(
       CAST(INSERTED.[eh_administrador] AS BIT) AS [eh_administrador],
       CAST(INSERTED.[ativo] AS BIT) AS [ativo],
       CONVERT(VARCHAR(33), INSERTED.[sessao_invalidada_em], 126) AS [sessao_invalidada_em],
-      CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em];
+      CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em],
+      CONVERT(VARCHAR(33), INSERTED.[ultima_atividade_em], 126) AS [ultima_atividade_em];
   `);
 
   return mapRow(result.recordset[0]);
@@ -193,7 +198,8 @@ export async function upsertUsuarioImportado(
       CAST(INSERTED.[eh_administrador] AS BIT) AS [eh_administrador],
       CAST(INSERTED.[ativo] AS BIT) AS [ativo],
       CONVERT(VARCHAR(33), INSERTED.[sessao_invalidada_em], 126) AS [sessao_invalidada_em],
-      CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em];
+      CONVERT(VARCHAR(33), INSERTED.[ultimo_login_em], 126) AS [ultimo_login_em],
+      CONVERT(VARCHAR(33), INSERTED.[ultima_atividade_em], 126) AS [ultima_atividade_em];
   `);
 
   const row = result.recordset[0];
@@ -276,4 +282,29 @@ export async function atualizarDadosUsuarioDoAd(
   `);
 
   return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/*
+ * Chamada em toda requisição autenticada (ver validarSessaoUsuario
+ * em autorizacao.ts) pra alimentar o "usuários logados agora" da
+ * tela de Manutenção. O próprio WHERE já throttla a escrita (só
+ * grava se fizer mais de 60s da última vez) — evita um UPDATE por
+ * requisição sem precisar ler o valor atual antes.
+ */
+export async function registrarAtividadeSemFalhar(usuarioId: string): Promise<void> {
+  try {
+    const pool = await getSqlServerPool();
+
+    await pool
+      .request()
+      .input("id", sql.UniqueIdentifier, usuarioId)
+      .query(`
+        UPDATE dbo.portal_usuarios
+        SET [ultima_atividade_em] = SYSDATETIME()
+        WHERE [id] = @id
+          AND ([ultima_atividade_em] IS NULL OR [ultima_atividade_em] < DATEADD(SECOND, -60, SYSDATETIME()));
+      `);
+  } catch (error) {
+    console.error("Erro ao registrar atividade do usuário:", error);
+  }
 }

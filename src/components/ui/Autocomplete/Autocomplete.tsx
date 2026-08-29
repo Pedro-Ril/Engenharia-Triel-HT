@@ -25,6 +25,8 @@ interface AutocompleteProps {
   emptyMessage?: string;
   disabled?: boolean;
   hasError?: boolean;
+  /* Limita quantas opções aparecem na lista aberta de uma vez — importante quando `options` vem de um catálogo grande (ex: milhares de itens de ERP). */
+  maxOptions?: number;
 }
 
 export function Autocomplete({
@@ -37,6 +39,7 @@ export function Autocomplete({
   emptyMessage = "Nenhum resultado encontrado.",
   disabled = false,
   hasError = false,
+  maxOptions,
 }: AutocompleteProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -78,16 +81,16 @@ export function Autocomplete({
       .trim()
       .toLocaleLowerCase("pt-BR");
 
-    if (!normalizedQuery) {
-      return options;
-    }
+    const encontradas = normalizedQuery
+      ? options.filter((option) =>
+          option.label
+            .toLocaleLowerCase("pt-BR")
+            .includes(normalizedQuery)
+        )
+      : options;
 
-    return options.filter((option) =>
-      option.label
-        .toLocaleLowerCase("pt-BR")
-        .includes(normalizedQuery)
-    );
-  }, [options, query]);
+    return maxOptions ? encontradas.slice(0, maxOptions) : encontradas;
+  }, [options, query, maxOptions]);
 
   function handleSelect(option: AutocompleteOption) {
     setQuery(option.label);

@@ -3,6 +3,7 @@ import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ interface RevisionSvgRecord {
 const uniqueIdentifierPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET(
+async function handleGET(
   _request: Request,
   context: RouteContext
 ) {
@@ -176,3 +177,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = comMetricasApi("desenho-aprovacao/[id]/revisoes/[revisaoId]/svg", handleGET);

@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 
 import { getSessionUsuario } from "@/lib/auth/session";
 import { getUsuarioBySamAccountName } from "@/lib/auth/usuarios";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const sessao = await getSessionUsuario();
 
   if (!sessao) {
@@ -30,3 +31,5 @@ export async function GET() {
     },
   });
 }
+
+export const GET = comMetricasApi("auth/me", handleGET);

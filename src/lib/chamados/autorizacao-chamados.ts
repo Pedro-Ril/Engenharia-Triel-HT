@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
-import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
+import { getUsuarioAutenticado, motivoLoginSuffix } from "@/lib/auth/autorizacao";
 import type { PortalUsuario } from "@/lib/auth/usuarios";
 
 /*
@@ -56,7 +56,7 @@ export async function requireAtendenteChamados(): Promise<AcessoAtendimento> {
   const usuario = await getUsuarioAutenticado();
 
   if (!usuario) {
-    redirect("/login?next=/chamados/atender");
+    redirect(`/login?next=/chamados/atender${await motivoLoginSuffix()}`);
   }
 
   const setorIds = await getSetoresQueAtende(usuario);

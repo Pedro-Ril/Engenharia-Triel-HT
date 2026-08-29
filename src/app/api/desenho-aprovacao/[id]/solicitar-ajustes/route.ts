@@ -8,6 +8,7 @@ import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +93,7 @@ function getRequiredText(
   return normalizedValue;
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   context: RouteContext
 ) {
@@ -533,3 +534,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = comMetricasApi("desenho-aprovacao/[id]/solicitar-ajustes", handlePOST);

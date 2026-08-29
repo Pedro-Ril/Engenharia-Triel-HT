@@ -8,6 +8,7 @@ import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -425,7 +426,7 @@ function createProjectSelectSql(
    GET - LISTAR DESENHOS
    ========================================================= */
 
-export async function GET() {
+async function handleGET() {
   const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
   if (acesso.negado) return acesso.negado;
 
@@ -469,11 +470,13 @@ export async function GET() {
   }
 }
 
+export const GET = comMetricasApi("desenho-aprovacao", handleGET);
+
 /* =========================================================
    POST - CRIAR DESENHO
    ========================================================= */
 
-export async function POST(
+async function handlePOST(
   request: Request
 ) {
   const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
@@ -1034,3 +1037,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = comMetricasApi("desenho-aprovacao", handlePOST);

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAtendenteChamadosApi } from "@/lib/chamados/autorizacao-chamados";
 import { listarFilaAtendimento } from "@/lib/chamados/chamados";
 import type { PrioridadeChamado, StatusChamado } from "@/lib/chamados/chamados";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ const statusValidos: StatusChamado[] = [
 ];
 const prioridadesValidas: PrioridadeChamado[] = ["baixa", "media", "alta", "urgente"];
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const resultadoAcesso = await requireAtendenteChamadosApi();
   if (resultadoAcesso.negado) return resultadoAcesso.negado;
 
@@ -69,3 +70,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = comMetricasApi("chamados/fila", handleGET);

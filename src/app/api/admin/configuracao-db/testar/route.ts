@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalBoolean, optionalText, requiredText } from "@/lib/auth/validation";
 import { testarConexaoDb } from "@/lib/database/configuracao-db";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ interface TestarConfiguracaoDbBody {
   trustServerCertificate?: unknown;
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -67,3 +68,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = comMetricasApi("admin/configuracao-db/testar", handlePOST);

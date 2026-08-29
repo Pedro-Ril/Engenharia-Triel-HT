@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 
@@ -485,7 +486,7 @@ function coletarDebugM2(nodes: EstruturaNode[]) {
   return debugM2;
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const acesso = await verificarAcessoModuloApi("revisao-projeto");
   if (acesso.negado) return acesso.negado;
 
@@ -585,3 +586,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = comMetricasApi("revisao-projeto/analisar-excel", handlePOST);

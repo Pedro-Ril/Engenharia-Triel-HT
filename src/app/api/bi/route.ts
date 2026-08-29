@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "./db";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 type SqlBuild = {
   whereClause: string;
@@ -82,7 +83,7 @@ function getDiaSemanaLabel(dia: number): string {
   return mapa[dia] ?? String(dia);
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const acesso = await verificarAcessoModuloApi("bi");
   if (acesso.negado) return acesso.negado;
 
@@ -407,3 +408,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = comMetricasApi("bi", handleGET);

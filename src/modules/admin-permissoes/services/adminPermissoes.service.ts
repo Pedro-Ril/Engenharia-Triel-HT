@@ -5,9 +5,13 @@ import type {
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
+  ConfigMateriaPrima,
   ConfiguracaoAd,
   ConfiguracaoDb,
   Empresa,
+  EmpresaComCatalogo,
+  ItensMateriaPrimaCachePaginados,
+  LogSincronizacaoMateriaPrima,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
@@ -15,6 +19,7 @@ import type {
   ResultadoTesteConexaoAd,
   ResultadoTesteConexaoDb,
   ResumoBuscasTerminalFabrica,
+  StatusManutencao,
   TemaPadrao,
   TipoAtualizacaoItem,
 } from "../types/adminPermissoes.types";
@@ -147,6 +152,40 @@ export async function excluirUsuario(id: string): Promise<ApiEnvelope<null>> {
     method: "DELETE",
   });
   return parseResponse<null>(response);
+}
+
+export async function forcarLogoutUsuario(
+  id: string
+): Promise<ApiEnvelope<PortalUsuarioAdmin>> {
+  const response = await fetch(`/api/admin/usuarios/${id}/forcar-logout`, {
+    method: "POST",
+  });
+  return parseResponse<PortalUsuarioAdmin>(response);
+}
+
+export async function forcarLogoutTodos(): Promise<ApiEnvelope<{ totalAfetados: number }>> {
+  const response = await fetch("/api/admin/usuarios/forcar-logout-todos", {
+    method: "POST",
+  });
+  return parseResponse<{ totalAfetados: number }>(response);
+}
+
+export async function buscarStatusManutencao(): Promise<StatusManutencao | null> {
+  const response = await fetch("/api/admin/manutencao");
+  const body = await parseResponse<StatusManutencao>(response);
+  return body.data ?? null;
+}
+
+export async function salvarStatusManutencao(dados: {
+  ativo: boolean;
+  mensagem?: string | null;
+}): Promise<ApiEnvelope<StatusManutencao>> {
+  const response = await fetch("/api/admin/manutencao", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<StatusManutencao>(response);
 }
 
 export async function listarEmpresas(): Promise<Empresa[]> {
@@ -546,6 +585,74 @@ export async function atualizarWikiArtigo(
 export async function excluirWikiArtigo(id: string): Promise<ApiEnvelope<null>> {
   const response = await fetch(`/api/admin/wiki/${id}`, {
     method: "DELETE",
+  });
+  return parseResponse<null>(response);
+}
+
+export async function buscarConfigMateriaPrima(): Promise<ConfigMateriaPrima | null> {
+  const response = await fetch("/api/admin/materias-primas/config");
+  const body = await parseResponse<ConfigMateriaPrima>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigMateriaPrima(dados: {
+  apiBaseUrl: string;
+  intervaloSincronizacaoMinutos: number | null;
+}): Promise<ApiEnvelope<ConfigMateriaPrima>> {
+  const response = await fetch("/api/admin/materias-primas/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigMateriaPrima>(response);
+}
+
+export async function listarEmpresasComCatalogoMateriaPrima(): Promise<EmpresaComCatalogo[]> {
+  const response = await fetch("/api/admin/materias-primas/empresas");
+  const body = await parseResponse<EmpresaComCatalogo[]>(response);
+  return body.data ?? [];
+}
+
+export async function listarLogsSincronizacaoMateriaPrima(): Promise<
+  LogSincronizacaoMateriaPrima[]
+> {
+  const response = await fetch("/api/admin/materias-primas/logs");
+  const body = await parseResponse<LogSincronizacaoMateriaPrima[]>(response);
+  return body.data ?? [];
+}
+
+export async function sincronizarCatalogoMateriaPrimaAdmin(
+  codEmpresa: string
+): Promise<ApiEnvelope<{ totalItens: number }>> {
+  const response = await fetch("/api/admin/materias-primas/sincronizar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codEmpresa }),
+  });
+  return parseResponse<{ totalItens: number }>(response);
+}
+
+export async function listarItensMateriaPrimaCacheAdmin(params: {
+  codEmpresa: string;
+  pagina: number;
+  busca: string;
+}): Promise<ApiEnvelope<ItensMateriaPrimaCachePaginados>> {
+  const query = new URLSearchParams({
+    codEmpresa: params.codEmpresa,
+    pagina: String(params.pagina),
+    busca: params.busca,
+  });
+  const response = await fetch(`/api/admin/materias-primas/itens?${query.toString()}`);
+  return parseResponse<ItensMateriaPrimaCachePaginados>(response);
+}
+
+export async function cancelarSincronizacaoMateriaPrimaAdmin(
+  codEmpresa: string
+): Promise<ApiEnvelope<null>> {
+  const response = await fetch("/api/admin/materias-primas/cancelar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codEmpresa }),
   });
   return parseResponse<null>(response);
 }

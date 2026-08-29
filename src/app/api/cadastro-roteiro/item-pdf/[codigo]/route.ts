@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import {
   limparCodigoPdf,
   localizarPdfsDoItem,
   montarPdfUnico,
 } from "@/lib/pdf/roteiro-pdf";
 
-export async function GET(
+async function handleGET(
   req: NextRequest,
   context: { params: Promise<{ codigo: string }> }
 ) {
@@ -65,3 +66,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = comMetricasApi("cadastro-roteiro/item-pdf/[codigo]", handleGET);

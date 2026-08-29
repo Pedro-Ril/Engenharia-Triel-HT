@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/validation";
 import { atualizarTag, excluirTag } from "@/lib/atualizacoes/atualizacoes";
 import { CORES_TAG_DISPONIVEIS } from "@/lib/atualizacoes/cores-tag";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+async function handlePATCH(request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -100,7 +101,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export const PATCH = comMetricasApi("admin/atualizacoes/tags/[id]", handlePATCH);
+
+async function handleDELETE(_request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
 
@@ -136,3 +139,5 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
   }
 }
+
+export const DELETE = comMetricasApi("admin/atualizacoes/tags/[id]", handleDELETE);

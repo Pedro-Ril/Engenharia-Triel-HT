@@ -70,3 +70,35 @@ export interface ResumoMonitoramento {
   sistema: EstatisticasSistema;
   logsPorNivel: Record<NivelLog, number>;
 }
+
+export type ServicoExterno = "active_directory" | "erp_materia_prima" | "email";
+
+export interface StatusServicoExterno {
+  servico: ServicoExterno;
+  status: "online" | "offline" | "sem_dados";
+  latenciaMediaMs: number | null;
+  totalChamadas24h: number;
+  taxaSucesso24h: number | null;
+  ultimaChamadaEm: string | null;
+  ultimaFalhaEm: string | null;
+  ultimaFalhaMensagem: string | null;
+}
+
+export interface ResumoRotaRequisicoes {
+  rota: string;
+  totalChamadas: number;
+  taxaErro: number;
+  latenciaMediaMs: number;
+}
+
+export interface ResumoRequisicoes {
+  totalChamadas24h: number;
+  taxaErro24h: number;
+  latenciaMedia24hMs: number;
+  porRota: ResumoRotaRequisicoes[];
+}
+
+export interface ResumoApis {
+  chamadasExternas: StatusServicoExterno[];
+  requisicoes: ResumoRequisicoes;
+}

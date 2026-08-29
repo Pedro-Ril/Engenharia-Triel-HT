@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import { buscarAnexoConteudo, buscarContextoAnexo } from "@/lib/chamados/chamados";
+import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: Request, context: RouteContext) {
+async function handleGET(request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   if (!uniqueIdentifierPattern.test(id)) {
@@ -74,3 +75,5 @@ export async function GET(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const GET = comMetricasApi("chamados/anexos/[id]", handleGET);

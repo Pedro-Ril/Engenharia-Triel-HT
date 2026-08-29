@@ -1,4 +1,25 @@
 /*
+ * Hook do Next.js (App Router) chamado uma única vez quando o
+ * servidor sobe — usado aqui pra iniciar o agendador em processo
+ * que sincroniza automaticamente o catálogo de matéria-prima
+ * (Engenharia de Manufatura) quando um intervalo é configurado em
+ * Administração > Matéria-Prima. Ver src/lib/materias-primas/scheduler.ts.
+ */
+export async function register() {
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  const { iniciarAgendadorMateriaPrima } = await import(
+    "@/lib/materias-primas/scheduler"
+  );
+  iniciarAgendadorMateriaPrima();
+
+  const { iniciarMonitoramentoAd } = await import(
+    "@/lib/monitoramento/scheduler-apis"
+  );
+  iniciarMonitoramentoAd();
+}
+
+/*
  * Hook do Next.js (App Router) chamado automaticamente pra
  * QUALQUER erro não tratado em rota de API, Server Component ou
  * Server Action — sem precisar adicionar `try/catch` manual em
