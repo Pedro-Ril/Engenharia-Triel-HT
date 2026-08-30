@@ -14,6 +14,7 @@ import {
   Layers,
   Megaphone,
   Settings,
+  Tv,
   Users,
 } from "lucide-react";
 
@@ -65,6 +66,7 @@ import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
+import { TvCorporativaPainel } from "@/modules/tv-corporativa/components/TvCorporativaPainel";
 
 const toastInicial: ToastState = {
   open: false,
@@ -128,6 +130,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "wiki",
         label: "Wiki",
         icon: <BookOpen size={16} />,
+      },
+      {
+        valor: "tv-corporativa",
+        label: "TV Corporativa",
+        icon: <Tv size={16} />,
       },
     ],
   },
@@ -433,6 +440,10 @@ export function AdminPermissoesPage() {
               }
               onArtigosRecarregados={setWikiArtigos}
             />
+          )}
+
+          {secao === "tv-corporativa" && (
+            <TvCorporativaPainel onFeedback={mostrarFeedback} />
           )}
         </div>
       </div>

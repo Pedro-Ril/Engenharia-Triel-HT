@@ -38,13 +38,26 @@ export function Modal({
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
   const elementoAnteriorRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
 
   const titleId = useId();
   const descriptionId = useId();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- createPortal exige document, que só existe no cliente; evita divergência de hidratação SSR
     setMounted(true);
   }, []);
+
+  /*
+   * onClose quase sempre chega como uma arrow function inline
+   * (`onClose={() => setAlgo(false)}`), recriada a cada render de
+   * quem abriu o modal — inclusive a cada tecla digitada num campo
+   * cujo estado vive no componente pai. Guardar num ref evita que
+   * isso precise entrar nas deps do efeito abaixo.
+   */
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +80,7 @@ export function Modal({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -97,7 +110,7 @@ export function Modal({
       document.removeEventListener("keydown", handleKeyDown);
       elementoAnteriorRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted || !open) {
     return null;

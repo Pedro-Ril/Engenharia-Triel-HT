@@ -34,6 +34,17 @@ const PREFIXOS_PUBLICOS = [
    */
   "/chamados",
   "/api/chamados",
+  /*
+   * TV Corporativa: o terminal (TV física, sem usuário logado) roda
+   * o player em /tv e chama /api/tv/** com um token de dispositivo
+   * próprio (Authorization: Bearer), nunca sessão de usuário — ver
+   * src/lib/tv/terminais.ts (requireTerminalApi). Cobre também as
+   * rotas públicas de download/instalação do agente nativo
+   * (/api/tv/agente/**), chamadas direto do terminal de um mini-PC
+   * recém-formatado, sem nenhuma sessão no portal.
+   */
+  "/tv",
+  "/api/tv",
 ];
 
 export function ehRotaPublica(pathname: string): boolean {

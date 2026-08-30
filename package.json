@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3002",
-    "lint": "eslint"
+    "lint": "eslint",
+    "tv-signaling": "node --env-file=.env tv-signaling/server.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -33,6 +34,7 @@
     "react-dom": "19.2.3",
     "recharts": "^3.8.0",
     "svg2pdf.js": "^2.7.0",
+    "ws": "^8.21.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

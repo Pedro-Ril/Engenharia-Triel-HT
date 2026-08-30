@@ -17,6 +17,11 @@ export async function register() {
     "@/lib/monitoramento/scheduler-apis"
   );
   iniciarMonitoramentoAd();
+
+  const { iniciarSignalingSeNecessario } = await import(
+    "@/lib/tv/signaling-processo"
+  );
+  iniciarSignalingSeNecessario();
 }
 
 /*
