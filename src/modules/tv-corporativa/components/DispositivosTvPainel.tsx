@@ -35,78 +35,28 @@ import {
   parearTerminal,
   revogarTerminal,
 } from "../services/tvCorporativa.service";
+import type { Empresa } from "@/modules/admin-permissoes/types/adminPermissoes.types";
+import { listarEmpresas } from "@/modules/admin-permissoes/services/adminPermissoes.service";
+
 import type { GradeTv, TerminalTv } from "../types/tvCorporativa.types";
+import {
+  estaAgenteOnline,
+  estaOnline,
+  formatarDataHora,
+  formatarTempoRelativo,
+  varianteStatusAgente,
+} from "../utils/statusTerminal";
 import { VisualizacaoAoVivoModal } from "./VisualizacaoAoVivoModal";
 
 interface DispositivosTvPainelProps {
   onFeedback: FeedbackHandler;
 }
 
-/*
- * "Online" = heartbeat dentro de uma janela de tolerância — usa 3x o
- * intervalo configurado do próprio terminal (mínimo 60s), já que
- * cada terminal pode ter um intervalo de atualização diferente,
- * diferente do JANELA_ONLINE_MS fixo de ManutencaoPainel.tsx (que é
- * pra atividade humana, não heartbeat de dispositivo).
- */
-function estaOnline(terminal: TerminalTv): boolean {
-  if (!terminal.ultimoHeartbeatEm || terminal.revogadoEm) return false;
-
-  const janelaMs = Math.max(60, terminal.intervaloAtualizacaoSegundos * 3) * 1000;
-  return Date.now() - new Date(terminal.ultimoHeartbeatEm).getTime() < janelaMs;
-}
-
-/*
- * Sinal de vida do PROCESSO do agente nativo (ver
- * INTERVALO_VERIFICAR_CONFIG_MS em tv-agente/agente.mjs, hoje 5min) —
- * independente do heartbeat do navegador acima: um terminal rodando
- * direto no navegador (sem agente) nunca preenche isso, por isso
- * `agenteUltimaVerificacaoEm` null é tratado à parte, não como
- * "offline".
- */
-const AGENTE_INTERVALO_VERIFICACAO_MS = 5 * 60 * 1000;
-
-function estaAgenteOnline(terminal: TerminalTv): boolean {
-  if (!terminal.agenteUltimaVerificacaoEm || terminal.revogadoEm) return false;
-
-  const janelaMs = AGENTE_INTERVALO_VERIFICACAO_MS * 3;
-  return Date.now() - new Date(terminal.agenteUltimaVerificacaoEm).getTime() < janelaMs;
-}
-
-/*
- * variant da badge de status do agente: verde só quando online E
- * atualizado, laranja quando online mas com uma versão antiga do
- * script (agenteAtualizado === false — null significa "nunca
- * reportou hash", tratado como se estivesse em dia), vermelho quando
- * offline — segue o mesmo padrão de cor (verde/laranja/vermelho) já
- * usado em Badge pros outros status do portal.
- */
-function varianteStatusAgente(terminal: TerminalTv): "success" | "warning" | "danger" {
-  if (!estaAgenteOnline(terminal)) return "danger";
-  return terminal.agenteAtualizado === false ? "warning" : "success";
-}
-
-function formatarDataHora(dataIso: string): string {
-  return new Date(dataIso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" });
-}
-
-function formatarTempoRelativo(dataIso: string): string {
-  const diffMs = Date.now() - new Date(dataIso).getTime();
-  const diffMinutos = Math.floor(diffMs / 60000);
-
-  if (diffMinutos < 1) return "agora há pouco";
-  if (diffMinutos < 60) return `há ${diffMinutos} min`;
-
-  const diffHoras = Math.floor(diffMinutos / 60);
-  if (diffHoras < 24) return `há ${diffHoras}h`;
-
-  return `há ${Math.floor(diffHoras / 24)} dias`;
-}
-
 export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) {
   const [carregando, setCarregando] = useState(true);
   const [terminais, setTerminais] = useState<TerminalTv[]>([]);
   const [grades, setGrades] = useState<GradeTv[]>([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
   const [pareamentoAberto, setPareamentoAberto] = useState(false);
   const [codigoDigitado, setCodigoDigitado] = useState("");
@@ -127,9 +77,14 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
   const [enviandoComandoId, setEnviandoComandoId] = useState<string | null>(null);
 
   async function carregarTudo() {
-    const [listaTerminais, listaGrades] = await Promise.all([listarTerminais(), listarGrades()]);
+    const [listaTerminais, listaGrades, listaEmpresas] = await Promise.all([
+      listarTerminais(),
+      listarGrades(),
+      listarEmpresas(),
+    ]);
     setTerminais(listaTerminais);
     setGrades(listaGrades);
+    setEmpresas(listaEmpresas);
   }
 
   useEffect(() => {
@@ -226,6 +181,26 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
         onFeedback(
           "danger",
           "Não foi possível atribuir a grade",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
+  async function handleAlterarEmpresa(terminal: TerminalTv, empresa: string) {
+    setSalvandoId(terminal.id);
+
+    try {
+      const resultado = await atualizarTerminal(terminal.id, { empresa: empresa || null });
+
+      if (resultado.ok) {
+        await carregarTudo();
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível vincular a empresa",
           resultado.message ?? "Tente novamente em instantes."
         );
       }
@@ -336,9 +311,16 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
     ...grades.map((grade) => ({ value: grade.id, label: grade.nome })),
   ];
 
+  const opcoesEmpresa = [
+    { value: "", label: "Nenhuma" },
+    ...empresas
+      .filter((empresa) => empresa.codigo)
+      .map((empresa) => ({ value: empresa.codigo as string, label: empresa.nome })),
+  ];
+
   return (
     <Card
-      title="Terminais"
+      title="Dispositivos"
       description="TVs pareadas com o portal — cada uma exibe a grade de programação atribuída."
       actions={
         <Stack direction="row" gap={8}>
@@ -357,12 +339,13 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
           description='Abra o player (/tv) numa TV e clique em "Parear terminal" com o código exibido na tela.'
         />
       ) : (
-        <Table minWidth={1080}>
+        <Table minWidth={1180}>
           <TableHead>
             <TableRow>
               <TableHeaderCell align="center">Status</TableHeaderCell>
               <TableHeaderCell>Nome</TableHeaderCell>
               <TableHeaderCell>Grade atribuída</TableHeaderCell>
+              <TableHeaderCell>Empresa</TableHeaderCell>
               <TableHeaderCell align="center">Intervalo (s)</TableHeaderCell>
               <TableHeaderCell>Página inicial</TableHeaderCell>
               <TableHeaderCell>Última atividade</TableHeaderCell>
@@ -393,28 +376,40 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
                     />
                   </TableCell>
 
-                  <TableCell align="center">
-                    <NumberInput
-                      value={String(terminal.intervaloAtualizacaoSegundos)}
-                      min={5}
-                      onChange={(event) => handleAlterarIntervalo(terminal, event.target.value)}
-                      disabled={salvandoId === terminal.id}
+                  <TableCell>
+                    <Dropdown
+                      value={terminal.empresa ?? ""}
+                      options={opcoesEmpresa}
+                      onValueChange={(valor) => handleAlterarEmpresa(terminal, valor)}
                     />
                   </TableCell>
 
+                  <TableCell align="center">
+                    <div style={{ width: 90, margin: "0 auto" }}>
+                      <NumberInput
+                        value={String(terminal.intervaloAtualizacaoSegundos)}
+                        min={5}
+                        onChange={(event) => handleAlterarIntervalo(terminal, event.target.value)}
+                        disabled={salvandoId === terminal.id}
+                      />
+                    </div>
+                  </TableCell>
+
                   <TableCell>
-                    <Input
-                      value={valorCaminho(terminal)}
-                      placeholder="/tv"
-                      onChange={(event) =>
-                        setCaminhoEditando((atual) => ({
-                          ...atual,
-                          [terminal.id]: event.target.value,
-                        }))
-                      }
-                      onBlur={() => handleSalvarCaminho(terminal)}
-                      disabled={salvandoId === terminal.id}
-                    />
+                    <div style={{ width: 120 }}>
+                      <Input
+                        value={valorCaminho(terminal)}
+                        placeholder="/tv"
+                        onChange={(event) =>
+                          setCaminhoEditando((atual) => ({
+                            ...atual,
+                            [terminal.id]: event.target.value,
+                          }))
+                        }
+                        onBlur={() => handleSalvarCaminho(terminal)}
+                        disabled={salvandoId === terminal.id}
+                      />
+                    </div>
                   </TableCell>
 
                   <TableCell>

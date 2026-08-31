@@ -1,0 +1,78 @@
+.filtroPasta {
+  max-width: 260px;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.item:hover {
+  border-color: var(--primary-ring);
+}
+
+.itemThumbBotao {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+
+.itemBotaoPreview {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+.itemThumb {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-page);
+  color: var(--text-faint);
+  overflow: hidden;
+}
+
+.itemThumb img,
+.itemThumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.itemNome {
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.previewGrande {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 200px;
+  padding: 8px;
+}

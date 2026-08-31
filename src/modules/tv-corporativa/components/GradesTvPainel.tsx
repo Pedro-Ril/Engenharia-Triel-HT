@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -12,19 +12,18 @@ import {
 import type { DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
+  horizontalListSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, FileText, Globe, Plus, Trash2, Video } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Drawer } from "@/components/ui/Drawer";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
@@ -60,6 +59,8 @@ import type {
   MidiaTv,
   TipoConteudoTv,
 } from "../types/tvCorporativa.types";
+import styles from "./GradesTvPainel.module.css";
+import { SeletorMidiaModal } from "./SeletorMidiaModal";
 
 interface GradesTvPainelProps {
   onFeedback: FeedbackHandler;
@@ -71,6 +72,16 @@ interface ItemEditavel {
   midiaId: string | null;
   urlPaginaWeb: string;
   duracaoSegundos: number;
+  /*
+   * Agendamento próprio do item, opcional — "todos"/00:00-23:59
+   * (padrão de novoItem()) significa "sem restrição além da janela do
+   * slot"; um item pode ser restringido pra só aparecer em dias/horas
+   * específicos DENTRO da janela do slot (ver estaNaJanela em
+   * src/lib/tv/grades.ts).
+   */
+  diasSemana: string;
+  horaInicio: string;
+  horaFim: string;
 }
 
 interface SlotEditavel {
@@ -80,6 +91,12 @@ interface SlotEditavel {
   horaInicio: string;
   horaFim: string;
   itens: ItemEditavel[];
+}
+
+interface PreviewConteudo {
+  tipoConteudo: TipoConteudoTv;
+  midia: MidiaTv | null;
+  urlPaginaWeb: string;
 }
 
 const DIAS = [
@@ -99,6 +116,36 @@ const OPCOES_TIPO_CONTEUDO = [
   { value: "pagina_web", label: "Página web" },
 ];
 
+function formatarDuracaoHMS(totalSegundos: number): string {
+  const h = Math.floor(totalSegundos / 3600);
+  const m = Math.floor((totalSegundos % 3600) / 60);
+  const s = totalSegundos % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function resumoAgendaItem(diasSemana: string, horaInicio: string, horaFim: string): string {
+  const semRestricao = diasSemana === "todos" && horaInicio === "00:00" && horaFim === "23:59";
+  if (semRestricao) return "Todo dia";
+
+  const diasTexto =
+    diasSemana === "todos"
+      ? "Todo dia"
+      : diasSemana
+          .split(",")
+          .map((d) => DIAS.find((dia) => dia.valor === Number(d))?.label ?? d)
+          .join(", ");
+
+  return `${diasTexto}, ${horaInicio}–${horaFim}`;
+}
+
+function IconeTipoConteudo({ tipo }: { tipo: TipoConteudoTv }) {
+  if (tipo === "video") return <Video size={28} />;
+  if (tipo === "documento") return <FileText size={28} />;
+  if (tipo === "pagina_web") return <Globe size={28} />;
+  return <FileText size={28} />;
+}
+
 function novoItem(): ItemEditavel {
   return {
     chave: crypto.randomUUID(),
@@ -106,6 +153,9 @@ function novoItem(): ItemEditavel {
     midiaId: null,
     urlPaginaWeb: "",
     duracaoSegundos: 15,
+    diasSemana: "todos",
+    horaInicio: "00:00",
+    horaFim: "23:59",
   };
 }
 
@@ -120,20 +170,30 @@ function novoSlot(): SlotEditavel {
   };
 }
 
-function ItemPlaylistLinha({
+function ItemPlaylistCard({
   item,
   midias,
+  tempoInicioAcumulado,
   onAlterar,
   onRemover,
+  onDuplicar,
+  onInserirAntes,
+  onPreview,
 }: {
   item: ItemEditavel;
   midias: MidiaTv[];
+  tempoInicioAcumulado: number;
   onAlterar: (item: ItemEditavel) => void;
   onRemover: () => void;
+  onDuplicar: () => void;
+  onInserirAntes: () => void;
+  onPreview: (conteudo: PreviewConteudo) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.chave,
   });
+  const [seletorAberto, setSeletorAberto] = useState(false);
+  const [agendaAberta, setAgendaAberta] = useState(false);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -141,101 +201,167 @@ function ItemPlaylistLinha({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const midiasDoTipo = midias.filter((midia) => midia.tipo === item.tipoConteudo);
+  const midiaSelecionada = midias.find((midia) => midia.id === item.midiaId) ?? null;
+  const temConteudoPreview = midiaSelecionada !== null || item.urlPaginaWeb.trim() !== "";
+
+  function abrirPreview() {
+    onPreview({ tipoConteudo: item.tipoConteudo, midia: midiaSelecionada, urlPaginaWeb: item.urlPaginaWeb });
+  }
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <Stack direction="row" gap={10} align="center" wrap>
+    <div ref={setNodeRef} style={style} className={styles.card}>
+      <div className={styles.cardHeader} {...attributes} {...listeners}>
         <IconButton
-          icon={<GripVertical size={15} />}
-          label="Arrastar pra reordenar"
-          size="small"
-          variant="neutral"
-          {...attributes}
-          {...listeners}
-        />
-
-        <div style={{ width: 150 }}>
-          <Dropdown
-            value={item.tipoConteudo}
-            options={OPCOES_TIPO_CONTEUDO}
-            onValueChange={(valor) =>
-              onAlterar({
-                ...item,
-                tipoConteudo: valor as TipoConteudoTv,
-                midiaId: null,
-                urlPaginaWeb: "",
-              })
-            }
-          />
-        </div>
-
-        {item.tipoConteudo === "pagina_web" ? (
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <Input
-              value={item.urlPaginaWeb}
-              placeholder="https://..."
-              onChange={(event) => onAlterar({ ...item, urlPaginaWeb: event.target.value })}
-            />
-          </div>
-        ) : (
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <Dropdown
-              value={item.midiaId ?? ""}
-              options={[
-                { value: "", label: "Selecione uma mídia..." },
-                ...midiasDoTipo.map((midia) => ({ value: midia.id, label: midia.nomeOriginal })),
-              ]}
-              onValueChange={(valor) => onAlterar({ ...item, midiaId: valor || null })}
-            />
-          </div>
-        )}
-
-        <div style={{ width: 110 }}>
-          <NumberInput
-            value={String(item.duracaoSegundos)}
-            min={1}
-            suffix="s"
-            onChange={(event) =>
-              onAlterar({ ...item, duracaoSegundos: Number(event.target.value) || 1 })
-            }
-          />
-        </div>
-
-        <IconButton
-          icon={<Trash2 size={15} />}
+          icon={<Trash2 size={13} />}
           label="Remover item"
           size="small"
           variant="danger"
           onClick={onRemover}
         />
-      </Stack>
+        <IconButton
+          icon={<Copy size={13} />}
+          label="Duplicar item"
+          size="small"
+          variant="neutral"
+          onClick={onDuplicar}
+        />
+        <button type="button" className={styles.inserirAntes} onClick={onInserirAntes}>
+          <Plus size={12} />
+          Inserir à frente
+        </button>
+      </div>
+
+      <button
+        type="button"
+        className={styles.thumb}
+        onClick={abrirPreview}
+        disabled={!temConteudoPreview}
+        title={temConteudoPreview ? "Visualizar" : undefined}
+      >
+        {item.tipoConteudo === "foto" && midiaSelecionada ? (
+          // eslint-disable-next-line @next/next/no-img-element -- miniatura de mídia vinda de disco, não do pipeline de otimização do Next
+          <img src={`/api/tv/midias/${midiaSelecionada.id}/arquivo`} alt="" />
+        ) : (
+          <IconeTipoConteudo tipo={item.tipoConteudo} />
+        )}
+      </button>
+
+      <div className={styles.corpo}>
+        <Dropdown
+          value={item.tipoConteudo}
+          options={OPCOES_TIPO_CONTEUDO}
+          onValueChange={(valor) =>
+            onAlterar({
+              ...item,
+              tipoConteudo: valor as TipoConteudoTv,
+              midiaId: null,
+              urlPaginaWeb: "",
+            })
+          }
+        />
+
+        {item.tipoConteudo === "pagina_web" ? (
+          <Input
+            value={item.urlPaginaWeb}
+            placeholder="https://..."
+            onChange={(event) => onAlterar({ ...item, urlPaginaWeb: event.target.value })}
+          />
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => setSeletorAberto(true)}>
+              {midiaSelecionada ? "Trocar mídia" : "Selecionar mídia..."}
+            </Button>
+            <SeletorMidiaModal
+              open={seletorAberto}
+              tipo={item.tipoConteudo}
+              midias={midias}
+              onClose={() => setSeletorAberto(false)}
+              onSelecionar={(midiaId) => {
+                onAlterar({ ...item, midiaId });
+                setSeletorAberto(false);
+              }}
+            />
+          </>
+        )}
+
+        <span className={styles.labelPeriodo}>Duração</span>
+        <NumberInput
+          value={String(item.duracaoSegundos)}
+          min={1}
+          suffix="s"
+          onChange={(event) =>
+            onAlterar({ ...item, duracaoSegundos: Number(event.target.value) || 1 })
+          }
+        />
+
+        <button
+          type="button"
+          className={styles.botaoPeriodoExibicao}
+          onClick={() => setAgendaAberta(true)}
+        >
+          Período de exibição: {resumoAgendaItem(item.diasSemana, item.horaInicio, item.horaFim)}
+        </button>
+
+        <Modal
+          open={agendaAberta}
+          onClose={() => setAgendaAberta(false)}
+          title="Período de exibição do item"
+          description="Restringe esse item a só aparecer em dias/horários específicos, dentro da janela do slot."
+          size="small"
+        >
+          <Stack gap={16}>
+            <CampoDiasHorario
+              diasSemana={item.diasSemana}
+              horaInicio={item.horaInicio}
+              horaFim={item.horaFim}
+              idPrefix={`item-${item.chave}`}
+              onAlterarDias={(dias) => onAlterar({ ...item, diasSemana: dias })}
+              onAlterarHoraInicio={(hora) => onAlterar({ ...item, horaInicio: hora })}
+              onAlterarHoraFim={(hora) => onAlterar({ ...item, horaFim: hora })}
+            />
+            <Stack direction="row" justify="end">
+              <Button onClick={() => setAgendaAberta(false)}>Concluído</Button>
+            </Stack>
+          </Stack>
+        </Modal>
+
+        <span className={styles.nomeArquivo} title={midiaSelecionada?.nomeOriginal}>
+          {midiaSelecionada?.nomeOriginal ?? (item.tipoConteudo === "pagina_web" ? "Página web" : "—")}
+        </span>
+      </div>
+
+      <div className={styles.barraTempo}>{formatarDuracaoHMS(tempoInicioAcumulado)}</div>
     </div>
   );
 }
 
-function SlotEditor({
-  slot,
-  midias,
-  onAlterar,
-  onRemover,
+/*
+ * Dias da semana + hora início/fim — mesmo controle usado tanto pela
+ * janela do slot (dia/horário em que ele vale) quanto, opcionalmente,
+ * por um item específico dentro dele (ver ItemPlaylistCard).
+ */
+function CampoDiasHorario({
+  diasSemana,
+  horaInicio,
+  horaFim,
+  idPrefix,
+  onAlterarDias,
+  onAlterarHoraInicio,
+  onAlterarHoraFim,
 }: {
-  slot: SlotEditavel;
-  midias: MidiaTv[];
-  onAlterar: (slot: SlotEditavel) => void;
-  onRemover: () => void;
+  diasSemana: string;
+  horaInicio: string;
+  horaFim: string;
+  idPrefix: string;
+  onAlterarDias: (dias: string) => void;
+  onAlterarHoraInicio: (hora: string) => void;
+  onAlterarHoraFim: (hora: string) => void;
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  const diasSelecionados =
-    slot.diasSemana === "todos" ? [] : slot.diasSemana.split(",").map(Number);
+  const diasSelecionados = diasSemana === "todos" ? [] : diasSemana.split(",").map(Number);
 
   function alternarDia(dia: number) {
-    if (slot.diasSemana === "todos") {
-      onAlterar({ ...slot, diasSemana: String(dia) });
+    if (diasSemana === "todos") {
+      onAlterarDias(String(dia));
       return;
     }
 
@@ -244,11 +370,72 @@ function SlotEditor({
       ? diasSelecionados.filter((d) => d !== dia)
       : [...diasSelecionados, dia].sort();
 
-    onAlterar({
-      ...slot,
-      diasSemana: novaLista.length > 0 ? novaLista.join(",") : String(dia),
-    });
+    onAlterarDias(novaLista.length > 0 ? novaLista.join(",") : String(dia));
   }
+
+  return (
+    <Stack gap={16}>
+      <Field label="Dias da semana">
+        <Stack direction="row" gap={6} wrap>
+          <Switch
+            compact
+            label="Todos os dias"
+            checked={diasSemana === "todos"}
+            onChange={(event) => onAlterarDias(event.target.checked ? "todos" : "1,2,3,4,5")}
+          />
+          {diasSemana !== "todos" &&
+            DIAS.map((dia) => (
+              <Button
+                key={dia.valor}
+                type="button"
+                variant={diasSelecionados.includes(dia.valor) ? "primary" : "secondary"}
+                onClick={() => alternarDia(dia.valor)}
+              >
+                {dia.label}
+              </Button>
+            ))}
+        </Stack>
+      </Field>
+
+      <Stack direction="row" gap={16}>
+        <Field label="Hora início" htmlFor={`${idPrefix}-inicio`}>
+          <input
+            id={`${idPrefix}-inicio`}
+            type="time"
+            value={horaInicio}
+            onChange={(event) => onAlterarHoraInicio(event.target.value)}
+          />
+        </Field>
+        <Field label="Hora fim" htmlFor={`${idPrefix}-fim`}>
+          <input
+            id={`${idPrefix}-fim`}
+            type="time"
+            value={horaFim}
+            onChange={(event) => onAlterarHoraFim(event.target.value)}
+          />
+        </Field>
+      </Stack>
+    </Stack>
+  );
+}
+
+function SlotEditor({
+  slot,
+  midias,
+  onAlterar,
+  onRemover,
+  onPreview,
+}: {
+  slot: SlotEditavel;
+  midias: MidiaTv[];
+  onAlterar: (slot: SlotEditavel) => void;
+  onRemover: () => void;
+  onPreview: (conteudo: PreviewConteudo) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -259,6 +446,21 @@ function SlotEditor({
 
     onAlterar({ ...slot, itens: arrayMove(slot.itens, oldIndex, newIndex) });
   }
+
+  function handleDuplicarItem(indice: number) {
+    const copia: ItemEditavel = { ...slot.itens[indice], chave: crypto.randomUUID() };
+    const novaLista = [...slot.itens];
+    novaLista.splice(indice + 1, 0, copia);
+    onAlterar({ ...slot, itens: novaLista });
+  }
+
+  function handleInserirAntes(indice: number) {
+    const novaLista = [...slot.itens];
+    novaLista.splice(indice, 0, novoItem());
+    onAlterar({ ...slot, itens: novaLista });
+  }
+
+  const duracaoTotalSegundos = slot.itens.reduce((soma, item) => soma + item.duracaoSegundos, 0);
 
   return (
     <Card
@@ -283,51 +485,26 @@ function SlotEditor({
           />
         </Field>
 
-        <Field label="Dias da semana">
-          <Stack direction="row" gap={6} wrap>
-            <Switch
-              compact
-              label="Todos os dias"
-              checked={slot.diasSemana === "todos"}
-              onChange={(event) =>
-                onAlterar({ ...slot, diasSemana: event.target.checked ? "todos" : "1,2,3,4,5" })
-              }
-            />
-            {slot.diasSemana !== "todos" &&
-              DIAS.map((dia) => (
-                <Button
-                  key={dia.valor}
-                  type="button"
-                  variant={diasSelecionados.includes(dia.valor) ? "primary" : "secondary"}
-                  onClick={() => alternarDia(dia.valor)}
-                >
-                  {dia.label}
-                </Button>
-              ))}
-          </Stack>
-        </Field>
-
-        <Stack direction="row" gap={16}>
-          <Field label="Hora início" htmlFor={`slot-inicio-${slot.chave}`}>
-            <input
-              id={`slot-inicio-${slot.chave}`}
-              type="time"
-              value={slot.horaInicio}
-              onChange={(event) => onAlterar({ ...slot, horaInicio: event.target.value })}
-            />
-          </Field>
-          <Field label="Hora fim" htmlFor={`slot-fim-${slot.chave}`}>
-            <input
-              id={`slot-fim-${slot.chave}`}
-              type="time"
-              value={slot.horaFim}
-              onChange={(event) => onAlterar({ ...slot, horaFim: event.target.value })}
-            />
-          </Field>
-        </Stack>
+        <CampoDiasHorario
+          diasSemana={slot.diasSemana}
+          horaInicio={slot.horaInicio}
+          horaFim={slot.horaFim}
+          idPrefix={`slot-${slot.chave}`}
+          onAlterarDias={(dias) => onAlterar({ ...slot, diasSemana: dias })}
+          onAlterarHoraInicio={(hora) => onAlterar({ ...slot, horaInicio: hora })}
+          onAlterarHoraFim={(hora) => onAlterar({ ...slot, horaFim: hora })}
+        />
 
         <Field label="Playlist">
           <Stack gap={10}>
+            <div className={styles.cabecalhoComposicao}>
+              <span>Composição da grade de programação.</span>
+              <span>
+                Total: <strong>{slot.itens.length}</strong> mídias adicionadas, tempo total:{" "}
+                <strong>{formatarDuracaoHMS(duracaoTotalSegundos)}</strong>
+              </span>
+            </div>
+
             {slot.itens.length === 0 ? (
               <EmptyState
                 icon={<Plus size={20} />}
@@ -342,14 +519,17 @@ function SlotEditor({
               >
                 <SortableContext
                   items={slot.itens.map((item) => item.chave)}
-                  strategy={verticalListSortingStrategy}
+                  strategy={horizontalListSortingStrategy}
                 >
-                  <Stack gap={8}>
-                    {slot.itens.map((item) => (
-                      <ItemPlaylistLinha
+                  <div className={styles.tiraCards}>
+                    {slot.itens.map((item, indice) => (
+                      <ItemPlaylistCard
                         key={item.chave}
                         item={item}
                         midias={midias}
+                        tempoInicioAcumulado={slot.itens
+                          .slice(0, indice)
+                          .reduce((soma, i) => soma + i.duracaoSegundos, 0)}
                         onAlterar={(novoItemValor) =>
                           onAlterar({
                             ...slot,
@@ -364,9 +544,12 @@ function SlotEditor({
                             itens: slot.itens.filter((i) => i.chave !== item.chave),
                           })
                         }
+                        onDuplicar={() => handleDuplicarItem(indice)}
+                        onInserirAntes={() => handleInserirAntes(indice)}
+                        onPreview={onPreview}
                       />
                     ))}
-                  </Stack>
+                  </div>
                 </SortableContext>
               </DndContext>
             )}
@@ -399,12 +582,12 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
   const [gradeParaExcluir, setGradeParaExcluir] = useState<GradeTv | null>(null);
   const [excluindo, setExcluindo] = useState(false);
 
-  const [editorAberto, setEditorAberto] = useState(false);
   const [gradeEmEdicaoId, setGradeEmEdicaoId] = useState<string | null>(null);
   const [nomeEdicao, setNomeEdicao] = useState("");
   const [ativaEdicao, setAtivaEdicao] = useState(true);
   const [slots, setSlots] = useState<SlotEditavel[]>([]);
   const [salvando, setSalvando] = useState(false);
+  const [preview, setPreview] = useState<PreviewConteudo | null>(null);
 
   async function carregarListas() {
     const [listaGrades, listaMidias] = await Promise.all([listarGrades(), listarMidias()]);
@@ -451,11 +634,16 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
     }
   }
 
-  async function handleAbrirEditor(grade: GradeTv) {
+  async function handleAlternarEdicao(grade: GradeTv) {
+    if (gradeEmEdicaoId === grade.id) {
+      setGradeEmEdicaoId(null);
+      return;
+    }
+
     setGradeEmEdicaoId(grade.id);
     setNomeEdicao(grade.nome);
     setAtivaEdicao(grade.ativa);
-    setEditorAberto(true);
+    setSlots([]);
 
     const detalhe: GradeComSlots | null = await buscarGrade(grade.id);
 
@@ -472,6 +660,9 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
           midiaId: item.midiaId,
           urlPaginaWeb: item.urlPaginaWeb ?? "",
           duracaoSegundos: item.duracaoSegundos,
+          diasSemana: item.diasSemana,
+          horaInicio: item.horaInicio.slice(0, 5),
+          horaFim: item.horaFim.slice(0, 5),
         })),
       }))
     );
@@ -512,13 +703,16 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
             urlPaginaWeb: item.tipoConteudo === "pagina_web" ? item.urlPaginaWeb.trim() : null,
             duracaoSegundos: item.duracaoSegundos,
             ordem: indiceItem,
+            diasSemana: item.diasSemana,
+            horaInicio: item.horaInicio,
+            horaFim: item.horaFim,
           })),
         }))
       );
 
       if (slotsResultado.ok) {
         onFeedback("success", "Grade salva", "A programação foi salva.");
-        setEditorAberto(false);
+        setGradeEmEdicaoId(null);
         await carregarListas();
       } else {
         onFeedback(
@@ -578,33 +772,104 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {grades.map((grade) => (
-              <TableRow key={grade.id}>
-                <TableCell>{grade.nome}</TableCell>
-                <TableCell align="center">
-                  <Badge variant={grade.ativa ? "success" : "neutral"}>
-                    {grade.ativa ? "Ativa" : "Inativa"}
-                  </Badge>
-                </TableCell>
-                <TableCell align="center">
-                  <Stack direction="row" justify="center" gap={4}>
-                    <IconButton
-                      icon={<Pencil size={15} />}
-                      label="Editar grade"
-                      size="small"
-                      onClick={() => handleAbrirEditor(grade)}
-                    />
-                    <IconButton
-                      icon={<Trash2 size={15} />}
-                      label="Excluir grade"
-                      size="small"
-                      variant="danger"
-                      onClick={() => setGradeParaExcluir(grade)}
-                    />
-                  </Stack>
-                </TableCell>
-              </TableRow>
-            ))}
+            {grades.map((grade) => {
+              const expandida = gradeEmEdicaoId === grade.id;
+
+              return (
+                <Fragment key={grade.id}>
+                  <TableRow>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className={styles.linhaClicavel}
+                        onClick={() => handleAlternarEdicao(grade)}
+                      >
+                        {expandida ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                        {grade.nome}
+                      </button>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Badge variant={grade.ativa ? "success" : "neutral"}>
+                        {grade.ativa ? "Ativa" : "Inativa"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        icon={<Trash2 size={15} />}
+                        label="Excluir grade"
+                        size="small"
+                        variant="danger"
+                        onClick={() => setGradeParaExcluir(grade)}
+                      />
+                    </TableCell>
+                  </TableRow>
+
+                  {expandida && (
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <Stack gap={20}>
+                          <Stack direction="row" gap={16} align="end">
+                            <div style={{ flex: 1 }}>
+                              <Field label="Nome da grade" htmlFor="tv-editar-grade-nome">
+                                <Input
+                                  id="tv-editar-grade-nome"
+                                  value={nomeEdicao}
+                                  onChange={(event) => setNomeEdicao(event.target.value)}
+                                />
+                              </Field>
+                            </div>
+                            <Field label="Status">
+                              <Switch
+                                compact
+                                label="Ativa"
+                                checked={ativaEdicao}
+                                onChange={(event) => setAtivaEdicao(event.target.checked)}
+                              />
+                            </Field>
+                          </Stack>
+
+                          {slots.map((slot) => (
+                            <SlotEditor
+                              key={slot.chave}
+                              slot={slot}
+                              midias={midias}
+                              onPreview={setPreview}
+                              onAlterar={(novoSlotValor) =>
+                                setSlots((atual) =>
+                                  atual.map((s) => (s.chave === slot.chave ? novoSlotValor : s))
+                                )
+                              }
+                              onRemover={() =>
+                                setSlots((atual) => atual.filter((s) => s.chave !== slot.chave))
+                              }
+                            />
+                          ))}
+
+                          <Stack direction="row" justify="end">
+                            <Button
+                              variant="secondary"
+                              onClick={() => setSlots((atual) => [...atual, novoSlot()])}
+                            >
+                              <Plus size={15} />
+                              Adicionar slot
+                            </Button>
+                          </Stack>
+
+                          <Stack direction="row" justify="end" gap={8}>
+                            <Button variant="secondary" onClick={() => setGradeEmEdicaoId(null)}>
+                              Cancelar
+                            </Button>
+                            <Button onClick={handleSalvarEdicao} loading={salvando}>
+                              Salvar
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              );
+            })}
           </TableBody>
         </Table>
       )}
@@ -631,65 +896,50 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
         </Stack>
       </Modal>
 
-      <Drawer
-        open={editorAberto}
-        onClose={() => setEditorAberto(false)}
-        title={nomeEdicao || "Editar grade"}
-        description="Configure os slots (janelas de dia/horário) e a playlist de cada um."
+      <Modal
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+        title="Pré-visualização"
         size="large"
-        footer={
-          <Stack direction="row" justify="end" gap={8}>
-            <Button variant="secondary" onClick={() => setEditorAberto(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSalvarEdicao} loading={salvando}>
-              Salvar
-            </Button>
-          </Stack>
-        }
       >
-        <Stack gap={20}>
-          <Stack direction="row" gap={16} align="end">
-            <div style={{ flex: 1 }}>
-              <Field label="Nome da grade" htmlFor="tv-editar-grade-nome">
-                <Input
-                  id="tv-editar-grade-nome"
-                  value={nomeEdicao}
-                  onChange={(event) => setNomeEdicao(event.target.value)}
-                />
-              </Field>
-            </div>
-            <Switch
-              label="Ativa"
-              checked={ativaEdicao}
-              onChange={(event) => setAtivaEdicao(event.target.checked)}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+          {preview?.tipoConteudo === "foto" && preview.midia && (
+            // eslint-disable-next-line @next/next/no-img-element -- preview de mídia vinda de disco, não do pipeline de otimização do Next
+            <img
+              src={`/api/tv/midias/${preview.midia.id}/arquivo`}
+              alt=""
+              style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 8 }}
             />
-          </Stack>
-
-          {slots.map((slot) => (
-            <SlotEditor
-              key={slot.chave}
-              slot={slot}
-              midias={midias}
-              onAlterar={(novoSlotValor) =>
-                setSlots((atual) =>
-                  atual.map((s) => (s.chave === slot.chave ? novoSlotValor : s))
-                )
-              }
-              onRemover={() =>
-                setSlots((atual) => atual.filter((s) => s.chave !== slot.chave))
-              }
+          )}
+          {preview?.tipoConteudo === "video" && preview.midia && (
+            <video
+              src={`/api/tv/midias/${preview.midia.id}/arquivo`}
+              controls
+              autoPlay
+              style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 8 }}
             />
-          ))}
-
-          <Stack direction="row" justify="end">
-            <Button variant="secondary" onClick={() => setSlots((atual) => [...atual, novoSlot()])}>
-              <Plus size={15} />
-              Adicionar slot
-            </Button>
-          </Stack>
-        </Stack>
-      </Drawer>
+          )}
+          {preview?.tipoConteudo === "documento" && preview.midia && (
+            <iframe
+              src={`/api/tv/midias/${preview.midia.id}/arquivo`}
+              title="Documento"
+              style={{ width: "100%", height: "70vh", border: "none", borderRadius: 8 }}
+            />
+          )}
+          {preview?.tipoConteudo === "pagina_web" && preview.urlPaginaWeb.trim() && (
+            <iframe
+              src={preview.urlPaginaWeb}
+              title="Página web"
+              style={{ width: "100%", height: "70vh", border: "none", borderRadius: 8 }}
+            />
+          )}
+          {preview &&
+            ((preview.tipoConteudo !== "pagina_web" && !preview.midia) ||
+              (preview.tipoConteudo === "pagina_web" && !preview.urlPaginaWeb.trim())) && (
+              <p>Nenhum conteúdo selecionado ainda pra este item.</p>
+            )}
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={gradeParaExcluir !== null}

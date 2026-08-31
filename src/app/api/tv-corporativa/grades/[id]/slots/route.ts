@@ -24,7 +24,8 @@ function validarItem(valor: unknown, indiceSlot: number, indiceItem: number) {
     throw new ValidationError(`Item ${indiceItem + 1} do slot ${indiceSlot + 1} é inválido.`);
   }
 
-  const { tipoConteudo, midiaId, urlPaginaWeb, duracaoSegundos, ordem } = valor;
+  const { tipoConteudo, midiaId, urlPaginaWeb, duracaoSegundos, ordem, diasSemana, horaInicio, horaFim } =
+    valor;
 
   if (typeof tipoConteudo !== "string" || !TIPOS_CONTEUDO.includes(tipoConteudo)) {
     throw new ValidationError(
@@ -50,12 +51,33 @@ function validarItem(valor: unknown, indiceSlot: number, indiceItem: number) {
     );
   }
 
+  if (diasSemana !== undefined && (typeof diasSemana !== "string" || !diasSemana.trim())) {
+    throw new ValidationError(
+      `Dias da semana inválidos no item ${indiceItem + 1} do slot ${indiceSlot + 1}.`
+    );
+  }
+
+  if (horaInicio !== undefined && (typeof horaInicio !== "string" || !horaPattern.test(horaInicio))) {
+    throw new ValidationError(
+      `Hora de início inválida no item ${indiceItem + 1} do slot ${indiceSlot + 1}.`
+    );
+  }
+
+  if (horaFim !== undefined && (typeof horaFim !== "string" || !horaPattern.test(horaFim))) {
+    throw new ValidationError(
+      `Hora de fim inválida no item ${indiceItem + 1} do slot ${indiceSlot + 1}.`
+    );
+  }
+
   return {
     tipoConteudo: tipoConteudo as ItemSlotTv["tipoConteudo"],
     midiaId: tipoConteudo === "pagina_web" ? null : (midiaId as string),
     urlPaginaWeb: tipoConteudo === "pagina_web" ? (urlPaginaWeb as string).trim() : null,
     duracaoSegundos: Math.round(duracaoSegundos),
     ordem: typeof ordem === "number" ? ordem : indiceItem,
+    diasSemana: typeof diasSemana === "string" ? diasSemana.trim() : "todos",
+    horaInicio: typeof horaInicio === "string" ? horaInicio : "00:00:00",
+    horaFim: typeof horaFim === "string" ? horaFim : "23:59:59",
   };
 }
 

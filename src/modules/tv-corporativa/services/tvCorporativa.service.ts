@@ -49,6 +49,7 @@ export async function atualizarTerminal(
     intervaloAtualizacaoSegundos?: number;
     gradeId?: string | null;
     caminhoInicial?: string | null;
+    empresa?: string | null;
   }
 ): Promise<ApiEnvelope<TerminalTv>> {
   const response = await fetch(`/api/admin/tv/terminais/${id}`, {
@@ -87,6 +88,51 @@ export async function visualizarTerminal(
   id: string
 ): Promise<ApiEnvelope<{ signalingUrl: string; token: string }>> {
   const response = await fetch(`/api/admin/tv/terminais/${id}/visualizar`, { method: "POST" });
+  return parseResponse(response);
+}
+
+/*
+ * Terminais — versão restrita (/tv-corporativa, não-admin), só os da
+ * própria empresa do usuário: listar, trocar grade e atualizar agente
+ * (ver src/app/api/tv-corporativa/terminais/**). Sem reiniciar
+ * máquina, revogar ou excluir — essas ações continuam exclusivas do
+ * painel administrativo.
+ */
+export async function listarTerminaisTv(): Promise<TerminalTv[]> {
+  try {
+    const response = await fetch("/api/tv-corporativa/terminais");
+    const body = await parseResponse<TerminalTv[]>(response);
+    return body.ok && body.data ? body.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function atualizarGradeTerminalTv(
+  id: string,
+  gradeId: string | null
+): Promise<ApiEnvelope<TerminalTv>> {
+  const response = await fetch(`/api/tv-corporativa/terminais/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gradeId }),
+  });
+  return parseResponse(response);
+}
+
+export async function atualizarAgenteTv(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/tv-corporativa/terminais/${id}/comando`, {
+    method: "POST",
+  });
+  return parseResponse(response);
+}
+
+export async function visualizarTerminalTv(
+  id: string
+): Promise<ApiEnvelope<{ signalingUrl: string; token: string }>> {
+  const response = await fetch(`/api/tv-corporativa/terminais/${id}/visualizar`, {
+    method: "POST",
+  });
   return parseResponse(response);
 }
 

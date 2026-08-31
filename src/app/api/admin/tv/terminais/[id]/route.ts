@@ -21,6 +21,7 @@ interface AtualizarTerminalBody {
   intervaloAtualizacaoSegundos?: unknown;
   gradeId?: unknown;
   caminhoInicial?: unknown;
+  empresa?: unknown;
 }
 
 async function handlePATCH(request: Request, context: RouteContext) {
@@ -83,6 +84,10 @@ async function handlePATCH(request: Request, context: RouteContext) {
      */
     if (Object.prototype.hasOwnProperty.call(body, "caminhoInicial")) {
       params.caminhoInicial = optionalText(body.caminhoInicial, "caminhoInicial", 200);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "empresa")) {
+      params.empresa = optionalText(body.empresa, "empresa", 30);
     }
 
     const terminal = await atualizarTerminal(id, params);

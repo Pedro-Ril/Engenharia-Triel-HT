@@ -17,6 +17,7 @@ export interface TerminalTv {
   agenteMemoriaPercentual: number | null;
   agenteProximaVerificacaoEm: string | null;
   agenteSistemaOperacional: string | null;
+  empresa: string | null;
 }
 
 export interface GradeTv {
@@ -36,6 +37,9 @@ export interface ItemSlotTv {
   urlPaginaWeb: string | null;
   duracaoSegundos: number;
   ordem: number;
+  diasSemana: string;
+  horaInicio: string;
+  horaFim: string;
 }
 
 export interface SlotTv {

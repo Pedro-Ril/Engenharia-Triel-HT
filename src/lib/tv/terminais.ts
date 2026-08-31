@@ -37,6 +37,7 @@ export interface TerminalTv {
   agenteMemoriaPercentual: number | null;
   agenteProximaVerificacaoEm: string | null;
   agenteSistemaOperacional: string | null;
+  empresa: string | null;
 }
 
 const colunasTerminal = `
@@ -56,7 +57,8 @@ const colunasTerminal = `
   [agente_cpu_percentual],
   [agente_memoria_percentual],
   CONVERT(VARCHAR(33), [agente_proxima_verificacao_em], 126) AS [agente_proxima_verificacao_em],
-  [agente_sistema_operacional]
+  [agente_sistema_operacional],
+  [empresa]
 `;
 
 const colunasTerminalOutput = `
@@ -76,7 +78,8 @@ const colunasTerminalOutput = `
   INSERTED.[agente_cpu_percentual],
   INSERTED.[agente_memoria_percentual],
   CONVERT(VARCHAR(33), INSERTED.[agente_proxima_verificacao_em], 126) AS [agente_proxima_verificacao_em],
-  INSERTED.[agente_sistema_operacional]
+  INSERTED.[agente_sistema_operacional],
+  INSERTED.[empresa]
 `;
 
 interface TerminalRow {
@@ -97,6 +100,7 @@ interface TerminalRow {
   agente_memoria_percentual?: number | null;
   agente_proxima_verificacao_em?: string | null;
   agente_sistema_operacional?: string | null;
+  empresa?: string | null;
 }
 
 function mapTerminalRow(row: TerminalRow): TerminalTv {
@@ -118,11 +122,23 @@ function mapTerminalRow(row: TerminalRow): TerminalTv {
     agenteMemoriaPercentual: row.agente_memoria_percentual ?? null,
     agenteProximaVerificacaoEm: row.agente_proxima_verificacao_em ?? null,
     agenteSistemaOperacional: row.agente_sistema_operacional ?? null,
+    empresa: row.empresa ?? null,
   };
 }
 
-export async function listarTerminais(): Promise<TerminalTv[]> {
+/*
+ * codigoEmpresa filtra pra só os terminais daquela empresa — usado
+ * pela visão restrita em /tv-corporativa (ver
+ * verificarAcessoModuloApi + PortalUsuario.codigoEmpresa), enquanto o
+ * painel de admin chama sem argumento nenhum pra ver todos.
+ */
+export async function listarTerminais(codigoEmpresa?: string): Promise<TerminalTv[]> {
   const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  if (codigoEmpresa) {
+    request.input("empresa", sql.NVarChar(30), codigoEmpresa);
+  }
 
   /*
    * Só terminais já pareados — um terminal em "aguardando_pareamento"
@@ -131,10 +147,11 @@ export async function listarTerminais(): Promise<TerminalTv[]> {
    * parear (o pareamento em si não depende disso, só do código de 6
    * dígitos exibido na tela do terminal).
    */
-  const result = await pool.request().query<TerminalRow>(`
+  const result = await request.query<TerminalRow>(`
     SELECT ${colunasTerminal}
     FROM dbo.portal_tv_terminais
     WHERE [status] = 'pareado'
+      ${codigoEmpresa ? "AND [empresa] = @empresa" : ""}
     ORDER BY [criado_em] DESC;
   `);
 
@@ -341,6 +358,14 @@ export async function parearTerminal(params: {
   return { terminal: mapTerminalRow(resultado.recordset[0]), tokenParaExibir: token };
 }
 
+/*
+ * codigoEmpresaExigida (3º argumento) restringe o UPDATE a um
+ * terminal daquela empresa específica — usado pela rota restrita de
+ * /tv-corporativa (um usuário comum só pode mexer nos terminais da
+ * própria empresa); undefined = sem restrição, usado pelo admin.
+ * Terminal de outra empresa simplesmente não bate no WHERE e o
+ * retorno é null, como se não existisse.
+ */
 export async function atualizarTerminal(
   id: string,
   params: {
@@ -348,7 +373,9 @@ export async function atualizarTerminal(
     intervaloAtualizacaoSegundos?: number;
     gradeId?: string | null;
     caminhoInicial?: string | null;
-  }
+    empresa?: string | null;
+  },
+  codigoEmpresaExigida?: string
 ): Promise<TerminalTv | null> {
   const pool = await getSqlServerPool();
   const request = pool.request();
@@ -367,6 +394,13 @@ export async function atualizarTerminal(
     Object.prototype.hasOwnProperty.call(params, "caminhoInicial")
   );
   request.input("caminhoInicial", sql.NVarChar(200), params.caminhoInicial ?? null);
+  request.input(
+    "empresaInformada",
+    sql.Bit,
+    Object.prototype.hasOwnProperty.call(params, "empresa")
+  );
+  request.input("empresa", sql.NVarChar(30), params.empresa ?? null);
+  request.input("codigoEmpresaExigida", sql.NVarChar(30), codigoEmpresaExigida ?? null);
 
   const result = await request.query(`
     UPDATE dbo.portal_tv_terminais
@@ -375,9 +409,11 @@ export async function atualizarTerminal(
       [intervalo_atualizacao_segundos] = COALESCE(@intervalo, [intervalo_atualizacao_segundos]),
       [grade_id] = CASE WHEN @gradeId IS NOT NULL THEN @gradeId ELSE [grade_id] END,
       [caminho_inicial] = CASE WHEN @caminhoInicialInformado = 1 THEN @caminhoInicial ELSE [caminho_inicial] END,
+      [empresa] = CASE WHEN @empresaInformada = 1 THEN @empresa ELSE [empresa] END,
       [atualizado_em] = SYSDATETIME()
     OUTPUT ${colunasTerminalOutput}
-    WHERE [id] = @id;
+    WHERE [id] = @id
+      AND (@codigoEmpresaExigida IS NULL OR [empresa] = @codigoEmpresaExigida);
   `);
 
   const row = result.recordset[0];
@@ -507,17 +543,20 @@ export type ComandoAgente = (typeof COMANDOS_AGENTE)[number];
  */
 export async function solicitarComandoAgente(
   terminalId: string,
-  comando: ComandoAgente
+  comando: ComandoAgente,
+  codigoEmpresaExigida?: string
 ): Promise<boolean> {
   const pool = await getSqlServerPool();
   const request = pool.request();
   request.input("id", sql.UniqueIdentifier, terminalId);
   request.input("comando", sql.VarChar(30), comando);
+  request.input("codigoEmpresaExigida", sql.NVarChar(30), codigoEmpresaExigida ?? null);
 
   const result = await request.query(`
     UPDATE dbo.portal_tv_terminais
     SET [comando_pendente] = @comando
-    WHERE [id] = @id AND [status] = 'pareado';
+    WHERE [id] = @id AND [status] = 'pareado'
+      AND (@codigoEmpresaExigida IS NULL OR [empresa] = @codigoEmpresaExigida);
   `);
 
   return (result.rowsAffected[0] ?? 0) > 0;
@@ -553,17 +592,22 @@ export async function consumirComandoPendente(terminalId: string): Promise<strin
  */
 const JANELA_VISUALIZACAO_MS = 15_000;
 
-export async function solicitarVisualizacao(terminalId: string): Promise<boolean> {
+export async function solicitarVisualizacao(
+  terminalId: string,
+  codigoEmpresaExigida?: string
+): Promise<boolean> {
   const pool = await getSqlServerPool();
   const request = pool.request();
   request.input("id", sql.UniqueIdentifier, terminalId);
+  request.input("codigoEmpresaExigida", sql.NVarChar(30), codigoEmpresaExigida ?? null);
 
   const result = await request.query(`
     UPDATE dbo.portal_tv_terminais
     SET [visualizacao_solicitada_em] = SYSDATETIME()
     WHERE [id] = @id
       AND [status] = 'pareado'
-      AND [revogado_em] IS NULL;
+      AND [revogado_em] IS NULL
+      AND (@codigoEmpresaExigida IS NULL OR [empresa] = @codigoEmpresaExigida);
   `);
 
   return (result.rowsAffected[0] ?? 0) > 0;

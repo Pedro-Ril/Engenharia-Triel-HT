@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 
+import type { ApiEnvelope } from "../services/tvCorporativa.service";
 import { visualizarTerminal } from "../services/tvCorporativa.service";
 import type { TerminalTv } from "../types/tvCorporativa.types";
 import styles from "./VisualizacaoAoVivoModal.module.css";
@@ -18,6 +19,12 @@ type StatusVisualizacao = "conectando" | "aguardando-terminal" | "recebendo" | "
 interface VisualizacaoAoVivoModalProps {
   terminal: TerminalTv | null;
   onClose: () => void;
+  /*
+   * Injeta a versão admin (padrão) ou a restrita (visualizarTerminalTv,
+   * ver DispositivosRestritoPainel.tsx) sem duplicar toda a lógica de
+   * WebRTC/sinalização deste componente pras duas telas.
+   */
+  visualizar?: (id: string) => Promise<ApiEnvelope<{ signalingUrl: string; token: string }>>;
 }
 
 /*
@@ -28,7 +35,11 @@ interface VisualizacaoAoVivoModalProps {
  * transmitindo (ver JANELA_VISUALIZACAO_MS em src/lib/tv/terminais.ts);
  * parar de renovar (fechar o modal) faz o terminal encerrar sozinho.
  */
-export function VisualizacaoAoVivoModal({ terminal, onClose }: VisualizacaoAoVivoModalProps) {
+export function VisualizacaoAoVivoModal({
+  terminal,
+  onClose,
+  visualizar = visualizarTerminal,
+}: VisualizacaoAoVivoModalProps) {
   const [status, setStatus] = useState<StatusVisualizacao>("conectando");
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
 
@@ -58,7 +69,7 @@ export function VisualizacaoAoVivoModal({ terminal, onClose }: VisualizacaoAoViv
       setStatus("conectando");
       setMensagemErro(null);
 
-      const resultado = await visualizarTerminal(terminal!.id);
+      const resultado = await visualizar(terminal!.id);
       if (cancelado) return;
 
       if (!resultado.ok || !resultado.data) {
@@ -126,7 +137,7 @@ export function VisualizacaoAoVivoModal({ terminal, onClose }: VisualizacaoAoViv
       };
 
       renovacaoRef.current = setInterval(() => {
-        visualizarTerminal(terminal!.id);
+        visualizar(terminal!.id);
       }, INTERVALO_RENOVACAO_MS);
     }
 
@@ -136,6 +147,7 @@ export function VisualizacaoAoVivoModal({ terminal, onClose }: VisualizacaoAoViv
       cancelado = true;
       encerrar();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- visualizar é estável na prática (função top-level importada ou passada fixa pelo pai); incluir na lista reconectaria à toa se o pai não memoizar
   }, [terminal]);
 
   return (

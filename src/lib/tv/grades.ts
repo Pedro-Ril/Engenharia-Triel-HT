@@ -17,6 +17,17 @@ export interface ItemSlotTv {
   urlPaginaWeb: string | null;
   duracaoSegundos: number;
   ordem: number;
+  /*
+   * Agendamento próprio do item, opcional — "todos"/00:00-23:59
+   * (padrão) significa "sem restrição além da janela do próprio
+   * slot"; um item pode ser restringido a dias/horários específicos
+   * DENTRO da janela do slot (ex: slot "Manhã 08h-12h" com um item
+   * que só aparece às terças). Mesma codificação de diasSemana do
+   * slot (ver SlotTv).
+   */
+  diasSemana: string;
+  horaInicio: string;
+  horaFim: string;
 }
 
 export interface SlotTv {
@@ -217,6 +228,9 @@ export async function buscarGradeComSlots(id: string): Promise<GradeComSlots | n
     url_pagina_web: string | null;
     duracao_segundos: number;
     ordem: number;
+    dias_semana: string;
+    hora_inicio: string;
+    hora_fim: string;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), i.[id]) AS [id],
@@ -225,7 +239,10 @@ export async function buscarGradeComSlots(id: string): Promise<GradeComSlots | n
       CONVERT(VARCHAR(36), i.[midia_id]) AS [midia_id],
       i.[url_pagina_web],
       i.[duracao_segundos],
-      i.[ordem]
+      i.[ordem],
+      i.[dias_semana],
+      CONVERT(VARCHAR(8), i.[hora_inicio], 108) AS [hora_inicio],
+      CONVERT(VARCHAR(8), i.[hora_fim], 108) AS [hora_fim]
     FROM dbo.portal_tv_slot_itens i
     INNER JOIN dbo.portal_tv_grade_slots s ON s.[id] = i.[slot_id]
     WHERE s.[grade_id] = @gradeId
@@ -242,6 +259,9 @@ export async function buscarGradeComSlots(id: string): Promise<GradeComSlots | n
       urlPaginaWeb: item.url_pagina_web,
       duracaoSegundos: item.duracao_segundos,
       ordem: item.ordem,
+      diasSemana: item.dias_semana,
+      horaInicio: item.hora_inicio,
+      horaFim: item.hora_fim,
     });
     itensPorSlot.set(item.slot_id, lista);
   }
@@ -285,6 +305,9 @@ export async function salvarSlotsDaGrade(
       urlPaginaWeb: string | null;
       duracaoSegundos: number;
       ordem: number;
+      diasSemana: string;
+      horaInicio: string;
+      horaFim: string;
     }[];
   }[]
 ): Promise<void> {
@@ -325,11 +348,16 @@ export async function salvarSlotsDaGrade(
         itemRequest.input("urlPaginaWeb", sql.NVarChar(500), item.urlPaginaWeb);
         itemRequest.input("duracaoSegundos", sql.Int, item.duracaoSegundos);
         itemRequest.input("ordem", sql.Int, item.ordem);
+        itemRequest.input("diasSemana", sql.VarChar(20), item.diasSemana);
+        itemRequest.input("horaInicio", sql.VarChar(8), item.horaInicio);
+        itemRequest.input("horaFim", sql.VarChar(8), item.horaFim);
 
         await itemRequest.query(`
           INSERT INTO dbo.portal_tv_slot_itens
-            ([slot_id], [tipo_conteudo], [midia_id], [url_pagina_web], [duracao_segundos], [ordem])
-          VALUES (@slotId, @tipoConteudo, @midiaId, @urlPaginaWeb, @duracaoSegundos, @ordem);
+            ([slot_id], [tipo_conteudo], [midia_id], [url_pagina_web], [duracao_segundos], [ordem],
+             [dias_semana], [hora_inicio], [hora_fim])
+          VALUES (@slotId, @tipoConteudo, @midiaId, @urlPaginaWeb, @duracaoSegundos, @ordem,
+                  @diasSemana, @horaInicio, @horaFim);
         `);
       }
     }
@@ -344,6 +372,26 @@ export async function salvarSlotsDaGrade(
 function diaDaSemanaAtual(): number {
   /* SQL Server-style não é usado aqui — calcula no Node mesmo (0=domingo...6=sábado). */
   return new Date().getDay();
+}
+
+/*
+ * Mesma checagem de janela dia/horário usada tanto pra escolher o
+ * slot vigente de uma grade quanto, dentro dele, filtrar os itens que
+ * têm um agendamento próprio mais restrito (ver ItemSlotTv).
+ */
+function estaNaJanela(
+  diasSemana: string,
+  horaInicio: string,
+  horaFim: string,
+  diaAtual: number,
+  horaAtual: string
+): boolean {
+  const diaBate =
+    diasSemana === "todos" || diasSemana.split(",").map(Number).includes(diaAtual);
+
+  if (!diaBate) return false;
+
+  return horaAtual >= horaInicio && horaAtual < horaFim;
 }
 
 export interface SlotVigenteParaTerminal {
@@ -389,15 +437,9 @@ export async function buscarSlotVigente(
   const diaAtual = diaDaSemanaAtual();
   const horaAtual = agora.toTimeString().slice(0, 8);
 
-  const slotVigente = slotsResult.recordset.find((slot) => {
-    const diaBate =
-      slot.dias_semana === "todos" ||
-      slot.dias_semana.split(",").map(Number).includes(diaAtual);
-
-    if (!diaBate) return false;
-
-    return horaAtual >= slot.hora_inicio && horaAtual < slot.hora_fim;
-  });
+  const slotVigente = slotsResult.recordset.find((slot) =>
+    estaNaJanela(slot.dias_semana, slot.hora_inicio, slot.hora_fim, diaAtual, horaAtual)
+  );
 
   if (!slotVigente) return null;
 
@@ -412,6 +454,9 @@ export async function buscarSlotVigente(
     midia_id: string | null;
     midia_caminho: string | null;
     midia_tipo_mime: string | null;
+    dias_semana: string;
+    hora_inicio: string;
+    hora_fim: string;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), i.[id]) AS [id],
@@ -420,7 +465,10 @@ export async function buscarSlotVigente(
       i.[url_pagina_web],
       CONVERT(VARCHAR(36), i.[midia_id]) AS [midia_id],
       m.[caminho_arquivo] AS [midia_caminho],
-      m.[tipo_mime] AS [midia_tipo_mime]
+      m.[tipo_mime] AS [midia_tipo_mime],
+      i.[dias_semana],
+      CONVERT(VARCHAR(8), i.[hora_inicio], 108) AS [hora_inicio],
+      CONVERT(VARCHAR(8), i.[hora_fim], 108) AS [hora_fim]
     FROM dbo.portal_tv_slot_itens i
     LEFT JOIN dbo.portal_tv_midias m ON m.[id] = i.[midia_id]
     WHERE i.[slot_id] = @slotId
@@ -429,18 +477,22 @@ export async function buscarSlotVigente(
 
   return {
     slotId: slotVigente.id,
-    itens: itensResult.recordset.map((item) => ({
-      id: item.id,
-      tipoConteudo: item.tipo_conteudo as ItemSlotTv["tipoConteudo"],
-      duracaoSegundos: item.duracao_segundos,
-      urlPaginaWeb: item.url_pagina_web,
-      midia: item.midia_id
-        ? {
-            id: item.midia_id,
-            url: `/api/tv/midias/${item.midia_id}/arquivo`,
-            tipoMime: item.midia_tipo_mime ?? "application/octet-stream",
-          }
-        : null,
-    })),
+    itens: itensResult.recordset
+      .filter((item) =>
+        estaNaJanela(item.dias_semana, item.hora_inicio, item.hora_fim, diaAtual, horaAtual)
+      )
+      .map((item) => ({
+        id: item.id,
+        tipoConteudo: item.tipo_conteudo as ItemSlotTv["tipoConteudo"],
+        duracaoSegundos: item.duracao_segundos,
+        urlPaginaWeb: item.url_pagina_web,
+        midia: item.midia_id
+          ? {
+              id: item.midia_id,
+              url: `/api/tv/midias/${item.midia_id}/arquivo`,
+              tipoMime: item.midia_tipo_mime ?? "application/octet-stream",
+            }
+          : null,
+      })),
   };
 }

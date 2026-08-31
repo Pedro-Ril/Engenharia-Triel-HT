@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Home, LayoutGrid, Upload } from "lucide-react";
+import { Home, LayoutGrid, Tv, Upload } from "lucide-react";
 
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -10,12 +10,14 @@ import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Toast } from "@/components/ui/Toast";
 import type { FeedbackHandler, ToastState } from "@/modules/admin-permissoes/types/toast.types";
 
+import { DispositivosRestritoPainel } from "./DispositivosRestritoPainel";
 import { GradesTvPainel } from "./GradesTvPainel";
 import { MidiasTvPainel } from "./MidiasTvPainel";
 
-type AbaTv = "grades" | "midias";
+type AbaTv = "dispositivos" | "grades" | "midias";
 
 const ABAS: { valor: AbaTv; label: string; icon: typeof LayoutGrid }[] = [
+  { valor: "dispositivos", label: "Dispositivos", icon: Tv },
   { valor: "grades", label: "Grades de programação", icon: LayoutGrid },
   { valor: "midias", label: "Mídias", icon: Upload },
 ];
@@ -30,11 +32,13 @@ const toastInicial: ToastState = {
 /*
  * Versão restrita da tela de TV Corporativa para gestores não-admin
  * (ver requireModuloAccess("tv-corporativa") no layout desta rota) —
- * só Grades e Mídias, sem Dispositivos/Configurações, que continuam
- * exclusivas de admin em Administração → TV Corporativa.
+ * Dispositivos aqui é uma versão limitada (DispositivosRestritoPainel):
+ * só os terminais da própria empresa do usuário, sem reiniciar
+ * máquina/revogar/excluir. Configurações continua exclusiva de admin
+ * em Administração → TV Corporativa.
  */
 export function TvCorporativaGestaoPage() {
-  const [aba, setAba] = useState<AbaTv>("grades");
+  const [aba, setAba] = useState<AbaTv>("dispositivos");
   const [toast, setToast] = useState<ToastState>(toastInicial);
 
   const mostrarFeedback: FeedbackHandler = (variant, title, description) => {
@@ -66,6 +70,7 @@ export function TvCorporativaGestaoPage() {
       />
 
       <div style={{ marginTop: 20 }}>
+        {aba === "dispositivos" && <DispositivosRestritoPainel onFeedback={mostrarFeedback} />}
         {aba === "grades" && <GradesTvPainel onFeedback={mostrarFeedback} />}
         {aba === "midias" && <MidiasTvPainel onFeedback={mostrarFeedback} />}
       </div>
