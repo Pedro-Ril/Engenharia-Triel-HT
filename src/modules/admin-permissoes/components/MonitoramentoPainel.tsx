@@ -18,6 +18,7 @@ import {
   ScrollText,
   Search,
   ServerCog,
+  Shuffle,
   Trash2,
   Wrench,
   XCircle,
@@ -98,6 +99,7 @@ const SERVICO_CONFIG: Record<
   active_directory: { label: "Active Directory", icon: KeyRound },
   erp_materia_prima: { label: "ERP · Matéria-Prima", icon: PackageSearch },
   email: { label: "Envio de e-mail", icon: Mail },
+  erp_estrutura: { label: "ERP · Substituição de Estrutura", icon: Shuffle },
 };
 
 const STATUS_SERVICO_CONFIG: Record<

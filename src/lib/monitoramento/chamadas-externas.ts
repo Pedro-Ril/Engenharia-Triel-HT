@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
-export type ServicoExterno = "active_directory" | "erp_materia_prima" | "email";
+export type ServicoExterno = "active_directory" | "erp_materia_prima" | "email" | "erp_estrutura";
 export type OrigemChamadaExterna = "health_check" | "uso_real";
 
 export interface StatusServicoExterno {
@@ -249,16 +249,19 @@ async function obterStatusErp(
 export async function obterResumoChamadasExternas(): Promise<StatusServicoExterno[]> {
   const pool = await getSqlServerPool();
 
-  const [resumoTabela, ultimaFalhaAd, ultimaFalhaEmail, statusErp] = await Promise.all([
-    obterResumoTabelaChamadas(pool),
-    obterUltimaFalha(pool, "active_directory"),
-    obterUltimaFalha(pool, "email"),
-    obterStatusErp(pool),
-  ]);
+  const [resumoTabela, ultimaFalhaAd, ultimaFalhaEmail, statusErp, ultimaFalhaErpEstrutura] =
+    await Promise.all([
+      obterResumoTabelaChamadas(pool),
+      obterUltimaFalha(pool, "active_directory"),
+      obterUltimaFalha(pool, "email"),
+      obterStatusErp(pool),
+      obterUltimaFalha(pool, "erp_estrutura"),
+    ]);
 
   return [
     montarStatus("active_directory", resumoTabela.get("active_directory"), ultimaFalhaAd),
     statusErp,
     montarStatus("email", resumoTabela.get("email"), ultimaFalhaEmail),
+    montarStatus("erp_estrutura", resumoTabela.get("erp_estrutura"), ultimaFalhaErpEstrutura),
   ];
 }

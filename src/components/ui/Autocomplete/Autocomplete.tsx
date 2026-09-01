@@ -27,6 +27,14 @@ interface AutocompleteProps {
   hasError?: boolean;
   /* Limita quantas opções aparecem na lista aberta de uma vez — importante quando `options` vem de um catálogo grande (ex: milhares de itens de ERP). */
   maxOptions?: number;
+  /*
+   * Substitui o filtro padrão (substring em qualquer parte do label,
+   * já normalizado em minúsculas e sem espaço nas pontas). Use quando
+   * o padrão for texto demais pra um campo que é essencialmente um
+   * código (ex: buscar só por prefixo exato do código, ignorando a
+   * descrição).
+   */
+  filterOption?: (option: AutocompleteOption, normalizedQuery: string) => boolean;
 }
 
 export function Autocomplete({
@@ -40,6 +48,7 @@ export function Autocomplete({
   disabled = false,
   hasError = false,
   maxOptions,
+  filterOption,
 }: AutocompleteProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +61,7 @@ export function Autocomplete({
     useState(-1);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza o texto exibido com o `selectedOption` controlado externamente pelo pai
     setQuery(selectedOption?.label ?? "");
   }, [selectedOption]);
 
@@ -83,14 +93,16 @@ export function Autocomplete({
 
     const encontradas = normalizedQuery
       ? options.filter((option) =>
-          option.label
-            .toLocaleLowerCase("pt-BR")
-            .includes(normalizedQuery)
+          filterOption
+            ? filterOption(option, normalizedQuery)
+            : option.label
+                .toLocaleLowerCase("pt-BR")
+                .includes(normalizedQuery)
         )
       : options;
 
     return maxOptions ? encontradas.slice(0, maxOptions) : encontradas;
-  }, [options, query, maxOptions]);
+  }, [options, query, maxOptions, filterOption]);
 
   function handleSelect(option: AutocompleteOption) {
     setQuery(option.label);

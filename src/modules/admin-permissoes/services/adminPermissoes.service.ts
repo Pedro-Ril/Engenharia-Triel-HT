@@ -5,6 +5,7 @@ import type {
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
+  ConfigEstruturaSubstituicao,
   ConfigMateriaPrima,
   ConfiguracaoAd,
   ConfiguracaoDb,
@@ -197,6 +198,7 @@ export async function listarEmpresas(): Promise<Empresa[]> {
 export async function criarEmpresa(dados: {
   nome: string;
   codigo?: string | null;
+  cnpj?: string | null;
   corPrimariaClara: string;
   corPrimariaEscura: string;
 }): Promise<ApiEnvelope<Empresa>> {
@@ -213,6 +215,7 @@ export async function atualizarEmpresa(
   dados: {
     nome?: string;
     codigo?: string | null;
+    cnpj?: string | null;
     corPrimariaClara?: string;
     corPrimariaEscura?: string;
     ativa?: boolean;
@@ -605,6 +608,29 @@ export async function salvarConfigMateriaPrima(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigMateriaPrima>(response);
+}
+
+export async function buscarConfigEstruturaSubstituicao(): Promise<ConfigEstruturaSubstituicao | null> {
+  const response = await fetch("/api/admin/estrutura-substituicao/config");
+  const body = await parseResponse<ConfigEstruturaSubstituicao>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigEstruturaSubstituicao(dados: {
+  urlConsultaEstrutura: string | null;
+  urlValidarItens: string | null;
+  urlAtualizarEstrutura: string | null;
+  urlConsultaEstruturaTeste: string | null;
+  urlValidarItensTeste: string | null;
+  urlAtualizarEstruturaTeste: string | null;
+  usarAmbienteTeste: boolean;
+}): Promise<ApiEnvelope<ConfigEstruturaSubstituicao>> {
+  const response = await fetch("/api/admin/estrutura-substituicao/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigEstruturaSubstituicao>(response);
 }
 
 export async function listarEmpresasComCatalogoMateriaPrima(): Promise<EmpresaComCatalogo[]> {

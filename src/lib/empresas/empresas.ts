@@ -8,6 +8,7 @@ export interface Empresa {
   id: string;
   nome: string;
   codigo: string | null;
+  cnpj: string | null;
   corPrimariaClara: string;
   corPrimariaEscura: string;
   ativa: boolean;
@@ -17,6 +18,7 @@ const colunasEmpresa = `
   CONVERT(VARCHAR(36), [id]) AS [id],
   [nome],
   [codigo],
+  [cnpj],
   [cor_primaria_clara],
   [cor_primaria_escura],
   CAST([ativa] AS BIT) AS [ativa]
@@ -26,6 +28,7 @@ interface EmpresaRow {
   id: string;
   nome: string;
   codigo: string | null;
+  cnpj: string | null;
   cor_primaria_clara: string;
   cor_primaria_escura: string;
   ativa: boolean;
@@ -36,6 +39,7 @@ function mapEmpresaRow(row: EmpresaRow): Empresa {
     id: row.id,
     nome: row.nome,
     codigo: row.codigo,
+    cnpj: row.cnpj,
     corPrimariaClara: row.cor_primaria_clara,
     corPrimariaEscura: row.cor_primaria_escura,
     ativa: row.ativa,
@@ -121,6 +125,7 @@ export async function resolverEmpresaDoUsuario(usuario: {
 export async function criarEmpresa(params: {
   nome: string;
   codigo?: string | null;
+  cnpj?: string | null;
   corPrimariaClara: string;
   corPrimariaEscura: string;
 }): Promise<Empresa> {
@@ -131,13 +136,14 @@ export async function criarEmpresa(params: {
 
   request.input("nome", sql.NVarChar(150), params.nome);
   request.input("codigo", sql.NVarChar(30), params.codigo ?? null);
+  request.input("cnpj", sql.VarChar(20), params.cnpj ?? null);
   request.input("corClara", sql.VarChar(7), params.corPrimariaClara);
   request.input("corEscura", sql.VarChar(7), params.corPrimariaEscura);
 
   const result = await request.query<{ id: string }>(`
-    INSERT INTO dbo.portal_empresas ([nome], [codigo], [cor_primaria_clara], [cor_primaria_escura])
+    INSERT INTO dbo.portal_empresas ([nome], [codigo], [cnpj], [cor_primaria_clara], [cor_primaria_escura])
     OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
-    VALUES (@nome, @codigo, @corClara, @corEscura);
+    VALUES (@nome, @codigo, @cnpj, @corClara, @corEscura);
   `);
 
   const criada = await buscarEmpresaPorId(result.recordset[0].id);
@@ -150,6 +156,7 @@ export async function atualizarEmpresa(
   params: {
     nome?: string;
     codigo?: string | null;
+    cnpj?: string | null;
     corPrimariaClara?: string;
     corPrimariaEscura?: string;
     ativa?: boolean;
@@ -170,6 +177,11 @@ export async function atualizarEmpresa(
   if (params.codigo !== undefined) {
     request.input("codigo", sql.NVarChar(30), params.codigo);
     sets.push("[codigo] = @codigo");
+  }
+
+  if (params.cnpj !== undefined) {
+    request.input("cnpj", sql.VarChar(20), params.cnpj);
+    sets.push("[cnpj] = @cnpj");
   }
 
   if (params.corPrimariaClara !== undefined || params.corPrimariaEscura !== undefined) {

@@ -71,7 +71,7 @@ export interface ResumoMonitoramento {
   logsPorNivel: Record<NivelLog, number>;
 }
 
-export type ServicoExterno = "active_directory" | "erp_materia_prima" | "email";
+export type ServicoExterno = "active_directory" | "erp_materia_prima" | "email" | "erp_estrutura";
 
 export interface StatusServicoExterno {
   servico: ServicoExterno;

@@ -17,6 +17,7 @@ import type { ResumoAcessoModulo } from "@/lib/auth/acesso-modulo";
 import type { ModuloPermitido, SetorComModulos } from "@/lib/auth/autorizacao";
 import styles from "@/app/home.module.css";
 
+import { BoasVindasModal } from "./BoasVindasModal";
 import { CatalogoModulosModal } from "./CatalogoModulosModal";
 
 interface HomeContentProps {
@@ -560,6 +561,8 @@ export function HomeContent({
         open={catalogoAberto}
         onClose={() => setCatalogoAberto(false)}
       />
+
+      <BoasVindasModal habilitado={!usuario && !abrirLoginInicial} />
     </main>
   );
 }

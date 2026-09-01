@@ -41,6 +41,7 @@ interface EmpresasPainelProps {
 const novaEmpresaInicial = {
   nome: "",
   codigo: "",
+  cnpj: "",
   corPrimariaClara: "#b71c1c",
   corPrimariaEscura: "#e04545",
 };
@@ -153,7 +154,7 @@ export function EmpresasPainel({
   async function handleAtualizar(
     empresa: Empresa,
     campos: Partial<
-      Pick<Empresa, "nome" | "codigo" | "corPrimariaClara" | "corPrimariaEscura" | "ativa">
+      Pick<Empresa, "nome" | "codigo" | "cnpj" | "corPrimariaClara" | "corPrimariaEscura" | "ativa">
     >
   ) {
     setSalvandoId(empresa.id);
@@ -244,6 +245,15 @@ export function EmpresasPainel({
               />
             </Field>
 
+            <Field label="CNPJ" hint="opcional, usado em integrações">
+              <Input
+                value={novaEmpresa.cnpj}
+                onChange={(event) =>
+                  setNovaEmpresa((atual) => ({ ...atual, cnpj: event.target.value }))
+                }
+              />
+            </Field>
+
             <Field label="Cor principal — modo claro">
               <input
                 type="color"
@@ -290,11 +300,12 @@ export function EmpresasPainel({
             (vermelho).
           </p>
         ) : (
-          <Table minWidth={780}>
+          <Table minWidth={900}>
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Nome</TableHeaderCell>
                 <TableHeaderCell>Código</TableHeaderCell>
+                <TableHeaderCell>CNPJ</TableHeaderCell>
                 <TableHeaderCell align="center">Cor (claro)</TableHeaderCell>
                 <TableHeaderCell align="center">Cor (escuro)</TableHeaderCell>
                 <TableHeaderCell align="center">Ativa</TableHeaderCell>
@@ -326,6 +337,20 @@ export function EmpresasPainel({
                         const codigo = event.target.value.trim();
                         if (codigo !== (empresa.codigo ?? "")) {
                           handleAtualizar(empresa, { codigo: codigo || null });
+                        }
+                      }}
+                    />
+                  </TableCell>
+
+                  <TableCell>
+                    <Input
+                      defaultValue={empresa.cnpj ?? ""}
+                      placeholder="—"
+                      disabled={salvandoId === empresa.id}
+                      onBlur={(event) => {
+                        const cnpj = event.target.value.trim();
+                        if (cnpj !== (empresa.cnpj ?? "")) {
+                          handleAtualizar(empresa, { cnpj: cnpj || null });
                         }
                       }}
                     />

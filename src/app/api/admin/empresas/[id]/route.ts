@@ -43,6 +43,7 @@ async function handlePATCH(request: Request, context: RouteContext) {
       nome: parsedBody.nome !== undefined ? requiredText(parsedBody.nome, "nome", 150) : undefined,
       codigo:
         parsedBody.codigo !== undefined ? optionalText(parsedBody.codigo, "código", 30) : undefined,
+      cnpj: parsedBody.cnpj !== undefined ? optionalText(parsedBody.cnpj, "CNPJ", 20) : undefined,
       corPrimariaClara:
         parsedBody.corPrimariaClara !== undefined
           ? requiredText(parsedBody.corPrimariaClara, "cor (modo claro)", 7)

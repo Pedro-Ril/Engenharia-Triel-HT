@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Database, KeyRound, PackageSearch, Wrench } from "lucide-react";
+import { Database, KeyRound, PackageSearch, Shuffle, Wrench } from "lucide-react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
@@ -9,6 +9,7 @@ import type { ConfiguracaoAd, ConfiguracaoDb } from "../types/adminPermissoes.ty
 import type { FeedbackHandler } from "../types/toast.types";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { ConfiguracaoDbPainel } from "./ConfiguracaoDbPainel";
+import { EstruturaSubstituicaoConfigPainel } from "./EstruturaSubstituicaoConfigPainel";
 import { ManutencaoPainel } from "./ManutencaoPainel";
 import { MateriaPrimaConfigPainel } from "./MateriaPrimaConfigPainel";
 
@@ -20,13 +21,14 @@ interface ConfiguracoesPainelProps {
   onConfiguracaoDbAtualizada: (configuracao: ConfiguracaoDb) => void;
 }
 
-type AbaConfiguracao = "ad" | "banco" | "materia-prima" | "manutencao";
+type AbaConfiguracao = "ad" | "banco" | "materia-prima" | "estrutura" | "manutencao";
 
 const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] = [
   { valor: "ad", label: "Active Directory", icon: KeyRound },
   { valor: "banco", label: "Banco de dados", icon: Database },
   { valor: "manutencao", label: "Manutenção", icon: Wrench },
   { valor: "materia-prima", label: "Matéria-Prima", icon: PackageSearch },
+  { valor: "estrutura", label: "Estrutura", icon: Shuffle },
 ];
 
 export function ConfiguracoesPainel({
@@ -68,6 +70,8 @@ export function ConfiguracoesPainel({
         )}
 
         {aba === "materia-prima" && <MateriaPrimaConfigPainel onFeedback={onFeedback} />}
+
+        {aba === "estrutura" && <EstruturaSubstituicaoConfigPainel onFeedback={onFeedback} />}
 
         {aba === "manutencao" && <ManutencaoPainel onFeedback={onFeedback} />}
       </div>

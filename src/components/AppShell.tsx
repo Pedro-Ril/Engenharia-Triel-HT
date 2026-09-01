@@ -7,6 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import type { UsuarioLogado } from "@/components/Sidebar";
 import { RouteLoadingProvider } from "@/components/RouteLoadingProvider";
 import type { SetorComModulos } from "@/lib/auth/autorizacao";
+import { persistirTemaEmCookie } from "@/lib/tema/aplicar-tema";
 import styles from "@/app/layout.module.css";
 
 interface AppShellProps {
@@ -93,6 +94,24 @@ function AppShellConteudo(props: PainelPortalProps) {
 export default function AppShell(props: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
+  const { usuario } = props;
+
+  /*
+   * Mantém o cookie de tema (ver persistirTemaEmCookie) sempre
+   * alinhado com o que o servidor resolveu pra este login — cobre
+   * quem nunca trocou de tema manualmente NESTE navegador (ex: já
+   * tinha "escuro" salvo no banco de outro dispositivo). Sem isso, o
+   * cookie só existiria depois de um toggle manual, e a preferência
+   * se perderia (voltando pro padrão "claro") assim que a sessão
+   * expirasse antes disso acontecer.
+   */
+  useEffect(() => {
+    if (!usuario) return;
+
+    const atributo = document.documentElement.getAttribute("data-theme");
+    const temaAtual = atributo === "dark" ? "escuro" : atributo === "light" ? "claro" : "sistema";
+    persistirTemaEmCookie(temaAtual);
+  }, [usuario]);
 
   /*
    * O layout raiz (setores/módulos liberados) só é buscado de

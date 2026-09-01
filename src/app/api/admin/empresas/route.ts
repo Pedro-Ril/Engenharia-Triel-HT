@@ -39,10 +39,11 @@ async function handlePOST(request: Request) {
 
     const nome = requiredText(parsedBody.nome, "nome", 150);
     const codigo = optionalText(parsedBody.codigo, "código", 30);
+    const cnpj = optionalText(parsedBody.cnpj, "CNPJ", 20);
     const corPrimariaClara = requiredText(parsedBody.corPrimariaClara, "cor (modo claro)", 7);
     const corPrimariaEscura = requiredText(parsedBody.corPrimariaEscura, "cor (modo escuro)", 7);
 
-    const empresa = await criarEmpresa({ nome, codigo, corPrimariaClara, corPrimariaEscura });
+    const empresa = await criarEmpresa({ nome, codigo, cnpj, corPrimariaClara, corPrimariaEscura });
 
     return NextResponse.json(
       { ok: true, message: "Empresa criada.", data: empresa },

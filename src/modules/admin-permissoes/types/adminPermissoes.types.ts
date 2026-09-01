@@ -40,6 +40,7 @@ export interface Empresa {
   id: string;
   nome: string;
   codigo: string | null;
+  cnpj: string | null;
   corPrimariaClara: string;
   corPrimariaEscura: string;
   ativa: boolean;
@@ -148,6 +149,18 @@ export interface StatusManutencao {
 export interface ConfigMateriaPrima {
   apiBaseUrl: string;
   intervaloSincronizacaoMinutos: number | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
+export interface ConfigEstruturaSubstituicao {
+  urlConsultaEstrutura: string | null;
+  urlValidarItens: string | null;
+  urlAtualizarEstrutura: string | null;
+  urlConsultaEstruturaTeste: string | null;
+  urlValidarItensTeste: string | null;
+  urlAtualizarEstruturaTeste: string | null;
+  usarAmbienteTeste: boolean;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }
