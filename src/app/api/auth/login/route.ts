@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getConfiguracaoAdSemSenha } from "@/lib/auth/configuracao-ad";
 import { AuthenticationError, ValidationError } from "@/lib/auth/errors";
-import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
+import { createSessionToken, deveUsarCookieSeguro, SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
 import { authenticateWithActiveDirectory } from "@/lib/auth/ldap";
 import {
   extrairIpOrigem,
@@ -225,7 +225,7 @@ async function handlePOST(request: Request) {
     response.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: deveUsarCookieSeguro(request),
       path: "/",
       maxAge: expiraEmSegundos,
     });

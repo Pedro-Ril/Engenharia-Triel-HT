@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
+import { deveUsarCookieSeguro, SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function handlePOST() {
+async function handlePOST(request: Request) {
   const response = NextResponse.json({
     ok: true,
     message: "Sessão encerrada.",
@@ -15,7 +15,7 @@ async function handlePOST() {
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: deveUsarCookieSeguro(request),
     path: "/",
     maxAge: 0,
   });
