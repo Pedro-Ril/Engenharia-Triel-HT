@@ -122,6 +122,7 @@ export interface AtualizacaoItem {
   tipo: TipoAtualizacaoItem;
   texto: string;
   ordem: number;
+  tags: AtualizacaoTag[];
 }
 
 export interface Atualizacao {
@@ -161,6 +162,18 @@ export interface ConfigEstruturaSubstituicao {
   urlValidarItensTeste: string | null;
   urlAtualizarEstruturaTeste: string | null;
   usarAmbienteTeste: boolean;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
+export interface ConfigIntegraLantek {
+  foccoApiBaseUrl: string | null;
+  foccoApiChave: string | null;
+  tokenConfigurado: boolean;
+  pastaDxf: string | null;
+  pastaDesenhos: string | null;
+  pastaExportacaoAgro: string | null;
+  pastaExportacaoVe: string | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }

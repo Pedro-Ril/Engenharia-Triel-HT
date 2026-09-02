@@ -17,6 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { TOOLTIP_GRAFICO_TEMA } from "@/lib/tema/tooltip-grafico";
 
 type Kpis = {
   clientes: string;
@@ -603,7 +604,7 @@ export default function BIPage() {
                     );
                   })}
                 </Pie>
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -630,7 +631,7 @@ export default function BIPage() {
                   width={260}
                   tick={{ fontSize: 12 }}
                 />
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Bar dataKey="total" name="Projetos" radius={[0, 8, 8, 0]}>
                   {dadosCliente.map((entry, index) => {
                     const clienteComparacao =
@@ -671,7 +672,7 @@ export default function BIPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="periodo" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Legend />
                 {nomesProjetistas.map((nome, index) => (
                   <Line
@@ -700,7 +701,7 @@ export default function BIPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="dia" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Legend />
                 <Line
                   type="monotone"
@@ -731,7 +732,7 @@ export default function BIPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="periodo" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Legend />
                 <Bar dataKey="total" name="Projetos" radius={[8, 8, 0, 0]}>
                   {dadosProjetosMes.map((entry, index) => {
@@ -777,7 +778,7 @@ export default function BIPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="label" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Legend />
                 <Bar dataKey="total" name="Projetos" radius={[8, 8, 0, 0]}>
                   {dadosDiaSemana.map((entry, index) => {
@@ -816,7 +817,7 @@ export default function BIPage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="periodo" />
               <YAxis />
-              <Tooltip />
+              <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
               <Legend />
               {nomesProjetistas.map((nome, index) => (
                 <Bar

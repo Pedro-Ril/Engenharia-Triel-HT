@@ -1,0 +1,566 @@
+/*
+  MELHORIA: variáveis movidas para :root para ficarem disponíveis em portais
+  do Handsontable (dropdowns, menus de contexto) que renderizam fora de .hot.
+*/
+:root {
+  --triel-red: var(--primary);
+  --triel-red-soft: var(--primary-soft);
+  --triel-red-soft-2: var(--primary-soft-strong);
+  --triel-border: var(--border-soft);
+  --triel-text: var(--text-soft);
+  --triel-muted: var(--text-muted);
+  --triel-bg: var(--bg-surface);
+}
+
+/*
+ * O Handsontable tem seu PRÓPRIO sistema de tema, baseado numa lista
+ * enorme de variáveis "--ht-*". Descoberta tardia, via inspeção real do
+ * DOM: ao contrário do que parecia, a biblioteca ENVOLVE sozinha cada
+ * instância numa div com a classe "ht-theme-main" (grid principal:
+ * "ht-root-wrapper ht-theme-main"; popups/menus: "ht-portal
+ * ht-theme-main") — e o CSS oficial dela
+ * ("ht-theme-main.min.css", importado no componente) já define TODAS
+ * essas variáveis diretamente nessa classe. Como essa div fica mais
+ * perto do elemento real na árvore do que o nosso ":root", a HERANÇA
+ * de "custom property" sempre usa o valor da própria biblioteca, nunca
+ * o nosso — não importa o que a gente escreva aqui em cima. É a causa
+ * raiz de vários bugs que pareciam aleatórios (borda de seleção azul,
+ * checkbox do filtro azul, borda clara sobrando nos popups): tudo
+ * herdava da MESMA div "ht-theme-main", não do ":root".
+ * Por isso as variáveis são redefinidas duas vezes: aqui em ":root"
+ * (serve de fallback e documentação) E logo abaixo, na própria classe
+ * "ht-theme-main" com especificidade reforçada (classe repetida) pra
+ * vencer de vez a regra original da biblioteca — sem isso, qualquer
+ * elemento dentro da grid ou dos popups continua herdando o valor
+ * padrão da biblioteca, não o nosso.
+ */
+:root,
+:global(.ht-theme-main.ht-theme-main) {
+  --ht-background-color: var(--bg-surface);
+  --ht-background-secondary-color: var(--bg-surface-muted);
+  --ht-border-color: var(--border-soft);
+  --ht-foreground-color: var(--text);
+  --ht-foreground-secondary-color: var(--text-muted);
+  --ht-accent-color: var(--primary);
+  --ht-disabled-color: var(--text-faint);
+  --ht-read-only-color: var(--text-muted);
+  --ht-placeholder-color: var(--text-faint);
+  --ht-link-color: var(--primary);
+  --ht-link-hover-color: var(--primary-hover);
+
+  --ht-header-background-color: var(--bg-surface-muted);
+  --ht-header-foreground-color: var(--text-soft);
+  --ht-header-active-background-color: var(--primary-soft);
+  --ht-header-active-foreground-color: var(--primary);
+  --ht-header-active-border-color: var(--primary);
+  --ht-header-highlighted-background-color: var(--primary-soft);
+  --ht-header-highlighted-foreground-color: var(--primary);
+  --ht-header-row-background-color: var(--bg-surface-muted);
+  --ht-header-row-foreground-color: var(--text-soft);
+  --ht-header-row-active-background-color: var(--primary-soft);
+  --ht-header-row-active-foreground-color: var(--primary);
+  --ht-header-row-highlighted-background-color: var(--primary-soft);
+  --ht-header-row-highlighted-foreground-color: var(--primary);
+  --ht-header-filter-background-color: var(--primary-soft);
+
+  --ht-row-cell-even-background-color: var(--bg-surface);
+  --ht-row-cell-odd-background-color: var(--bg-surface);
+  --ht-row-header-even-background-color: var(--bg-surface-muted);
+  --ht-row-header-odd-background-color: var(--bg-surface-muted);
+
+  --ht-cell-vertical-border-color: var(--border-soft);
+  --ht-cell-horizontal-border-color: var(--border-soft);
+  --ht-cell-selection-background-color: var(--primary-soft);
+  --ht-cell-selection-border-color: var(--primary);
+  --ht-cell-editor-background-color: var(--bg-surface);
+  --ht-cell-editor-foreground-color: var(--text);
+  --ht-cell-editor-border-color: var(--primary);
+  --ht-cell-read-only-background-color: var(--bg-surface-muted);
+  --ht-cell-success-background-color: var(--success-bg);
+  --ht-cell-error-background-color: var(--danger-bg);
+  --ht-cell-autofill-background-color: var(--primary);
+  --ht-cell-autofill-border-color: var(--primary);
+  --ht-cell-autofill-fill-border-color: var(--primary);
+
+  --ht-input-background-color: var(--bg-surface);
+  --ht-input-foreground-color: var(--text);
+  --ht-input-border-color: var(--border-input);
+  --ht-input-focus-background-color: var(--bg-surface);
+  --ht-input-focus-foreground-color: var(--text);
+  --ht-input-focus-border-color: var(--primary);
+  --ht-input-hover-background-color: var(--bg-surface);
+  --ht-input-hover-foreground-color: var(--text);
+  --ht-input-hover-border-color: var(--border-input-hover);
+  --ht-input-disabled-background-color: var(--bg-surface-muted);
+  --ht-input-disabled-border-color: var(--border-soft);
+  --ht-input-disabled-foreground-color: var(--text-faint);
+
+  --ht-primary-button-background-color: var(--primary);
+  --ht-primary-button-foreground-color: var(--text-inverse);
+  --ht-primary-button-border-color: var(--primary);
+  --ht-primary-button-hover-background-color: var(--primary-hover);
+  --ht-primary-button-hover-foreground-color: var(--text-inverse);
+  --ht-primary-button-hover-border-color: var(--primary-hover);
+  --ht-primary-button-focus-background-color: var(--primary-hover);
+  --ht-primary-button-focus-foreground-color: var(--text-inverse);
+  --ht-primary-button-focus-border-color: var(--primary-hover);
+  --ht-primary-button-disabled-background-color: var(--bg-surface-muted);
+  --ht-primary-button-disabled-foreground-color: var(--text-faint);
+  --ht-primary-button-disabled-border-color: var(--border-soft);
+
+  --ht-secondary-button-background-color: var(--bg-surface);
+  --ht-secondary-button-foreground-color: var(--text);
+  --ht-secondary-button-border-color: var(--border-soft);
+  --ht-secondary-button-hover-background-color: var(--bg-surface-muted);
+  --ht-secondary-button-hover-foreground-color: var(--text);
+  --ht-secondary-button-hover-border-color: var(--border-soft);
+  --ht-secondary-button-focus-background-color: var(--bg-surface-muted);
+  --ht-secondary-button-focus-foreground-color: var(--text);
+  --ht-secondary-button-focus-border-color: var(--primary);
+
+  --ht-dialog-content-background-color: var(--bg-surface);
+  --ht-dialog-solid-background-color: var(--bg-surface);
+  --ht-menu-border-color: var(--border-soft);
+  --ht-notification-background-color: var(--bg-surface);
+  --ht-notification-foreground-color: var(--text);
+  --ht-notification-border-color: var(--border-soft);
+
+  --ht-checkbox-background-color: var(--bg-surface);
+  --ht-checkbox-border-color: var(--border-input);
+  --ht-checkbox-checked-background-color: var(--primary);
+  --ht-checkbox-checked-border-color: var(--primary);
+  --ht-checkbox-checked-icon-color: var(--text-inverse);
+  --ht-checkbox-icon-color: var(--text-inverse);
+
+  --ht-icon-button-background-color: transparent;
+  --ht-icon-button-icon-color: var(--text-muted);
+  --ht-icon-button-hover-background-color: var(--primary-soft);
+  --ht-icon-button-hover-icon-color: var(--primary);
+  --ht-icon-button-border-color: transparent;
+  --ht-icon-button-hover-border-color: transparent;
+  /*
+   * Ícone de filtro de coluna já ATIVO (filtro aplicado) + mouse em
+   * cima ao mesmo tempo — a biblioteca define essas 3 variáveis com
+   * azul fixo (não encadeado por "--ht-accent-color", que já
+   * cobrimos acima), então sem essas linhas aqui o hover depois de
+   * aplicar um filtro continuava azul mesmo com tudo mais vermelho.
+   */
+  --ht-icon-button-active-background-color: var(--primary);
+  --ht-icon-button-active-border-color: var(--primary);
+  --ht-icon-button-active-icon-color: var(--text-inverse);
+  --ht-icon-button-active-hover-background-color: var(--primary-hover);
+  --ht-icon-button-active-hover-border-color: var(--primary-hover);
+  --ht-icon-button-active-hover-icon-color: var(--text-inverse);
+
+  --ht-scrollbar-thumb-color: var(--primary-soft-strong);
+  --ht-scrollbar-track-color: var(--bg-surface-muted);
+
+  --ht-pagination-bar-background-color: var(--bg-surface-muted);
+  --ht-pagination-bar-foreground-color: var(--text);
+  --ht-pagination-button-background-color: var(--bg-surface);
+  --ht-pagination-button-foreground-color: var(--text);
+  --ht-pagination-button-border-color: var(--border-soft);
+  --ht-pagination-button-hover-background-color: var(--primary-soft);
+  --ht-pagination-button-hover-foreground-color: var(--primary);
+  --ht-pagination-button-hover-border-color: var(--primary-soft-border);
+}
+
+.wrapper {
+  width: 100%;
+}
+
+/*
+  CORREÇÃO: ".handsontable" e demais classes abaixo são da biblioteca, não
+  locais deste CSS Module — precisam ficar dentro de :global(...) para não
+  serem "hasheadas" (senão nunca batem com o DOM real e a regra fica morta).
+  ".hot" continua local (classe aplicada no wrapper via className={styles.hot}).
+*/
+
+/* área geral da tabela */
+.hot :global(.handsontable) {
+  color: var(--triel-text);
+  font-size: 0.92rem;
+}
+
+/* fundo geral */
+.hot :global(.handsontable .htCore) {
+  background: var(--triel-bg);
+}
+
+/*
+ * ".htCore" é só a <table> (do tamanho exato das linhas reais) — o
+ * ".wtHolder" por baixo é o CONTAINER de rolagem, maior que a tabela.
+ * Quando um filtro deixa menos linhas, sobra espaço vazio abaixo da
+ * última linha, e esse espaço mostra o fundo branco padrão do
+ * ".wtHolder" (nunca coberto antes). O "!important" é necessário porque
+ * a própria biblioteca já tem uma regra pro mesmo elemento
+ * (".handsontable:not(...).htHasScrollX .ht_master .wtHolder", 5
+ * classes de especificidade) que vence a minha (3 classes) sem ele.
+ */
+.hot :global(.handsontable .wtHolder) {
+  background: var(--triel-bg) !important;
+}
+
+/*
+ * Fundo de cada célula, forçado direto — não depende só da variável
+ * "--ht-row-cell-even/odd-background-color" (que o Handsontable usa
+ * internamente) porque colunas somente-leitura (readOnly) recebem a
+ * classe ".htDimmed", que aplica seu PRÓPRIO fundo com !important por
+ * cima — é essa regra que ficava sempre clara, mesmo com a variável
+ * setada certo, então força aqui direto pra garantir.
+ */
+.hot :global(.handsontable td) {
+  background-color: var(--triel-bg) !important;
+  color: var(--triel-text) !important;
+}
+
+.hot :global(.handsontable .htDimmed) {
+  background-color: var(--bg-surface-muted) !important;
+  color: var(--triel-muted) !important;
+}
+
+/*
+ * Texto das células editáveis do tipo dropdown (Material, Máquina) —
+ * o Handsontable marca essas células com a classe ".htAutocomplete" e
+ * aplica uma cor de texto própria (~#222, quase preta) que não segue
+ * nenhuma variável de tema; por isso o texto "sumia" (texto quase
+ * preto sobre fundo escuro). Mantido como reforço, mesmo com o `color`
+ * já forçado acima em todo `td` — este seletor é mais específico.
+ */
+.hot :global(.handsontable .htAutocomplete) {
+  color: var(--triel-text) !important;
+}
+
+/*
+ * Cabeçalho (linha de título das colunas E coluna de número de linha).
+ * "!important" necessário aqui: a coluna de número de linha tem uma
+ * regra própria do Handsontable pra alternar linhas pares/ímpares
+ * (".ht__row_even"/"ht__row_odd") que, mesmo com a variável de tema
+ * setada certo, continuava vencendo com um cinza claro fixo — força
+ * direto pra garantir, igual já foi feito com ".htDimmed" acima.
+ */
+.hot :global(.handsontable thead th),
+.hot :global(.handsontable tbody th) {
+  background: var(--bg-surface-muted) !important;
+  color: var(--triel-text) !important;
+  font-weight: 700;
+  border-color: var(--triel-border) !important; /* Handsontable usa inline style aqui */
+}
+
+/* Estado de destaque da coluna de número de linha (linha ativa/selecionada) */
+.hot :global(.handsontable th.ht__highlight),
+.hot :global(.handsontable th.ht__active_highlight),
+.hot :global(.handsontable th.current),
+.hot :global(.handsontable th.active) {
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+}
+
+/* células */
+.hot :global(.handsontable td),
+.hot :global(.handsontable th) {
+  border-color: var(--triel-border) !important; /* Handsontable usa inline style aqui */
+}
+
+/* linha/célula selecionada */
+.hot :global(.handsontable .current),
+.hot :global(.handsontable .area),
+.hot :global(.handsontable .highlight) {
+  background-color: var(--triel-red-soft) !important; /* necessário — Handsontable aplica via JS */
+}
+
+/*
+ * Borda da seleção (célula/linha clicada) e alça de auto-preenchimento —
+ * o Handsontable embrulha a tabela numa div ".ht-theme-main" (tema padrão
+ * dele, aplicado automaticamente mesmo sem eu pedir) que já define
+ * "--ht-cell-selection-border-color"/"--ht-cell-autofill-background-color"
+ * pro azul padrão (#1a42e8) NELA MESMA — como essa div fica mais perto do
+ * ".wtBorder" na árvore do que o ":root" onde eu redefino essas variáveis,
+ * a herança usa sempre o valor da biblioteca, nunca o meu. E a regra que
+ * pinta o ".wtBorder" (".handsontable .wtBorder.current { ... !important }")
+ * tem 3 classes de especificidade — minha regra anterior, com só 1 classe,
+ * nunca vencia o empate de "!important" contra "!important". Aumentando a
+ * especificidade aqui (".hot" + as mesmas 3 classes) resolve os dois
+ * problemas de uma vez, sem precisar redefinir a variável em outro lugar.
+ */
+.hot :global(.handsontable .wtBorder.current),
+.hot :global(.handsontable .wtBorder.area),
+.hot :global(.handsontable .wtBorder.corner) {
+  background-color: var(--triel-red) !important;
+}
+
+/* cabeçalho de colunas congeladas */
+.hot :global(.handsontable .ht_clone_left thead th),
+.hot :global(.handsontable .ht_clone_top_left_corner thead th) {
+  background: var(--bg-surface-muted);
+}
+
+/* sombra para indicar colunas fixas */
+.hot :global(.handsontable .ht_clone_left) {
+  box-shadow: 6px 0 14px rgba(15, 23, 42, 0.08);
+  z-index: 4;
+}
+
+/*
+  ─── UI flutuante do Handsontable (menus, filtros, editores) ───────────────
+  Estes elementos são renderizados pelo Handsontable em portal, fora da
+  árvore DOM de ".hot" — por isso NÃO levam o prefixo ".hot" (do contrário
+  a regra nunca bateria, mesmo com o :global correto).
+  ─────────────────────────────────────────────────────────────────────────
+*/
+
+/* inputs/selects internos do filtro */
+:global(.htUIInput),
+:global(.htUISelect),
+:global(.htUIAutocomplete) {
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--triel-border);
+  border-radius: 10px;
+}
+
+/* foco em campos do menu */
+:global(.htUIInput:focus),
+:global(.htUISelect:focus),
+:global(.htUIAutocomplete:focus) {
+  border-color: var(--triel-red);
+  box-shadow: 0 0 0 3px var(--triel-red-soft);
+  outline: none;
+}
+
+/*
+ * Botão OK/Cancelar do menu de filtro — os nomes de classe corretos do
+ * Handsontable são .htUIButtonOK/.htUIButtonCancel (".htUIPrimary"/
+ * ".htUISecondary" não existem na biblioteca; a regra nunca batia,
+ * mesmo antes desta correção, e por isso o botão ficava com o azul
+ * padrão do Handsontable em vez do vermelho da marca).
+ */
+:global(.htUIButtonOK) input,
+:global(.ht-button--primary) {
+  background: var(--triel-red) !important; /* necessário — Handsontable aplica inline */
+  border-color: var(--triel-red) !important;
+  color: var(--text-inverse) !important;
+  border-radius: 10px !important;
+}
+
+:global(.htUIButtonOK) input:hover,
+:global(.ht-button--primary:hover) {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+:global(.htUIButtonCancel) input,
+:global(.ht-button--secondary) {
+  background: var(--bg-surface) !important;
+  border-color: var(--triel-border) !important;
+  color: var(--text) !important;
+  border-radius: 10px !important;
+}
+
+:global(.htUIButtonCancel) input:hover,
+:global(.ht-button--secondary:hover) {
+  background: var(--bg-surface-muted) !important;
+}
+
+/*
+ * Menu dropdown / filtro / menu de contexto (botão direito) — ".htMenu"
+ * NÃO é uma classe real do Handsontable (confirmado: zero ocorrências
+ * no CSS da biblioteca) — essa regra nunca bateu com nada, por isso o
+ * popup de contexto continuava sempre branco mesmo depois do primeiro
+ * ajuste. As classes reais são ".htDropdownMenu"/".htContextMenu"/
+ * ".htFiltersConditionsMenu", cada uma delas some com um ".ht_master"
+ * (e um ".wtHolder" dentro dele) que tem SEU PRÓPRIO fundo branco,
+ * sem depender de nenhuma variável — por isso força os dois níveis.
+ */
+:global(.htDropdownMenu),
+:global(.htContextMenu),
+:global(.htFiltersConditionsMenu) {
+  background: var(--bg-surface) !important; /* necessário — Handsontable usa inline */
+  color: var(--text);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16) !important; /* necessário — Handsontable usa inline */
+  border: 1px solid var(--triel-border) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+
+:global(.htDropdownMenu .ht_master),
+:global(.htContextMenu .ht_master),
+:global(.htFiltersConditionsMenu .ht_master),
+:global(.htDropdownMenu .wtHolder),
+:global(.htContextMenu .wtHolder),
+:global(.htFiltersConditionsMenu .wtHolder) {
+  background: var(--bg-surface) !important;
+}
+
+:global(.htDropdownMenu table td),
+:global(.htContextMenu table td),
+:global(.htFiltersConditionsMenu table td) {
+  background: var(--bg-surface) !important;
+  color: var(--text) !important;
+}
+
+:global(.htDropdownMenu table td:hover),
+:global(.htContextMenu table td:hover),
+:global(.htFiltersConditionsMenu table td:hover) {
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+}
+
+/*
+ * Barra de rolagem DENTRO desses popups — as regras de scrollbar lá
+ * embaixo são todas escopadas em ".hot" (só valem pro grid principal);
+ * esses menus renderizam num portal FORA de ".hot", por isso a barra
+ * de rolagem interna deles continuava com o cinza padrão do navegador.
+ */
+:global(.htDropdownMenu .wtHolder)::-webkit-scrollbar,
+:global(.htContextMenu .wtHolder)::-webkit-scrollbar,
+:global(.htFiltersConditionsMenu .wtHolder)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:global(.htDropdownMenu .wtHolder)::-webkit-scrollbar-track,
+:global(.htContextMenu .wtHolder)::-webkit-scrollbar-track,
+:global(.htFiltersConditionsMenu .wtHolder)::-webkit-scrollbar-track {
+  background: var(--bg-surface-muted) !important;
+}
+
+:global(.htDropdownMenu .wtHolder)::-webkit-scrollbar-thumb,
+:global(.htContextMenu .wtHolder)::-webkit-scrollbar-thumb,
+:global(.htFiltersConditionsMenu .wtHolder)::-webkit-scrollbar-thumb {
+  background: var(--primary-soft-strong) !important;
+  border-radius: 999px;
+}
+
+:global(.htDropdownMenu .wtHolder),
+:global(.htContextMenu .wtHolder),
+:global(.htFiltersConditionsMenu .wtHolder) {
+  scrollbar-color: var(--primary-soft-strong) var(--bg-surface-muted) !important;
+}
+
+/*
+ * Checkbox marcado (lista de valores do filtro) e qualquer outro
+ * checkbox/radio dentro desses popups — troca o azul padrão do
+ * navegador pelo vermelho da marca.
+ */
+:global(.htDropdownMenu input[type="checkbox"]),
+:global(.htContextMenu input[type="checkbox"]),
+:global(.htFiltersConditionsMenu input[type="checkbox"]),
+:global(.htFiltersMenuValue input[type="checkbox"]) {
+  accent-color: var(--primary);
+}
+
+/* ─── Painel de filtro ───────────────────────────────────────────────────────
+   Tamanho via :global — portais renderizados fora do escopo do CSS Module.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Largura das seções */
+:global(.htFiltersMenuCondition),
+:global(.htFiltersMenuValue),
+:global(.htFiltersMenuActionBar) {
+  min-width: 400px !important;
+}
+
+/* Lista de checkboxes — altura maior, scroll horizontal quando necessário */
+:global(.htFiltersMenuValue .htUIMultipleSelectHot) {
+  height: 280px !important;
+}
+:global(.htFiltersMenuValue .htUIMultipleSelectHot .wtHolder) {
+  overflow-x: auto !important;
+}
+
+/* Itens exibem conteúdo completo — scroll cuida do resto */
+:global(.htFiltersMenuValue .htUIMultipleSelectHot td) {
+  white-space: nowrap;
+}
+
+/* Campo de busca ocupa toda a largura */
+:global(.htFiltersMenuValue .htUIInput input) {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* seta / ícone de dropdown no cabeçalho (dentro do escopo do componente) */
+.hot :global(.handsontable .changeType),
+.hot :global(.handsontable .colHeader .htDropdownMenu) {
+  color: var(--triel-red);
+}
+
+/*
+  Cód. Item / Cód. Desenho — sinalização de DXF encontrado/não encontrado.
+  Especificidade elevada de propósito (classe repetida) para vencer
+  ".handsontable .htDimmed", que o Handsontable aplica em toda célula
+  somente-leitura (como estas) com a mesma prioridade "!important".
+*/
+.hot :global(.handsontable td.dxfCellFound.dxfCellFound) {
+  background-color: var(--success-bg) !important;
+  color: var(--success-text) !important;
+}
+
+.hot :global(.handsontable td.dxfCellMissing.dxfCellMissing) {
+  background-color: var(--danger-bg) !important;
+  color: var(--danger-text) !important;
+}
+
+/* cabeçalho com filtro ativo */
+.hot :global(.handsontable th.htFiltered),
+.hot :global(.handsontable .ht_clone_top th.htFiltered),
+.hot :global(.handsontable .ht_clone_top_left_corner th.htFiltered) {
+  background: var(--triel-red-soft) !important; /* necessário — Handsontable aplica via JS */
+  color: var(--triel-red) !important;
+}
+
+/*
+ * Scrollbar visual do container clonado — faltava o ".../-track", que
+ * sem regra própria cai no cinza claro padrão do navegador (por isso
+ * a barra de rolagem ainda parecia clara mesmo com o resto escuro).
+ */
+.hot :global(.handsontable .wtHolder)::-webkit-scrollbar,
+.hot :global(.handsontable .wtHider)::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.hot :global(.handsontable .wtHolder)::-webkit-scrollbar-track,
+.hot :global(.handsontable .wtHider)::-webkit-scrollbar-track {
+  background: var(--bg-surface-muted);
+}
+
+.hot :global(.handsontable .wtHolder)::-webkit-scrollbar-thumb,
+.hot :global(.handsontable .wtHider)::-webkit-scrollbar-thumb {
+  background: var(--triel-red-soft-2);
+  border-radius: 999px;
+}
+
+.hot :global(.handsontable .wtHolder)::-webkit-scrollbar-thumb:hover,
+.hot :global(.handsontable .wtHider)::-webkit-scrollbar-thumb:hover {
+  background: var(--triel-red);
+}
+
+.hot :global(.handsontable .wtHolder),
+.hot :global(.handsontable .wtHider) {
+  scrollbar-color: var(--triel-red-soft-2) var(--bg-surface-muted);
+}
+/* Scrollbar dos cards */
+.seuContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.seuContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.seuContainer::-webkit-scrollbar-thumb {
+  background: var(--triel-red-soft-2); /* mesmo vermelho do projeto */
+  border-radius: 999px;
+}
+
+.seuContainer::-webkit-scrollbar-thumb:hover {
+  background: var(--triel-red);
+}
+
+/* Firefox */
+.seuContainer {
+  scrollbar-color: var(--triel-red-soft-2) transparent;
+  scrollbar-width: thin;
+}

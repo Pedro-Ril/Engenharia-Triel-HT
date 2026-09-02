@@ -24,6 +24,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { TOOLTIP_GRAFICO_TEMA } from "@/lib/tema/tooltip-grafico";
 import Link from "next/link";
 
 import { Alert } from "@/components/ui/Alert";
@@ -264,7 +265,7 @@ export function MinhaContaPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" allowDecimals={false} />
                   <YAxis type="category" dataKey="nome" width={150} tick={{ fontSize: 12 }} />
-                  <Tooltip cursor={false} />
+                  <Tooltip {...TOOLTIP_GRAFICO_TEMA} cursor={false} />
                   <Bar dataKey="total" name="Acessos" fill="var(--primary)" radius={[0, 8, 8, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -345,7 +346,7 @@ export function MinhaContaPage() {
                       <Cell key={entry.label} fill={entry.cor} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 </PieChart>
               </ResponsiveContainer>
             )}

@@ -41,7 +41,7 @@ export function requiredTagIds(value: unknown, fieldName: string): string[] {
 export function requiredItens(
   value: unknown,
   fieldName: string
-): { tipo: TipoAtualizacaoItem; texto: string }[] {
+): { tipo: TipoAtualizacaoItem; texto: string; tagIds: string[] }[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new ValidationError(`Adicione ao menos um item em ${fieldName}.`);
   }
@@ -60,8 +60,9 @@ export function requiredItens(
     }
 
     const texto = requiredText(item.texto, "texto do item", 500);
+    const tagIds = requiredTagIds(item.tagIds ?? [], "tags do item");
 
-    return { tipo: tipo as TipoAtualizacaoItem, texto };
+    return { tipo: tipo as TipoAtualizacaoItem, texto, tagIds };
   });
 }
 

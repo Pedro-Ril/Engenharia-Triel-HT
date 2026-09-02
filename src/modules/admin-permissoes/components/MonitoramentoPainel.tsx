@@ -34,6 +34,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { TOOLTIP_GRAFICO_TEMA } from "@/lib/tema/tooltip-grafico";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -293,7 +294,7 @@ function AbaVisaoGeral({ resumo }: { resumo: ResumoMonitoramento }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="label" />
                 <YAxis allowDecimals={false} />
-                <Tooltip />
+                <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                 <Bar dataKey="total" name="Ocorrências" radius={[8, 8, 0, 0]}>
                   {dadosLogs.map((entry) => (
                     <Cell key={entry.nivel} fill={NIVEL_CONFIG[entry.nivel].cor} />
@@ -445,6 +446,7 @@ function AbaBancoDeDados({ resumo }: { resumo: ResumoMonitoramento }) {
                 <XAxis type="number" allowDecimals={false} unit=" MB" />
                 <YAxis type="category" dataKey="nome" width={160} tick={{ fontSize: 12 }} />
                 <Tooltip
+                  {...TOOLTIP_GRAFICO_TEMA}
                   formatter={(value) => [`${Number(value).toLocaleString("pt-BR")} MB`, "Tamanho"]}
                 />
                 <Bar dataKey="tamanhoMB" name="Tamanho" fill="var(--primary)" radius={[0, 8, 8, 0]} />

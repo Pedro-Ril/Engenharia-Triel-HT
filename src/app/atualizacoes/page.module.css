@@ -411,9 +411,18 @@
   color: var(--success-text);
 }
 
+/*
+ * Usava "--primary" (o vermelho da marca) — ficava quase idêntico a
+ * todo o resto da interface (botões, seleção, bordas), sem parecer
+ * um "tipo" próprio ao lado do verde (Novo) e âmbar (Correção).
+ * "--info-*" (azul) já existe no sistema de tokens e é a cor
+ * semântica mais comum pra "melhoria/aprimoramento" nesse tipo de
+ * changelog — mesma dupla "-bg-strong"/"-text" que os outros dois já
+ * usam.
+ */
 .badgeMelhoria {
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: var(--info-bg-strong);
+  color: var(--info-text);
 }
 
 .badgeCorrecao {

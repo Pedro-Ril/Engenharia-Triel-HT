@@ -66,17 +66,10 @@ interface AtualizacoesPainelProps {
   onFeedback: FeedbackHandler;
 }
 
-const TIPO_ESTILOS: Record<
-  TipoAtualizacaoItem,
-  { label: string; bg: string; texto: string }
-> = {
-  novo: { label: "Novo", bg: "rgba(15, 118, 110, 0.1)", texto: "#0f766e" },
-  melhoria: {
-    label: "Melhoria",
-    bg: "var(--tag-red-bg)",
-    texto: "var(--tag-red-text)",
-  },
-  correcao: { label: "Correção", bg: "rgba(146, 64, 14, 0.1)", texto: "#92400e" },
+const TIPO_ESTILOS: Record<TipoAtualizacaoItem, { label: string }> = {
+  novo: { label: "Novo" },
+  melhoria: { label: "Melhoria" },
+  correcao: { label: "Correção" },
 };
 
 function pad2(valor: number): string {
@@ -109,6 +102,7 @@ interface ItemForm {
   id: string;
   tipo: TipoAtualizacaoItem;
   texto: string;
+  tagIds: string[];
 }
 
 function novoItemForm(): ItemForm {
@@ -116,6 +110,7 @@ function novoItemForm(): ItemForm {
     id: typeof crypto !== "undefined" ? crypto.randomUUID() : String(Math.random()),
     tipo: "melhoria",
     texto: "",
+    tagIds: [],
   };
 }
 
@@ -216,17 +211,49 @@ function SelectTipoItem({
   );
 }
 
+function TagChipToggle({
+  tag,
+  selecionada,
+  onClick,
+}: {
+  tag: AtualizacaoTag;
+  selecionada: boolean;
+  onClick: () => void;
+}) {
+  const estilo = ESTILOS_CORES_TAG[tag.cor as keyof typeof ESTILOS_CORES_TAG] ?? ESTILOS_CORES_TAG.slate;
+
+  return (
+    <button
+      type="button"
+      className={styles.itemTagChip}
+      aria-pressed={selecionada}
+      onClick={onClick}
+      style={
+        selecionada
+          ? { background: estilo.bg, color: estilo.texto, borderColor: estilo.borda }
+          : undefined
+      }
+    >
+      {tag.nome}
+    </button>
+  );
+}
+
 function ItemFormRow({
   item,
+  tags,
   podeRemover,
   onTipoChange,
   onTextoChange,
+  onToggleTag,
   onRemover,
 }: {
   item: ItemForm;
+  tags: AtualizacaoTag[];
   podeRemover: boolean;
   onTipoChange: (tipo: TipoAtualizacaoItem) => void;
   onTextoChange: (texto: string) => void;
+  onToggleTag: (tagId: string) => void;
   onRemover: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -239,33 +266,48 @@ function ItemFormRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={styles.itemFormRow}>
-      <IconButton
-        icon={<GripVertical size={15} />}
-        label="Arrastar para reordenar item"
-        size="small"
-        className={styles.alcaArrastar}
-        {...attributes}
-        {...listeners}
-      />
+    <div ref={setNodeRef} style={style} className={styles.itemFormRowWrapper}>
+      <div className={styles.itemFormRow}>
+        <IconButton
+          icon={<GripVertical size={15} />}
+          label="Arrastar para reordenar item"
+          size="small"
+          className={styles.alcaArrastar}
+          {...attributes}
+          {...listeners}
+        />
 
-      <SelectTipoItem valor={item.tipo} onChange={onTipoChange} />
+        <SelectTipoItem valor={item.tipo} onChange={onTipoChange} />
 
-      <Input
-        value={item.texto}
-        placeholder="Descreva o item..."
-        className={styles.itemFormTexto}
-        onChange={(event) => onTextoChange(event.target.value)}
-      />
+        <Input
+          value={item.texto}
+          placeholder="Descreva o item..."
+          className={styles.itemFormTexto}
+          onChange={(event) => onTextoChange(event.target.value)}
+        />
 
-      <IconButton
-        icon={<Trash2 size={15} />}
-        label="Remover item"
-        size="small"
-        variant="danger"
-        onClick={onRemover}
-        disabled={!podeRemover}
-      />
+        <IconButton
+          icon={<Trash2 size={15} />}
+          label="Remover item"
+          size="small"
+          variant="danger"
+          onClick={onRemover}
+          disabled={!podeRemover}
+        />
+      </div>
+
+      {tags.length > 0 && (
+        <div className={styles.itemTagChips}>
+          {tags.map((tag) => (
+            <TagChipToggle
+              key={tag.id}
+              tag={tag}
+              selecionada={item.tagIds.includes(tag.id)}
+              onClick={() => onToggleTag(tag.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -437,7 +479,11 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
             publicado: item.publicado,
             ordem: item.ordem,
             tagIds: item.tags.map((tag) => tag.id),
-            itens: item.itens.map((i) => ({ tipo: i.tipo, texto: i.texto })),
+            itens: item.itens.map((i) => ({
+              tipo: i.tipo,
+              texto: i.texto,
+              tagIds: i.tags.map((tag) => tag.id),
+            })),
           })
         )
       );
@@ -572,6 +618,7 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
         id: item.id,
         tipo: item.tipo,
         texto: item.texto,
+        tagIds: item.tags.map((tag) => tag.id),
       })),
     });
     setErroAtualizacao(null);
@@ -601,6 +648,17 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
       ...atual,
       itens: atual.itens.map((item) =>
         item.id === id ? { ...item, [campo]: valor } : item
+      ),
+    }));
+  }
+
+  function alternarTagItemForm(id: string, tagId: string) {
+    setFormAtualizacao((atual) => ({
+      ...atual,
+      itens: atual.itens.map((item) =>
+        item.id === id
+          ? { ...item, tagIds: alternarIdEmLista(item.tagIds, tagId) }
+          : item
       ),
     }));
   }
@@ -640,7 +698,11 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
       publicado: formAtualizacao.publicado,
       ordem: formAtualizacao.ordem,
       tagIds: formAtualizacao.tagIds,
-      itens: itensValidos.map((item) => ({ tipo: item.tipo, texto: item.texto })),
+      itens: itensValidos.map((item) => ({
+        tipo: item.tipo,
+        texto: item.texto,
+        tagIds: item.tagIds,
+      })),
     };
 
     try {
@@ -1014,11 +1076,13 @@ export function AtualizacoesPainel({ onFeedback }: AtualizacoesPainelProps) {
                     <ItemFormRow
                       key={item.id}
                       item={item}
+                      tags={tags}
                       podeRemover={formAtualizacao.itens.length > 1}
                       onTipoChange={(tipo) => atualizarItemForm(item.id, "tipo", tipo)}
                       onTextoChange={(texto) =>
                         atualizarItemForm(item.id, "texto", texto)
                       }
+                      onToggleTag={(tagId) => alternarTagItemForm(item.id, tagId)}
                       onRemover={() => removerItemForm(item.id)}
                     />
                   ))}

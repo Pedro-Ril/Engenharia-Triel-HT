@@ -21,6 +21,7 @@ export interface AtualizacaoItem {
   tipo: TipoAtualizacaoItem;
   texto: string;
   ordem: number;
+  tags: AtualizacaoTag[];
 }
 
 export interface Atualizacao {
@@ -239,15 +240,58 @@ async function carregarItensETags(
     ORDER BY [ordem];
   `);
 
+  const itemPorId = new Map<string, AtualizacaoItem>();
+
   for (const row of itensResult.recordset) {
-    const lista = itensPorAtualizacao.get(row.atualizacao_id) ?? [];
-    lista.push({
+    const item: AtualizacaoItem = {
       id: row.id,
       tipo: row.tipo as TipoAtualizacaoItem,
       texto: row.texto,
       ordem: row.ordem,
-    });
+      tags: [],
+    };
+    itemPorId.set(row.id, item);
+
+    const lista = itensPorAtualizacao.get(row.atualizacao_id) ?? [];
+    lista.push(item);
     itensPorAtualizacao.set(row.atualizacao_id, lista);
+  }
+
+  const tagsItemResult = await pool.request().query<{
+    item_id: string;
+    id: string;
+    chave: string;
+    nome: string;
+    cor: string;
+    ordem: number;
+    ativo: boolean;
+  }>(`
+    SELECT
+      CONVERT(VARCHAR(36), im.[item_id]) AS [item_id],
+      CONVERT(VARCHAR(36), t.[id]) AS [id],
+      t.[chave],
+      t.[nome],
+      t.[cor],
+      t.[ordem],
+      CAST(t.[ativo] AS BIT) AS [ativo]
+    FROM dbo.portal_atualizacao_item_modulos AS im
+    INNER JOIN dbo.portal_atualizacao_tags AS t
+      ON t.[id] = im.[tag_id]
+    ORDER BY t.[ordem], t.[nome];
+  `);
+
+  for (const row of tagsItemResult.recordset) {
+    const item = itemPorId.get(row.item_id);
+    if (!item) continue;
+
+    item.tags.push({
+      id: row.id,
+      chave: row.chave,
+      nome: row.nome,
+      cor: row.cor as CorTag,
+      ordem: row.ordem,
+      ativo: row.ativo,
+    });
   }
 
   const tagsResult = await pool.request().query<{
@@ -339,7 +383,7 @@ export interface SalvarAtualizacaoParams {
   publicado: boolean;
   ordem: number;
   tagIds: string[];
-  itens: { tipo: TipoAtualizacaoItem; texto: string }[];
+  itens: { tipo: TipoAtualizacaoItem; texto: string; tagIds: string[] }[];
   criadoPor?: string;
 }
 
@@ -444,7 +488,7 @@ export async function atualizarAtualizacao(
 async function inserirItens(
   transaction: InstanceType<typeof sql.Transaction>,
   atualizacaoId: string,
-  itens: { tipo: TipoAtualizacaoItem; texto: string }[]
+  itens: { tipo: TipoAtualizacaoItem; texto: string; tagIds: string[] }[]
 ) {
   for (const [indice, item] of itens.entries()) {
     const request = new sql.Request(transaction);
@@ -454,11 +498,25 @@ async function inserirItens(
     request.input("texto", sql.NVarChar(500), item.texto);
     request.input("ordem", sql.Int, indice);
 
-    await request.query(`
+    const insertResult = await request.query<{ id: string }>(`
       INSERT INTO dbo.portal_atualizacao_itens
         ([atualizacao_id], [tipo], [texto], [ordem])
+      OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
       VALUES (@atualizacaoId, @tipo, @texto, @ordem);
     `);
+
+    const itemId = insertResult.recordset[0].id;
+
+    for (const tagId of item.tagIds) {
+      const tagRequest = new sql.Request(transaction);
+      tagRequest.input("itemId", sql.UniqueIdentifier, itemId);
+      tagRequest.input("tagId", sql.UniqueIdentifier, tagId);
+
+      await tagRequest.query(`
+        INSERT INTO dbo.portal_atualizacao_item_modulos ([item_id], [tag_id])
+        VALUES (@itemId, @tagId);
+      `);
+    }
   }
 }
 

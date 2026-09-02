@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { X } from "lucide-react";
 import styles from "@/app/atualizacoes/page.module.css";
 import { getEstiloCorTag } from "@/lib/atualizacoes/cores-tag";
@@ -31,20 +32,20 @@ const TIPO_CONFIG = {
   novo: {
     label: "Novo",
     className: styles.badgeNovo,
-    bg: "rgba(15, 118, 110, 0.1)",
-    texto: "#0f766e",
+    bg: "var(--success-bg-strong)",
+    texto: "var(--success-text)",
   },
   melhoria: {
     label: "Melhoria",
     className: styles.badgeMelhoria,
-    bg: "var(--tag-red-bg)",
-    texto: "var(--tag-red-text)",
+    bg: "var(--info-bg-strong)",
+    texto: "var(--info-text)",
   },
   correcao: {
     label: "Correção",
     className: styles.badgeCorrecao,
-    bg: "rgba(146, 64, 14, 0.1)",
-    texto: "#92400e",
+    bg: "var(--warning-bg-strong)",
+    texto: "var(--warning-text)",
   },
 };
 
@@ -71,6 +72,40 @@ function TagDot({ tag }: { tag: AtualizacaoTag }) {
       title={tag.nome}
     />
   );
+}
+
+/*
+ * Estilo do item do changelog, de acordo com o(s) módulo(s) marcados
+ * nele (não no card da atualização como um todo — um card pode
+ * reunir itens de módulos diferentes). Usa exatamente o mesmo
+ * conjunto de cores do badge de módulo (TagChip): "bg" de fundo,
+ * "texto" pra cor do texto, "borda" pra borda — sem diluir, igual ao
+ * badge em si.
+ *
+ * Um módulo só = as 3 cores exatas da tag; dois ou mais = fade entre
+ * os fundos ("bg" de cada um, na mesma ordem em que os módulos
+ * aparecem, já vem ordenado por "ordem" da tag) — a cor do texto
+ * nesse caso fica a padrão do item, já que misturar cor de texto em
+ * gradiente não é algo direto em CSS; a borda usa a cor do primeiro
+ * módulo. Sem módulo marcado = undefined, cai no visual padrão
+ * definido em CSS (sem borda colorida, fundo neutro).
+ */
+function estiloItem(tags: AtualizacaoTag[]): CSSProperties | undefined {
+  if (tags.length === 0) return undefined;
+
+  const cores = tags.map((tag) => getEstiloCorTag(tag.cor));
+
+  if (cores.length === 1) {
+    const [estilo] = cores;
+    return { background: estilo.bg, color: estilo.texto, borderColor: estilo.borda };
+  }
+
+  const passo = 100 / (cores.length - 1);
+  const background = `linear-gradient(90deg, ${cores
+    .map((estilo, indice) => `${estilo.bg} ${Math.round(indice * passo)}%`)
+    .join(", ")})`;
+
+  return { background, borderColor: cores[0].borda };
 }
 
 export default function AtualizacoesPage({
@@ -349,7 +384,8 @@ export default function AtualizacoesPage({
           )}
 
           <div className={styles.timeline}>
-            {atualizacoesFiltradas.map((item, index) => (
+            {atualizacoesFiltradas.map((item, index) => {
+              return (
               <div
                 key={item.id}
                 className={styles.timelineItem}
@@ -403,7 +439,8 @@ export default function AtualizacoesPage({
                   </div>
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -440,7 +477,11 @@ export default function AtualizacoesPage({
             <div className={styles.modalBody}>
               <ul className={styles.itensList}>
                 {selecionada.itens.map((item) => (
-                  <li key={item.id} className={styles.itemRow}>
+                  <li
+                    key={item.id}
+                    className={styles.itemRow}
+                    style={estiloItem(item.tags)}
+                  >
                     <span
                       className={`${styles.badge} ${TIPO_CONFIG[item.tipo].className}`}
                     >

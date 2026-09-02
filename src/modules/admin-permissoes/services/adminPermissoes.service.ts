@@ -6,6 +6,7 @@ import type {
   AtualizacaoTag,
   BuscaTerminalFabrica,
   ConfigEstruturaSubstituicao,
+  ConfigIntegraLantek,
   ConfigMateriaPrima,
   ConfiguracaoAd,
   ConfiguracaoDb,
@@ -474,7 +475,7 @@ export interface SalvarAtualizacaoDados {
   publicado: boolean;
   ordem: number;
   tagIds: string[];
-  itens: { tipo: TipoAtualizacaoItem; texto: string }[];
+  itens: { tipo: TipoAtualizacaoItem; texto: string; tagIds: string[] }[];
 }
 
 export async function criarAtualizacao(
@@ -631,6 +632,29 @@ export async function salvarConfigEstruturaSubstituicao(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigEstruturaSubstituicao>(response);
+}
+
+export async function buscarConfigIntegraLantek(): Promise<ConfigIntegraLantek | null> {
+  const response = await fetch("/api/admin/integra-lantek/config");
+  const body = await parseResponse<ConfigIntegraLantek>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigIntegraLantek(dados: {
+  foccoApiBaseUrl: string | null;
+  foccoApiChave: string | null;
+  foccoApiToken: string | null;
+  pastaDxf: string | null;
+  pastaDesenhos: string | null;
+  pastaExportacaoAgro: string | null;
+  pastaExportacaoVe: string | null;
+}): Promise<ApiEnvelope<ConfigIntegraLantek>> {
+  const response = await fetch("/api/admin/integra-lantek/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigIntegraLantek>(response);
 }
 
 export async function listarEmpresasComCatalogoMateriaPrima(): Promise<EmpresaComCatalogo[]> {

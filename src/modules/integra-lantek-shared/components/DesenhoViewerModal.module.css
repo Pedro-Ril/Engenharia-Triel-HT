@@ -1,0 +1,332 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  padding: 12px;
+}
+
+.modal {
+  width: min(99vw, 2000px);
+  height: min(96vh, 1000px);
+  background: var(--bg-surface);
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(
+    180deg,
+    var(--primary-soft) 0%,
+    transparent 100%
+  );
+  flex-shrink: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--text);
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.closeButton {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.closeButton:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft-border);
+  transform: translateY(-1px);
+}
+
+.panes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.paneDivider {
+  width: 1px;
+  flex-shrink: 0;
+  background: var(--border-soft);
+}
+
+.paneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.paneHeader > span:first-child {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/*
+ * ─── Menu flutuante de medição, sobreposto ao canvas do DXF ──────────────
+ * Fica por cima do viewport de desenho técnico (canvas WebGL com fundo
+ * próprio, não ligado ao tema do portal) — mantido sempre um painel claro
+ * translúcido de propósito, igual controles flutuantes de qualquer visor
+ * de mídia/CAD, independente do tema do portal.
+ */
+
+.medicaoFlutuante {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 220px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #ececec;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(4px);
+}
+
+.medicaoFlutuanteLinha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.medicaoResultado {
+  color: #b71c1c;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.medirButton {
+  min-height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(183, 28, 28, 0.25);
+  background: #ffffff;
+  color: #b71c1c;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.medirButton:hover:not(:disabled) {
+  background: rgba(183, 28, 28, 0.06);
+}
+
+.medirButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.medirButtonAtivo {
+  background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.medirButtonAtivo:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
+}
+
+.medicaoLimparButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.medicaoLimparButton:hover {
+  background: rgba(183, 28, 28, 0.06);
+  color: #b71c1c;
+  border-color: rgba(183, 28, 28, 0.2);
+}
+
+.paneHint {
+  color: #9ca3af;
+  font-size: 0.82rem;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paneBody {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-surface);
+}
+
+.viewerCanvas {
+  width: 100%;
+  height: 100%;
+}
+
+.pdfFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* Mesma razão do painel de medição acima: overlay sobre o canvas do visor, mantido em paleta clara fixa. */
+.overlayState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #6b7280;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.overlayError {
+  color: #b91c1c;
+}
+
+.overlayErrorDetail {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  max-width: 480px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.secondaryButton {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--primary-soft-border);
+  background: var(--bg-surface);
+  color: var(--primary);
+  transition:
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.secondaryButton:hover {
+  background: var(--primary-soft);
+}
+
+@media (max-width: 900px) {
+  .panes {
+    flex-direction: column;
+  }
+
+  .paneDivider {
+    width: auto;
+    height: 1px;
+  }
+}
+
+@media (max-width: 700px) {
+  .overlay {
+    padding: 12px;
+  }
+
+  .modal {
+    width: 100%;
+    height: 94vh;
+    border-radius: 18px;
+  }
+}

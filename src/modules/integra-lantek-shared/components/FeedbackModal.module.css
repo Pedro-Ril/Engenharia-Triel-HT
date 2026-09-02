@@ -1,0 +1,407 @@
+/* ── Variáveis locais (complementam o :root do projeto) ── */
+.overlay {
+  --modal-red: var(--primary);
+  --modal-red-soft: var(--primary-soft);
+  --modal-red-mid: var(--primary-soft-strong);
+  --modal-green: var(--success-text);
+  --modal-green-soft: var(--success-bg);
+  --modal-border: var(--border-soft);
+  --modal-border-top: var(--border-soft);
+  --modal-text: var(--text);
+  --modal-muted: var(--text-muted);
+  --modal-bg: var(--bg-surface);
+  --modal-bg-soft: var(--bg-surface-soft);
+  --modal-shadow-dark: rgba(15, 23, 42, 0.28);
+
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  padding: 24px;
+}
+
+/* ── Modal ── */
+.modal {
+  width: min(1040px, 100%);
+  max-height: 92vh;
+  background: var(--modal-bg);
+  border-radius: 24px;
+  box-shadow: 0 28px 70px var(--modal-shadow-dark);
+  border: 1px solid var(--modal-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Cabeçalho ── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 26px 28px 20px;
+  border-bottom: 1px solid var(--modal-border-top);
+  background:
+    radial-gradient(circle at top right, var(--modal-red-soft), transparent 28%),
+    linear-gradient(180deg, var(--modal-bg) 0%, var(--modal-bg-soft) 100%);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.topIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--modal-green-soft);
+  color: var(--modal-green);
+  font-size: 1.95rem;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--modal-green-soft);
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--modal-text);
+  font-size: 1.65rem;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.closeButton {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border: 1px solid var(--modal-border);
+  border-radius: 12px;
+  background: var(--modal-bg);
+  color: var(--modal-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, border-color 0.18s, transform 0.18s;
+}
+
+.closeButton:hover {
+  background: var(--modal-red-soft);
+  color: var(--modal-red);
+  border-color: var(--modal-red-mid);
+  transform: translateY(-1px);
+}
+
+/* SVGs compartilham o mesmo tamanho */
+.closeIconSvg,
+.copyIconSvg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Mensagem ── */
+.messageBlock {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--bg-surface-muted);
+  border: 1px solid var(--modal-border);
+}
+
+.messageLine {
+  margin: 0 0 6px;
+  color: var(--text-soft);
+  line-height: 1.7;
+  font-size: 0.98rem;
+}
+
+.messageLine:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Corpo rolável ── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px 10px;
+  scrollbar-color: var(--modal-red-mid) transparent;
+  scrollbar-width: thin;
+}
+
+.content::-webkit-scrollbar { width: 10px; }
+.content::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb {
+  background: var(--modal-red-mid);
+  border-radius: 999px;
+}
+.content::-webkit-scrollbar-thumb:hover { background: var(--modal-red); }
+
+/* ── Resumo ── */
+.resumoWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resumoHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.resumoTitle {
+  margin: 0;
+  color: var(--modal-text);
+  font-size: 1.12rem;
+  font-weight: 800;
+}
+
+.resumoHint {
+  margin: 6px 0 0;
+  color: var(--modal-muted);
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.badgeTotal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--modal-red-soft);
+  color: var(--modal-red);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid var(--modal-red-soft);
+  white-space: nowrap;
+}
+
+/* ── Grid de cards ── */
+.resumoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(295px, 1fr));
+  gap: 16px;
+}
+
+.resumoCard {
+  border: 1px solid var(--modal-border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--modal-bg) 0%, var(--modal-bg-soft) 100%);
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+}
+
+.resumoCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  border-color: var(--modal-red-soft);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.resumoLabel {
+  color: var(--modal-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Tags de material e espessura compartilham base */
+.resumoMaterial,
+.resumoEspessura {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  word-break: break-word;
+}
+
+.resumoMaterial {
+  background: var(--neutral-bg);
+  color: var(--modal-text);
+}
+
+.resumoEspessura {
+  background: var(--modal-red-soft);
+  color: var(--modal-red);
+}
+
+/* ── Botão copiar ── */
+.copyIconButton {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--modal-red-mid);
+  background: var(--modal-bg);
+  color: var(--modal-red);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.18s, border-color 0.18s, transform 0.18s, color 0.18s;
+}
+
+.copyIconButton:hover {
+  background: var(--modal-red-soft);
+  border-color: var(--modal-red-mid);
+  transform: translateY(-1px);
+}
+
+.copyIconButtonSuccess {
+  background: var(--modal-green-soft);
+  border-color: var(--success-border);
+  color: var(--modal-green);
+}
+
+/* ── Contagem e ordens ── */
+.resumoCount {
+  display: block;
+  color: var(--modal-text);
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.ordensBox {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 10px 4px 0 0;
+  border-top: 1px solid var(--border-soft);
+  scrollbar-color: var(--modal-red-mid) transparent;
+  scrollbar-width: thin;
+}
+
+.ordensBox::-webkit-scrollbar { width: 8px; }
+.ordensBox::-webkit-scrollbar-track { background: transparent; }
+.ordensBox::-webkit-scrollbar-thumb {
+  background: var(--modal-red-mid);
+  border-radius: 999px;
+}
+.ordensBox::-webkit-scrollbar-thumb:hover { background: var(--modal-red); }
+
+.resumoOrdens {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.7;
+  font-size: 0.94rem;
+  word-break: break-word;
+}
+
+/* ── Rodapé ── */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 18px 28px 24px;
+  border-top: 1px solid var(--modal-border-top);
+  background: var(--modal-bg);
+  flex-shrink: 0;
+}
+
+.primaryButton {
+  min-height: 46px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--modal-red) 0%, var(--primary-hover) 100%);
+  color: var(--text-inverse);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(183, 28, 28, 0.22);
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(183, 28, 28, 0.28);
+}
+
+/* ── Responsivo ── */
+@media (max-width: 768px) {
+  .overlay { padding: 12px; }
+
+  .modal {
+    width: 100%;
+    max-height: 95vh;
+    border-radius: 18px;
+  }
+
+  .header {
+    padding: 18px 18px 16px;
+    gap: 14px;
+  }
+
+  .headerLeft { gap: 14px; }
+
+  .topIcon {
+    width: 52px;
+    height: 52px;
+    font-size: 1.55rem;
+  }
+
+  .title { font-size: 1.28rem; }
+
+  .content { padding: 18px 18px 10px; }
+
+  .footer { padding: 16px 18px 18px; }
+
+  .resumoHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .resumoGrid { grid-template-columns: 1fr; }
+
+  .primaryButton { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .headerLeft { flex-direction: column; }
+
+  .closeButton {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+}

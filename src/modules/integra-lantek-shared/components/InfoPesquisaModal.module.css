@@ -1,0 +1,329 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2200;
+  padding: 24px;
+}
+
+.modal {
+  width: min(980px, 100%);
+  max-height: 92vh;
+  background: var(--bg-surface);
+  border-radius: 24px;
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  background:
+    radial-gradient(circle at top right, var(--primary-soft), transparent 28%),
+    linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-surface-soft) 100%);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
+
+.title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-size: 0.93rem;
+  max-width: 720px;
+}
+
+.close {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.close:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft-border);
+  transform: translateY(-1px);
+}
+
+.content {
+  padding: 22px 24px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: var(--primary-soft-strong);
+  border-radius: 999px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.section {
+  margin-bottom: 22px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Fluxo SVG wrapper */
+.flowWrapper {
+  background: var(--bg-surface-muted);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 12px 8px;
+  overflow-x: auto;
+}
+
+.flowSvg {
+  display: block;
+  font-family: inherit;
+}
+
+/* Rect — etapa ativa (borda sólida, fill mais forte) */
+.flowStepActive {
+  fill: var(--primary-soft);
+  stroke: var(--primary);
+  stroke-width: 1;
+}
+
+/* Rect — etapas padrão (borda tracejada, fill suave) */
+.flowStep {
+  fill: var(--primary-soft);
+  stroke: var(--primary);
+  stroke-width: 0.6;
+  stroke-dasharray: 4 3;
+}
+
+/* Número da etapa */
+.flowStepNumber {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--primary);
+}
+
+/* Label principal da etapa */
+.flowStepLabel {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--text);
+}
+
+/* Subtítulo da etapa */
+.flowStepSub {
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+
+/* Linha conectora entre etapas */
+.flowConnector {
+  stroke: var(--text-faint);
+  stroke-width: 1.2;
+}
+
+/* Seta do marker */
+.flowArrowPath {
+  stroke: var(--text-faint);
+}
+
+/*
+ * Bloco de SQL sempre com aparência de "editor de código" (fundo escuro
+ * fixo, texto claro fixo) — não muda com o tema, igual qualquer bloco de
+ * código; nunca fica ilegível porque nunca vira claro-sobre-claro.
+ */
+.sqlBox {
+  background: #0f172a;
+  border-radius: 18px;
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.sqlBox pre {
+  margin: 0;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace;
+  white-space: pre-wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  border-color: var(--primary-soft-border);
+}
+
+.card h4 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.7;
+  font-size: 0.94rem;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 18px 24px 24px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+}
+
+.primary {
+  min-height: 46px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: var(--text-inverse);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+  box-shadow: 0 10px 24px rgba(183, 28, 28, 0.22);
+}
+
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(183, 28, 28, 0.28);
+}
+
+@media (max-width: 768px) {
+  .overlay {
+    padding: 12px;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: 95vh;
+    border-radius: 18px;
+  }
+
+  .header {
+    padding: 18px 18px 16px;
+  }
+
+  .title {
+    font-size: 1.15rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+
+  .content {
+    padding: 18px 18px 10px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer {
+    padding: 16px 18px 18px;
+  }
+
+  .primary {
+    width: 100%;
+  }
+}

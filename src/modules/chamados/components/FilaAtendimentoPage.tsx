@@ -18,6 +18,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { TOOLTIP_GRAFICO_TEMA } from "@/lib/tema/tooltip-grafico";
 import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
@@ -479,7 +480,7 @@ export function FilaAtendimentoPage({
                       <Cell key={entry.status} fill={CORES_STATUS[entry.status]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -493,7 +494,7 @@ export function FilaAtendimentoPage({
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="label" />
                   <YAxis allowDecimals={false} />
-                  <Tooltip />
+                  <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
                   <Bar dataKey="total" name="Chamados" radius={[8, 8, 0, 0]}>
                     {dadosPrioridadeGrafico.map((entry) => (
                       <Cell key={entry.prioridade} fill={CORES_PRIORIDADE[entry.prioridade]} />

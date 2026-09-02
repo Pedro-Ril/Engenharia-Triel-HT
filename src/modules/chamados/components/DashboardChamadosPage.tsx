@@ -18,6 +18,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { TOOLTIP_GRAFICO_TEMA } from "@/lib/tema/tooltip-grafico";
 import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
@@ -282,7 +283,7 @@ export function DashboardChamadosPage({
           <Cell key={entry.status} fill={CORES_STATUS[entry.status]} />
         ))}
       </Pie>
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Legend />
     </PieChart>
   );
@@ -292,7 +293,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis dataKey="label" />
       <YAxis allowDecimals={false} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" radius={[8, 8, 0, 0]}>
         {dadosPrioridade.map((entry) => (
           <Cell key={entry.prioridade} fill={CORES_PRIORIDADE[entry.prioridade]} />
@@ -306,7 +307,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis dataKey="dia" />
       <YAxis allowDecimals={false} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Line type="monotone" dataKey="total" name="Chamados" stroke="var(--primary)" strokeWidth={3} />
     </LineChart>
   );
@@ -316,7 +317,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" allowDecimals={false} />
       <YAxis type="category" dataKey="setorNome" width={160} tick={{ fontSize: 12 }} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" radius={[0, 8, 8, 0]}>
         {dados.porSetor.map((entry, index) => (
           <Cell key={entry.setorId} fill={CORES_SETOR[index % CORES_SETOR.length]} />
@@ -330,7 +331,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" allowDecimals={false} />
       <YAxis type="category" dataKey="atendenteNome" width={160} tick={{ fontSize: 12 }} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" fill="#3949ab" radius={[0, 8, 8, 0]} />
     </BarChart>
   );
@@ -340,7 +341,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" allowDecimals={false} />
       <YAxis type="category" dataKey="empresa" width={160} tick={{ fontSize: 12 }} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" fill="#00897b" radius={[0, 8, 8, 0]} />
     </BarChart>
   );
@@ -350,7 +351,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" allowDecimals={false} />
       <YAxis type="category" dataKey="departamento" width={160} tick={{ fontSize: 12 }} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" fill="#5e35b1" radius={[0, 8, 8, 0]} />
     </BarChart>
   );
@@ -360,7 +361,7 @@ export function DashboardChamadosPage({
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" allowDecimals={false} />
       <YAxis type="category" dataKey="categoria" width={160} tick={{ fontSize: 12 }} />
-      <Tooltip />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" fill="#fb8c00" radius={[0, 8, 8, 0]} />
     </BarChart>
   );

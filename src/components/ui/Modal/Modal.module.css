@@ -1,7 +1,17 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  /*
+   * Precisa ficar ACIMA do Drawer (z-index 11500) — um Modal (ex:
+   * IconPicker) aberto de dentro de um Drawer já aberto (ex: "Editar
+   * módulo") renderizava visualmente por cima, mas com z-index menor
+   * o overlay do Drawer continuava capturando os cliques por baixo
+   * dos próprios botões do Modal, deixando a seleção de ícone
+   * impossível de usar sem fechar o Drawer primeiro. Fica abaixo do
+   * Dropdown/DropdownMenu (12000) de propósito — um <select> aberto
+   * dentro de um Modal precisa continuar aparecendo por cima dele.
+   */
+  z-index: 11600;
 
   display: flex;
   align-items: center;

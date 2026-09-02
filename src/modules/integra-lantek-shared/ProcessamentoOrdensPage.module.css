@@ -1,0 +1,336 @@
+.page {
+  min-height: 100vh;
+  width: 100%;
+  padding: 20px 24px 24px;
+  background: transparent;
+}
+
+.heroHeader {
+  margin-bottom: 24px;
+}
+
+.heroHeaderContent {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 30px 32px;
+  box-shadow:
+    0 14px 32px rgba(15, 23, 42, 0.06),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.84rem;
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1.08;
+  color: var(--text);
+  max-width: 900px;
+}
+
+.subtitle {
+  margin: 14px 0 0;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-soft);
+  max-width: 860px;
+}
+
+.sectionBlock {
+  margin-top: 22px;
+}
+
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 24px;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.05),
+    0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.sectionMiniTitle {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.55rem;
+  color: var(--text);
+}
+
+.sectionText {
+  margin: 10px 0 0;
+  max-width: 760px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.infoBadge {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.infoBadge:hover {
+  background: var(--primary-soft-strong);
+  transform: translateY(-1px);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 220px minmax(280px, 1fr) auto auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.field,
+.fieldWide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldWide {
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.input,
+.select {
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--border-input);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  padding: 0 14px;
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-ring);
+}
+
+.button {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primaryButton {
+  border: none;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: var(--text-inverse);
+  box-shadow: 0 10px 20px rgba(183, 28, 28, 0.2);
+}
+
+.primaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.secondaryButton {
+  border: 1px solid var(--primary-soft-border);
+  background: var(--bg-surface);
+  color: var(--primary);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+
+/*
+ * Verde sólido fixo de propósito — --success-bg-strong é uma tinta
+ * PÁLIDA (feita pra combinar com --success-text, não com texto branco
+ * em cima), por isso não serve pra um botão preenchido. Não existe um
+ * tom de verde "sólido" que já venha certo nos dois temas, então
+ * mantém-se este verde saturado fixo (mesma lógica das cores de
+ * gráfico do CLAUDE.md): já funciona bem com texto branco tanto no
+ * tema claro quanto no escuro.
+ */
+.successButton {
+  border: none;
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+  color: var(--text-inverse);
+  box-shadow: 0 10px 20px rgba(22, 163, 74, 0.2);
+}
+
+.successButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.errorMessage {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.emptyState {
+  border: 1px dashed var(--primary-soft-border);
+  border-radius: 18px;
+  padding: 28px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+}
+
+.gridWrapper {
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.summaryCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.05),
+    0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.summaryValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.actionRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1200px) {
+  .formGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .panelHeader {
+    flex-direction: column;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px;
+  }
+
+  .heroHeaderContent,
+  .panel,
+  .summaryCard {
+    border-radius: 16px;
+  }
+
+  .heroHeaderContent,
+  .panel {
+    padding: 20px;
+  }
+
+  .actionRow {
+    flex-direction: column;
+  }
+
+  .actionRow .button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,213 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top right, var(--primary-soft), transparent 20%),
+    var(--bg-page);
+}
+
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 24px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+  padding: 28px;
+}
+
+.header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.statusBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.statusLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.statusValue {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.statusOpen {
+  color: var(--success-text);
+}
+
+.statusClosed {
+  color: var(--primary);
+}
+
+.errorBox {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/*
+ * A caixa do semáforo e as duas luzes (vermelha/verde) são a
+ * identidade visual do painel — como um semáforo físico real, o
+ * fundo escuro da carcaça e as cores vivas das lâmpadas não mudam
+ * com o tema do portal (mesma lógica das cores de série de gráfico
+ * já documentada em CLAUDE.md: aqui a cor É o dado, não uma
+ * superfície de conteúdo).
+ */
+.semaforo {
+  width: 110px;
+  height: 250px;
+  margin: 0 auto 28px;
+  background: #111827;
+  border-radius: 28px;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.22);
+  padding: 22px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.luz {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.vermelha {
+  background: #ef4444;
+}
+
+.verde {
+  background: #22c55e;
+}
+
+.ligada.vermelha {
+  opacity: 1;
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.8);
+}
+
+.ligada.verde {
+  opacity: 1;
+  box-shadow: 0 0 22px rgba(34, 197, 94, 0.8);
+}
+
+.desligada {
+  opacity: 0.2;
+  box-shadow: none;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.button {
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/*
+ * Verde sólido "de ação" (texto branco por cima) — igual ao caso já
+ * documentado em DesenhoViewerModal: o portal não tem um token de
+ * verde sólido pareado claro/escuro (só "--success-text", pensado pra
+ * texto sobre fundo claro, não pra ser ele mesmo o fundo de um botão
+ * cheio). Mantém os mesmos hex já usados nesse outro botão de sucesso
+ * do portal, em vez de inventar um tom novo.
+ */
+.buttonOpen {
+  background: #15803d;
+  color: var(--text-inverse);
+  box-shadow: 0 10px 20px rgba(21, 128, 61, 0.25);
+}
+
+.buttonOpen:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.buttonClose {
+  background: var(--primary);
+  color: var(--text-inverse);
+  box-shadow: 0 10px 20px rgba(var(--primary-rgb), 0.25);
+}
+
+.buttonClose:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.buttonSecondary {
+  background: var(--bg-surface);
+  color: var(--text-soft);
+  border: 1px solid var(--border-input);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: var(--bg-surface-muted);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .statusValue {
+    font-size: 22px;
+  }
+}
