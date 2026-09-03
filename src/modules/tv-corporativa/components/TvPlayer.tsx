@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { gerarId } from "@/lib/utils/gerar-id";
 import styles from "./TvPlayer.module.css";
 
 const CHAVE_HARDWARE_ID = "tv-hardware-id";
@@ -142,7 +143,7 @@ function obterOuCriarHardwareId(hardwareIdDaUrl: string | null): string {
   const existente = localStorage.getItem(CHAVE_HARDWARE_ID);
   if (existente) return existente;
 
-  const novo = crypto.randomUUID();
+  const novo = gerarId();
   localStorage.setItem(CHAVE_HARDWARE_ID, novo);
   return novo;
 }

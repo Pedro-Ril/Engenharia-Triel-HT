@@ -43,6 +43,7 @@ import {
   CORES_TAG_DISPONIVEIS,
   ESTILOS_CORES_TAG,
 } from "@/lib/atualizacoes/cores-tag";
+import { gerarId } from "@/lib/utils/gerar-id";
 
 import {
   atualizarAtualizacao,
@@ -107,7 +108,7 @@ interface ItemForm {
 
 function novoItemForm(): ItemForm {
   return {
-    id: typeof crypto !== "undefined" ? crypto.randomUUID() : String(Math.random()),
+    id: gerarId(),
     tipo: "melhoria",
     texto: "",
     tagIds: [],

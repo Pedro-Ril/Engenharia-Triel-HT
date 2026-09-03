@@ -42,6 +42,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/Table";
+import { gerarId } from "@/lib/utils/gerar-id";
 import type { FeedbackHandler } from "@/modules/admin-permissoes/types/toast.types";
 
 import {
@@ -148,7 +149,7 @@ function IconeTipoConteudo({ tipo }: { tipo: TipoConteudoTv }) {
 
 function novoItem(): ItemEditavel {
   return {
-    chave: crypto.randomUUID(),
+    chave: gerarId(),
     tipoConteudo: "foto",
     midiaId: null,
     urlPaginaWeb: "",
@@ -161,7 +162,7 @@ function novoItem(): ItemEditavel {
 
 function novoSlot(): SlotEditavel {
   return {
-    chave: crypto.randomUUID(),
+    chave: gerarId(),
     nome: "",
     diasSemana: "todos",
     horaInicio: "08:00",
@@ -448,7 +449,7 @@ function SlotEditor({
   }
 
   function handleDuplicarItem(indice: number) {
-    const copia: ItemEditavel = { ...slot.itens[indice], chave: crypto.randomUUID() };
+    const copia: ItemEditavel = { ...slot.itens[indice], chave: gerarId() };
     const novaLista = [...slot.itens];
     novaLista.splice(indice + 1, 0, copia);
     onAlterar({ ...slot, itens: novaLista });
@@ -649,13 +650,13 @@ export function GradesTvPainel({ onFeedback }: GradesTvPainelProps) {
 
     setSlots(
       (detalhe?.slots ?? []).map((slot) => ({
-        chave: crypto.randomUUID(),
+        chave: gerarId(),
         nome: slot.nome ?? "",
         diasSemana: slot.diasSemana,
         horaInicio: slot.horaInicio.slice(0, 5),
         horaFim: slot.horaFim.slice(0, 5),
         itens: slot.itens.map((item) => ({
-          chave: crypto.randomUUID(),
+          chave: gerarId(),
           tipoConteudo: item.tipoConteudo,
           midiaId: item.midiaId,
           urlPaginaWeb: item.urlPaginaWeb ?? "",
