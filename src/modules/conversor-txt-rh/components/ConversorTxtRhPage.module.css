@@ -1,0 +1,25 @@
+/*
+ * Reproduz visualmente o Button (variant="secondary") do design
+ * system — não dá pra usar o componente Button aqui porque esse link
+ * precisa ser uma <a href download>, não um <button>.
+ */
+.downloadLink {
+  min-height: 44px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.downloadLink:hover {
+  background: var(--primary-soft);
+  transform: translateY(-1px);
+}

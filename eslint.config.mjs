@@ -12,6 +12,15 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    /*
+     * Pastas com o código ORIGINAL de ferramentas standalone trazidas
+     * pra dentro do portal (Lantek, Semáforo, Conversor TXT RH) —
+     * ficam só como referência durante a migração, nunca fazem parte
+     * do app em si. Já excluídas do tsconfig.json; faltava aqui.
+     */
+    "Integra-o-FoccoERP-x-Lantek-via-XLS/**",
+    "Semaforo_Balaca/**",
+    "Conversor_TXT_RH/**",
   ]),
 ]);
 
