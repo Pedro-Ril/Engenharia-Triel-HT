@@ -101,7 +101,25 @@ export function Autocomplete({
         )
       : options;
 
-    return maxOptions ? encontradas.slice(0, maxOptions) : encontradas;
+    if (!maxOptions || encontradas.length <= maxOptions) {
+      return encontradas;
+    }
+
+    /*
+     * "options" chega na ordem que o chamador montou (ex: ordem de
+     * inserção de um Map, nada a ver com o código em si) — cortar
+     * direto em maxOptions sem ordenar antes descartava um subconjunto
+     * arbitrário, escondendo em silêncio um item válido (ex: buscar
+     * "1" com centenas de resultados e o item "11" cair fora só por
+     * ter sido encontrado depois dos outros 50 na árvore da
+     * estrutura). Ordena por label (numeric:true trata "2" < "11" <
+     * "100" corretamente) antes de cortar, pra o corte ser sempre os
+     * mesmos primeiros N em vez de depender da sorte da ordem de
+     * entrada.
+     */
+    return [...encontradas]
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { numeric: true }))
+      .slice(0, maxOptions);
   }, [options, query, maxOptions, filterOption]);
 
   function handleSelect(option: AutocompleteOption) {
