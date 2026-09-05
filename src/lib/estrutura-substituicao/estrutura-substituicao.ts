@@ -346,8 +346,38 @@ export async function substituirItemNaEstrutura(params: {
 }): Promise<ResultadoNivelSubstituicao[]> {
   const { ambiente, urlAtualizarEstrutura } = await exigirConfig();
 
+  /*
+   * A consulta de estrutura do ERP às vezes devolve a MESMA linha
+   * (código+sequência+quantidade+datas, tudo idêntico) duas vezes sob
+   * o mesmo pai — confirmado comparando com a resposta bruta do ERP,
+   * que carrega um ID_ESTRUTURA por linha (não capturado aqui, ver
+   * itemApiParaItemNivel) que diferenciava duas linhas por outro lado
+   * idênticas. Sem essa chave, não dá pra saber se são duas linhas
+   * "de verdade" diferentes ou uma duplicata de dado do ERP — mas
+   * encaminhar uma linha idêntica duas vezes pro POST de atualização
+   * não tem utilidade nenhuma (na melhor hipótese é redundante, na
+   * pior confunde o próprio ERP), então descarta repetições exatas
+   * dentro do mesmo pai antes de montar o payload. Só remove quando
+   * TUDO bate — dois itens com o mesmo código mas sequência ou
+   * quantidade diferente continuam sendo duas linhas legítimas.
+   */
+  function chaveLinha(item: ItemNivelEstrutura): string {
+    return [item.codigo, item.sequencia, item.quantidade, item.dataInicial, item.dataFinal].join(
+      " "
+    );
+  }
+
   const gruposPorPai = new Map<string, ItemNivelEstrutura[]>();
+  const chavesVistasPorPai = new Map<string, Set<string>>();
+
   for (const item of params.estrutura.itens) {
+    const chavesDoPai = chavesVistasPorPai.get(item.codigoPai) ?? new Set<string>();
+    chavesVistasPorPai.set(item.codigoPai, chavesDoPai);
+
+    const chave = chaveLinha(item);
+    if (chavesDoPai.has(chave)) continue;
+    chavesDoPai.add(chave);
+
     const grupo = gruposPorPai.get(item.codigoPai);
     if (grupo) {
       grupo.push(item);
