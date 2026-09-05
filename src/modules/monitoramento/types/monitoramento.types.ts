@@ -12,6 +12,16 @@ export interface LogSistema {
   criadoEm: string;
 }
 
+export interface AcessoModulo {
+  id: string;
+  usuarioId: string;
+  nomeExibicao: string;
+  samAccountName: string;
+  moduloChave: string;
+  moduloNome: string;
+  acessadoEm: string;
+}
+
 export interface TabelaBanco {
   nome: string;
   linhas: number;

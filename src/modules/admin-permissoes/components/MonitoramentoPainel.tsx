@@ -61,6 +61,7 @@ import {
 } from "@/components/ui/Table";
 import {
   buscarAtividadeRecente,
+  buscarHistoricoAcessos,
   buscarLogs,
   buscarResumoApis,
   buscarResumoMonitoramento,
@@ -68,6 +69,7 @@ import {
   limparRequisicoesAntigas,
 } from "@/modules/monitoramento/services/monitoramento.service";
 import type {
+  AcessoModulo,
   EventoAtividade,
   LogSistema,
   NivelLog,
@@ -77,6 +79,8 @@ import type {
   StatusServicoExterno,
 } from "@/modules/monitoramento/types/monitoramento.types";
 
+import { listarModulos } from "../services/adminPermissoes.service";
+import type { PortalModulo } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 import styles from "./Monitoramento.module.css";
 
@@ -84,13 +88,14 @@ interface MonitoramentoPainelProps {
   onFeedback: FeedbackHandler;
 }
 
-type AbaMonitoramento = "geral" | "banco" | "logs" | "apis";
+type AbaMonitoramento = "geral" | "banco" | "logs" | "apis" | "acessos";
 
 const ABAS: { valor: AbaMonitoramento; label: string; icon: typeof ServerCog }[] = [
   { valor: "geral", label: "Visão geral", icon: ServerCog },
   { valor: "banco", label: "Banco de dados", icon: Database },
   { valor: "logs", label: "Logs", icon: ScrollText },
   { valor: "apis", label: "APIs", icon: Network },
+  { valor: "acessos", label: "Acessos", icon: LogIn },
 ];
 
 const SERVICO_CONFIG: Record<
@@ -244,6 +249,7 @@ export function MonitoramentoPainel({ onFeedback }: MonitoramentoPainelProps) {
           {aba === "banco" && <AbaBancoDeDados resumo={resumo} />}
           {aba === "logs" && <AbaLogs onFeedback={onFeedback} />}
           {aba === "apis" && <AbaApis onFeedback={onFeedback} />}
+          {aba === "acessos" && <AbaAcessos />}
         </>
       ) : null}
     </Stack>
@@ -786,6 +792,142 @@ function CardServicoExterno({ status }: { status: StatusServicoExterno }) {
             Última falha {formatarTempoRelativo(status.ultimaFalhaEm)}
             {status.ultimaFalhaMensagem && `: ${status.ultimaFalhaMensagem}`}
           </Alert>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+const POR_PAGINA_ACESSOS = 25;
+
+function AbaAcessos() {
+  const [buscaDigitada, setBuscaDigitada] = useState("");
+  const [busca, setBusca] = useState("");
+  const [moduloChave, setModuloChave] = useState("");
+  const [pagina, setPagina] = useState(1);
+
+  const [itens, setItens] = useState<AcessoModulo[]>([]);
+  const [total, setTotal] = useState(0);
+  const [carregando, setCarregando] = useState(true);
+  const [modulos, setModulos] = useState<PortalModulo[]>([]);
+
+  useEffect(() => {
+    listarModulos().then(setModulos);
+  }, []);
+
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setBusca(buscaDigitada);
+      setPagina(1);
+    }, 400);
+    return () => clearTimeout(temporizador);
+  }, [buscaDigitada]);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    async function carregar() {
+      setCarregando(true);
+
+      const resultado = await buscarHistoricoAcessos({
+        busca: busca || undefined,
+        moduloChave: moduloChave || undefined,
+        pagina,
+        porPagina: POR_PAGINA_ACESSOS,
+      });
+
+      if (cancelado) return;
+
+      if (resultado) {
+        setItens(resultado.itens);
+        setTotal(resultado.total);
+      }
+
+      setCarregando(false);
+    }
+
+    carregar();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [busca, moduloChave, pagina]);
+
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA_ACESSOS));
+
+  const opcoesModulo = [
+    { value: "", label: "Todos os módulos" },
+    ...[...modulos]
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((modulo) => ({ value: modulo.chave, label: modulo.nome })),
+  ];
+
+  return (
+    <Card
+      title="Histórico de acessos a módulos"
+      description="Toda vez que alguém abre um módulo restrito do portal."
+    >
+      <Stack gap={16}>
+        <div className={styles.filtrosLogs}>
+          <div className={styles.filtroCampo} style={{ flex: 1 }}>
+            <Field label="Buscar">
+              <Input
+                value={buscaDigitada}
+                placeholder="Nome ou usuário de rede"
+                onChange={(event) => setBuscaDigitada(event.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className={styles.filtroCampo}>
+            <Field label="Módulo">
+              <Dropdown
+                value={moduloChave}
+                options={opcoesModulo}
+                onValueChange={(valor) => {
+                  setModuloChave(valor);
+                  setPagina(1);
+                }}
+              />
+            </Field>
+          </div>
+        </div>
+
+        {carregando ? (
+          <Loader label="Carregando histórico de acessos..." />
+        ) : itens.length === 0 ? (
+          <EmptyState
+            icon={<LogIn size={28} />}
+            title="Nenhum acesso encontrado"
+            description="Sem acessos registrados para os filtros selecionados."
+          />
+        ) : (
+          <>
+            <Table minWidth={700}>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Usuário</TableHeaderCell>
+                  <TableHeaderCell>Módulo</TableHeaderCell>
+                  <TableHeaderCell>Quando</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {itens.map((acesso) => (
+                  <TableRow key={acesso.id}>
+                    <TableCell>
+                      {acesso.nomeExibicao}
+                      <span className={styles.logMensagem}> ({acesso.samAccountName})</span>
+                    </TableCell>
+                    <TableCell>{acesso.moduloNome}</TableCell>
+                    <TableCell>{formatarDataHora(acesso.acessadoEm)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            <Pagination page={pagina} totalPages={totalPaginas} onPageChange={setPagina} />
+          </>
         )}
       </Stack>
     </Card>

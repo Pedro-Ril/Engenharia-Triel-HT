@@ -29,9 +29,12 @@ import { Toast } from "@/components/ui/Toast";
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
 import type { WikiArtigo } from "@/modules/wiki/types/wiki.types";
 
+import { buscarUsuarioAtual } from "@/modules/auth/services/auth.service";
+
 import {
   buscarConfiguracaoAd,
   buscarConfiguracaoDb,
+  buscarConfiguracaoSmtp,
   buscarTemaPadrao,
   listarDownloadsAdmin,
   listarEmpresas,
@@ -44,6 +47,7 @@ import {
 import type {
   ConfiguracaoAd,
   ConfiguracaoDb,
+  ConfiguracaoSmtp,
   Empresa,
   PortalModulo,
   PortalPermissao,
@@ -153,10 +157,12 @@ export function AdminPermissoesPage() {
     null
   );
   const [configuracaoDb, setConfiguracaoDb] = useState<ConfiguracaoDb | null>(null);
+  const [configuracaoSmtp, setConfiguracaoSmtp] = useState<ConfiguracaoSmtp | null>(null);
   const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
   const [wikiArtigos, setWikiArtigos] = useState<WikiArtigo[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [temaPadrao, setTemaPadrao] = useState<TemaPadrao | null>(null);
+  const [emailUsuarioLogado, setEmailUsuarioLogado] = useState<string | null>(null);
 
   function mostrarFeedback(
     variant: ToastState["variant"],
@@ -177,10 +183,12 @@ export function AdminPermissoesPage() {
         permissoesData,
         configuracaoAdData,
         configuracaoDbData,
+        configuracaoSmtpData,
         downloadsData,
         wikiArtigosData,
         empresasData,
         temaPadraoData,
+        usuarioAtualData,
       ] = await Promise.all([
         listarSetores(),
         listarModulos(),
@@ -188,10 +196,12 @@ export function AdminPermissoesPage() {
         listarPermissoes(),
         buscarConfiguracaoAd(),
         buscarConfiguracaoDb(),
+        buscarConfiguracaoSmtp(),
         listarDownloadsAdmin(),
         listarWikiArtigosAdmin(),
         listarEmpresas(),
         buscarTemaPadrao(),
+        buscarUsuarioAtual(),
       ]);
 
       setSetores(setoresData);
@@ -200,10 +210,12 @@ export function AdminPermissoesPage() {
       setPermissoes(permissoesData);
       setConfiguracaoAd(configuracaoAdData);
       setConfiguracaoDb(configuracaoDbData);
+      setConfiguracaoSmtp(configuracaoSmtpData);
       setDownloads(downloadsData);
       setWikiArtigos(wikiArtigosData);
       setEmpresas(empresasData);
       setTemaPadrao(temaPadraoData);
+      setEmailUsuarioLogado(usuarioAtualData?.email ?? null);
       setCarregando(false);
     }
 
@@ -385,9 +397,12 @@ export function AdminPermissoesPage() {
             <ConfiguracoesPainel
               configuracaoAd={configuracaoAd}
               configuracaoDb={configuracaoDb}
+              configuracaoSmtp={configuracaoSmtp}
+              emailUsuarioLogado={emailUsuarioLogado}
               onFeedback={mostrarFeedback}
               onConfiguracaoAdAtualizada={setConfiguracaoAd}
               onConfiguracaoDbAtualizada={setConfiguracaoDb}
+              onConfiguracaoSmtpAtualizada={setConfiguracaoSmtp}
             />
           )}
 

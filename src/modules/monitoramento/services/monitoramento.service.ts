@@ -1,4 +1,5 @@
 import type {
+  AcessoModulo,
   LogSistema,
   NivelLog,
   ResultadoAtividade,
@@ -68,6 +69,36 @@ export async function buscarLogs(filtros: FiltrosLogs): Promise<ResultadoLogs | 
   try {
     const response = await fetch(`/api/admin/monitoramento/logs?${params.toString()}`);
     const body = await parseResponse<ResultadoLogs>(response);
+    return body.ok && body.data ? body.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface FiltrosAcessos {
+  busca?: string;
+  moduloChave?: string;
+  pagina: number;
+  porPagina: number;
+}
+
+export interface ResultadoAcessos {
+  itens: AcessoModulo[];
+  total: number;
+}
+
+export async function buscarHistoricoAcessos(
+  filtros: FiltrosAcessos
+): Promise<ResultadoAcessos | null> {
+  const params = new URLSearchParams();
+  if (filtros.busca) params.set("busca", filtros.busca);
+  if (filtros.moduloChave) params.set("moduloChave", filtros.moduloChave);
+  params.set("pagina", String(filtros.pagina));
+  params.set("porPagina", String(filtros.porPagina));
+
+  try {
+    const response = await fetch(`/api/admin/monitoramento/acessos?${params.toString()}`);
+    const body = await parseResponse<ResultadoAcessos>(response);
     return body.ok && body.data ? body.data : null;
   } catch {
     return null;

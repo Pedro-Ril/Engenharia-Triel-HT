@@ -91,3 +91,105 @@ export const getResumoAcessosModulos = cache(async (
     totalAcessos: row.total_acessos,
   }));
 });
+
+export interface AcessoModuloAdmin {
+  id: string;
+  usuarioId: string;
+  nomeExibicao: string;
+  samAccountName: string;
+  moduloChave: string;
+  moduloNome: string;
+  acessadoEm: string;
+}
+
+export interface FiltrosHistoricoAcessoModulo {
+  busca?: string;
+  moduloChave?: string;
+}
+
+/*
+ * Versão administrativa de getResumoAcessosModulos: em vez de um
+ * resumo por módulo de UM usuário (usado na home), lista cada acesso
+ * individual, de TODOS os usuários, paginado — pra Administração →
+ * Monitoramento → Acessos. Busca livre casa por nome de exibição ou
+ * usuário de rede; o filtro de módulo é opcional (dropdown na tela).
+ */
+export async function listarHistoricoAcessoModuloAdmin(
+  pagina: number,
+  porPagina: number,
+  filtros: FiltrosHistoricoAcessoModulo = {}
+): Promise<{ itens: AcessoModuloAdmin[]; total: number }> {
+  const pool = await getSqlServerPool();
+  const offset = (pagina - 1) * porPagina;
+
+  const condicoes: string[] = [];
+  if (filtros.busca) {
+    condicoes.push("(u.[nome_exibicao] LIKE @busca OR u.[sam_account_name] LIKE @busca)");
+  }
+  if (filtros.moduloChave) {
+    condicoes.push("m.[chave] = @moduloChave");
+  }
+  const whereClause = condicoes.length > 0 ? `WHERE ${condicoes.join(" AND ")}` : "";
+
+  const itensRequest = pool.request();
+  const totalRequest = pool.request();
+
+  if (filtros.busca) {
+    const termo = `%${filtros.busca}%`;
+    itensRequest.input("busca", sql.NVarChar(200), termo);
+    totalRequest.input("busca", sql.NVarChar(200), termo);
+  }
+  if (filtros.moduloChave) {
+    itensRequest.input("moduloChave", sql.VarChar(60), filtros.moduloChave);
+    totalRequest.input("moduloChave", sql.VarChar(60), filtros.moduloChave);
+  }
+  itensRequest.input("offset", sql.Int, offset);
+  itensRequest.input("porPagina", sql.Int, porPagina);
+
+  const [itensResult, totalResult] = await Promise.all([
+    itensRequest.query<{
+      id: string;
+      usuario_id: string;
+      nome_exibicao: string;
+      sam_account_name: string;
+      modulo_chave: string;
+      modulo_nome: string;
+      acessado_em: string;
+    }>(`
+      SELECT
+        CONVERT(VARCHAR(36), h.[id]) AS [id],
+        CONVERT(VARCHAR(36), h.[usuario_id]) AS [usuario_id],
+        u.[nome_exibicao],
+        u.[sam_account_name],
+        m.[chave] AS [modulo_chave],
+        m.[nome] AS [modulo_nome],
+        CONVERT(VARCHAR(33), h.[acessado_em], 126) AS [acessado_em]
+      FROM dbo.portal_acesso_modulo_historico AS h
+      INNER JOIN dbo.portal_usuarios AS u ON u.[id] = h.[usuario_id]
+      INNER JOIN dbo.portal_modulos AS m ON m.[id] = h.[modulo_id]
+      ${whereClause}
+      ORDER BY h.[acessado_em] DESC
+      OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
+    `),
+    totalRequest.query<{ total: number }>(`
+      SELECT COUNT(*) AS [total]
+      FROM dbo.portal_acesso_modulo_historico AS h
+      INNER JOIN dbo.portal_usuarios AS u ON u.[id] = h.[usuario_id]
+      INNER JOIN dbo.portal_modulos AS m ON m.[id] = h.[modulo_id]
+      ${whereClause};
+    `),
+  ]);
+
+  return {
+    itens: itensResult.recordset.map((row) => ({
+      id: row.id,
+      usuarioId: row.usuario_id,
+      nomeExibicao: row.nome_exibicao,
+      samAccountName: row.sam_account_name,
+      moduloChave: row.modulo_chave,
+      moduloNome: row.modulo_nome,
+      acessadoEm: row.acessado_em,
+    })),
+    total: totalResult.recordset[0]?.total ?? 0,
+  };
+}

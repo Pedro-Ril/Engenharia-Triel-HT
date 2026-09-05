@@ -178,6 +178,21 @@ export interface ConfigIntegraLantek {
   atualizadoPor: string | null;
 }
 
+export type CriptografiaSmtp = "nenhuma" | "ssl" | "tls";
+
+export interface ConfiguracaoSmtp {
+  host: string;
+  porta: number;
+  criptografia: CriptografiaSmtp;
+  autenticacaoAtiva: boolean;
+  usuario: string | null;
+  senhaConfigurada: boolean;
+  remetenteNome: string | null;
+  remetenteEmail: string;
+  atualizadoEm: string;
+  atualizadoPor: string | null;
+}
+
 export interface EmpresaComCatalogo {
   codEmpresa: string;
   totalItens: number;

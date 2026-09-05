@@ -134,3 +134,4 @@ export async function listarHistoricoDoUsuario(
     ipOrigem: normalizarIpv4(row.ipOrigem),
   }));
 }
+

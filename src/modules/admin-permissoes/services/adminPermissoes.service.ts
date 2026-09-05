@@ -10,6 +10,8 @@ import type {
   ConfigMateriaPrima,
   ConfiguracaoAd,
   ConfiguracaoDb,
+  ConfiguracaoSmtp,
+  CriptografiaSmtp,
   Empresa,
   EmpresaComCatalogo,
   ItensMateriaPrimaCachePaginados,
@@ -655,6 +657,45 @@ export async function salvarConfigIntegraLantek(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigIntegraLantek>(response);
+}
+
+export async function buscarConfiguracaoSmtp(): Promise<ConfiguracaoSmtp | null> {
+  const response = await fetch("/api/admin/configuracao-smtp");
+  const body = await parseResponse<ConfiguracaoSmtp | null>(response);
+  return body.data ?? null;
+}
+
+export interface DadosConfiguracaoSmtp {
+  host: string;
+  porta: number;
+  criptografia: CriptografiaSmtp;
+  autenticacaoAtiva: boolean;
+  usuario: string | null;
+  senha: string | null;
+  remetenteNome: string | null;
+  remetenteEmail: string;
+}
+
+export async function salvarConfiguracaoSmtp(
+  dados: DadosConfiguracaoSmtp
+): Promise<ApiEnvelope<ConfiguracaoSmtp>> {
+  const response = await fetch("/api/admin/configuracao-smtp", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfiguracaoSmtp>(response);
+}
+
+export async function testarConfiguracaoSmtp(
+  dados: DadosConfiguracaoSmtp
+): Promise<ApiEnvelope<null>> {
+  const response = await fetch("/api/admin/configuracao-smtp/testar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<null>(response);
 }
 
 export async function listarEmpresasComCatalogoMateriaPrima(): Promise<EmpresaComCatalogo[]> {
