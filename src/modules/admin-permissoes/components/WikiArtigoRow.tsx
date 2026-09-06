@@ -59,6 +59,10 @@ export function WikiArtigoRow({
       </TableCell>
 
       <TableCell align="center">
+        {artigo.topicoNome ? <Badge variant="info">{artigo.topicoNome}</Badge> : "—"}
+      </TableCell>
+
+      <TableCell align="center">
         {artigo.privadoAdmin ? (
           <Badge variant="warning">
             <Stack direction="row" gap={5} align="center">

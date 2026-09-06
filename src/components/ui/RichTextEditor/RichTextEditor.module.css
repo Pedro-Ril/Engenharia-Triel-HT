@@ -72,6 +72,26 @@
   opacity: 0.4;
 }
 
+.statusUpload {
+  padding: 6px 14px;
+
+  border-bottom: 1px solid var(--border);
+  background: var(--info-bg);
+
+  color: var(--info-text);
+  font-size: 13px;
+}
+
+.erroUpload {
+  padding: 6px 14px;
+
+  border-bottom: 1px solid var(--border);
+  background: var(--danger-bg);
+
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
 /*
  * Estilo do texto formatado — usado tanto no editor (dentro do
  * Tiptap) quanto na visualização pública (RichTextViewer), pra

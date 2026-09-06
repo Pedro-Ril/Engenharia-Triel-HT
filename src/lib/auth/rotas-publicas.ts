@@ -45,6 +45,17 @@ const PREFIXOS_PUBLICOS = [
    */
   "/tv",
   "/api/tv",
+  /*
+   * Transferência de Arquivos: o link de download gerado (estilo
+   * WeTransfer) precisa funcionar sem login, inclusive pra quem está
+   * fora da empresa — a página de envio (/transferencia-arquivos, sem
+   * mais nada depois) continua exigindo login normalmente, por isso o
+   * link público mora num prefixo separado (/baixar) em vez de dentro
+   * de /transferencia-arquivos. Ver src/lib/transferencia/transferencias.ts
+   * (as funções de busca por token já filtram expiração).
+   */
+  "/baixar",
+  "/api/baixar",
 ];
 
 export function ehRotaPublica(pathname: string): boolean {

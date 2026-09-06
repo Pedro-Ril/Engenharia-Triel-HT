@@ -1,5 +1,5 @@
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
-import type { WikiArtigo } from "@/modules/wiki/types/wiki.types";
+import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 
 import type {
   Atualizacao,
@@ -26,6 +26,8 @@ import type {
   StatusManutencao,
   TemaPadrao,
   TipoAtualizacaoItem,
+  TransferenciaAdmin,
+  TransferenciaConfig,
 } from "../types/adminPermissoes.types";
 
 interface ApiEnvelope<T> {
@@ -561,6 +563,7 @@ export interface DadosWikiArtigo {
   titulo: string;
   conteudo: string;
   moduloId: string | null;
+  topicoId: string | null;
   privadoAdmin: boolean;
   ativo: boolean;
 }
@@ -593,6 +596,56 @@ export async function excluirWikiArtigo(id: string): Promise<ApiEnvelope<null>> 
     method: "DELETE",
   });
   return parseResponse<null>(response);
+}
+
+export async function listarWikiTopicos(): Promise<WikiTopico[]> {
+  const response = await fetch("/api/admin/wiki/topicos");
+  const body = await parseResponse<WikiTopico[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarWikiTopico(dados: {
+  nome: string;
+  icone: string | null;
+}): Promise<ApiEnvelope<WikiTopico>> {
+  const response = await fetch("/api/admin/wiki/topicos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<WikiTopico>(response);
+}
+
+export async function atualizarWikiTopico(
+  id: string,
+  dados: { nome?: string; icone?: string | null }
+): Promise<ApiEnvelope<WikiTopico>> {
+  const response = await fetch(`/api/admin/wiki/topicos/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<WikiTopico>(response);
+}
+
+export async function excluirWikiTopico(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/wiki/topicos/${id}`, {
+    method: "DELETE",
+  });
+  return parseResponse<null>(response);
+}
+
+export async function uploadWikiImagem(
+  arquivo: File
+): Promise<ApiEnvelope<{ id: string; url: string }>> {
+  const formData = new FormData();
+  formData.append("imagem", arquivo);
+
+  const response = await fetch("/api/admin/wiki/imagens", {
+    method: "POST",
+    body: formData,
+  });
+  return parseResponse<{ id: string; url: string }>(response);
 }
 
 export async function buscarConfigMateriaPrima(): Promise<ConfigMateriaPrima | null> {
@@ -695,6 +748,35 @@ export async function testarConfiguracaoSmtp(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
   });
+  return parseResponse<null>(response);
+}
+
+export async function buscarConfigTransferencia(): Promise<TransferenciaConfig | null> {
+  const response = await fetch("/api/admin/transferencia-arquivos/config");
+  const body = await parseResponse<TransferenciaConfig>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigTransferencia(dados: {
+  pastaArmazenamento: string;
+  duracaoMaximaHoras: number | null;
+}): Promise<ApiEnvelope<TransferenciaConfig>> {
+  const response = await fetch("/api/admin/transferencia-arquivos/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<TransferenciaConfig>(response);
+}
+
+export async function listarTransferenciasAdmin(): Promise<TransferenciaAdmin[]> {
+  const response = await fetch("/api/admin/transferencia-arquivos");
+  const body = await parseResponse<TransferenciaAdmin[]>(response);
+  return body.data ?? [];
+}
+
+export async function excluirTransferenciaAdmin(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/transferencia-arquivos/minhas/${id}`, { method: "DELETE" });
   return parseResponse<null>(response);
 }
 

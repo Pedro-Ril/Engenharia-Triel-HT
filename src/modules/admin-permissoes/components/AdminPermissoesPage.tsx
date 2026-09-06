@@ -13,6 +13,7 @@ import {
   KeyRound,
   Layers,
   Megaphone,
+  Send,
   Settings,
   Tv,
   Users,
@@ -27,7 +28,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { Toast } from "@/components/ui/Toast";
 
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
-import type { WikiArtigo } from "@/modules/wiki/types/wiki.types";
+import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 
 import { buscarUsuarioAtual } from "@/modules/auth/services/auth.service";
 
@@ -43,6 +44,7 @@ import {
   listarSetores,
   listarUsuarios,
   listarWikiArtigosAdmin,
+  listarWikiTopicos,
 } from "../services/adminPermissoes.service";
 import type {
   ConfiguracaoAd,
@@ -68,6 +70,7 @@ import { MonitoramentoPainel } from "./MonitoramentoPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
+import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
 import { TvCorporativaPainel } from "@/modules/tv-corporativa/components/TvCorporativaPainel";
@@ -140,6 +143,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         label: "TV Corporativa",
         icon: <Tv size={16} />,
       },
+      {
+        valor: "transferencia-arquivos",
+        label: "Transferência de Arquivos",
+        icon: <Send size={16} />,
+      },
     ],
   },
 ];
@@ -160,6 +168,7 @@ export function AdminPermissoesPage() {
   const [configuracaoSmtp, setConfiguracaoSmtp] = useState<ConfiguracaoSmtp | null>(null);
   const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
   const [wikiArtigos, setWikiArtigos] = useState<WikiArtigo[]>([]);
+  const [wikiTopicos, setWikiTopicos] = useState<WikiTopico[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [temaPadrao, setTemaPadrao] = useState<TemaPadrao | null>(null);
   const [emailUsuarioLogado, setEmailUsuarioLogado] = useState<string | null>(null);
@@ -186,6 +195,7 @@ export function AdminPermissoesPage() {
         configuracaoSmtpData,
         downloadsData,
         wikiArtigosData,
+        wikiTopicosData,
         empresasData,
         temaPadraoData,
         usuarioAtualData,
@@ -199,6 +209,7 @@ export function AdminPermissoesPage() {
         buscarConfiguracaoSmtp(),
         listarDownloadsAdmin(),
         listarWikiArtigosAdmin(),
+        listarWikiTopicos(),
         listarEmpresas(),
         buscarTemaPadrao(),
         buscarUsuarioAtual(),
@@ -213,6 +224,7 @@ export function AdminPermissoesPage() {
       setConfiguracaoSmtp(configuracaoSmtpData);
       setDownloads(downloadsData);
       setWikiArtigos(wikiArtigosData);
+      setWikiTopicos(wikiTopicosData);
       setEmpresas(empresasData);
       setTemaPadrao(temaPadraoData);
       setEmailUsuarioLogado(usuarioAtualData?.email ?? null);
@@ -443,6 +455,7 @@ export function AdminPermissoesPage() {
             <WikiPainel
               artigos={wikiArtigos}
               modulos={modulos}
+              topicos={wikiTopicos}
               onFeedback={mostrarFeedback}
               onArtigoCriado={(artigo) => setWikiArtigos((atual) => [...atual, artigo])}
               onArtigoAtualizado={(artigo) =>
@@ -454,11 +467,29 @@ export function AdminPermissoesPage() {
                 setWikiArtigos((atual) => atual.filter((item) => item.id !== id))
               }
               onArtigosRecarregados={setWikiArtigos}
+              onTopicoCriado={(topico) => setWikiTopicos((atual) => [...atual, topico])}
+              onTopicoAtualizado={(topico) =>
+                setWikiTopicos((atual) =>
+                  atual.map((item) => (item.id === topico.id ? topico : item))
+                )
+              }
+              onTopicoExcluido={(id) => {
+                setWikiTopicos((atual) => atual.filter((item) => item.id !== id));
+                setWikiArtigos((atual) =>
+                  atual.map((artigo) =>
+                    artigo.topicoId === id ? { ...artigo, topicoId: null, topicoNome: null } : artigo
+                  )
+                );
+              }}
             />
           )}
 
           {secao === "tv-corporativa" && (
             <TvCorporativaPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "transferencia-arquivos" && (
+            <TransferenciasAdminPainel onFeedback={mostrarFeedback} />
           )}
         </div>
       </div>

@@ -22,6 +22,11 @@ export async function register() {
     "@/lib/tv/signaling-processo"
   );
   iniciarSignalingSeNecessario();
+
+  const { iniciarLimpezaTransferencias } = await import(
+    "@/lib/transferencia/scheduler"
+  );
+  iniciarLimpezaTransferencias();
 }
 
 /*

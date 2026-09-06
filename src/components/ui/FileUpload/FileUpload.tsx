@@ -24,6 +24,13 @@ interface FileUploadProps {
   multiple?: boolean;
   disabled?: boolean;
   maxSizeMB?: number;
+  /*
+   * Sobrescreve o texto padrão "Limite de X MB por arquivo" — útil
+   * quando `maxSizeMB` é só um valor técnico interno (ex: um teto
+   * bem alto pra simular "sem limite") e mostrar o número não faz
+   * sentido pro usuário.
+   */
+  limiteTexto?: string;
   files?: File[];
   hasError?: boolean;
   onFilesChange?: (files: File[]) => void;
@@ -92,6 +99,7 @@ export function FileUpload({
   multiple = false,
   disabled = false,
   maxSizeMB = 10,
+  limiteTexto,
   files,
   hasError = false,
   onFilesChange,
@@ -271,7 +279,7 @@ export function FileUpload({
             </span>
 
             <span className={styles.rules}>
-              Limite de {maxSizeMB} MB por arquivo
+              {limiteTexto ?? `Limite de ${maxSizeMB} MB por arquivo`}
             </span>
           </span>
         </button>

@@ -31,6 +31,17 @@ interface PainelPortalProps extends AppShellProps {
  */
 const ROTAS_COM_TELA_CHEIA = ["/terminal-fabrica", "/chamados/dashboard"];
 
+/*
+ * Rotas que escondem o menu lateral/topo do portal só quando quem
+ * acessa NÃO tem sessão válida — a página pública de download de
+ * Transferência de Arquivos (ver src/app/baixar/[token]) pode ser
+ * aberta por qualquer pessoa que recebeu o link, inclusive fora da
+ * empresa/sem login, então o menu não faz sentido nesse caso; mas se
+ * quem está logado no portal abrir o próprio link, o menu continua
+ * aparecendo normalmente (ele já está "dentro" do portal).
+ */
+const ROTAS_SEM_MENU_SE_DESLOGADO = ["/baixar"];
+
 function PainelPortal({
   children,
   setores,
@@ -84,7 +95,13 @@ function AppShellConteudo(props: PainelPortalProps) {
   const telaCheiaAtiva =
     suportaTelaCheia && searchParams.get("fullscreen") === "1";
 
-  if (telaCheiaAtiva) {
+  const semMenu =
+    !props.usuario &&
+    ROTAS_SEM_MENU_SE_DESLOGADO.some(
+      (prefixo) => pathname === prefixo || pathname?.startsWith(`${prefixo}/`)
+    );
+
+  if (telaCheiaAtiva || semMenu) {
     return <>{props.children}</>;
   }
 

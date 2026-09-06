@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { registrarAcessoModuloSemFalhar } from "@/lib/auth/acesso-modulo";
-import { getUsuarioAutenticado, motivoLoginSuffix } from "@/lib/auth/autorizacao";
+import {
+  getSetoresComModulosPermitidos,
+  getUsuarioAutenticado,
+  motivoLoginSuffix,
+} from "@/lib/auth/autorizacao";
 import { listarArtigosVisiveis } from "@/lib/wiki/wiki";
 import { WikiPageClient } from "@/modules/wiki/components/WikiPageClient";
 
@@ -14,7 +18,10 @@ export default async function WikiPage() {
 
   await registrarAcessoModuloSemFalhar(usuario.id, "wiki");
 
-  const artigos = await listarArtigosVisiveis(usuario);
+  const [artigos, setoresComModulos] = await Promise.all([
+    listarArtigosVisiveis(usuario),
+    getSetoresComModulosPermitidos(usuario),
+  ]);
 
-  return <WikiPageClient artigos={artigos} />;
+  return <WikiPageClient artigos={artigos} setoresComModulos={setoresComModulos} />;
 }

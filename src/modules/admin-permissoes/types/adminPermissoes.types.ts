@@ -193,6 +193,34 @@ export interface ConfiguracaoSmtp {
   atualizadoPor: string | null;
 }
 
+export interface TransferenciaConfig {
+  pastaArmazenamento: string | null;
+  duracaoMaximaHoras: number | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
+export interface ArquivoTransferenciaAdmin {
+  id: string;
+  nomeOriginal: string;
+  tipoMime: string;
+  tamanhoBytes: number;
+}
+
+export interface TransferenciaAdmin {
+  id: string;
+  token: string;
+  arquivos: ArquivoTransferenciaAdmin[];
+  tamanhoTotalBytes: number;
+  mensagem: string | null;
+  enviadoPorUsuarioId: string;
+  enviadoPorNome: string | null;
+  destinatarioEmail: string | null;
+  emailEnviado: boolean;
+  criadoEm: string;
+  expiraEm: string;
+}
+
 export interface EmpresaComCatalogo {
   codEmpresa: string;
   totalItens: number;

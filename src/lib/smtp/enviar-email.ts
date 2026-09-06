@@ -6,9 +6,11 @@ import { ValidationError } from "@/lib/auth/errors";
 import type { PortalUsuario } from "@/lib/auth/usuarios";
 
 import { getConfiguracaoSmtp, type ConfiguracaoSmtp } from "./smtp-config";
+import { montarEmailHtml } from "./template-email";
 
 export interface EnviarEmailParams {
-  destinatario: string;
+  /* Aceita um ou vários endereços — vários destinatários viram um único e-mail com todos em "para". */
+  destinatario: string | string[];
   assunto: string;
   corpoHtml: string;
   corpoTexto?: string;
@@ -105,11 +107,11 @@ export async function enviarEmailTeste(
   await enviarEmailComConfig(config, {
     destinatario: usuario.email,
     assunto: "Teste de configuração SMTP — Portal Triel-HT",
-    corpoHtml: `
-      <p>Este é um e-mail de teste enviado pelo Portal Triel-HT.</p>
-      <p>Se você recebeu esta mensagem, a configuração SMTP está funcionando corretamente.</p>
-      <p>Enviado para: <strong>${usuario.nomeExibicao}</strong> (${usuario.email})</p>
-    `,
+    corpoHtml: montarEmailHtml(`
+      <p style="margin: 0 0 12px;">Este é um e-mail de teste enviado pelo Portal Triel-HT.</p>
+      <p style="margin: 0 0 12px;">Se você recebeu esta mensagem, a configuração SMTP está funcionando corretamente.</p>
+      <p style="margin: 0;">Enviado para: <strong>${usuario.nomeExibicao}</strong> (${usuario.email})</p>
+    `),
     corpoTexto: `Este é um e-mail de teste enviado pelo Portal Triel-HT.\n\nSe você recebeu esta mensagem, a configuração SMTP está funcionando corretamente.\n\nEnviado para: ${usuario.nomeExibicao} (${usuario.email})`,
   });
 }

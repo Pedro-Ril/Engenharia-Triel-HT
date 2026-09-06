@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -31,7 +31,18 @@ interface RichTextEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /*
+   * Quando informado, o botão "Imagem" da toolbar passa a abrir um
+   * seletor de arquivo (em vez de pedir uma URL por prompt), e colar
+   * (Ctrl+V) ou arrastar uma imagem pro editor também funciona — a
+   * função recebe o arquivo e devolve a URL já salva pra inserir no
+   * conteúdo. Sem essa prop, o editor mantém o comportamento antigo
+   * de URL por prompt.
+   */
+  imagemUpload?: (arquivo: File) => Promise<string>;
 }
+
+const TAMANHO_MAXIMO_IMAGEM_BYTES = 8 * 1024 * 1024;
 
 function ToolbarButton({
   onClick,
@@ -66,7 +77,20 @@ export function RichTextEditor({
   onChange,
   placeholder,
   disabled = false,
+  imagemUpload,
 }: RichTextEditorProps) {
+  const [enviandoImagem, setEnviandoImagem] = useState(false);
+  const [erroUpload, setErroUpload] = useState<string | null>(null);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
+
+  /*
+   * Guardada em ref (não em state) porque as callbacks do ProseMirror
+   * (handlePaste/handleDrop) são registradas uma vez na criação do
+   * editor e não são recriadas a cada render — ler direto do ref
+   * evita fechar sobre uma versão antiga de `editor`/`imagemUpload`.
+   */
+  const processarImagemRef = useRef<(arquivo: File) => void>(() => {});
+
   const editor = useEditor({
     immediatelyRender: false,
     editable: !disabled,
@@ -89,8 +113,66 @@ export function RichTextEditor({
       attributes: {
         class: styles.conteudo,
       },
+      handlePaste: (_view, event) => {
+        if (!imagemUpload) return false;
+
+        const itemImagem = Array.from(event.clipboardData?.items ?? []).find((item) =>
+          item.type.startsWith("image/")
+        );
+        const arquivo = itemImagem?.getAsFile();
+        if (!arquivo) return false;
+
+        event.preventDefault();
+        processarImagemRef.current(arquivo);
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        if (!imagemUpload) return false;
+
+        const arquivo = Array.from(event.dataTransfer?.files ?? []).find((item) =>
+          item.type.startsWith("image/")
+        );
+        if (!arquivo) return false;
+
+        event.preventDefault();
+        processarImagemRef.current(arquivo);
+        return true;
+      },
     },
   });
+
+  useEffect(() => {
+    processarImagemRef.current = (arquivo: File) => {
+      if (!imagemUpload || !editor) return;
+
+      setErroUpload(null);
+
+      if (!arquivo.type.startsWith("image/")) {
+        setErroUpload("Apenas arquivos de imagem podem ser inseridos.");
+        return;
+      }
+
+      if (arquivo.size > TAMANHO_MAXIMO_IMAGEM_BYTES) {
+        setErroUpload(
+          `A imagem excede o limite de ${TAMANHO_MAXIMO_IMAGEM_BYTES / (1024 * 1024)} MB.`
+        );
+        return;
+      }
+
+      setEnviandoImagem(true);
+
+      imagemUpload(arquivo)
+        .then((url) => {
+          editor.chain().focus().setImage({ src: url }).run();
+        })
+        .catch((error: unknown) => {
+          setErroUpload(error instanceof Error ? error.message : "Falha ao enviar a imagem.");
+        })
+        .finally(() => {
+          setEnviandoImagem(false);
+        });
+    };
+  }, [imagemUpload, editor]);
 
   /* Sincroniza quando `value` muda por fora (ex: trocar de artigo no formulário). */
   useEffect(() => {
@@ -123,13 +205,34 @@ export function RichTextEditor({
   }
 
   function inserirImagem() {
+    if (imagemUpload) {
+      inputArquivoRef.current?.click();
+      return;
+    }
+
     const url = window.prompt("URL da imagem:");
     if (!url) return;
     editor?.chain().focus().setImage({ src: url }).run();
   }
 
+  function handleArquivoSelecionado(event: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0];
+    event.target.value = "";
+    if (arquivo) processarImagemRef.current(arquivo);
+  }
+
   return (
     <div className={styles.wrapper}>
+      {imagemUpload && (
+        <input
+          ref={inputArquivoRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          onChange={handleArquivoSelecionado}
+          style={{ display: "none" }}
+        />
+      )}
+
       <div className={styles.toolbar}>
         <ToolbarButton
           label="Negrito"
@@ -236,7 +339,11 @@ export function RichTextEditor({
           <LinkIcon size={16} />
         </ToolbarButton>
 
-        <ToolbarButton label="Imagem" disabled={disabled} onClick={inserirImagem}>
+        <ToolbarButton
+          label="Imagem"
+          disabled={disabled || enviandoImagem}
+          onClick={inserirImagem}
+        >
           <ImageIcon size={16} />
         </ToolbarButton>
 
@@ -258,6 +365,9 @@ export function RichTextEditor({
           <Redo size={16} />
         </ToolbarButton>
       </div>
+
+      {enviandoImagem && <p className={styles.statusUpload}>Enviando imagem...</p>}
+      {erroUpload && <p className={styles.erroUpload}>{erroUpload}</p>}
 
       <EditorContent editor={editor} />
     </div>

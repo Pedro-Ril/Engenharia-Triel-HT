@@ -38,6 +38,7 @@ async function handlePOST(request: Request) {
     const titulo = requiredText(body.titulo, "título", 200);
     const conteudo = requiredText(body.conteudo, "conteúdo", 1_000_000);
     const moduloId = optionalText(body.moduloId, "moduloId", 36);
+    const topicoId = optionalText(body.topicoId, "topicoId", 36);
     const privadoAdmin = optionalBoolean(body.privadoAdmin, "privadoAdmin", false);
     const ativo = optionalBoolean(body.ativo, "ativo", true);
 
@@ -45,6 +46,7 @@ async function handlePOST(request: Request) {
       titulo,
       conteudo,
       moduloId,
+      topicoId,
       privadoAdmin,
       ativo,
       autorUsuarioId: acesso.usuario.id,

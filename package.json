@@ -21,6 +21,8 @@
     "@tiptap/pm": "^3.30.2",
     "@tiptap/react": "^3.30.2",
     "@tiptap/starter-kit": "^3.30.2",
+    "archiver": "^8.0.0",
+    "busboy": "^1.6.0",
     "dxf-viewer": "^1.0.48",
     "handsontable": "^17.1.0",
     "jose": "^6.2.9",
@@ -44,6 +46,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/archiver": "^8.0.0",
+    "@types/busboy": "^1.5.4",
     "@types/mssql": "^12.3.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",

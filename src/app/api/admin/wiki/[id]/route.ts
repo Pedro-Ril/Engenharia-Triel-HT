@@ -27,6 +27,8 @@ async function handlePATCH(request: Request, { params }: RouteParams) {
     const conteudo = optionalText(body.conteudo, "conteúdo", 1_000_000) ?? undefined;
     const moduloId =
       body.moduloId === undefined ? undefined : optionalText(body.moduloId, "moduloId", 36);
+    const topicoId =
+      body.topicoId === undefined ? undefined : optionalText(body.topicoId, "topicoId", 36);
     const privadoAdmin =
       body.privadoAdmin === undefined
         ? undefined
@@ -39,6 +41,7 @@ async function handlePATCH(request: Request, { params }: RouteParams) {
       titulo,
       conteudo,
       moduloId,
+      topicoId,
       privadoAdmin,
       ativo,
       ordem,

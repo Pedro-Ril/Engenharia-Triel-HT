@@ -38,3 +38,38 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.filtroBusca {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.filtroTopico {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
+.moduloGrupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.moduloGrupo + .moduloGrupo {
+  margin-top: 16px;
+}
+
+.moduloSubtitulo {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

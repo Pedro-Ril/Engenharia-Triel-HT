@@ -10,6 +10,8 @@ export interface WikiArtigoResumo {
   titulo: string;
   moduloId: string | null;
   moduloNome: string | null;
+  topicoId: string | null;
+  topicoNome: string | null;
   privadoAdmin: boolean;
   ativo: boolean;
   ordem: number;
@@ -28,6 +30,8 @@ interface WikiArtigoRow {
   conteudo: string;
   modulo_id: string | null;
   modulo_nome: string | null;
+  topico_id: string | null;
+  topico_nome: string | null;
   privado_admin: boolean;
   ativo: boolean;
   ordem: number;
@@ -42,6 +46,8 @@ const colunasArtigo = `
   a.[conteudo],
   CONVERT(VARCHAR(36), a.[modulo_id]) AS [modulo_id],
   m.[nome] AS [modulo_nome],
+  CONVERT(VARCHAR(36), a.[topico_id]) AS [topico_id],
+  t.[nome] AS [topico_nome],
   CAST(a.[privado_admin] AS BIT) AS [privado_admin],
   CAST(a.[ativo] AS BIT) AS [ativo],
   a.[ordem],
@@ -53,6 +59,7 @@ const colunasArtigo = `
 const juncoesArtigo = `
   FROM dbo.portal_wiki_artigos AS a
   LEFT JOIN dbo.portal_modulos AS m ON m.[id] = a.[modulo_id]
+  LEFT JOIN dbo.portal_wiki_topicos AS t ON t.[id] = a.[topico_id]
   LEFT JOIN dbo.portal_usuarios AS autor ON autor.[id] = a.[autor_usuario_id]
 `;
 
@@ -63,6 +70,8 @@ function mapRow(row: WikiArtigoRow): WikiArtigo {
     conteudo: row.conteudo,
     moduloId: row.modulo_id,
     moduloNome: row.modulo_nome,
+    topicoId: row.topico_id,
+    topicoNome: row.topico_nome,
     privadoAdmin: row.privado_admin,
     ativo: row.ativo,
     ordem: row.ordem,
@@ -139,6 +148,7 @@ export interface CriarArtigoParams {
   titulo: string;
   conteudo: string;
   moduloId: string | null;
+  topicoId: string | null;
   privadoAdmin: boolean;
   ativo: boolean;
   autorUsuarioId: string | null;
@@ -151,6 +161,7 @@ export async function criarArtigo(params: CriarArtigoParams): Promise<WikiArtigo
   request.input("titulo", sql.NVarChar(200), params.titulo);
   request.input("conteudo", sql.NVarChar(sql.MAX), params.conteudo);
   request.input("moduloId", sql.UniqueIdentifier, params.moduloId);
+  request.input("topicoId", sql.UniqueIdentifier, params.topicoId);
   request.input("privadoAdmin", sql.Bit, params.privadoAdmin);
   request.input("ativo", sql.Bit, params.ativo);
   request.input("autorUsuarioId", sql.UniqueIdentifier, params.autorUsuarioId);
@@ -164,9 +175,9 @@ export async function criarArtigo(params: CriarArtigoParams): Promise<WikiArtigo
       );
 
       INSERT INTO dbo.portal_wiki_artigos
-        ([titulo], [conteudo], [modulo_id], [privado_admin], [ativo], [ordem], [autor_usuario_id])
+        ([titulo], [conteudo], [modulo_id], [topico_id], [privado_admin], [ativo], [ordem], [autor_usuario_id])
       OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
-      VALUES (@titulo, @conteudo, @moduloId, @privadoAdmin, @ativo, @proximaOrdem, @autorUsuarioId);
+      VALUES (@titulo, @conteudo, @moduloId, @topicoId, @privadoAdmin, @ativo, @proximaOrdem, @autorUsuarioId);
     `);
 
     const artigo = await buscarArtigoPorIdAdmin(result.recordset[0].id);
@@ -175,6 +186,9 @@ export async function criarArtigo(params: CriarArtigoParams): Promise<WikiArtigo
   } catch (error) {
     if (error instanceof Error && /FK_portal_wiki_artigos_modulo/i.test(error.message)) {
       throw new ValidationError("O módulo selecionado não existe.");
+    }
+    if (error instanceof Error && /FK_portal_wiki_artigos_topico/i.test(error.message)) {
+      throw new ValidationError("O tópico selecionado não existe.");
     }
     throw error;
   }
@@ -200,6 +214,7 @@ export interface AtualizarArtigoParams {
   titulo?: string;
   conteudo?: string;
   moduloId?: string | null;
+  topicoId?: string | null;
   privadoAdmin?: boolean;
   ativo?: boolean;
   ordem?: number;
@@ -229,6 +244,11 @@ export async function atualizarArtigo(
   if (params.moduloId !== undefined) {
     request.input("moduloId", sql.UniqueIdentifier, params.moduloId);
     sets.push("[modulo_id] = @moduloId");
+  }
+
+  if (params.topicoId !== undefined) {
+    request.input("topicoId", sql.UniqueIdentifier, params.topicoId);
+    sets.push("[topico_id] = @topicoId");
   }
 
   if (params.privadoAdmin !== undefined) {
@@ -261,6 +281,9 @@ export async function atualizarArtigo(
   } catch (error) {
     if (error instanceof Error && /FK_portal_wiki_artigos_modulo/i.test(error.message)) {
       throw new ValidationError("O módulo selecionado não existe.");
+    }
+    if (error instanceof Error && /FK_portal_wiki_artigos_topico/i.test(error.message)) {
+      throw new ValidationError("O tópico selecionado não existe.");
     }
     throw error;
   }

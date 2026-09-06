@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Database, FileSpreadsheet, KeyRound, Mail, PackageSearch, Shuffle, Wrench } from "lucide-react";
+import {
+  Database,
+  FileSpreadsheet,
+  KeyRound,
+  Mail,
+  PackageSearch,
+  Send,
+  Shuffle,
+  Wrench,
+} from "lucide-react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
@@ -14,6 +23,7 @@ import { EstruturaSubstituicaoConfigPainel } from "./EstruturaSubstituicaoConfig
 import { IntegraLantekConfigPainel } from "./IntegraLantekConfigPainel";
 import { ManutencaoPainel } from "./ManutencaoPainel";
 import { MateriaPrimaConfigPainel } from "./MateriaPrimaConfigPainel";
+import { TransferenciaConfigPainel } from "./TransferenciaConfigPainel";
 
 interface ConfiguracoesPainelProps {
   configuracaoAd: ConfiguracaoAd | null;
@@ -33,6 +43,7 @@ type AbaConfiguracao =
   | "materia-prima"
   | "estrutura"
   | "lantek"
+  | "transferencia"
   | "manutencao";
 
 const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] = [
@@ -43,6 +54,7 @@ const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] =
   { valor: "materia-prima", label: "Matéria-Prima", icon: PackageSearch },
   { valor: "estrutura", label: "Estrutura", icon: Shuffle },
   { valor: "lantek", label: "Integração Lantek", icon: FileSpreadsheet },
+  { valor: "transferencia", label: "Transferência de Arquivos", icon: Send },
 ];
 
 export function ConfiguracoesPainel({
@@ -100,6 +112,8 @@ export function ConfiguracoesPainel({
         {aba === "estrutura" && <EstruturaSubstituicaoConfigPainel onFeedback={onFeedback} />}
 
         {aba === "lantek" && <IntegraLantekConfigPainel onFeedback={onFeedback} />}
+
+        {aba === "transferencia" && <TransferenciaConfigPainel onFeedback={onFeedback} />}
 
         {aba === "manutencao" && <ManutencaoPainel onFeedback={onFeedback} />}
       </div>
