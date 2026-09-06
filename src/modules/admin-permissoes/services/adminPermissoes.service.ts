@@ -760,6 +760,7 @@ export async function buscarConfigTransferencia(): Promise<TransferenciaConfig |
 export async function salvarConfigTransferencia(dados: {
   pastaArmazenamento: string;
   duracaoMaximaHoras: number | null;
+  urlPublica: string | null;
 }): Promise<ApiEnvelope<TransferenciaConfig>> {
   const response = await fetch("/api/admin/transferencia-arquivos/config", {
     method: "PATCH",

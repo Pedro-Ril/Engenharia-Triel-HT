@@ -35,6 +35,7 @@ export function TransferenciaConfigPainel({ onFeedback }: TransferenciaConfigPai
 
   const [pastaArmazenamento, setPastaArmazenamento] = useState("");
   const [duracaoMaximaHoras, setDuracaoMaximaHoras] = useState("");
+  const [urlPublica, setUrlPublica] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function TransferenciaConfigPainel({ onFeedback }: TransferenciaConfigPai
       setConfig(dados);
       setPastaArmazenamento(dados?.pastaArmazenamento ?? "");
       setDuracaoMaximaHoras(dados?.duracaoMaximaHoras ? String(dados.duracaoMaximaHoras) : "");
+      setUrlPublica(dados?.urlPublica ?? "");
       setCarregando(false);
     }
 
@@ -59,6 +61,7 @@ export function TransferenciaConfigPainel({ onFeedback }: TransferenciaConfigPai
       const resultado = await salvarConfigTransferencia({
         pastaArmazenamento: pastaArmazenamento.trim(),
         duracaoMaximaHoras: duracaoNumero,
+        urlPublica: urlPublica.trim() || null,
       });
 
       if (resultado.ok && resultado.data) {
@@ -109,6 +112,20 @@ export function TransferenciaConfigPainel({ onFeedback }: TransferenciaConfigPai
               id="duracaoMaximaHoras"
               value={duracaoMaximaHoras}
               onChange={(event) => setDuracaoMaximaHoras(event.target.value)}
+              disabled={salvando}
+            />
+          </Field>
+
+          <Field
+            label="URL pública do portal"
+            htmlFor="urlPublica"
+            hint="Deixe em branco para usar o endereço da própria requisição. Configure aqui se o servidor fica atrás de um proxy que não repassa o domínio público (o link gerado sairia com 'localhost' em vez do endereço real)."
+          >
+            <Input
+              id="urlPublica"
+              placeholder="https://portal.trielht.com.br"
+              value={urlPublica}
+              onChange={(event) => setUrlPublica(event.target.value)}
               disabled={salvando}
             />
           </Field>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { isObject, optionalInteger, requiredText } from "@/lib/auth/validation";
+import { isObject, optionalInteger, optionalText, requiredText } from "@/lib/auth/validation";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import {
   buscarConfigTransferencia,
@@ -33,6 +33,7 @@ export const GET = comMetricasApi("admin/transferencia-arquivos/config", handleG
 interface ConfigBody {
   pastaArmazenamento?: unknown;
   duracaoMaximaHoras?: unknown;
+  urlPublica?: unknown;
 }
 
 async function handlePATCH(request: Request) {
@@ -56,9 +57,15 @@ async function handlePATCH(request: Request) {
       throw new ValidationError("A duração máxima deve ser maior que zero.");
     }
 
+    const urlPublica = optionalText(body.urlPublica, "URL pública do portal", 300);
+    if (urlPublica && !/^https?:\/\//i.test(urlPublica)) {
+      throw new ValidationError("A URL pública deve começar com http:// ou https://.");
+    }
+
     const config = await salvarConfigTransferencia({
       pastaArmazenamento,
       duracaoMaximaHoras,
+      urlPublica: urlPublica ? urlPublica.replace(/\/+$/, "") : null,
       atualizadoPor: acesso.usuario.samAccountName,
     });
 

@@ -10,6 +10,7 @@ import {
   montarEmailHtml,
   montarLinkEmailHtml,
 } from "@/lib/smtp/template-email";
+import { origemPublicaEfetiva } from "@/lib/transferencia/transferencia-config";
 import { buscarTransferenciaPorId, marcarEmailEnviado } from "@/lib/transferencia/transferencias";
 
 export const runtime = "nodejs";
@@ -72,7 +73,7 @@ async function handlePOST(request: Request, { params }: RouteParams) {
   }
 
   const destinatarios = transferencia.destinatarioEmail.split(";").map((email) => email.trim());
-  const linkDownload = `${new URL(request.url).origin}/baixar/${transferencia.token}`;
+  const linkDownload = `${await origemPublicaEfetiva(request)}/baixar/${transferencia.token}`;
   const descricaoArquivos =
     transferencia.arquivos.length === 1
       ? "um arquivo"

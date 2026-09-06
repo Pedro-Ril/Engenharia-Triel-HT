@@ -196,6 +196,7 @@ export interface ConfiguracaoSmtp {
 export interface TransferenciaConfig {
   pastaArmazenamento: string | null;
   duracaoMaximaHoras: number | null;
+  urlPublica: string | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }

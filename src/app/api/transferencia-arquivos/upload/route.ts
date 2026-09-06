@@ -19,6 +19,7 @@ import {
 } from "@/lib/smtp/template-email";
 import {
   duracaoMaximaHorasEfetiva,
+  origemPublicaEfetiva,
   pastaArmazenamentoObrigatoria,
 } from "@/lib/transferencia/transferencia-config";
 import { criarTransferencia, marcarEmailEnviado } from "@/lib/transferencia/transferencias";
@@ -293,7 +294,7 @@ async function handlePOST(request: Request) {
       duracaoHoras: camposFinais.duracaoHoras,
     });
 
-    const linkDownload = `${new URL(request.url).origin}/baixar/${transferencia.token}`;
+    const linkDownload = `${await origemPublicaEfetiva(request)}/baixar/${transferencia.token}`;
     let emailEnviado = false;
     let avisoEmail: string | null = null;
 

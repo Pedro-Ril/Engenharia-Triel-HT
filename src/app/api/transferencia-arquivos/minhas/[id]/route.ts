@@ -11,7 +11,10 @@ import {
   montarEmailHtml,
   montarLinkEmailHtml,
 } from "@/lib/smtp/template-email";
-import { duracaoMaximaHorasEfetiva } from "@/lib/transferencia/transferencia-config";
+import {
+  duracaoMaximaHorasEfetiva,
+  origemPublicaEfetiva,
+} from "@/lib/transferencia/transferencia-config";
 import {
   atualizarExpiracao,
   excluirTransferencia,
@@ -63,7 +66,7 @@ async function avisarDestinatarios(
   if (!transferencia.destinatarioEmail) return;
 
   const destinatarios = transferencia.destinatarioEmail.split(";").map((email) => email.trim());
-  const linkDownload = `${new URL(request.url).origin}/baixar/${transferencia.token}`;
+  const linkDownload = `${await origemPublicaEfetiva(request)}/baixar/${transferencia.token}`;
   const cartaoArquivos = montarCartaoArquivosEmailHtml(
     transferencia.arquivos.map((arquivo) => ({
       nome: arquivo.nomeOriginal,
