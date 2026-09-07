@@ -10,6 +10,67 @@ export type ApprovalRepresentation =
   | "superior"
   | "completo";
 
+export type RevisionStatus =
+  | "gerando"
+  | "gerado"
+  | "em_aprovacao"
+  | "ajustes_solicitados"
+  | "aprovado"
+  | "reprovado"
+  | "erro";
+
+export type FlowAction =
+  | "gerar"
+  | "aprovar"
+  | "solicitar-ajustes"
+  | "reprovar"
+  | "reabrir-revisao";
+
+export interface ApprovalHistoryItem {
+  id: string;
+  desenhoId: string;
+
+  acao: string;
+
+  statusAnterior: ApprovalStatus | null;
+  statusNovo: ApprovalStatus | null;
+
+  observacao: string | null;
+  dados: unknown;
+
+  usuario: string | null;
+  criadoEm: string;
+}
+
+export interface ApprovalRevision {
+  id: string;
+
+  numeroRevisao: number;
+  codigoRevisao: string;
+  statusRevisao: RevisionStatus;
+
+  templateCodigo: string | null;
+  templateVersao: number | null;
+  geradorVersao: string | null;
+
+  possuiSvg: boolean;
+  possuiPdf: boolean;
+
+  criadoEm: string;
+  criadoPor: string | null;
+
+  geradoEm: string | null;
+  geradoPor: string | null;
+
+  enviadoAprovacaoEm: string | null;
+  enviadoAprovacaoPor: string | null;
+
+  decididoEm: string | null;
+  decididoPor: string | null;
+
+  observacaoDecisao: string | null;
+}
+
 export interface ApprovalProject {
   id?: string;
 

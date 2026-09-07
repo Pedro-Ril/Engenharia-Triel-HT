@@ -1,4 +1,12 @@
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
+import type {
+  AssetTemplate,
+  CampoDinamico,
+  Template,
+  TemplateJson,
+  TemplateVersao,
+  VinculoTemplate,
+} from "@/modules/desenho-aprovacao/types/template.types";
 import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 
 import type {
@@ -829,4 +837,183 @@ export async function cancelarSincronizacaoMateriaPrimaAdmin(
     body: JSON.stringify({ codEmpresa }),
   });
   return parseResponse<null>(response);
+}
+
+/* =========================================================
+   TEMPLATES DE DESENHO DE APROVAÇÃO
+   ========================================================= */
+
+export async function listarTemplatesDesenhoAdmin(): Promise<Template[]> {
+  const response = await fetch("/api/admin/desenho-aprovacao/templates");
+  const body = await parseResponse<Template[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarTemplateDesenhoAdmin(dados: {
+  nome: string;
+  descricao: string | null;
+  formatoPapel: string;
+  orientacao: "horizontal" | "vertical";
+  larguraMm: number;
+  alturaMm: number;
+}): Promise<ApiEnvelope<Template>> {
+  const response = await fetch("/api/admin/desenho-aprovacao/templates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<Template>(response);
+}
+
+export async function atualizarTemplateDesenhoAdmin(
+  id: string,
+  dados: { nome?: string; descricao?: string | null; status?: "ativo" | "arquivado" }
+): Promise<ApiEnvelope<Template>> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<Template>(response);
+}
+
+export async function listarCamposDinamicosAdmin(): Promise<CampoDinamico[]> {
+  const response = await fetch("/api/admin/desenho-aprovacao/campos");
+  const body = await parseResponse<CampoDinamico[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarCampoDinamicoAdmin(dados: {
+  chave: string;
+  rotulo: string;
+  categoria: string;
+  tipoDado: string;
+  unidadePadrao: string | null;
+  valorExemplo: string | null;
+  descricao: string | null;
+}): Promise<ApiEnvelope<CampoDinamico>> {
+  const response = await fetch("/api/admin/desenho-aprovacao/campos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<CampoDinamico>(response);
+}
+
+export async function listarVinculosTemplateAdmin(templateId: string): Promise<VinculoTemplate[]> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/vinculos`);
+  const body = await parseResponse<VinculoTemplate[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarVinculoTemplateAdmin(
+  templateId: string,
+  dados: {
+    produto: string;
+    modelo: string | null;
+    padrao: boolean;
+    prioridade: number;
+    vigenciaInicio: string | null;
+    vigenciaFim: string | null;
+  }
+): Promise<ApiEnvelope<VinculoTemplate>> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/vinculos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<VinculoTemplate>(response);
+}
+
+export async function enviarAssetSvgTemplateAdmin(
+  templateId: string,
+  versaoId: string,
+  arquivo: File
+): Promise<ApiEnvelope<AssetTemplate>> {
+  const formData = new FormData();
+  formData.append("versaoId", versaoId);
+  formData.append("arquivo", arquivo);
+
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/assets`, {
+    method: "POST",
+    body: formData,
+  });
+  return parseResponse<AssetTemplate>(response);
+}
+
+export async function listarVersoesTemplateAdmin(templateId: string): Promise<TemplateVersao[]> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/versoes`);
+  const body = await parseResponse<TemplateVersao[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarVersaoTemplateAdmin(
+  templateId: string,
+  templateJson?: TemplateJson
+): Promise<ApiEnvelope<TemplateVersao>> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/versoes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(templateJson ? { templateJson } : {}),
+  });
+  return parseResponse<TemplateVersao>(response);
+}
+
+export async function buscarVersaoTemplateAdmin(
+  templateId: string,
+  versaoId: string
+): Promise<ApiEnvelope<TemplateVersao>> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/versoes/${versaoId}`);
+  return parseResponse<TemplateVersao>(response);
+}
+
+export async function salvarRascunhoTemplateAdmin(
+  templateId: string,
+  versaoId: string,
+  templateJson: TemplateJson
+): Promise<ApiEnvelope<TemplateVersao>> {
+  const response = await fetch(`/api/admin/desenho-aprovacao/templates/${templateId}/versoes/${versaoId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(templateJson),
+  });
+  return parseResponse<TemplateVersao>(response);
+}
+
+export async function publicarVersaoTemplateAdmin(
+  templateId: string,
+  versaoId: string
+): Promise<ApiEnvelope<TemplateVersao>> {
+  const response = await fetch(
+    `/api/admin/desenho-aprovacao/templates/${templateId}/versoes/${versaoId}/publicar`,
+    { method: "POST" }
+  );
+  return parseResponse<TemplateVersao>(response);
+}
+
+export async function arquivarVersaoTemplateAdmin(
+  templateId: string,
+  versaoId: string
+): Promise<ApiEnvelope<TemplateVersao>> {
+  const response = await fetch(
+    `/api/admin/desenho-aprovacao/templates/${templateId}/versoes/${versaoId}/arquivar`,
+    { method: "POST" }
+  );
+  return parseResponse<TemplateVersao>(response);
+}
+
+export async function preVisualizarVersaoTemplateAdmin(
+  templateId: string,
+  versaoId: string,
+  dadosExemplo: Record<string, unknown>
+): Promise<ApiEnvelope<{ svg: string }>> {
+  const response = await fetch(
+    `/api/admin/desenho-aprovacao/templates/${templateId}/versoes/${versaoId}/preview`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dadosExemplo }),
+    }
+  );
+  return parseResponse<{ svg: string }>(response);
 }

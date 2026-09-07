@@ -5,6 +5,10 @@ import {
 } from "node:fs";
 import path from "node:path";
 
+import { buscarTemplatePublicadoPorProduto } from "@/lib/desenho-aprovacao/templates";
+
+import { renderizarTemplate } from "./render-template";
+
 export type ApprovalDrawingRepresentation =
   | "lateral"
   | "superior"
@@ -94,20 +98,20 @@ export interface ApprovalDrawingData {
   criadoPor: string;
 }
 
-interface SvgBounds {
+export interface SvgBounds {
   minX: number;
   minY: number;
   width: number;
   height: number;
 }
 
-interface ParsedTemplateSvg {
+export interface ParsedTemplateSvg {
   viewBox: string;
   bounds: SvgBounds;
   innerContent: string;
 }
 
-interface FittedArtworkBounds {
+export interface FittedArtworkBounds {
   left: number;
   top: number;
   right: number;
@@ -186,7 +190,7 @@ const productTemplates: Record<
   },
 };
 
-function escapeXml(
+export function escapeXml(
   value: string | null | undefined
 ): string {
   if (!value) {
@@ -263,38 +267,36 @@ export function getApprovalDrawingTemplateInfo(
   };
 }
 
-function parseTemplateSvg(
-  filePath: string
+/*
+ * Extrai viewBox/conteúdo interno de um SVG a partir do texto-fonte —
+ * reaproveitada tanto pelo carregamento de arquivo abaixo (produtos
+ * hardcoded) quanto pelo renderizador genérico de templates dinâmicos
+ * (render-template.ts), que já tem o SVG decodificado de
+ * eng_templates_aprovacao_assets em memória, não em disco.
+ */
+export function parseTemplateSvgSource(
+  source: string,
+  sourceLabel: string
 ): ParsedTemplateSvg {
-  const cached =
-    templateCache.get(filePath);
-
-  if (cached) {
-    return cached;
-  }
-
-  const source = readFileSync(
-    filePath,
-    "utf8"
-  ).trim();
+  const trimmedSource = source.trim();
 
   if (
     /<script\b|<foreignObject\b/i.test(
-      source
+      trimmedSource
     )
   ) {
     throw new Error(
-      `O template SVG possui elementos não permitidos: ${filePath}`
+      `O SVG possui elementos não permitidos: ${sourceLabel}`
     );
   }
 
-  const svgTagMatch = source.match(
+  const svgTagMatch = trimmedSource.match(
     /<svg\b([^>]*)>/i
   );
 
   if (!svgTagMatch) {
     throw new Error(
-      `O template não contém uma tag SVG válida: ${filePath}`
+      `O SVG não contém uma tag <svg> válida: ${sourceLabel}`
     );
   }
 
@@ -305,7 +307,7 @@ function parseTemplateSvg(
 
   if (!viewBoxMatch) {
     throw new Error(
-      `O template não possui viewBox: ${filePath}`
+      `O SVG não possui viewBox: ${sourceLabel}`
     );
   }
 
@@ -326,7 +328,7 @@ function parseTemplateSvg(
     viewBoxValues[3] <= 0
   ) {
     throw new Error(
-      `O template possui um viewBox inválido: ${filePath}`
+      `O SVG possui um viewBox inválido: ${sourceLabel}`
     );
   }
 
@@ -337,14 +339,14 @@ function parseTemplateSvg(
     height,
   ] = viewBoxValues;
 
-  const innerContent = source
+  const innerContent = trimmedSource
     .replace(/^<\?xml[^>]*>\s*/i, "")
     .replace(/<!--([\s\S]*?)-->/g, "")
     .replace(/^[\s\S]*?<svg\b[^>]*>/i, "")
     .replace(/<\/svg>\s*$/i, "")
     .trim();
 
-  const parsed = {
+  return {
     viewBox,
     bounds: {
       minX,
@@ -354,6 +356,27 @@ function parseTemplateSvg(
     },
     innerContent,
   };
+}
+
+function parseTemplateSvg(
+  filePath: string
+): ParsedTemplateSvg {
+  const cached =
+    templateCache.get(filePath);
+
+  if (cached) {
+    return cached;
+  }
+
+  const source = readFileSync(
+    filePath,
+    "utf8"
+  );
+
+  const parsed = parseTemplateSvgSource(
+    source,
+    filePath
+  );
 
   templateCache.set(
     filePath,
@@ -397,7 +420,7 @@ function formatNumber(
   ).format(value)} ${suffix}`;
 }
 
-function createText(
+export function createText(
   x: number,
   y: number,
   text: string,
@@ -408,6 +431,11 @@ function createText(
       | "start"
       | "middle"
       | "end";
+    fill?: string;
+    fontFamily?: string;
+    italic?: boolean;
+    underline?: boolean;
+    letterSpacing?: number;
   }
 ): string {
   return `
@@ -417,15 +445,18 @@ function createText(
       font-size="${options?.fontSize ?? 3.2}"
       font-weight="${options?.fontWeight ?? 400}"
       text-anchor="${options?.textAnchor ?? "start"}"
-      font-family="Arial, Helvetica, sans-serif"
-      fill="#111111"
+      font-family="${options?.fontFamily ?? "Arial, Helvetica, sans-serif"}"
+      fill="${options?.fill ?? "#111111"}"
+      ${options?.italic ? 'font-style="italic"' : ""}
+      ${options?.underline ? 'text-decoration="underline"' : ""}
+      ${options?.letterSpacing !== undefined ? `letter-spacing="${options.letterSpacing}"` : ""}
     >
       ${escapeXml(text)}
     </text>
   `;
 }
 
-function createHorizontalDimensionLine(
+export function createHorizontalDimensionLine(
   objectLeft: number,
   objectRight: number,
   objectBottom: number,
@@ -493,7 +524,7 @@ function createHorizontalDimensionLine(
   `;
 }
 
-function createVerticalDimensionLine(
+export function createVerticalDimensionLine(
   objectLeft: number,
   objectTop: number,
   objectBottom: number,
@@ -563,7 +594,7 @@ function createVerticalDimensionLine(
   `;
 }
 
-function calculateFittedArtworkBounds(
+export function calculateFittedArtworkBounds(
   template: ParsedTemplateSvg,
   x: number,
   y: number,
@@ -597,12 +628,13 @@ function calculateFittedArtworkBounds(
   };
 }
 
-function renderTemplateArtwork(
+export function renderTemplateArtwork(
   template: ParsedTemplateSvg,
   x: number,
   y: number,
   width: number,
-  height: number
+  height: number,
+  preserveAspectRatio: string = "xMidYMid meet"
 ): string {
   return `
     <svg
@@ -611,7 +643,7 @@ function renderTemplateArtwork(
       width="${width}"
       height="${height}"
       viewBox="${template.viewBox}"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="${preserveAspectRatio}"
       overflow="hidden"
     >
       ${template.innerContent}
@@ -1024,9 +1056,33 @@ function generateSiloGraneleiroSvg(
   `.trim();
 }
 
-export function generateApprovalDrawingSvg(
+export async function generateApprovalDrawingSvg(
   data: ApprovalDrawingData
-): string {
+): Promise<string> {
+  /*
+   * O sistema de templates dinâmicos (eng_templates_aprovacao*) tem
+   * prioridade quando existe um template publicado pro produto — é o
+   * caminho pra produtos NOVOS (Aves, Suínos, futuros), configurados pela
+   * tela de admin sem precisar de um novo gerador em TypeScript. O Silo
+   * Graneleiro (único produto em produção) continua no gerador hardcoded
+   * abaixo enquanto não houver um template dinâmico publicado pra ele —
+   * decisão de risco deliberada, zero mudança de comportamento pro que já
+   * está em produção.
+   */
+  if (data.produto) {
+    const encontrado = await buscarTemplatePublicadoPorProduto(
+      data.produto,
+      data.modelo
+    );
+
+    if (encontrado) {
+      return renderizarTemplate(
+        encontrado.versao.templateJson,
+        data as unknown as Record<string, unknown>
+      );
+    }
+  }
+
   const category =
     getApprovalDrawingProductCategory(
       data.produto

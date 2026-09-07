@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 
-import {
-  getUsuarioAtual,
-} from "@/lib/auditoria/usuario-atual";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { ValidationError } from "@/lib/auth/errors";
+import { isObject } from "@/lib/auth/validation";
 import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import {
+  listarCamposExtraDoProduto,
+  validarValoresCamposExtra,
+} from "@/lib/desenho-aprovacao/templates";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -70,12 +73,16 @@ interface ApprovalProjectResponse {
 
   criadoEm: string;
   atualizadoEm: string;
+
+  camposExtra: string | null;
 }
 
 interface CreateApprovalProjectBody {
   cliente?: unknown;
   produto?: unknown;
   modelo?: unknown;
+
+  camposExtra?: unknown;
 
   caminhao?: unknown;
   cabine?: unknown;
@@ -102,8 +109,6 @@ interface CreateApprovalProjectBody {
   incluirCotas?: unknown;
   calculoAutomatico?: unknown;
   incluirCaminhao?: unknown;
-
-  usuario?: unknown;
 }
 
 const validRepresentations =
@@ -112,23 +117,6 @@ const validRepresentations =
     "superior",
     "completo",
   ]);
-
-class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
-
-function isObject(
-  value: unknown
-): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  );
-}
 
 function optionalText(
   value: unknown,
@@ -413,7 +401,9 @@ function createProjectSelectSql(
         VARCHAR(33),
         [atualizado_em],
         126
-      ) AS [atualizadoEm]
+      ) AS [atualizadoEm],
+
+      [campos_extra] AS [camposExtra]
 
     FROM
       [dbo].[eng_desenhos_aprovacao]
@@ -692,14 +682,28 @@ async function handlePOST(
       );
 
     /*
-     * Aceita somente usuários no formato nome.sobrenome.
-     * Quando o valor estiver ausente ou for inválido,
-     * utiliza PORTAL_AUDIT_USER.
+     * Campos extras (Fase 9): se o produto tem um template publicado que
+     * referencia campos fora dos fixos acima (ex: "quantidadeAves"), valida
+     * os valores enviados contra a definição resolvida desse template
+     * (tipo do catálogo global, obrigatoriedade do próprio template).
+     */
+    const definicoesCamposExtra = produto
+      ? await listarCamposExtraDoProduto(produto, modelo)
+      : [];
+
+    const camposExtra = validarValoresCamposExtra(
+      definicoesCamposExtra,
+      requestBody.camposExtra
+    );
+
+    /*
+     * O autor da ação vem sempre da sessão autenticada, nunca do
+     * corpo da requisição — antes o campo "usuario" era enviado pelo
+     * cliente porque o portal não tinha autenticação; hoje
+     * verificarAcessoModuloApi já garante uma sessão real.
      */
     const usuario =
-      getUsuarioAtual(
-        requestBody.usuario
-      );
+      acesso.usuario.samAccountName;
 
     const pool =
       await getSqlServerPool();
@@ -839,6 +843,12 @@ async function handlePOST(
         usuario
       );
 
+      databaseRequest.input(
+        "camposExtra",
+        sql.NVarChar(sql.MAX),
+        camposExtra
+      );
+
       const result =
         await databaseRequest
           .query<ApprovalProjectResponse>(`
@@ -884,6 +894,8 @@ async function handlePOST(
               [calculo_automatico],
               [incluir_caminhao],
 
+              [campos_extra],
+
               [criado_por],
               [atualizado_por]
             )
@@ -925,6 +937,8 @@ async function handlePOST(
               @incluirCotas,
               @calculoAutomatico,
               @incluirCaminhao,
+
+              @camposExtra,
 
               @usuario,
               @usuario

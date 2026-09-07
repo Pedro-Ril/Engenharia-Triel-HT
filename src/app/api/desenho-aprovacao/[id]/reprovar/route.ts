@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
-import {
-  getUsuarioAtual,
-} from "@/lib/auditoria/usuario-atual";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { ValidationError } from "@/lib/auth/errors";
+import { isObject } from "@/lib/auth/validation";
 import {
   getSqlServerPool,
   sql,
@@ -20,7 +19,6 @@ interface RouteContext {
 }
 
 interface RequestBody {
-  usuario?: unknown;
   observacao?: unknown;
 }
 
@@ -48,25 +46,8 @@ interface RejectionResult {
   observacao: string;
 }
 
-class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
-
 const uniqueIdentifierPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isObject(
-  value: unknown
-): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  );
-}
 
 function getRequiredText(
   value: unknown,
@@ -115,7 +96,6 @@ async function handlePOST(
     );
   }
 
-  let usuarioInformado: unknown;
   let observacao: string;
 
   try {
@@ -129,9 +109,6 @@ async function handlePOST(
     }
 
     const body: RequestBody = parsedBody;
-
-    usuarioInformado =
-      body.usuario;
 
     observacao = getRequiredText(
       body.observacao,
@@ -164,14 +141,12 @@ async function handlePOST(
   }
 
   /*
-   * Aceita somente usuários no formato nome.sobrenome.
-   * Quando o valor estiver ausente ou for inválido,
-   * utiliza PORTAL_AUDIT_USER.
+   * O autor da ação vem sempre da sessão autenticada, nunca do
+   * corpo da requisição — antes o campo "usuario" era enviado pelo
+   * cliente porque o portal não tinha autenticação.
    */
   const usuario =
-    getUsuarioAtual(
-      usuarioInformado
-    );
+    acesso.usuario.samAccountName;
 
   const pool =
     await getSqlServerPool();

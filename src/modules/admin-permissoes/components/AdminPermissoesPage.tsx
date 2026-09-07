@@ -8,6 +8,7 @@ import {
   Building2,
   Download,
   Factory,
+  FileSliders,
   Headset,
   Home,
   KeyRound,
@@ -70,6 +71,7 @@ import { MonitoramentoPainel } from "./MonitoramentoPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
+import { DesenhoAprovacaoTemplatesPainel } from "./DesenhoAprovacaoTemplatesPainel";
 import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
@@ -147,6 +149,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "transferencia-arquivos",
         label: "Transferência de Arquivos",
         icon: <Send size={16} />,
+      },
+      {
+        valor: "desenho-aprovacao-templates",
+        label: "Templates de Desenho",
+        icon: <FileSliders size={16} />,
       },
     ],
   },
@@ -490,6 +497,10 @@ export function AdminPermissoesPage() {
 
           {secao === "transferencia-arquivos" && (
             <TransferenciasAdminPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "desenho-aprovacao-templates" && (
+            <DesenhoAprovacaoTemplatesPainel onFeedback={mostrarFeedback} />
           )}
         </div>
       </div>

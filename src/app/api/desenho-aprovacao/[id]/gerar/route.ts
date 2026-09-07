@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 
-import {
-  getUsuarioAtual,
-} from "@/lib/auditoria/usuario-atual";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   getSqlServerPool,
@@ -33,10 +30,6 @@ interface RouteContext {
   params: Promise<{
     id: string;
   }>;
-}
-
-interface GenerateDrawingBody {
-  usuario?: unknown;
 }
 
 interface DrawingDatabaseRecord {
@@ -96,35 +89,6 @@ interface GeneratedRevisionResult {
 const uniqueIdentifierPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function isObject(
-  value: unknown
-): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  );
-}
-
-async function getUsuarioInformado(
-  request: Request
-): Promise<unknown> {
-  try {
-    const body: unknown =
-      await request.json();
-
-    if (isObject(body)) {
-      return body.usuario;
-    }
-  } catch {
-    /*
-     * O corpo é opcional.
-     */
-  }
-
-  return undefined;
-}
-
 function getRevisionCode(
   revisionNumber: number
 ): string {
@@ -175,7 +139,7 @@ function validateDrawing(
 }
 
 async function handlePOST(
-  request: Request,
+  _request: Request,
   context: RouteContext
 ) {
   const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
@@ -196,20 +160,13 @@ async function handlePOST(
     );
   }
 
-  const usuarioInformado =
-    await getUsuarioInformado(
-      request
-    );
-
   /*
-   * Aceita somente usuários no formato nome.sobrenome.
-   * Quando o valor estiver ausente ou for inválido,
-   * utiliza PORTAL_AUDIT_USER.
+   * O autor da ação vem sempre da sessão autenticada, nunca do
+   * corpo da requisição — antes o campo "usuario" era enviado pelo
+   * cliente porque o portal não tinha autenticação.
    */
   const usuario =
-    getUsuarioAtual(
-      usuarioInformado
-    );
+    acesso.usuario.samAccountName;
 
   const pool = await getSqlServerPool();
 
@@ -448,7 +405,7 @@ async function handlePOST(
       );
 
     const svgContent =
-      generateApprovalDrawingSvg(
+      await generateApprovalDrawingSvg(
         drawingData
       );
 

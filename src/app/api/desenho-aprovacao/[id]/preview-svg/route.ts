@@ -240,7 +240,7 @@ async function handleGET(
     };
 
     const svg =
-      generateApprovalDrawingSvg(
+      await generateApprovalDrawingSvg(
         drawingData
       );
 

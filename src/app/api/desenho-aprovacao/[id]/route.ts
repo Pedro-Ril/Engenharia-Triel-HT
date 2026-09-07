@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 
-import {
-  getUsuarioAtual,
-} from "@/lib/auditoria/usuario-atual";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { ValidationError } from "@/lib/auth/errors";
+import { isObject } from "@/lib/auth/validation";
 import {
   getSqlServerPool,
   sql,
 } from "@/lib/database/sql-server";
+import {
+  listarCamposExtraDoProduto,
+  validarValoresCamposExtra,
+} from "@/lib/desenho-aprovacao/templates";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -68,6 +71,8 @@ interface ApprovalProjectResponse {
 
   atualizadoEm: string;
   atualizadoPor: string | null;
+
+  camposExtra: string | null;
 }
 
 interface CurrentApprovalProject {
@@ -103,12 +108,16 @@ interface CurrentApprovalProject {
   incluirCotas: boolean;
   calculoAutomatico: boolean;
   incluirCaminhao: boolean;
+
+  camposExtra: string | null;
 }
 
 interface UpdateApprovalProjectBody {
   cliente?: unknown;
   produto?: unknown;
   modelo?: unknown;
+
+  camposExtra?: unknown;
 
   caminhao?: unknown;
   cabine?: unknown;
@@ -135,8 +144,6 @@ interface UpdateApprovalProjectBody {
   incluirCotas?: unknown;
   calculoAutomatico?: unknown;
   incluirCaminhao?: unknown;
-
-  usuario?: unknown;
 }
 
 interface RouteContext {
@@ -203,24 +210,9 @@ const updatableFields = [
   "incluirCotas",
   "calculoAutomatico",
   "incluirCaminhao",
+
+  "camposExtra",
 ] as const;
-
-class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
-
-function isObject(
-  value: unknown
-): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  );
-}
 
 function optionalText(
   value: unknown,
@@ -501,7 +493,9 @@ function getProjectSelectSql(
       ) AS [atualizadoEm],
 
       [atualizado_por]
-        AS [atualizadoPor]
+        AS [atualizadoPor],
+
+      [campos_extra] AS [camposExtra]
 
     FROM
       [dbo].[eng_desenhos_aprovacao]
@@ -780,7 +774,9 @@ async function handlePATCH(
               CAST(
                 [incluir_caminhao]
                 AS BIT
-              ) AS [incluirCaminhao]
+              ) AS [incluirCaminhao],
+
+              [campos_extra] AS [camposExtra]
 
             FROM
               [dbo].[eng_desenhos_aprovacao]
@@ -1034,14 +1030,25 @@ async function handlePATCH(
             );
 
       /*
-       * Aceita somente usuários no formato nome.sobrenome.
-       * Quando o valor estiver ausente ou for inválido,
-       * utiliza PORTAL_AUDIT_USER.
+       * Campos extras (Fase 9): revalida contra o produto final (pode ter
+       * mudado nesta mesma requisição) sempre que campos extras forem
+       * enviados; sem envio, preserva o que já estava salvo.
+       */
+      const camposExtra =
+        body.camposExtra === undefined
+          ? current.camposExtra
+          : validarValoresCamposExtra(
+              produto ? await listarCamposExtraDoProduto(produto, modelo) : [],
+              body.camposExtra
+            );
+
+      /*
+       * O autor da ação vem sempre da sessão autenticada, nunca do
+       * corpo da requisição — antes o campo "usuario" era enviado
+       * pelo cliente porque o portal não tinha autenticação.
        */
       const usuario =
-        getUsuarioAtual(
-          body.usuario
-        );
+        acesso.usuario.samAccountName;
 
       const dadosHistorico =
         JSON.stringify({
@@ -1217,6 +1224,12 @@ async function handlePATCH(
       );
 
       databaseRequest.input(
+        "camposExtra",
+        sql.NVarChar(sql.MAX),
+        camposExtra
+      );
+
+      databaseRequest.input(
         "dadosJson",
         sql.NVarChar(sql.MAX),
         dadosHistorico
@@ -1282,6 +1295,9 @@ async function handlePATCH(
 
           [incluir_caminhao] =
             @incluirCaminhao,
+
+          [campos_extra] =
+            @camposExtra,
 
           [atualizado_em] =
             SYSDATETIME(),
@@ -1396,7 +1412,7 @@ export const PATCH = comMetricasApi("desenho-aprovacao/[id]", handlePATCH);
    ========================================================= */
 
 async function handleDELETE(
-  request: Request,
+  _request: Request,
   context: RouteContext
 ) {
   const acesso = await verificarAcessoModuloApi("desenho-aprovacao");
@@ -1421,31 +1437,13 @@ async function handleDELETE(
       );
     }
 
-    let usuarioInformado: unknown;
-
-    try {
-      const body: unknown =
-        await request.json();
-
-      if (isObject(body)) {
-        usuarioInformado =
-          body.usuario;
-      }
-    } catch {
-      /*
-       * O corpo é opcional no DELETE.
-       */
-    }
-
     /*
-     * Aceita somente usuários no formato nome.sobrenome.
-     * Quando o valor estiver ausente ou for inválido,
-     * utiliza PORTAL_AUDIT_USER.
+     * O autor da ação vem sempre da sessão autenticada, nunca do
+     * corpo da requisição — antes o campo "usuario" era enviado
+     * pelo cliente porque o portal não tinha autenticação.
      */
     const usuario =
-      getUsuarioAtual(
-        usuarioInformado
-      );
+      acesso.usuario.samAccountName;
 
     const pool =
       await getSqlServerPool();

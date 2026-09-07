@@ -2,6 +2,7 @@
 
 import {
   type FormEvent,
+  useEffect,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Stack } from "@/components/ui/Stack";
 import { Switch } from "@/components/ui/Switch";
 import { Textarea } from "@/components/ui/Textarea";
+import type { CampoExtraTemplate } from "@/modules/desenho-aprovacao/types/template.types";
 
 type ApprovalRepresentation =
   | "lateral"
@@ -233,6 +235,47 @@ export default function NovoDesenhoPage() {
     erroCargas,
     setErroCargas,
   ] = useState<string | null>(null);
+
+  const [
+    camposExtraDefinicoes,
+    setCamposExtraDefinicoes,
+  ] = useState<CampoExtraTemplate[]>([]);
+
+  const [
+    valoresCamposExtra,
+    setValoresCamposExtra,
+  ] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const produto = produtoSelecionado?.value.trim();
+
+    if (!produto) {
+      setCamposExtraDefinicoes([]);
+      setValoresCamposExtra({});
+      return;
+    }
+
+    let cancelado = false;
+
+    const query = modeloSelecionado?.value
+      ? `?modelo=${encodeURIComponent(modeloSelecionado.value)}`
+      : "";
+
+    fetch(`/api/desenho-aprovacao/templates/${encodeURIComponent(produto)}/campos${query}`)
+      .then((response) => response.json())
+      .then((payload: { ok: boolean; data?: CampoExtraTemplate[] }) => {
+        if (cancelado) return;
+        setCamposExtraDefinicoes(payload.ok ? payload.data ?? [] : []);
+        setValoresCamposExtra({});
+      })
+      .catch(() => {
+        if (!cancelado) setCamposExtraDefinicoes([]);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [produtoSelecionado?.value, modeloSelecionado?.value]);
 
   const somaCargas =
     (cargaDianteiraDigitada ?? 0) +
@@ -465,6 +508,23 @@ export default function NovoDesenhoPage() {
         );
       }
 
+      const camposExtra: Record<string, unknown> = {};
+
+      for (const definicao of camposExtraDefinicoes) {
+        const bruto = valoresCamposExtra[definicao.chave];
+
+        if (!bruto) {
+          if (definicao.obrigatorio) {
+            throw new Error(`O campo "${definicao.rotulo}" é obrigatório.`);
+          }
+
+          continue;
+        }
+
+        camposExtra[definicao.chave] =
+          definicao.tipoDado === "numero" ? Number(bruto) : bruto;
+      }
+
       const requestBody = {
         cliente,
         produto,
@@ -551,7 +611,7 @@ export default function NovoDesenhoPage() {
             "incluirCaminhao"
           ),
 
-        usuario: "portal-web",
+        camposExtra,
       };
 
       setSalvando(true);
@@ -790,6 +850,76 @@ export default function NovoDesenhoPage() {
               </Field>
             </FormGrid>
           </Card>
+
+          {camposExtraDefinicoes.length > 0 && (
+            <Card
+              title="Campos adicionais"
+              description="Campos específicos do template configurado para este produto."
+            >
+              <FormGrid columns={3}>
+                {camposExtraDefinicoes.map((definicao) => (
+                  <Field
+                    key={definicao.chave}
+                    label={definicao.rotulo}
+                    htmlFor={`campo-extra-${definicao.chave}`}
+                    required={definicao.obrigatorio}
+                  >
+                    {definicao.tipoDado === "numero" ? (
+                      <NumberInput
+                        id={`campo-extra-${definicao.chave}`}
+                        suffix={definicao.unidadePadrao ?? undefined}
+                        value={valoresCamposExtra[definicao.chave] ?? ""}
+                        onChange={(event) =>
+                          setValoresCamposExtra((atual) => ({
+                            ...atual,
+                            [definicao.chave]: event.target.value,
+                          }))
+                        }
+                        disabled={salvando}
+                      />
+                    ) : definicao.tipoDado === "data" ? (
+                      <DateInput
+                        id={`campo-extra-${definicao.chave}`}
+                        value={valoresCamposExtra[definicao.chave] ?? ""}
+                        onValueChange={(value) =>
+                          setValoresCamposExtra((atual) => ({
+                            ...atual,
+                            [definicao.chave]: value,
+                          }))
+                        }
+                        disabled={salvando}
+                      />
+                    ) : definicao.tipoDado === "booleano" ? (
+                      <Switch
+                        id={`campo-extra-${definicao.chave}`}
+                        label={definicao.rotulo}
+                        checked={valoresCamposExtra[definicao.chave] === "true"}
+                        onChange={(event) =>
+                          setValoresCamposExtra((atual) => ({
+                            ...atual,
+                            [definicao.chave]: event.target.checked ? "true" : "",
+                          }))
+                        }
+                        disabled={salvando}
+                      />
+                    ) : (
+                      <Input
+                        id={`campo-extra-${definicao.chave}`}
+                        value={valoresCamposExtra[definicao.chave] ?? ""}
+                        onChange={(event) =>
+                          setValoresCamposExtra((atual) => ({
+                            ...atual,
+                            [definicao.chave]: event.target.value,
+                          }))
+                        }
+                        disabled={salvando}
+                      />
+                    )}
+                  </Field>
+                ))}
+              </FormGrid>
+            </Card>
+          )}
 
           <Card
             title="Veículo"
