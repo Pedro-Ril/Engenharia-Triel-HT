@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 
+import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
+import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
+import { registrarAcessoTransferencia } from "@/lib/transferencia/transferencia-acessos";
 import { buscarArquivoParaServir } from "@/lib/transferencia/transferencias";
 
 export const runtime = "nodejs";
@@ -34,6 +37,23 @@ async function handleGET(request: Request, context: RouteContext) {
       { status: 404 }
     );
   }
+
+  /*
+   * Sem `await` de propósito — não vale a pena atrasar o início do
+   * streaming (arquivo pode ser grande) esperando o registro de
+   * telemetria terminar; `registrarAcessoTransferencia` já engole os
+   * próprios erros, então isso nunca vira uma promise rejeitada solta.
+   */
+  getUsuarioAutenticado().then((usuario) =>
+    registrarAcessoTransferencia({
+      transferenciaId: arquivo.transferenciaId,
+      tipo: "download_arquivo",
+      arquivoNomeOriginal: arquivo.nomeOriginal,
+      usuarioId: usuario?.id ?? null,
+      usuarioNomeSnapshot: usuario?.nomeExibicao ?? null,
+      ip: extrairIpOrigem(request),
+    })
+  );
 
   const caminhoCompleto = arquivo.caminhoCompleto;
   const tamanhoBytes = arquivo.tamanhoBytes;

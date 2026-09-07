@@ -22,3 +22,20 @@ export interface TransferenciaCriada extends Transferencia {
   linkDownload: string;
   avisoEmail: string | null;
 }
+
+export type TipoAcessoTransferencia = "pagina" | "download_arquivo" | "download_zip";
+
+export interface AcessoTransferencia {
+  id: string;
+  tipo: TipoAcessoTransferencia;
+  arquivoNomeOriginal: string | null;
+  usuarioNomeSnapshot: string | null;
+  ip: string | null;
+  criadoEm: string;
+}
+
+export interface ResumoAcessosTransferencia {
+  totalPagina: number;
+  totalDownloads: number;
+  eventos: AcessoTransferencia[];
+}

@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { createReadStream } from "node:fs";
 import { PassThrough, Readable } from "node:stream";
 
+import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
+import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
+import { registrarAcessoTransferencia } from "@/lib/transferencia/transferencia-acessos";
 import { buscarArquivosParaZip } from "@/lib/transferencia/transferencias";
 
 export const runtime = "nodejs";
@@ -22,7 +25,7 @@ interface RouteContext {
  * rota de arquivo individual) — trade-off aceito para poder zipar
  * lotes de qualquer tamanho sem buffer.
  */
-async function handleGET(_request: Request, context: RouteContext) {
+async function handleGET(request: Request, context: RouteContext) {
   const { token } = await context.params;
 
   const dados = await buscarArquivosParaZip(token);
@@ -32,6 +35,17 @@ async function handleGET(_request: Request, context: RouteContext) {
       { status: 404 }
     );
   }
+
+  /* Sem `await` de propósito — mesmo raciocínio da rota de arquivo individual. */
+  getUsuarioAutenticado().then((usuario) =>
+    registrarAcessoTransferencia({
+      transferenciaId: dados.transferenciaId,
+      tipo: "download_zip",
+      usuarioId: usuario?.id ?? null,
+      usuarioNomeSnapshot: usuario?.nomeExibicao ?? null,
+      ip: extrairIpOrigem(request),
+    })
+  );
 
   const archive = new ZipArchive({ zlib: { level: 9 } });
   const saida = new PassThrough();

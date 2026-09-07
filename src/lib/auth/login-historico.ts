@@ -81,14 +81,25 @@ function normalizarIpv4(valor: string | null): string | null {
   return IPV4_PATTERN.test(semPrefixoV6) ? semPrefixoV6 : null;
 }
 
-export function extrairIpOrigem(request: Request): string | null {
-  const forwardedFor = request.headers.get("x-forwarded-for");
+/*
+ * Recebe `Headers` diretamente (em vez de só `Request`) pra também
+ * funcionar em Server Components — que não têm acesso a um `Request`,
+ * só ao `headers()` de `next/headers` (ver
+ * src/app/baixar/[token]/page.tsx, que registra IP de quem visualiza a
+ * página pública de download).
+ */
+export function extrairIpDeHeaders(headers: Headers): string | null {
+  const forwardedFor = headers.get("x-forwarded-for");
 
   const candidato = forwardedFor
     ? (forwardedFor.split(",")[0]?.trim() ?? null)
-    : request.headers.get("x-real-ip");
+    : headers.get("x-real-ip");
 
   return normalizarIpv4(candidato);
+}
+
+export function extrairIpOrigem(request: Request): string | null {
+  return extrairIpDeHeaders(request.headers);
 }
 
 export interface TentativaLoginHistorico {

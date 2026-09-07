@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
+import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { isObject } from "@/lib/auth/validation";
+import { getSqlServerPool, sql } from "@/lib/database/sql-server";
+import { registrarLog } from "@/lib/monitoramento/logs";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { enviarEmail } from "@/lib/smtp/enviar-email";
 import {
@@ -17,6 +20,7 @@ import {
 } from "@/lib/transferencia/transferencia-config";
 import {
   atualizarExpiracao,
+  buscarTransferenciaPorId,
   excluirTransferencia,
   type Transferencia,
 } from "@/lib/transferencia/transferencias";
@@ -205,13 +209,27 @@ async function handlePATCH(request: Request, { params }: RouteParams) {
 
 export const PATCH = comMetricasApi("transferencia-arquivos/minhas/[id]", handlePATCH);
 
+async function buscarNomeExibicao(usuarioId: string): Promise<string | null> {
+  const pool = await getSqlServerPool();
+  const result = await pool
+    .request()
+    .input("usuarioId", sql.UniqueIdentifier, usuarioId)
+    .query<{ nome_exibicao: string }>(
+      `SELECT [nome_exibicao] FROM dbo.portal_usuarios WHERE [id] = @usuarioId;`
+    );
+
+  return result.recordset[0]?.nome_exibicao ?? null;
+}
+
 /*
- * Também usada pelo painel de admin (excluirTransferenciaAdmin) pra
- * apagar transferência de qualquer usuário — verificarAcessoModuloApi
- * já libera administradores independente de permissão explícita ao
- * módulo, então o bypass de admin continua funcionando aqui.
+ * Exclusão definitiva é ação só de administrador (ver
+ * excluirTransferencia) — o dono comum só consegue tirar o link do ar
+ * via "expirar agora" (PATCH), nunca apagar o registro. Também usada
+ * pelo painel de admin (excluirTransferenciaAdmin), que aponta pra
+ * essa mesma rota. Pedido explícito: toda exclusão fica registrada em
+ * portal_logs (visível em Administração → Monitoramento → Logs).
  */
-async function handleDELETE(_request: Request, { params }: RouteParams) {
+async function handleDELETE(request: Request, { params }: RouteParams) {
   const acesso = await verificarAcessoModuloApi("transferencia-arquivos");
   if (acesso.negado) return acesso.negado;
   const { usuario } = acesso;
@@ -219,6 +237,7 @@ async function handleDELETE(_request: Request, { params }: RouteParams) {
   const { id } = await params;
 
   try {
+    const transferencia = await buscarTransferenciaPorId(id);
     const excluido = await excluirTransferencia(id, usuario);
 
     if (!excluido) {
@@ -226,6 +245,29 @@ async function handleDELETE(_request: Request, { params }: RouteParams) {
         { ok: false, message: "Transferência não encontrada." },
         { status: 404 }
       );
+    }
+
+    if (transferencia) {
+      const nomeRemetente = await buscarNomeExibicao(transferencia.enviadoPorUsuarioId);
+      const descricaoArquivos =
+        transferencia.arquivos.length === 1
+          ? transferencia.arquivos[0].nomeOriginal
+          : `${transferencia.arquivos.length} arquivos`;
+
+      await registrarLog({
+        nivel: "info",
+        origem: "transferencia-arquivos/admin",
+        mensagem: `${usuario.nomeExibicao} excluiu a transferência de ${nomeRemetente ?? "usuário desconhecido"} (${descricaoArquivos}).`,
+        detalhes: JSON.stringify({
+          transferenciaId: transferencia.id,
+          token: transferencia.token,
+          enviadoPorUsuarioId: transferencia.enviadoPorUsuarioId,
+          arquivos: transferencia.arquivos.map((arquivo) => arquivo.nomeOriginal),
+        }),
+        metodo: "DELETE",
+        caminho: new URL(request.url).pathname,
+        ipOrigem: extrairIpOrigem(request),
+      });
     }
 
     return NextResponse.json({ ok: true, message: "Transferência excluída." });

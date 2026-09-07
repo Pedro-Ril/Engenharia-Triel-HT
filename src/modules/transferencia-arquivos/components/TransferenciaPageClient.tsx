@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ban, Copy, Home, Mail, Pencil, Send, Trash2 } from "lucide-react";
+import { Ban, Copy, Download, Globe, Home, Info, Mail, Package, Pencil, Send, Trash2, User } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -17,6 +17,7 @@ import { FileUpload } from "@/components/ui/FileUpload";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
+import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -35,6 +36,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Toast } from "@/components/ui/Toast";
 
 import {
+  buscarAcessosTransferencia,
   editarExpiracaoTransferencia,
   enviarTransferencia,
   excluirTransferencia,
@@ -42,7 +44,11 @@ import {
   listarMinhasTransferencias,
   reenviarLinkTransferencia,
 } from "../services/transferencia.service";
-import type { Transferencia, TransferenciaCriada } from "../types/transferencia.types";
+import type {
+  ResumoAcessosTransferencia,
+  Transferencia,
+  TransferenciaCriada,
+} from "../types/transferencia.types";
 import styles from "./TransferenciaPageClient.module.css";
 
 const OPCOES_UNIDADE = [
@@ -51,6 +57,7 @@ const OPCOES_UNIDADE = [
 ];
 
 const ITENS_POR_PAGINA = 5;
+const ITENS_POR_PAGINA_ACESSOS = 15;
 
 function formatarTamanho(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -73,7 +80,23 @@ function descricaoArquivos(transferencia: Transferencia): string {
     : `${transferencia.arquivos.length} arquivos`;
 }
 
-export function TransferenciaPageClient() {
+function descricaoEvento(evento: ResumoAcessosTransferencia["eventos"][number]): string {
+  if (evento.tipo === "pagina") return "Visualizou a página de download";
+  if (evento.tipo === "download_zip") return "Baixou tudo (.zip)";
+  return `Baixou "${evento.arquivoNomeOriginal ?? "arquivo"}"`;
+}
+
+function IconeEvento({ tipo }: { tipo: ResumoAcessosTransferencia["eventos"][number]["tipo"] }) {
+  if (tipo === "pagina") return <Globe size={14} />;
+  if (tipo === "download_zip") return <Package size={14} />;
+  return <Download size={14} />;
+}
+
+interface TransferenciaPageClientProps {
+  ehAdministrador: boolean;
+}
+
+export function TransferenciaPageClient({ ehAdministrador }: TransferenciaPageClientProps) {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [duracaoQuantidade, setDuracaoQuantidade] = useState("7");
   const [duracaoUnidade, setDuracaoUnidade] = useState<"horas" | "dias">("dias");
@@ -101,6 +124,11 @@ export function TransferenciaPageClient() {
   const [confirmandoExpiracao, setConfirmandoExpiracao] = useState(false);
 
   const [reenviandoId, setReenviandoId] = useState<string | null>(null);
+
+  const [verificandoAcessos, setVerificandoAcessos] = useState<Transferencia | null>(null);
+  const [carregandoAcessos, setCarregandoAcessos] = useState(false);
+  const [acessos, setAcessos] = useState<ResumoAcessosTransferencia | null>(null);
+  const [paginaAcessos, setPaginaAcessos] = useState(1);
 
   /*
    * Uma transferência pode expirar sozinha (só o tempo passando, sem
@@ -318,6 +346,19 @@ export function TransferenciaPageClient() {
     }
   }
 
+  async function handleAbrirAcessos(transferencia: Transferencia) {
+    setVerificandoAcessos(transferencia);
+    setAcessos(null);
+    setPaginaAcessos(1);
+    setCarregandoAcessos(true);
+
+    try {
+      setAcessos(await buscarAcessosTransferencia(transferencia.id));
+    } finally {
+      setCarregandoAcessos(false);
+    }
+  }
+
   async function handleConfirmarExpirarAgora() {
     if (!expirandoAgora) return;
 
@@ -355,6 +396,11 @@ export function TransferenciaPageClient() {
   const transferenciasDaPagina = transferencias.slice(
     (paginaAtual - 1) * ITENS_POR_PAGINA,
     paginaAtual * ITENS_POR_PAGINA
+  );
+
+  const totalPaginasAcessos = Math.max(
+    1,
+    Math.ceil((acessos?.eventos.length ?? 0) / ITENS_POR_PAGINA_ACESSOS)
   );
 
   return (
@@ -565,12 +611,20 @@ export function TransferenciaPageClient() {
                             </>
                           )}
                           <IconButton
-                            icon={<Trash2 size={15} />}
-                            label="Excluir transferência"
+                            icon={<Info size={15} />}
+                            label="Ver informações de acesso"
                             size="small"
-                            variant="danger"
-                            onClick={() => setExcluindo(transferencia)}
+                            onClick={() => handleAbrirAcessos(transferencia)}
                           />
+                          {ehAdministrador && (
+                            <IconButton
+                              icon={<Trash2 size={15} />}
+                              label="Excluir transferência"
+                              size="small"
+                              variant="danger"
+                              onClick={() => setExcluindo(transferencia)}
+                            />
+                          )}
                         </Stack>
                       </TableCell>
                     </TableRow>
@@ -642,6 +696,81 @@ export function TransferenciaPageClient() {
             />
           </Stack>
         </Field>
+      </Modal>
+
+      <Modal
+        open={verificandoAcessos !== null}
+        title="Informações de acesso"
+        description={verificandoAcessos ? descricaoArquivos(verificandoAcessos) : undefined}
+        size="medium"
+        onClose={() => setVerificandoAcessos(null)}
+      >
+        {carregandoAcessos ? (
+          <Loader label="Carregando..." />
+        ) : !acessos || acessos.eventos.length === 0 ? (
+          <EmptyState
+            icon={<Info size={28} />}
+            title="Nenhum acesso registrado"
+            description="Ninguém visualizou ou baixou este link ainda."
+          />
+        ) : (
+          <Stack gap={16}>
+            <Stack direction="row" gap={24}>
+              <span>
+                <strong>{acessos.totalPagina}</strong> acesso{acessos.totalPagina === 1 ? "" : "s"} à
+                página
+              </span>
+              <span>
+                <strong>{acessos.totalDownloads}</strong> download
+                {acessos.totalDownloads === 1 ? "" : "s"}
+              </span>
+            </Stack>
+
+            <Table minWidth={560}>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Evento</TableHeaderCell>
+                  <TableHeaderCell>Usuário</TableHeaderCell>
+                  <TableHeaderCell>IP</TableHeaderCell>
+                  <TableHeaderCell align="center">Data</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {acessos.eventos
+                  .slice(
+                    (Math.min(paginaAcessos, totalPaginasAcessos) - 1) * ITENS_POR_PAGINA_ACESSOS,
+                    Math.min(paginaAcessos, totalPaginasAcessos) * ITENS_POR_PAGINA_ACESSOS
+                  )
+                  .map((evento) => (
+                    <TableRow key={evento.id}>
+                      <TableCell>
+                        <Stack direction="row" gap={6} align="center">
+                          <IconeEvento tipo={evento.tipo} />
+                          {descricaoEvento(evento)}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" gap={6} align="center">
+                          <User size={14} />
+                          {evento.usuarioNomeSnapshot ?? "Não autenticado"}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{evento.ip ?? "—"}</TableCell>
+                      <TableCell align="center" className={styles.semQuebra}>
+                        {formatarData(evento.criadoEm)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+
+            <Pagination
+              page={Math.min(paginaAcessos, totalPaginasAcessos)}
+              totalPages={totalPaginasAcessos}
+              onPageChange={setPaginaAcessos}
+            />
+          </Stack>
+        )}
       </Modal>
 
       <Toast

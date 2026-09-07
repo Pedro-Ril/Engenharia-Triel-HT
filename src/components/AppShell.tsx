@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
@@ -41,6 +41,20 @@ const ROTAS_COM_TELA_CHEIA = ["/terminal-fabrica", "/chamados/dashboard"];
  * aparecendo normalmente (ele já está "dentro" do portal).
  */
 const ROTAS_SEM_MENU_SE_DESLOGADO = ["/baixar"];
+
+/*
+ * Rotas onde os efeitos de "voltar a ficar visível"/"deslogou em
+ * outra aba" abaixo NÃO devem disparar `router.refresh()` — pensados
+ * pra recarregar permissões/sessão de telas autenticadas, mas
+ * `/baixar/[token]` é pública, sem permissão nenhuma pra recarregar.
+ * Rodar mesmo assim tinha um efeito colateral real: cada
+ * `router.refresh()` reexecuta o Server Component da página, que
+ * registra "acesso à página" (ver src/lib/transferencia/transferencia-acessos.ts)
+ * — cada alt-tab de volta pra uma aba de download já aberta virava um
+ * acesso novo, inflando a contagem sem ninguém ter revisitado o link
+ * de verdade.
+ */
+const ROTAS_SEM_ATUALIZACAO_AUTOMATICA = ["/baixar"];
 
 function PainelPortal({
   children,
@@ -111,7 +125,16 @@ function AppShellConteudo(props: PainelPortalProps) {
 export default function AppShell(props: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const { usuario } = props;
+
+  const semAtualizacaoAutomatica = useMemo(
+    () =>
+      ROTAS_SEM_ATUALIZACAO_AUTOMATICA.some(
+        (prefixo) => pathname === prefixo || pathname?.startsWith(`${prefixo}/`)
+      ),
+    [pathname]
+  );
 
   /*
    * Mantém o cookie de tema (ver persistirTemaEmCookie) sempre
@@ -139,6 +162,8 @@ export default function AppShell(props: AppShellProps) {
    * reduz essa janela de desatualização.
    */
   useEffect(() => {
+    if (semAtualizacaoAutomatica) return;
+
     function aoFicarVisivel() {
       if (document.visibilityState === "visible") {
         router.refresh();
@@ -147,7 +172,7 @@ export default function AppShell(props: AppShellProps) {
 
     document.addEventListener("visibilitychange", aoFicarVisivel);
     return () => document.removeEventListener("visibilitychange", aoFicarVisivel);
-  }, [router]);
+  }, [router, semAtualizacaoAutomatica]);
 
   /*
    * Sair em uma aba grava isso no localStorage — o evento
@@ -156,6 +181,8 @@ export default function AppShell(props: AppShellProps) {
    * página reavaliar sua própria checagem de sessão no servidor.
    */
   useEffect(() => {
+    if (semAtualizacaoAutomatica) return;
+
     function aoDeslogarEmOutraAba(event: StorageEvent) {
       if (event.key === "portal-logout-em") {
         router.refresh();
@@ -164,7 +191,7 @@ export default function AppShell(props: AppShellProps) {
 
     window.addEventListener("storage", aoDeslogarEmOutraAba);
     return () => window.removeEventListener("storage", aoDeslogarEmOutraAba);
-  }, [router]);
+  }, [router, semAtualizacaoAutomatica]);
 
   return (
     <RouteLoadingProvider>

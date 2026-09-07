@@ -1,4 +1,5 @@
 import { Calendar, Clock, Download, FileWarning, Package, User } from "lucide-react";
+import { headers } from "next/headers";
 
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
@@ -6,6 +7,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Stack } from "@/components/ui/Stack";
+import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
+import { extrairIpDeHeaders } from "@/lib/auth/login-historico";
+import { registrarAcessoTransferencia } from "@/lib/transferencia/transferencia-acessos";
 import { buscarPorTokenParaExibicao } from "@/lib/transferencia/transferencias";
 
 import styles from "./Pagina.module.css";
@@ -61,6 +65,17 @@ export default async function DownloadTransferenciaPage({ params }: PageProps) {
   const { token } = await params;
   const transferencia = await buscarPorTokenParaExibicao(token);
   const expirada = transferencia ? estaExpirada(transferencia.expiraEm) : false;
+
+  if (transferencia) {
+    const [usuario, listaHeaders] = await Promise.all([getUsuarioAutenticado(), headers()]);
+    await registrarAcessoTransferencia({
+      transferenciaId: transferencia.id,
+      tipo: "pagina",
+      usuarioId: usuario?.id ?? null,
+      usuarioNomeSnapshot: usuario?.nomeExibicao ?? null,
+      ip: extrairIpDeHeaders(listaHeaders),
+    });
+  }
 
   return (
     <PageContainer>

@@ -1,4 +1,8 @@
-import type { Transferencia, TransferenciaCriada } from "../types/transferencia.types";
+import type {
+  ResumoAcessosTransferencia,
+  Transferencia,
+  TransferenciaCriada,
+} from "../types/transferencia.types";
 
 interface ApiEnvelope<T> {
   ok: boolean;
@@ -43,6 +47,14 @@ export async function reenviarLinkTransferencia(id: string): Promise<ApiEnvelope
     method: "POST",
   });
   return response.json();
+}
+
+export async function buscarAcessosTransferencia(
+  id: string
+): Promise<ResumoAcessosTransferencia | null> {
+  const response = await fetch(`/api/transferencia-arquivos/minhas/${id}/acessos`);
+  const body: ApiEnvelope<ResumoAcessosTransferencia> = await response.json();
+  return body.data ?? null;
 }
 
 export interface DadosEnvioTransferencia {

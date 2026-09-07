@@ -311,6 +311,7 @@ export interface ArquivoParaExibicaoPublica {
 }
 
 export interface TransferenciaParaExibicaoPublica {
+  id: string;
   arquivos: ArquivoParaExibicaoPublica[];
   tamanhoTotalBytes: number;
   mensagem: string | null;
@@ -373,6 +374,7 @@ export async function buscarPorTokenParaExibicao(
   const arquivos = arquivosResult.recordset.map(mapArquivoRow);
 
   return {
+    id: row.id,
     arquivos: arquivos.map((arquivo) => ({
       id: arquivo.id,
       nomeOriginal: arquivo.nomeOriginal,
@@ -387,6 +389,7 @@ export async function buscarPorTokenParaExibicao(
 }
 
 export interface ArquivoParaServir {
+  transferenciaId: string;
   caminhoCompleto: string;
   tipoMime: string;
   tamanhoBytes: number;
@@ -404,12 +407,15 @@ export async function buscarArquivoParaServir(
   request.input("arquivoId", sql.UniqueIdentifier, arquivoId);
 
   const result = await request.query<{
+    transferencia_id: string;
     caminho_arquivo: string;
     tipo_mime: string;
     tamanho_bytes: number;
     nome_original: string;
   }>(`
-    SELECT a.[caminho_arquivo], a.[tipo_mime], a.[tamanho_bytes], a.[nome_original]
+    SELECT
+      CONVERT(VARCHAR(36), t.[id]) AS [transferencia_id],
+      a.[caminho_arquivo], a.[tipo_mime], a.[tamanho_bytes], a.[nome_original]
     FROM dbo.portal_transferencia_arquivos a
     INNER JOIN dbo.portal_transferencias t ON t.[id] = a.[transferencia_id]
     WHERE t.[token] = @token AND a.[id] = @arquivoId AND t.[expira_em] > SYSDATETIME();
@@ -422,6 +428,7 @@ export async function buscarArquivoParaServir(
   if (!config.pastaArmazenamento) return null;
 
   return {
+    transferenciaId: row.transferencia_id,
     caminhoCompleto: path.join(config.pastaArmazenamento, row.caminho_arquivo),
     tipoMime: row.tipo_mime,
     tamanhoBytes: row.tamanho_bytes,
@@ -430,6 +437,7 @@ export async function buscarArquivoParaServir(
 }
 
 export interface ArquivosParaZip {
+  transferenciaId: string;
   arquivos: { caminhoCompleto: string; nomeOriginal: string }[];
 }
 
@@ -439,8 +447,14 @@ export async function buscarArquivosParaZip(token: string): Promise<ArquivosPara
   const request = pool.request();
   request.input("token", sql.VarChar(64), token);
 
-  const result = await request.query<{ caminho_arquivo: string; nome_original: string }>(`
-    SELECT a.[caminho_arquivo], a.[nome_original]
+  const result = await request.query<{
+    transferencia_id: string;
+    caminho_arquivo: string;
+    nome_original: string;
+  }>(`
+    SELECT
+      CONVERT(VARCHAR(36), t.[id]) AS [transferencia_id],
+      a.[caminho_arquivo], a.[nome_original]
     FROM dbo.portal_transferencia_arquivos a
     INNER JOIN dbo.portal_transferencias t ON t.[id] = a.[transferencia_id]
     WHERE t.[token] = @token AND t.[expira_em] > SYSDATETIME()
@@ -453,6 +467,7 @@ export async function buscarArquivosParaZip(token: string): Promise<ArquivosPara
   if (!config.pastaArmazenamento) return null;
 
   return {
+    transferenciaId: result.recordset[0].transferencia_id,
     arquivos: result.recordset.map((row) => ({
       caminhoCompleto: path.join(config.pastaArmazenamento as string, row.caminho_arquivo),
       nomeOriginal: row.nome_original,
@@ -536,24 +551,31 @@ export async function atualizarExpiracao(
   return montarTransferencia(transferenciaRow, arquivos);
 }
 
+/*
+ * Diferente de atualizarExpiracao (dono ou admin) — exclusão
+ * definitiva é ação só de administrador. O usuário dono continua
+ * podendo tirar o link do ar a qualquer momento via "expirar agora"
+ * (atualizarExpiracao com duração 0), só não apaga o registro/arquivo
+ * de vez. Pedido explícito: toda exclusão fica registrada em
+ * portal_logs (ver chamada a registrarLog em handleDELETE).
+ */
 export async function excluirTransferencia(
   id: string,
-  usuario: Pick<PortalUsuario, "id" | "ehAdministrador">
+  usuario: Pick<PortalUsuario, "ehAdministrador">
 ): Promise<boolean> {
+  if (!usuario.ehAdministrador) {
+    throw new ValidationError("Apenas administradores podem excluir transferências.");
+  }
+
   const pool = await getSqlServerPool();
   const request = pool.request();
   request.input("id", sql.UniqueIdentifier, id);
 
-  const dados = await request.query<{ enviado_por_usuario_id: string }>(`
-    SELECT [enviado_por_usuario_id] FROM dbo.portal_transferencias WHERE [id] = @id;
+  const dados = await request.query<{ id: string }>(`
+    SELECT [id] FROM dbo.portal_transferencias WHERE [id] = @id;
   `);
 
-  const linha = dados.recordset[0];
-  if (!linha) return false;
-
-  if (linha.enviado_por_usuario_id !== usuario.id && !usuario.ehAdministrador) {
-    throw new ValidationError("Você não tem permissão para excluir esta transferência.");
-  }
+  if (dados.recordset.length === 0) return false;
 
   const caminhosArquivos = await buscarCaminhosDosArquivos(id);
 
