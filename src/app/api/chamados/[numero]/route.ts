@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
+import { getUsuarioAutenticado, requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
+import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { isObject } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import {
@@ -9,9 +10,11 @@ import {
   atualizarPrioridade,
   atualizarPublico,
   buscarChamadoPorNumero,
+  excluirChamado,
 } from "@/lib/chamados/chamados";
 import { optionalUuid, requiredPrioridade } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
+import { registrarLog } from "@/lib/monitoramento/logs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -163,3 +166,61 @@ async function handlePATCH(request: Request, context: RouteContext) {
 }
 
 export const PATCH = comMetricasApi("chamados/[numero]", handlePATCH);
+
+async function handleDELETE(request: Request, context: RouteContext) {
+  const { numero: numeroParam } = await context.params;
+  const numero = parseNumero(numeroParam);
+
+  if (!numero) {
+    return NextResponse.json(
+      { ok: false, message: "Número de chamado inválido." },
+      { status: 400 }
+    );
+  }
+
+  const acesso = await requireAdminApi();
+  if (acesso.negado) {
+    return acesso.negado;
+  }
+  const { usuario } = acesso;
+
+  try {
+    const chamado = await buscarChamadoPorNumero(numero);
+
+    if (!chamado) {
+      return NextResponse.json(
+        { ok: false, message: "Chamado não encontrado." },
+        { status: 404 }
+      );
+    }
+
+    const excluido = await excluirChamado(chamado.id);
+
+    if (!excluido) {
+      return NextResponse.json(
+        { ok: false, message: "Não foi possível excluir o chamado." },
+        { status: 500 }
+      );
+    }
+
+    await registrarLog({
+      nivel: "info",
+      origem: "chamados/admin",
+      mensagem: `Chamado #${chamado.numero} excluído por ${usuario.nomeExibicao}.`,
+      detalhes: `Título: ${chamado.titulo}`,
+      metodo: "DELETE",
+      caminho: `/api/chamados/${numero}`,
+      ipOrigem: extrairIpOrigem(request),
+    });
+
+    return NextResponse.json({ ok: true, message: "Chamado excluído." });
+  } catch (error) {
+    console.error("Erro ao excluir chamado:", error);
+    return NextResponse.json(
+      { ok: false, message: "Não foi possível excluir o chamado." },
+      { status: 500 }
+    );
+  }
+}
+
+export const DELETE = comMetricasApi("chamados/[numero]", handleDELETE);

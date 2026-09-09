@@ -5,6 +5,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { requiredText } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import { adicionarMensagem, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
+import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { parseAnexosFormData } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -91,6 +92,15 @@ async function handlePOST(request: Request, context: RouteContext) {
       texto,
       anexos,
     });
+
+    if (ehAtendente && !interno && !ehDono) {
+      await notificarSolicitanteChamado({
+        chamado,
+        evento: "nova_resposta",
+        origem: new URL(request.url).origin,
+        autorNome,
+      });
+    }
 
     return NextResponse.json(
       { ok: true, message: "Mensagem enviada.", data: mensagem },

@@ -95,6 +95,7 @@ export default async function Page({ params, searchParams }: PageProps) {
       atendentesDoSetor={atendentesDoSetor}
       setoresParaTransferir={setoresParaTransferir}
       podeResponder={podeVer}
+      ehAdministrador={usuario?.ehAdministrador ?? false}
     />
   );
 }

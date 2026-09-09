@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { buscarChamadoPorNumero, reabrirChamado } from "@/lib/chamados/chamados";
 import { carregarContextoAcao, lerNomeConfirmado } from "@/lib/chamados/api-helpers";
+import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ async function handlePOST(request: Request, context: RouteContext) {
   const { contexto, erro } = await carregarContextoAcao(numero, nomeConfirmado);
   if (erro) return erro;
 
-  const { chamado, usuario } = contexto;
+  const { chamado, usuario, ehDono } = contexto;
 
   const autorNome = usuario?.nomeExibicao ?? chamado.solicitanteNome;
 
@@ -30,6 +31,15 @@ async function handlePOST(request: Request, context: RouteContext) {
         { ok: false, message: "Este chamado não pode ser reaberto no estado atual." },
         { status: 409 }
       );
+    }
+
+    if (!ehDono) {
+      await notificarSolicitanteChamado({
+        chamado,
+        evento: "reaberto",
+        origem: new URL(request.url).origin,
+        autorNome,
+      });
     }
 
     const atualizado = await buscarChamadoPorNumero(chamado.numero);

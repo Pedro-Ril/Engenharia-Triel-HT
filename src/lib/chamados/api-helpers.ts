@@ -17,6 +17,8 @@ interface ContextoAcaoChamado {
   chamado: Chamado;
   usuario: PortalUsuario | null;
   ehAtendente: boolean;
+  /* Dono real: sessão do solicitante OU nome confirmado corretamente (chamado anônimo). */
+  ehDono: boolean;
 }
 
 /*
@@ -58,7 +60,7 @@ export async function carregarContextoAcao(
   }
 
   const usuario = await getUsuarioAutenticado();
-  const { podeVer, ehAtendente, bloqueadoPorTentativas } = await verificarAcessoChamado(
+  const { podeVer, ehAtendente, ehDono, bloqueadoPorTentativas } = await verificarAcessoChamado(
     chamado,
     usuario,
     nomeConfirmado
@@ -87,7 +89,7 @@ export async function carregarContextoAcao(
     };
   }
 
-  return { contexto: { chamado, usuario, ehAtendente }, erro: null };
+  return { contexto: { chamado, usuario, ehAtendente, ehDono }, erro: null };
 }
 
 export async function lerNomeConfirmado(request: Request): Promise<string | null> {

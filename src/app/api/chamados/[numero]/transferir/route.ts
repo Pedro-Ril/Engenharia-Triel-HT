@@ -57,6 +57,15 @@ async function handlePOST(request: Request, context: RouteContext) {
       throw new ValidationError("O setor selecionado não existe ou não aceita chamados.");
     }
 
+    if (
+      novoSetorId === chamado.setorId &&
+      novoAtendenteUsuarioId === chamado.atendenteUsuarioId
+    ) {
+      throw new ValidationError(
+        "Selecione um setor ou atendente diferente do atual para transferir o chamado."
+      );
+    }
+
     const sucesso = await transferirChamado({
       chamadoId: chamado.id,
       novoSetorId,

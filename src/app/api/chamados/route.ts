@@ -5,6 +5,7 @@ import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { ValidationError } from "@/lib/auth/errors";
 import { optionalText, requiredText } from "@/lib/auth/validation";
 import { criarChamado } from "@/lib/chamados/chamados";
+import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -61,6 +62,18 @@ async function handlePOST(request: Request) {
       solicitanteDepartamento: usuario?.departamento ?? null,
       ipOrigem: extrairIpOrigem(request),
       anexos,
+    });
+
+    await notificarSolicitanteChamado({
+      chamado: {
+        numero,
+        titulo,
+        solicitanteNome,
+        solicitanteContato,
+        solicitanteUsuarioId: usuario?.id ?? null,
+      },
+      evento: "aberto",
+      origem: new URL(request.url).origin,
     });
 
     return NextResponse.json(

@@ -1013,6 +1013,29 @@ export async function fecharChamado(chamadoId: string, autorNome: string): Promi
 }
 
 /*
+ * Exclusão definitiva — só admin (ver requireAdminApi na rota). Mensagens,
+ * anexos e tentativas de nome cascateiam via FK (ON DELETE CASCADE), não
+ * precisam de limpeza manual aqui. Diferente das outras transições de
+ * status, isso não deixa rastro dentro do próprio chamado (ele deixa de
+ * existir) — quem chama essa função é responsável por registrar o log em
+ * portal_logs antes ou depois, já que é o único lugar que sobrevive à
+ * exclusão.
+ */
+export async function excluirChamado(chamadoId: string): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("id", sql.UniqueIdentifier, chamadoId);
+
+  const result = await request.query(`
+    DELETE FROM dbo.portal_chamados
+    WHERE [id] = @id;
+  `);
+
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/*
  * Transferir para outro atendente do mesmo setor OU para outro
  * setor inteiro (com ou sem atendente já escolhido lá). Se o setor
  * mudar de fato, a categoria é zerada — categorias pertencem a um

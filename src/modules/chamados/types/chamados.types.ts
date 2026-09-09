@@ -128,6 +128,27 @@ export interface ContagemCategoria {
   total: number;
 }
 
+export type EventoNotificacaoChamado =
+  | "aberto"
+  | "aceito"
+  | "nova_resposta"
+  | "resolvido_pendente"
+  | "reaberto"
+  | "fechado";
+
+export interface NotificacaoEmailChamado {
+  id: string;
+  chamadoNumero: number;
+  chamadoTitulo: string;
+  evento: EventoNotificacaoChamado;
+  destinatarioEmail: string;
+  destinatarioNome: string | null;
+  assunto: string;
+  sucesso: boolean;
+  erroMensagem: string | null;
+  enviadoEm: string;
+}
+
 export interface EstatisticasChamados {
   totais: TotaisPorStatus;
   tempoMedioResolucaoHoras: number | null;

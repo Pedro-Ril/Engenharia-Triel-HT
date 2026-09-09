@@ -10,6 +10,7 @@ import {
   Lock,
   Paperclip,
   RotateCcw,
+  Trash2,
   UserCheck,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ import {
   atualizarChamado,
   confirmarResolucaoChamado,
   enviarMensagemChamado,
+  excluirChamado,
   fecharChamado,
   listarAtendentesDoSetor,
   marcarChamadoComoResolvido,
@@ -56,6 +58,7 @@ interface ChamadoDetalhePageProps {
   setoresParaTransferir: SetorChamado[];
   /* false quando o acesso só foi liberado por o chamado ser público (visitante sem sessão/dono/atendente) — esconde ações e resposta. */
   podeResponder: boolean;
+  ehAdministrador: boolean;
 }
 
 function formatarData(valorIso: string): string {
@@ -81,6 +84,7 @@ export function ChamadoDetalhePage({
   atendentesDoSetor,
   setoresParaTransferir,
   podeResponder,
+  ehAdministrador,
 }: ChamadoDetalhePageProps) {
   const router = useRouter();
 
@@ -92,6 +96,8 @@ export function ChamadoDetalhePage({
   const [salvandoControle, setSalvandoControle] = useState(false);
   const [executandoAcao, setExecutandoAcao] = useState<string | null>(null);
   const [confirmandoReabrir, setConfirmandoReabrir] = useState(false);
+  const [confirmandoExcluir, setConfirmandoExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
 
   const [transferenciaAberta, setTransferenciaAberta] = useState(false);
   const [novoSetorId, setNovoSetorId] = useState("");
@@ -230,6 +236,24 @@ export function ChamadoDetalhePage({
     }
   }
 
+  async function handleExcluir() {
+    setErro(null);
+    setExcluindo(true);
+
+    try {
+      const resultado = await excluirChamado(chamado.numero);
+
+      if (resultado.ok) {
+        router.push("/chamados");
+      } else {
+        setErro(resultado.message ?? "Não foi possível excluir o chamado.");
+        setConfirmandoExcluir(false);
+      }
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
   const podeAceitar =
     chamado.ehAtendente &&
     !chamado.atendenteUsuarioId &&
@@ -245,6 +269,10 @@ export function ChamadoDetalhePage({
   const podeReabrir = ["aguardando_confirmacao", "resolvido", "fechado"].includes(chamado.status);
 
   const podeTransferir = chamado.ehAtendente && chamado.status !== "fechado";
+
+  const transferenciaSemAlteracao =
+    novoSetorId === chamado.setorId &&
+    (novoAtendenteId || null) === chamado.atendenteUsuarioId;
 
   /*
    * Atendente não pode responder antes de aceitar o chamado (ver
@@ -290,13 +318,14 @@ export function ChamadoDetalhePage({
         </Alert>
       )}
 
-      {podeResponder &&
-        (podeAceitar ||
-          podeMarcarResolvido ||
-          aguardandoConfirmacao ||
-          podeFechar ||
-          podeReabrir ||
-          podeTransferir) && (
+      {(ehAdministrador ||
+        (podeResponder &&
+          (podeAceitar ||
+            podeMarcarResolvido ||
+            aguardandoConfirmacao ||
+            podeFechar ||
+            podeReabrir ||
+            podeTransferir))) && (
         <Card title="Ações">
           <Stack direction="row" gap={10} wrap>
             {podeAceitar && (
@@ -355,6 +384,13 @@ export function ChamadoDetalhePage({
               <Button variant="secondary" onClick={abrirTransferencia}>
                 <ArrowRightLeft size={16} />
                 Transferir chamado
+              </Button>
+            )}
+
+            {ehAdministrador && (
+              <Button variant="danger" onClick={() => setConfirmandoExcluir(true)}>
+                <Trash2 size={16} />
+                Excluir chamado
               </Button>
             )}
           </Stack>
@@ -519,6 +555,17 @@ export function ChamadoDetalhePage({
         onClose={() => setConfirmandoReabrir(false)}
       />
 
+      <ConfirmDialog
+        open={confirmandoExcluir}
+        title="Excluir chamado?"
+        variant="danger"
+        message="Esta ação é permanente e não pode ser desfeita. Todas as mensagens e anexos deste chamado serão excluídos junto. Um registro desta exclusão ficará nos logs de monitoramento."
+        confirmLabel="Excluir"
+        loading={excluindo}
+        onConfirm={handleExcluir}
+        onClose={() => setConfirmandoExcluir(false)}
+      />
+
       <Modal
         open={transferenciaAberta}
         title="Transferir chamado"
@@ -532,7 +579,7 @@ export function ChamadoDetalhePage({
             <Button
               onClick={handleConfirmarTransferencia}
               loading={transferindo}
-              disabled={!novoSetorId}
+              disabled={!novoSetorId || transferenciaSemAlteracao}
             >
               Transferir
             </Button>
@@ -575,6 +622,12 @@ export function ChamadoDetalhePage({
               />
             )}
           </Field>
+
+          {transferenciaSemAlteracao && (
+            <Alert variant="warning">
+              Selecione um setor ou atendente diferente do atual para transferir.
+            </Alert>
+          )}
 
           {erroTransferencia && <Alert variant="danger">{erroTransferencia}</Alert>}
         </Stack>

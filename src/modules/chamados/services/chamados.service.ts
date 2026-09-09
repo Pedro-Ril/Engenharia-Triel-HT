@@ -5,6 +5,8 @@ import type {
   ChamadosAtendente,
   ChamadoResumo,
   EstatisticasChamados,
+  EventoNotificacaoChamado,
+  NotificacaoEmailChamado,
   PrioridadeChamado,
   SetorAceiteChamados,
   StatusChamado,
@@ -113,6 +115,13 @@ export async function transferirChamado(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
+  });
+  return parseResponse(response);
+}
+
+export async function excluirChamado(numero: number): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/chamados/${numero}`, {
+    method: "DELETE",
   });
   return parseResponse(response);
 }
@@ -275,4 +284,27 @@ export async function excluirCategoriaChamados(id: string): Promise<ApiEnvelope<
     method: "DELETE",
   });
   return parseResponse(response);
+}
+
+/* =========================================================
+   ADMIN — notificações por e-mail
+   ========================================================= */
+
+export async function listarNotificacoesEmailChamados(filtros: {
+  chamadoNumero?: number;
+  evento?: EventoNotificacaoChamado;
+  sucesso?: boolean;
+  pagina: number;
+  porPagina: number;
+}): Promise<{ itens: NotificacaoEmailChamado[]; total: number } | null> {
+  const params = new URLSearchParams();
+  if (filtros.chamadoNumero !== undefined) params.set("chamadoNumero", String(filtros.chamadoNumero));
+  if (filtros.evento) params.set("evento", filtros.evento);
+  if (filtros.sucesso !== undefined) params.set("sucesso", String(filtros.sucesso));
+  params.set("pagina", String(filtros.pagina));
+  params.set("porPagina", String(filtros.porPagina));
+
+  const response = await fetch(`/api/admin/chamados/notificacoes-email?${params.toString()}`);
+  const body = await parseResponse<{ itens: NotificacaoEmailChamado[]; total: number }>(response);
+  return body.data ?? null;
 }

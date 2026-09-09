@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { aceitarChamado, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
 import { carregarContextoAcao, lerNomeConfirmado } from "@/lib/chamados/api-helpers";
+import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ async function handlePOST(request: Request, context: RouteContext) {
   const { contexto, erro } = await carregarContextoAcao(numero, nomeConfirmado);
   if (erro) return erro;
 
-  const { chamado, usuario, ehAtendente } = contexto;
+  const { chamado, usuario, ehAtendente, ehDono } = contexto;
 
   if (!ehAtendente || !usuario) {
     return NextResponse.json(
@@ -40,6 +41,15 @@ async function handlePOST(request: Request, context: RouteContext) {
         },
         { status: 409 }
       );
+    }
+
+    if (!ehDono) {
+      await notificarSolicitanteChamado({
+        chamado,
+        evento: "aceito",
+        origem: new URL(request.url).origin,
+        autorNome: usuario.nomeExibicao,
+      });
     }
 
     const atualizado = await buscarChamadoPorNumero(chamado.numero);
