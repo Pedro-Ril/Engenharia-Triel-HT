@@ -100,12 +100,25 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+# Sem isso, apt/dpkg pode abrir um prompt interativo (conffile modificado,
+# escolha de versao/alternativa, reinicio de servico via needrestart...) preso
+# esperando resposta pra sempre, ja que este script roda com um tty de verdade
+# atras (sessao SSH via curl | sudo bash, nao um pipe totalmente desanexado).
+export DEBIAN_FRONTEND=noninteractive
+# needrestart (Ubuntu server, instalado por padrao) tem seu proprio dialogo
+# interativo de "quais servicos/bibliotecas reiniciar" que NAO e controlado
+# por DEBIAN_FRONTEND -- so por essa variavel. 'a' = reinicia automaticamente
+# sem perguntar (suspeito provavel do travamento relatado ao instalar o
+# Chrome, junto com o prompt do gpg mais abaixo).
+export NEEDRESTART_MODE=a
+APT_NONINTERATIVO='-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
+
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js nao encontrado - instalando..."
 
   if command -v apt-get >/dev/null 2>&1; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
+    apt-get install -y $APT_NONINTERATIVO nodejs
   else
     echo "Gerenciador de pacotes nao suportado para instalar o Node.js automaticamente (so apt/Debian/Ubuntu por enquanto). Instale manualmente (https://nodejs.org) e rode este script de novo." >&2
     exit 1
@@ -117,11 +130,14 @@ if ! command -v google-chrome >/dev/null 2>&1 && ! command -v chromium-browser >
 
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update
-    apt-get install -y gnupg curl
-    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+    apt-get install -y $APT_NONINTERATIVO gnupg curl
+    # --yes: sem isso, gpg pergunta "Overwrite? (y/N)" direto no /dev/tty (nao no
+    # stdin/stdout do pipe) se a chave ja existir de uma tentativa anterior --
+    # trava o instalador esperando uma resposta que nunca chega (visto ao vivo).
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
     apt-get update
-    apt-get install -y google-chrome-stable
+    apt-get install -y $APT_NONINTERATIVO google-chrome-stable
   else
     echo "Gerenciador de pacotes nao suportado para instalar o navegador automaticamente (so apt/Debian/Ubuntu por enquanto). Instale o Chrome ou o Chromium manualmente e rode este script de novo." >&2
     exit 1
@@ -130,7 +146,7 @@ fi
 
 echo "Instalando X minimo (sem ambiente de desktop)..."
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get install -y xserver-xorg xinit x11-xserver-utils
+  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils
 else
   echo "Gerenciador de pacotes nao suportado para instalar o X automaticamente (so apt/Debian/Ubuntu por enquanto)." >&2
   exit 1
