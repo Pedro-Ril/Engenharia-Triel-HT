@@ -357,7 +357,17 @@ function localizarNavegador() {
         "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
         "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
       ]
-    : ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium-browser", "/usr/bin/chromium"];
+    : [
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        // Em algumas versões do Ubuntu, "apt-get install chromium"/"chromium-browser"
+        // é só um pacote de transição que instala a versão snap (binário fica
+        // aqui, não em /usr/bin) — cobre esse caso sem precisar saber de
+        // antemão qual dos dois o apt resolveu na máquina.
+        "/snap/bin/chromium",
+      ];
 
   const encontrado = candidatos.find((caminho) => existsSync(caminho));
 

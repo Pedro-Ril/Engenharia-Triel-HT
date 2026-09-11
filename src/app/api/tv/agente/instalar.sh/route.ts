@@ -20,7 +20,10 @@ export const dynamic = "force-dynamic";
  * quem baixa é um mini-PC recém-formatado, sem sessão nenhuma no
  * portal.
  *
- * Instala Node.js (via NodeSource) e Google Chrome se não encontrar
+ * Instala Node.js (via NodeSource) e um navegador (Google Chrome em
+ * amd64; Chromium em qualquer outra arquitetura, ex: Raspberry Pi/ARM
+ * — o Chrome oficial não tem build pra ARM e apt-get falha com todas
+ * as dependências "not installable" se tentar) se não encontrar
  * nenhum navegador compatível já instalado — só sabe fazer isso via
  * apt (Debian/Ubuntu); noutra distro, para com uma mensagem clara em
  * vez de tentar adivinhar o gerenciador de pacotes certo. Precisa de
@@ -126,18 +129,31 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 if ! command -v google-chrome >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1 && ! command -v chromium >/dev/null 2>&1; then
-  echo "Navegador nao encontrado - instalando o Google Chrome..."
+  echo "Navegador nao encontrado - instalando..."
 
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update
     apt-get install -y $APT_NONINTERATIVO gnupg curl
-    # --yes: sem isso, gpg pergunta "Overwrite? (y/N)" direto no /dev/tty (nao no
-    # stdin/stdout do pipe) se a chave ja existir de uma tentativa anterior --
-    # trava o instalador esperando uma resposta que nunca chega (visto ao vivo).
-    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
-    apt-get update
-    apt-get install -y $APT_NONINTERATIVO google-chrome-stable
+
+    # Google Chrome oficial so tem build pra amd64 -- numa maquina ARM (ex:
+    # Raspberry Pi) apt-get tenta instalar mesmo assim e falha com TODAS as
+    # dependencias "not installable" (nenhuma versao amd64 delas existe pra
+    # essa arquitetura). Nesses casos instala o Chromium (build nativo da
+    # arquitetura da maquina) em vez do Chrome.
+    ARQUITETURA="$(dpkg --print-architecture 2>/dev/null || echo desconhecida)"
+    if [ "$ARQUITETURA" = "amd64" ]; then
+      echo "Instalando o Google Chrome..."
+      # --yes: sem isso, gpg pergunta "Overwrite? (y/N)" direto no /dev/tty (nao
+      # no stdin/stdout do pipe) se a chave ja existir de uma tentativa anterior
+      # -- trava o instalador esperando uma resposta que nunca chega (visto ao vivo).
+      curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg
+      echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+      apt-get update
+      apt-get install -y $APT_NONINTERATIVO google-chrome-stable
+    else
+      echo "Arquitetura $ARQUITETURA detectada - o Google Chrome oficial so tem build pra amd64. Instalando o Chromium no lugar..."
+      apt-get install -y $APT_NONINTERATIVO chromium || apt-get install -y $APT_NONINTERATIVO chromium-browser
+    fi
   else
     echo "Gerenciador de pacotes nao suportado para instalar o navegador automaticamente (so apt/Debian/Ubuntu por enquanto). Instale o Chrome ou o Chromium manualmente e rode este script de novo." >&2
     exit 1
@@ -184,7 +200,7 @@ mkdir -p "$DIR"
 curl -fsSL "$PORTAL_URL/api/tv/agente/download?plataforma=linux" -o "$DIR/agente.mjs"
 chown -R tvkiosk:tvkiosk /opt/portal-triel-ht
 
-echo "Instalando extensao de captura de tela via politica do Chrome..."
+echo "Instalando extensao de captura de tela via politica do navegador..."
 mkdir -p /etc/opt/chrome/policies/managed
 cat > /etc/opt/chrome/policies/managed/tv-corporativa.json <<POLICY
 {
@@ -194,6 +210,14 @@ cat > /etc/opt/chrome/policies/managed/tv-corporativa.json <<POLICY
   "TranslateEnabled": false
 }
 POLICY
+# Chrome (amd64) le de /etc/opt/chrome/; Chromium le de /etc/chromium/ (pacotes
+# mais novos) ou /etc/chromium-browser/ (nome de pacote antigo/Raspberry Pi OS)
+# -- copia a mesma politica pros diretorios do Chromium tambem, ja que so o
+# diretorio do navegador realmente instalado importa (os outros ficam sem
+# efeito nenhum, sem problema).
+mkdir -p /etc/chromium/policies/managed /etc/chromium-browser/policies/managed
+cp /etc/opt/chrome/policies/managed/tv-corporativa.json /etc/chromium/policies/managed/tv-corporativa.json
+cp /etc/opt/chrome/policies/managed/tv-corporativa.json /etc/chromium-browser/policies/managed/tv-corporativa.json
 
 cat > "$KIOSK_HOME/.xinitrc" <<XINITRC
 xset -dpms
