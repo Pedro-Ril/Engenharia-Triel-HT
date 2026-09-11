@@ -13,7 +13,12 @@ import {
   listarCamposDoTipo,
   validarValoresCamposDinamicos,
 } from "@/lib/estoque-equipamentos-usados/tipos-equipamento";
-import { parseEvidenciasFormData, salvarEvidencias } from "@/lib/estoque-equipamentos-usados/evidencias";
+import {
+  excluirEvidencia,
+  listarEvidenciasDoEquipamento,
+  parseEvidenciasFormData,
+  salvarEvidencias,
+} from "@/lib/estoque-equipamentos-usados/evidencias";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
 import type { CampoTipoEquipamento } from "@/modules/estoque-equipamentos-usados/types/estoque.types";
@@ -34,6 +39,30 @@ function optionalDecimal(value: FormDataEntryValue | null, fieldName: string): n
     throw new ValidationError(`O campo ${fieldName} deve ser um número válido.`);
   }
   return numero;
+}
+
+/*
+ * IDs de evidências marcadas para remoção nesta mesma edição — excluir
+ * uma evidência só é permitido por aqui (dentro de "Editar dados
+ * técnicos"), nunca direto na galeria de visualização, exatamente pra
+ * passar sempre pelo motivo obrigatório e ficar registrado no histórico
+ * de alterações.
+ */
+function idsEvidenciasParaExcluir(value: FormDataEntryValue | null): string[] {
+  if (typeof value !== "string" || !value.trim()) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new ValidationError("A lista de evidências a excluir veio num formato inválido.");
+  }
+
+  if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) {
+    throw new ValidationError("A lista de evidências a excluir veio num formato inválido.");
+  }
+
+  return parsed;
 }
 
 interface AlteracaoDadosTecnicos {
@@ -111,6 +140,10 @@ async function handlePATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ ok: false, message: "Equipamento não encontrado." }, { status: 404 });
     }
 
+    if (equipamento.status === "baixado") {
+      throw new ValidationError("Não é possível editar dados técnicos de um equipamento já baixado.");
+    }
+
     if (!equipamento.tipoEquipamentoId) {
       throw new ValidationError("Este equipamento não tem um tipo definido.");
     }
@@ -141,8 +174,18 @@ async function handlePATCH(request: Request, context: RouteContext) {
       blocosDoTipo.map((bloco) => parseEvidenciasFormData(formData, bloco.id))
     );
 
+    const idsParaExcluir = idsEvidenciasParaExcluir(formData.get("evidenciasExcluidas"));
+    const evidenciasAtuais = await listarEvidenciasDoEquipamento(id);
+    /* Só exclui o que realmente pertence a este equipamento — um id de
+       evidência de outro equipamento (por engano ou manipulação) é ignorado. */
+    const evidenciasExcluidas = evidenciasAtuais.filter((evidencia) => idsParaExcluir.includes(evidencia.id));
+
     await atualizarDadosEquipamento(id, { nomeCliente, codigoCliente, valor, camposValoresJson });
     await salvarEvidencias(id, evidenciasPorBloco.flat(), usuario.id, usuario.nomeExibicao);
+
+    for (const evidencia of evidenciasExcluidas) {
+      await excluirEvidencia(evidencia.id);
+    }
 
     const atualizado = await buscarEquipamentoPorId(id);
 
@@ -156,6 +199,15 @@ async function handlePATCH(request: Request, context: RouteContext) {
         { nomeCliente: equipamento.nomeCliente, valor: equipamento.valor, camposValores: equipamento.camposValores },
         { nomeCliente, valor, camposValores: camposValoresDepois }
       );
+
+      for (const evidencia of evidenciasExcluidas) {
+        alteracoes.push({
+          campo: "evidencia",
+          rotulo: `Evidência removida (${evidencia.nomeArquivo})`,
+          de: "Presente",
+          para: "Removida",
+        });
+      }
 
       if (alteracoes.length > 0) {
         await registrarLog({

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
-import { buscarEvidencia, excluirEvidencia } from "@/lib/estoque-equipamentos-usados/evidencias";
+import { buscarEvidencia } from "@/lib/estoque-equipamentos-usados/evidencias";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -51,22 +51,9 @@ async function handleGET(request: Request, context: RouteContext) {
 
 export const GET = comMetricasApi("estoque-equipamentos-usados/evidencias/[id]", handleGET);
 
-async function handleDELETE(request: Request, context: RouteContext) {
-  const acesso = await verificarAcessoModuloApi(MODULO_CHAVE);
-  if (acesso.negado) return acesso.negado;
-
-  const { id } = await context.params;
-
-  try {
-    await excluirEvidencia(id);
-    return NextResponse.json({ ok: true, message: "Evidência excluída." });
-  } catch (error) {
-    console.error("Erro ao excluir evidência de equipamento:", error);
-    return NextResponse.json(
-      { ok: false, message: "Não foi possível excluir a evidência." },
-      { status: 500 }
-    );
-  }
-}
-
-export const DELETE = comMetricasApi("estoque-equipamentos-usados/evidencias/[id]", handleDELETE);
+/*
+ * Sem DELETE aqui de propósito — excluir evidência só pode acontecer
+ * dentro de "Editar dados técnicos" (rota PATCH .../dados), que exige
+ * motivo e registra no histórico de alterações. Um endpoint solto de
+ * exclusão contornaria isso por completo.
+ */

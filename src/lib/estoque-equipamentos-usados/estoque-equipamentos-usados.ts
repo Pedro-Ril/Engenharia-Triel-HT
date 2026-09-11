@@ -5,7 +5,8 @@ import type { Request as SqlRequest } from "mssql";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { ValidationError } from "@/lib/auth/errors";
 import type { PortalUsuario } from "@/lib/auth/usuarios";
-import { COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA } from "./tipos-equipamento";
+import { COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA, listarCamposComPendencia } from "./tipos-equipamento";
+import { buscarEmpresaPorCodigo } from "@/lib/empresas/empresas";
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "baixado";
 export type TipoAcaoMovimentacao =
@@ -50,6 +51,8 @@ export interface MovimentacaoEquipamento {
   numeroNf: string | null;
   destinatarioNome: string | null;
   motivoBaixa: MotivoBaixa | null;
+  valor: number | null;
+  dataEmissaoNf: string | null;
   statusResultante: StatusEquipamento;
   observacoes: string | null;
   dataAcao: string;
@@ -150,6 +153,8 @@ interface MovimentacaoRow {
   numero_nf: string | null;
   destinatario_nome: string | null;
   motivo_baixa: MotivoBaixa | null;
+  valor: number | null;
+  data_emissao_nf: string | null;
   status_resultante: StatusEquipamento;
   observacoes: string | null;
   data_acao: string;
@@ -165,6 +170,8 @@ function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
     numeroNf: row.numero_nf,
     destinatarioNome: row.destinatario_nome,
     motivoBaixa: row.motivo_baixa,
+    valor: row.valor,
+    dataEmissaoNf: row.data_emissao_nf,
     statusResultante: row.status_resultante,
     observacoes: row.observacoes,
     dataAcao: row.data_acao,
@@ -292,6 +299,8 @@ export async function buscarEquipamentoPorId(id: string): Promise<EquipamentoCom
           [numero_nf],
           [destinatario_nome],
           [motivo_baixa],
+          [valor],
+          CONVERT(VARCHAR(10), [data_emissao_nf], 23) AS [data_emissao_nf],
           [status_resultante],
           [observacoes],
           CONVERT(VARCHAR(10), [data_acao], 23) AS [data_acao],
@@ -367,7 +376,14 @@ export async function listarEquipamentos(
     if (filtros.busca) {
       request.input("busca", sql.NVarChar(300), `%${filtros.busca}%`);
       condicoes.push(
-        "([descricao] LIKE @busca OR [numero_serie] LIKE @busca OR [erp_codigo_item] LIKE @busca OR CAST([numero] AS NVARCHAR(10)) LIKE @busca)"
+        `(
+          [descricao] LIKE @busca
+          OR [numero_serie] LIKE @busca
+          OR [erp_codigo_item] LIKE @busca
+          OR [nome_cliente] LIKE @busca
+          OR [codigo_cliente] LIKE @busca
+          OR CAST([numero] AS NVARCHAR(10)) LIKE @busca
+        )`
       );
     }
 
@@ -423,6 +439,8 @@ interface RegistrarMovimentacaoParams {
   numeroNf: string;
   destinatarioNome: string | null;
   motivoBaixa: MotivoBaixa | null;
+  valor: number | null;
+  dataEmissaoNf: string | null;
   observacoes: string | null;
   dataAcao: string;
   criadoPorUsuarioId: string;
@@ -458,8 +476,20 @@ async function registrarMovimentacao(
   try {
     const statusAtualResult = await new sql.Request(transaction)
       .input("id", sql.UniqueIdentifier, params.equipamentoId)
-      .query<{ status: StatusEquipamento; numero_nf_entrada: string | null }>(`
-        SELECT [status], [numero_nf_entrada] FROM dbo.com_estoque_equipamentos_usados WITH (UPDLOCK, ROWLOCK)
+      .query<{
+        status: StatusEquipamento;
+        numero_nf_entrada: string | null;
+        erp_codigo_item: string | null;
+        erp_id_item: string | null;
+        erp_data_entrada: string | null;
+        tipo_equipamento_id: string | null;
+        codigo_empresa: string | null;
+      }>(`
+        SELECT [status], [numero_nf_entrada], [erp_codigo_item], [erp_id_item],
+          CONVERT(VARCHAR(10), [erp_data_entrada], 23) AS [erp_data_entrada],
+          [codigo_empresa],
+          CONVERT(VARCHAR(36), [tipo_equipamento_id]) AS [tipo_equipamento_id]
+        FROM dbo.com_estoque_equipamentos_usados WITH (UPDLOCK, ROWLOCK)
         WHERE [id] = @id;
       `);
 
@@ -479,17 +509,81 @@ async function registrarMovimentacao(
 
     /*
      * Empréstimo/consignação só podem sair do estoque com a NF de
-     * entrada já vinculada — sem isso o equipamento não tem lastro
-     * documental de como entrou, então não pode circular pra fora.
+     * entrada já CONFIRMADA pela integração com o ERP (código do item,
+     * ID configurado e data de entrada todos preenchidos) — só ter o
+     * número digitado não basta, senão o equipamento pode circular pra
+     * fora sem o lastro documental real ter sido validado ainda.
      */
     if (
       (params.tipoAcao === "emprestimo" || params.tipoAcao === "consignacao") &&
-      !linhaAtual.numero_nf_entrada
+      (!linhaAtual.numero_nf_entrada ||
+        !linhaAtual.erp_codigo_item ||
+        !linhaAtual.erp_id_item ||
+        !linhaAtual.erp_data_entrada)
     ) {
       throw new ValidationError(
-        `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — este equipamento ainda não tem uma NF de entrada vinculada.`
+        `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — a NF de entrada deste equipamento ainda não foi confirmada pela integração com o ERP.`
       );
     }
+
+    /*
+     * Qualquer campo de sistema marcado como "vira status" (pendência) E
+     * "trava movimentações" (ver TiposEquipamentoPainel) bloqueia
+     * QUALQUER movimentação (empréstimo, consignação, retorno ou baixa)
+     * enquanto estiver vazio nesse equipamento — configurável por
+     * admin, ao contrário da regra fixa de NF de entrada acima.
+     */
+    if (linhaAtual.tipo_equipamento_id) {
+      const camposPendencia = await listarCamposComPendencia();
+      const pendenciasBloqueantes = camposPendencia.filter(
+        (campo) => campo.travaMovimentacao && campo.tipoEquipamentoId === linhaAtual.tipo_equipamento_id
+      );
+
+      if (pendenciasBloqueantes.length > 0) {
+        const colunas = pendenciasBloqueantes
+          .map((campo) => COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA[campo.chave])
+          .filter((coluna): coluna is string => Boolean(coluna));
+
+        if (colunas.length > 0) {
+          const colunasSql = colunas.map((coluna) => `[${coluna}]`).join(", ");
+          const resultPendencias = await new sql.Request(transaction)
+            .input("id", sql.UniqueIdentifier, params.equipamentoId)
+            .query<Record<string, unknown>>(`
+              SELECT ${colunasSql} FROM dbo.com_estoque_equipamentos_usados WHERE [id] = @id;
+            `);
+
+          const linhaPendencias = resultPendencias.recordset[0] ?? {};
+
+          for (const campo of pendenciasBloqueantes) {
+            const coluna = COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA[campo.chave];
+            if (!coluna) continue;
+
+            const valor = linhaPendencias[coluna];
+            const vazio = valor === null || valor === undefined || valor === "";
+
+            if (vazio) {
+              throw new ValidationError(
+                `Não é possível registrar esta ação — o equipamento tem uma pendência que trava movimentações: "${campo.rotulo}".`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    /*
+     * "Retorno ao estoque" não tem um destinatário externo — quem
+     * recebe de volta é a própria empresa do cadastro do equipamento,
+     * então o destinatário dessa movimentação é sempre ela, resolvida
+     * pelo código já gravado, nunca digitada por quem clica em
+     * "Confirmar".
+     */
+    const destinatarioNomeFinal =
+      params.tipoAcao === "retorno"
+        ? linhaAtual.codigo_empresa
+          ? (await buscarEmpresaPorCodigo(linhaAtual.codigo_empresa))?.nome ?? null
+          : null
+        : params.destinatarioNome;
 
     await new sql.Request(transaction)
       .input("id", sql.UniqueIdentifier, params.equipamentoId)
@@ -504,8 +598,10 @@ async function registrarMovimentacao(
       .input("equipamentoId", sql.UniqueIdentifier, params.equipamentoId)
       .input("tipoAcao", sql.VarChar(20), params.tipoAcao)
       .input("numeroNf", sql.NVarChar(30), params.numeroNf)
-      .input("destinatarioNome", sql.NVarChar(200), params.destinatarioNome)
+      .input("destinatarioNome", sql.NVarChar(200), destinatarioNomeFinal)
       .input("motivoBaixa", sql.VarChar(20), params.motivoBaixa)
+      .input("valor", sql.Decimal(12, 2), params.valor)
+      .input("dataEmissaoNf", sql.Date, params.dataEmissaoNf)
       .input("statusResultante", sql.VarChar(20), regra.novoStatus)
       .input("observacoes", sql.NVarChar(1000), params.observacoes)
       .input("dataAcao", sql.Date, params.dataAcao)
@@ -513,10 +609,10 @@ async function registrarMovimentacao(
       .input("criadoPorNome", sql.NVarChar(150), params.criadoPorNome)
       .query(`
         INSERT INTO dbo.com_estoque_equipamentos_usados_movimentacoes
-          ([equipamento_id], [tipo_acao], [numero_nf], [destinatario_nome], [motivo_baixa],
+          ([equipamento_id], [tipo_acao], [numero_nf], [destinatario_nome], [motivo_baixa], [valor], [data_emissao_nf],
            [status_resultante], [observacoes], [data_acao], [criado_por_usuario_id], [criado_por_nome])
         VALUES
-          (@equipamentoId, @tipoAcao, @numeroNf, @destinatarioNome, @motivoBaixa,
+          (@equipamentoId, @tipoAcao, @numeroNf, @destinatarioNome, @motivoBaixa, @valor, @dataEmissaoNf,
            @statusResultante, @observacoes, @dataAcao, @criadoPorUsuarioId, @criadoPorNome);
       `);
 
@@ -537,6 +633,8 @@ export interface AcaoMovimentacaoParams {
   equipamentoId: string;
   numeroNf: string;
   destinatarioNome: string | null;
+  valor: number | null;
+  dataEmissaoNf: string | null;
   observacoes: string | null;
   dataAcao: string;
   criadoPorUsuarioId: string;
@@ -555,12 +653,19 @@ export function registrarConsignacao(
   return registrarMovimentacao({ ...params, tipoAcao: "consignacao", motivoBaixa: null });
 }
 
+/*
+ * Não recebe destinatário nem valor/data de emissão — registrarMovimentacao
+ * resolve sozinho o nome da empresa do cadastro pra essa ação (ver
+ * comentário lá dentro); retorno não tem uma NF de saída própria.
+ */
 export function registrarRetorno(
-  params: Omit<AcaoMovimentacaoParams, "destinatarioNome">
+  params: Omit<AcaoMovimentacaoParams, "destinatarioNome" | "valor" | "dataEmissaoNf">
 ): Promise<EquipamentoComEstrato> {
   return registrarMovimentacao({
     ...params,
     destinatarioNome: null,
+    valor: null,
+    dataEmissaoNf: null,
     tipoAcao: "retorno",
     motivoBaixa: null,
   });

@@ -9,7 +9,8 @@ export type ServicoExterno =
   | "erp_estrutura"
   | "erp_estoque_usados"
   | "erp_estoque_usados_clientes"
-  | "erp_estoque_usados_nf_entrada";
+  | "erp_estoque_usados_nf_entrada"
+  | "erp_estoque_usados_nf_saida";
 export type OrigemChamadaExterna = "health_check" | "uso_real";
 
 export interface StatusServicoExterno {

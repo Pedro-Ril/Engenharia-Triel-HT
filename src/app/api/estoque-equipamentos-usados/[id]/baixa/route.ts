@@ -4,6 +4,7 @@ import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { optionalText, requiredText } from "@/lib/auth/validation";
 import {
+  buscarEquipamentoPorId,
   registrarBaixa,
   type MotivoBaixa,
 } from "@/lib/estoque-equipamentos-usados/estoque-equipamentos-usados";
@@ -11,6 +12,7 @@ import {
   parseAnexosMovimentacaoFormData,
   salvarAnexosMovimentacao,
 } from "@/lib/estoque-equipamentos-usados/movimentacoes-anexos";
+import { tentarBuscarNfSaida } from "@/lib/estoque-equipamentos-usados/nf-saida-integracao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -32,6 +34,15 @@ function requiredMotivoBaixa(value: FormDataEntryValue | null): MotivoBaixa {
     throw new ValidationError("Informe um motivo de baixa válido (venda, descarte, perda ou outro).");
   }
   return value as MotivoBaixa;
+}
+
+function optionalDecimal(value: FormDataEntryValue | null, fieldName: string): number | null {
+  if (value === null || value === "") return null;
+  const numero = Number(value);
+  if (!Number.isFinite(numero)) {
+    throw new ValidationError(`O campo ${fieldName} deve ser um número válido.`);
+  }
+  return numero;
 }
 
 async function handlePOST(request: Request, context: RouteContext) {
@@ -56,14 +67,39 @@ async function handlePOST(request: Request, context: RouteContext) {
     const numeroNf = requiredText(formData.get("numeroNf"), "número da NF", 30);
     const motivoBaixa = requiredMotivoBaixa(formData.get("motivoBaixa"));
     const destinatarioNome = optionalText(formData.get("destinatarioNome"), "destinatário", 200);
+    const valor = optionalDecimal(formData.get("valor"), "valor");
+    const dataEmissaoNf = optionalText(formData.get("dataEmissaoNf"), "data de emissão da NF", 10);
     const observacoes = optionalText(formData.get("observacoes"), "observações", 1000);
     const anexos = await parseAnexosMovimentacaoFormData(formData);
+
+    /*
+     * Só registra a "Tentativa de integração" aqui, na confirmação —
+     * não na digitação/blur (ver rota .../nf-saida) — e só quando o
+     * motivo é venda (único caso em que baixa tem uma NF de saída).
+     * Não bloqueia a baixa se essa consulta falhar: tentarBuscarNfSaida
+     * nunca lança, e o destinatário/valor já vieram do formulário.
+     */
+    if (motivoBaixa === "venda") {
+      const equipamentoAntes = await buscarEquipamentoPorId(id);
+      if (equipamentoAntes?.codigoEmpresa) {
+        await tentarBuscarNfSaida({
+          equipamentoId: id,
+          codigoEmpresa: equipamentoAntes.codigoEmpresa,
+          numeroNf,
+          idItem: equipamentoAntes.erpIdItem,
+          tipoNf: "saida_venda",
+          disparadoPor: usuario.nomeExibicao,
+        });
+      }
+    }
 
     const equipamento = await registrarBaixa({
       equipamentoId: id,
       numeroNf,
       motivoBaixa,
       destinatarioNome,
+      valor,
+      dataEmissaoNf,
       observacoes,
       dataAcao: hoje(),
       criadoPorUsuarioId: usuario.id,

@@ -53,6 +53,8 @@ export interface MovimentacaoEquipamento {
   numeroNf: string | null;
   destinatarioNome: string | null;
   motivoBaixa: MotivoBaixa | null;
+  valor: number | null;
+  dataEmissaoNf: string | null;
   statusResultante: StatusEquipamento;
   observacoes: string | null;
   dataAcao: string;
@@ -86,9 +88,11 @@ export interface HistoricoAlteracaoDadosTecnicos {
 }
 
 export type StatusTentativaIntegracaoNf = "sucesso" | "nao_encontrado" | "erro";
+export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda";
 
 export interface TentativaIntegracaoNf {
   id: string;
+  tipoNf: TipoNfIntegracao;
   status: StatusTentativaIntegracaoNf;
   mensagem: string | null;
   parametrosConsulta: string | null;
@@ -143,6 +147,7 @@ export interface CampoTipoEquipamento {
   ativo: boolean;
   ehSistema: boolean;
   geraPendencia: boolean;
+  travaMovimentacao: boolean;
   vemDeIntegracao: boolean;
 }
 
@@ -150,6 +155,7 @@ export interface CampoPendenciaConfig {
   tipoEquipamentoId: string;
   chave: string;
   rotulo: string;
+  travaMovimentacao: boolean;
 }
 
 export interface EvidenciaEquipamento {
@@ -161,4 +167,51 @@ export interface EvidenciaEquipamento {
   tamanhoBytes: number;
   criadoPorNome: string;
   criadoEm: string;
+}
+
+export interface PainelBiContagemStatus {
+  status: StatusEquipamento;
+  quantidade: number;
+  valorTotal: number;
+}
+
+export interface PainelBiTipo {
+  tipoId: string;
+  tipoNome: string;
+  quantidade: number;
+  valorTotal: number;
+}
+
+export interface PainelBiMes {
+  mes: string;
+  quantidade: number;
+}
+
+export interface PainelBiMovimentacao {
+  equipamentoId: string;
+  equipamentoNumero: number;
+  equipamentoDescricao: string;
+  tipoAcao: TipoAcaoMovimentacao;
+  numeroNf: string | null;
+  destinatarioNome: string | null;
+  dataAcao: string;
+  criadoPorNome: string;
+}
+
+export interface PainelBiCliente {
+  nomeCliente: string;
+  quantidade: number;
+}
+
+export interface PainelBiEstoque {
+  totalEquipamentos: number;
+  valorTotalEmEstoque: number;
+  pendencias: number;
+  semNfEntrada: number;
+  porStatus: PainelBiContagemStatus[];
+  porTipo: PainelBiTipo[];
+  entradasPorMes: PainelBiMes[];
+  movimentacoesRecentes: PainelBiMovimentacao[];
+  clientesComEquipamentoFora: PainelBiCliente[];
+  atualizadoEm: string;
 }

@@ -43,6 +43,7 @@ export interface CampoTipoEquipamento {
   ativo: boolean;
   ehSistema: boolean;
   geraPendencia: boolean;
+  travaMovimentacao: boolean;
   vemDeIntegracao: boolean;
 }
 
@@ -115,7 +116,7 @@ export const DEFINICOES_CAMPOS_SISTEMA: DefinicaoCampoSistema[] = [
   { chave: CHAVE_SISTEMA_MODELO, rotulo: "Modelo", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 4, coluna: "modelo", vemDeIntegracao: false },
   { chave: CHAVE_SISTEMA_NUMERO_SERIE, rotulo: "Número de série", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 5, coluna: "numero_serie", vemDeIntegracao: false },
   { chave: CHAVE_SISTEMA_CODIGO_EMPRESA, rotulo: "Empresa", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 6, coluna: "codigo_empresa", vemDeIntegracao: false },
-  { chave: CHAVE_SISTEMA_NUMERO_NF_ENTRADA, rotulo: "NF de entrada", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 7, coluna: "numero_nf_entrada", vemDeIntegracao: true },
+  { chave: CHAVE_SISTEMA_NUMERO_NF_ENTRADA, rotulo: "NF de entrada", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 7, coluna: "numero_nf_entrada", vemDeIntegracao: false },
   { chave: CHAVE_SISTEMA_ERP_CODIGO_ITEM, rotulo: "Código do item no ERP", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 8, coluna: "erp_codigo_item", vemDeIntegracao: true },
   { chave: CHAVE_SISTEMA_ID_CONFIGURADO, rotulo: "ID Configurado", tipoDado: "texto", unidade: null, obrigatorio: false, ordem: 9, coluna: "erp_id_item", vemDeIntegracao: true },
   { chave: CHAVE_SISTEMA_DATA_ENTRADA_NF, rotulo: "Data Entrada NF", tipoDado: "data", unidade: null, obrigatorio: false, ordem: 10, coluna: "erp_data_entrada", vemDeIntegracao: true },
@@ -544,6 +545,7 @@ interface CampoRow {
   ativo: boolean;
   eh_sistema: boolean;
   gera_pendencia: boolean;
+  trava_movimentacao: boolean;
   vem_de_integracao: boolean;
 }
 
@@ -563,6 +565,7 @@ function mapCampoRow(row: CampoRow): CampoTipoEquipamento {
     ativo: row.ativo,
     ehSistema: row.eh_sistema,
     geraPendencia: row.gera_pendencia,
+    travaMovimentacao: row.trava_movimentacao,
     vemDeIntegracao: row.vem_de_integracao,
   };
 }
@@ -592,6 +595,7 @@ export async function listarCamposDoTipo(
         c.[ativo],
         c.[eh_sistema],
         c.[gera_pendencia],
+        c.[trava_movimentacao],
         c.[vem_de_integracao]
       FROM dbo.com_estoque_tipos_equipamento_campos AS c
       INNER JOIN dbo.com_estoque_tipos_equipamento_blocos AS b ON b.[id] = c.[bloco_id]
@@ -705,6 +709,7 @@ export async function atualizarCampoTipo(
     ordem?: number;
     ativo?: boolean;
     geraPendencia?: boolean;
+    travaMovimentacao?: boolean;
     vemDeIntegracao?: boolean;
   }
 ): Promise<void> {
@@ -719,9 +724,10 @@ export async function atualizarCampoTipo(
       eh_sistema: boolean;
       obrigatorio: boolean;
       gera_pendencia: boolean;
+      trava_movimentacao: boolean;
       vem_de_integracao: boolean;
     }>(
-      `SELECT [tipo_dado], [chave], [eh_sistema], [obrigatorio], [gera_pendencia], [vem_de_integracao]
+      `SELECT [tipo_dado], [chave], [eh_sistema], [obrigatorio], [gera_pendencia], [trava_movimentacao], [vem_de_integracao]
        FROM dbo.com_estoque_tipos_equipamento_campos WHERE [id] = @id;`
     );
 
@@ -760,6 +766,25 @@ export async function atualizarCampoTipo(
     );
   }
 
+  if (dados.travaMovimentacao === true && !geraPendenciaEfetivo) {
+    throw new ValidationError(
+      'Só é possível travar movimentações numa pendência marcada como "vira status" — marque essa opção primeiro.'
+    );
+  }
+
+  /*
+   * Desligar "vira status" também desliga "trava movimentações" junto
+   * (não dá pra travar uma movimentação por uma pendência que deixou de
+   * existir) — a menos que o próprio chamador já tenha dito
+   * explicitamente o que quer para travaMovimentacao nessa mesma chamada.
+   */
+  const travaMovimentacaoFinal =
+    dados.travaMovimentacao !== undefined
+      ? dados.travaMovimentacao
+      : !geraPendenciaEfetivo && atual.trava_movimentacao
+        ? false
+        : undefined;
+
   const tipoDadoEfetivo = dados.tipoDado ?? atual.tipo_dado;
 
   const request = pool.request();
@@ -796,6 +821,11 @@ export async function atualizarCampoTipo(
   if (dados.geraPendencia !== undefined) {
     request.input("geraPendencia", sql.Bit, dados.geraPendencia);
     sets.push("[gera_pendencia] = @geraPendencia");
+  }
+
+  if (travaMovimentacaoFinal !== undefined) {
+    request.input("travaMovimentacao", sql.Bit, travaMovimentacaoFinal);
+    sets.push("[trava_movimentacao] = @travaMovimentacao");
   }
 
   if (dados.vemDeIntegracao !== undefined) {
@@ -964,6 +994,7 @@ export interface CampoPendenciaConfig {
   tipoEquipamentoId: string;
   chave: string;
   rotulo: string;
+  travaMovimentacao: boolean;
 }
 
 /*
@@ -979,8 +1010,13 @@ export async function listarCamposComPendencia(): Promise<CampoPendenciaConfig[]
     tipo_equipamento_id: string;
     chave: string;
     rotulo: string;
+    trava_movimentacao: boolean;
   }>(`
-    SELECT CONVERT(VARCHAR(36), c.[tipo_equipamento_id]) AS [tipo_equipamento_id], c.[chave], c.[rotulo]
+    SELECT
+      CONVERT(VARCHAR(36), c.[tipo_equipamento_id]) AS [tipo_equipamento_id],
+      c.[chave],
+      c.[rotulo],
+      c.[trava_movimentacao]
     FROM dbo.com_estoque_tipos_equipamento_campos AS c
     INNER JOIN dbo.com_estoque_tipos_equipamento AS t ON t.[id] = c.[tipo_equipamento_id]
     WHERE c.[eh_sistema] = 1 AND c.[gera_pendencia] = 1 AND c.[ativo] = 1 AND t.[ativo] = 1;
@@ -990,6 +1026,7 @@ export async function listarCamposComPendencia(): Promise<CampoPendenciaConfig[]
     tipoEquipamentoId: row.tipo_equipamento_id,
     chave: row.chave,
     rotulo: row.rotulo,
+    travaMovimentacao: row.trava_movimentacao,
   }));
 }
 

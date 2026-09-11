@@ -1,0 +1,439 @@
+.painel {
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
+  padding: 18px 26px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg-page);
+  overflow: hidden;
+}
+
+.painel * {
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   ESTADOS DE CARREGAMENTO / ERRO
+   ========================================================= */
+
+.estadoVazio {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid var(--border-soft);
+  border-top-color: var(--primary);
+  animation: girar 0.8s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================================
+   CABEÇALHO
+   ========================================================= */
+
+.header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 24px;
+  border-radius: 18px;
+  background: var(--sidebar-gradient);
+  box-shadow: 0 10px 28px rgba(183, 28, 28, 0.22);
+}
+
+.marca {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marcaWordmark {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.marcaSubtitulo {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.headerDireita {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.aoVivo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.aoVivoPulso {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: pulsar 1.8s ease-in-out infinite;
+}
+
+@keyframes pulsar {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(74, 222, 128, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+.relogioBloco {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.relogio {
+  font-family: "Consolas", "SFMono-Regular", Menlo, monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.dataAtual {
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.78);
+  text-transform: capitalize;
+}
+
+.botaoTelaCheia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.botaoTelaCheia:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* =========================================================
+   KPIs
+   ========================================================= */
+
+.kpiRow {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 12px;
+}
+
+.kpiTile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.kpiTileAlerta {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.kpiIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.kpiTileAlerta .kpiIcone {
+  background: var(--warning-bg-strong);
+  color: var(--warning-text);
+}
+
+.kpiTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kpiValor {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpiRotulo {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
+   GRADE DE GRÁFICOS
+   ========================================================= */
+
+.chartsGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tile {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 14px 18px 10px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.tileTitulo {
+  flex-shrink: 0;
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tileCorpo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tileCorpo > *:first-child {
+  flex: 1.3;
+  min-width: 0;
+  height: 100%;
+}
+
+.tileCorpoSemLegenda {
+  flex: 1;
+  min-height: 0;
+}
+
+.legenda {
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.legenda li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legenda li strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.legendaPonto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legendaLabel {
+  white-space: nowrap;
+}
+
+.legendaValor {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   LISTAS (movimentações recentes / ranking de clientes)
+   ========================================================= */
+
+.listaCorpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.listaVazia {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: auto;
+}
+
+.linhaMovimentacao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.linhaMovimentacao:last-child {
+  border-bottom: none;
+}
+
+.acaoPonto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.linhaMovimentacaoTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.linhaMovimentacaoTitulo {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.linhaMovimentacaoSub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.linhaMovimentacaoData {
+  flex-shrink: 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.linhaRanking {
+  display: grid;
+  grid-template-columns: 110px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+}
+
+.linhaRankingNome {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.linhaRankingBarraFundo {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+  overflow: hidden;
+}
+
+.linhaRankingBarra {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.linhaRankingValor {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   RODAPÉ
+   ========================================================= */
+
+.footer {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}

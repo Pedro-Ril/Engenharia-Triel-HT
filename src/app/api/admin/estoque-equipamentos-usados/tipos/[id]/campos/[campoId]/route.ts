@@ -70,6 +70,10 @@ async function handlePATCH(request: Request, context: RouteContext) {
         parsedBody.geraPendencia === undefined
           ? undefined
           : optionalBoolean(parsedBody.geraPendencia, "vira status", false),
+      travaMovimentacao:
+        parsedBody.travaMovimentacao === undefined
+          ? undefined
+          : optionalBoolean(parsedBody.travaMovimentacao, "trava movimentações", false),
       vemDeIntegracao:
         parsedBody.vemDeIntegracao === undefined
           ? undefined

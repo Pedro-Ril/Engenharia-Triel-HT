@@ -6,6 +6,7 @@ import type {
   CampoTipoEquipamento,
   Equipamento,
   EquipamentoComEstrato,
+  HistoricoAlteracaoDadosTecnicos,
   StatusEquipamento,
   TipoAcaoMovimentacao,
 } from "../types/estoque.types";
@@ -76,6 +77,17 @@ function formatarData(data?: string | null): string {
 
 function formatarDataHora(data: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
+}
+
+function formatarDataHoraIso(dataIso: string): string {
+  return formatarDataHora(new Date(dataIso));
+}
+
+function formatarValorHistorico(valor: unknown): string {
+  if (valor === undefined || valor === null || valor === "") return "-";
+  if (typeof valor === "boolean") return valor ? "Sim" : "Não";
+  if (Array.isArray(valor)) return valor.length > 0 ? valor.join(", ") : "-";
+  return String(valor);
 }
 
 function formatarValorCampo(campo: CampoTipoEquipamento, valor: unknown): string {
@@ -382,7 +394,8 @@ export function exportarPdfEntradaEquipamento(
  */
 export function exportarPdfEstratoEquipamento(
   equipamento: EquipamentoComEstrato,
-  anexosPorMovimentacao: Map<string, AnexoMovimentacao[]> = new Map()
+  anexosPorMovimentacao: Map<string, AnexoMovimentacao[]> = new Map(),
+  historicoDados: HistoricoAlteracaoDadosTecnicos[] = []
 ): void {
   const doc = new jsPDF("p", "mm", "a4");
   const geradoEm = new Date();
@@ -397,6 +410,8 @@ export function exportarPdfEstratoEquipamento(
     return [
       ACAO_LABELS[movimentacao.tipoAcao],
       movimentacao.numeroNf ?? "-",
+      formatarMoeda(movimentacao.valor),
+      formatarData(movimentacao.dataEmissaoNf),
       movimentacao.destinatarioNome ?? "-",
       STATUS_LABELS[movimentacao.statusResultante],
       anexos.length > 0 ? anexos.map((anexo) => anexo.nomeArquivo).join(", ") : "-",
@@ -408,7 +423,7 @@ export function exportarPdfEstratoEquipamento(
   autoTable(doc, {
     startY: TOPO_CONTEUDO + 4,
     margin: { top: ALTURA_FAIXA + 6, left: MARGEM, right: MARGEM },
-    head: [["Ação", "NF", "Destinatário", "Status resultante", "Anexos", "Responsável", "Data"]],
+    head: [["Ação", "NF", "Valor", "Emissão NF", "Destinatário", "Status resultante", "Anexos", "Responsável", "Data"]],
     body: linhas,
     styles: {
       fontSize: 8.5,
@@ -428,6 +443,47 @@ export function exportarPdfEstratoEquipamento(
     },
     didDrawPage: () => desenharFaixaCabecalho(doc, equipamento, tituloPagina),
   });
+
+  if (historicoDados.length > 0) {
+    const cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+
+    desenharTituloSecao(doc, "Histórico de Alterações de Dados Técnicos", cursorY);
+
+    const linhasHistorico = historicoDados.flatMap((registro) =>
+      registro.alteracoes.map((alteracao) => [
+        formatarDataHoraIso(registro.criadoEm),
+        registro.autorNome,
+        alteracao.rotulo,
+        formatarValorHistorico(alteracao.de),
+        formatarValorHistorico(alteracao.para),
+        registro.motivo ?? "-",
+      ])
+    );
+
+    autoTable(doc, {
+      startY: cursorY + 4,
+      margin: { top: ALTURA_FAIXA + 6, left: MARGEM, right: MARGEM },
+      head: [["Data", "Autor", "Campo", "De", "Para", "Motivo"]],
+      body: linhasHistorico,
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 2.5,
+        textColor: COR_TEXTO,
+        lineColor: COR_LINHA,
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: COR_PRIMARIA,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 8.5,
+      },
+      alternateRowStyles: {
+        fillColor: COR_FUNDO_ALTERNADO,
+      },
+      didDrawPage: () => desenharFaixaCabecalho(doc, equipamento, tituloPagina),
+    });
+  }
 
   desenharRodapes(doc, geradoEm);
 

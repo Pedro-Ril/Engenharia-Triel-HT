@@ -9,6 +9,7 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { DateInput } from "@/components/ui/DateInput";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FileUpload } from "@/components/ui/FileUpload";
@@ -39,8 +40,10 @@ import { ClienteAutocomplete } from "./ClienteAutocomplete";
 import { exportarPdfEntradaEquipamento } from "../utils/pdf-export";
 import {
   CHAVE_SISTEMA_CODIGO_EMPRESA,
+  CHAVE_SISTEMA_DATA_ENTRADA_NF,
   CHAVE_SISTEMA_DESCRICAO,
   CHAVE_SISTEMA_ERP_CODIGO_ITEM,
+  CHAVE_SISTEMA_ID_CONFIGURADO,
   CHAVE_SISTEMA_MARCA,
   CHAVE_SISTEMA_MODELO,
   CHAVE_SISTEMA_NOME_CLIENTE,
@@ -66,6 +69,8 @@ function formInicial() {
     numeroNfEntrada: "",
     observacoes: "",
     erpCodigoItem: "",
+    erpIdItem: "",
+    erpDataEntrada: "",
   };
 }
 
@@ -82,6 +87,14 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
   const [camposDoTipo, setCamposDoTipo] = useState<CampoTipoEquipamento[]>([]);
   const [carregandoBlocos, setCarregandoBlocos] = useState(false);
   const [valoresCampos, setValoresCampos] = useState<Record<string, unknown>>({});
+  /*
+   * Guarda-chuva pra qualquer campo de sistema que este formulário ainda
+   * não conhece por nome (ver renderCampoSistema, caso "default") — sem
+   * isso, um campo de sistema novo cadastrado no admin e esquecido aqui
+   * simplesmente não apareceria na tela, como já aconteceu com "ID
+   * Configurado"/"Data Entrada NF".
+   */
+  const [valoresSistemaExtras, setValoresSistemaExtras] = useState<Record<string, string>>({});
 
   const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
 
@@ -135,6 +148,7 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
       setBlocosDoTipo(blocos);
       setCamposDoTipo(campos);
       setValoresCampos({});
+      setValoresSistemaExtras({});
       setEvidencias({});
       setCampoInvalidoId(null);
       setCarregandoBlocos(false);
@@ -342,6 +356,53 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
             />
           </Field>
         );
+      case CHAVE_SISTEMA_ID_CONFIGURADO:
+        return campo.vemDeIntegracao ? (
+          <Field
+            key={campo.id}
+            id={id}
+            label={campo.rotulo}
+            hint="Preenchido automaticamente pela integração com o ERP junto com a NF de entrada — não é possível digitar aqui"
+          >
+            <Input value="" disabled placeholder="Aguardando integração com o ERP" />
+          </Field>
+        ) : (
+          <Field
+            key={campo.id}
+            id={id}
+            label={campo.rotulo}
+            required={campo.obrigatorio}
+            error={erro}
+            highlighted={destacado}
+          >
+            <Input
+              value={form.erpIdItem}
+              onChange={(event) => atualizarCampo("erpIdItem", event.target.value)}
+            />
+          </Field>
+        );
+      case CHAVE_SISTEMA_DATA_ENTRADA_NF:
+        return campo.vemDeIntegracao ? (
+          <Field
+            key={campo.id}
+            id={id}
+            label={campo.rotulo}
+            hint="Preenchido automaticamente pela integração com o ERP junto com a NF de entrada — não é possível digitar aqui"
+          >
+            <Input value="" disabled placeholder="Aguardando integração com o ERP" />
+          </Field>
+        ) : (
+          <Field
+            key={campo.id}
+            id={id}
+            label={campo.rotulo}
+            required={campo.obrigatorio}
+            error={erro}
+            highlighted={destacado}
+          >
+            <DateInput value={form.erpDataEntrada} onValueChange={(valor) => atualizarCampo("erpDataEntrada", valor)} />
+          </Field>
+        );
       case CHAVE_SISTEMA_OBSERVACOES:
         return (
           <Field
@@ -359,8 +420,49 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
             />
           </Field>
         );
-      default:
-        return null;
+      default: {
+        /*
+         * Fallback genérico pra qualquer campo de sistema que este
+         * formulário ainda não tem um "case" dedicado — nunca deve
+         * ficar invisível. Se vem de integração, é sempre só leitura
+         * (mesmo padrão dos 4 campos conhecidos); senão, vira um input
+         * de texto (ou data, se o tipo do campo for "data") ligado a
+         * valoresSistemaExtras e enviado ao salvar com a própria chave.
+         */
+        const valorExtra = valoresSistemaExtras[campo.chave] ?? "";
+        const definirValorExtra = (valor: string) =>
+          setValoresSistemaExtras((atual) => ({ ...atual, [campo.chave]: valor }));
+
+        if (campo.vemDeIntegracao) {
+          return (
+            <Field
+              key={campo.id}
+              id={id}
+              label={campo.rotulo}
+              hint="Preenchido automaticamente pela integração com o ERP — não é possível digitar aqui"
+            >
+              <Input value="" disabled placeholder="Aguardando integração com o ERP" />
+            </Field>
+          );
+        }
+
+        return (
+          <Field
+            key={campo.id}
+            id={id}
+            label={campo.rotulo}
+            required={campo.obrigatorio}
+            error={erro}
+            highlighted={destacado}
+          >
+            {campo.tipoDado === "data" ? (
+              <DateInput value={valorExtra} onValueChange={definirValorExtra} />
+            ) : (
+              <Input value={valorExtra} onChange={(event) => definirValorExtra(event.target.value)} />
+            )}
+          </Field>
+        );
+      }
     }
   }
 
@@ -441,10 +543,14 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
         return form.numeroNfEntrada;
       case CHAVE_SISTEMA_ERP_CODIGO_ITEM:
         return form.erpCodigoItem;
+      case CHAVE_SISTEMA_ID_CONFIGURADO:
+        return form.erpIdItem;
+      case CHAVE_SISTEMA_DATA_ENTRADA_NF:
+        return form.erpDataEntrada;
       case CHAVE_SISTEMA_OBSERVACOES:
         return form.observacoes;
       default:
-        return "";
+        return valoresSistemaExtras[chave] ?? "";
     }
   }
 
@@ -507,6 +613,18 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
       formData.set("numeroNfEntrada", form.numeroNfEntrada);
       formData.set("observacoes", form.observacoes);
       formData.set("erpCodigoItem", form.erpCodigoItem);
+      formData.set("erpIdItem", form.erpIdItem);
+      formData.set("erpDataEntrada", form.erpDataEntrada);
+      /*
+       * Qualquer campo de sistema desconhecido (ver renderCampoSistema,
+       * caso "default") vai com a própria chave como nome — o backend
+       * só vai gravar isso de fato quando alguém adicionar a coluna e
+       * ligar essa chave em criarEquipamento, mas o valor pelo menos não
+       * se perde silenciosamente aqui na hora de montar o envio.
+       */
+      for (const [chave, valor] of Object.entries(valoresSistemaExtras)) {
+        formData.set(chave, valor);
+      }
       formData.set("camposValores", JSON.stringify(valoresCampos));
 
       for (const [blocoId, arquivos] of Object.entries(evidencias)) {

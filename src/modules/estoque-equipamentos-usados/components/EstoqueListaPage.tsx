@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Home, Plus, Trash2, Warehouse } from "lucide-react";
+import { Eye, Home, MonitorPlay, Plus, Trash2, Warehouse } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -58,6 +58,16 @@ const OPCOES_STATUS = [
 
 function formatarData(dataIso: string): string {
   return new Date(dataIso).toLocaleDateString("pt-BR");
+}
+
+/*
+ * Código e descrição SEMPRE ficam em colunas separadas no banco
+ * (nome_cliente/codigo_cliente) — "código | descrição" é só o formato
+ * de exibição, remontado aqui na leitura, nunca gravado como string só.
+ */
+function formatarCodDescricao(codigo: string | null, descricao: string | null): string {
+  if (codigo && descricao) return `${codigo} | ${descricao}`;
+  return descricao || codigo || "-";
 }
 
 const POR_PAGINA = 20;
@@ -205,12 +215,20 @@ export function EstoqueListaPage() {
         title="Estoque de Equipamentos Usados"
         description="Controle de entrada, empréstimo, consignação e baixa de equipamentos usados."
         actions={
-          <Link href="/estoque-equipamentos-usados/nova">
-            <Button>
-              <Plus size={16} />
-              Nova entrada
-            </Button>
-          </Link>
+          <Stack direction="row" gap={8}>
+            <Link href="/estoque-equipamentos-usados/painel" target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary">
+                <MonitorPlay size={16} />
+                Painel de BI
+              </Button>
+            </Link>
+            <Link href="/estoque-equipamentos-usados/nova">
+              <Button>
+                <Plus size={16} />
+                Nova entrada
+              </Button>
+            </Link>
+          </Stack>
         }
       />
 
@@ -227,7 +245,7 @@ export function EstoqueListaPage() {
             <Field label="Buscar">
               <Input
                 value={buscaDigitada}
-                placeholder="Descrição, série, código ERP ou número"
+                placeholder="Descrição, cliente, série, código ERP ou número"
                 onChange={(event) => setBuscaDigitada(event.target.value)}
               />
             </Field>
@@ -267,11 +285,12 @@ export function EstoqueListaPage() {
             />
           ) : (
             <>
-              <Table minWidth={920}>
+              <Table minWidth={1080}>
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Nº</TableHeaderCell>
                     <TableHeaderCell>Descrição</TableHeaderCell>
+                    <TableHeaderCell>Cliente</TableHeaderCell>
                     <TableHeaderCell>Marca/Modelo</TableHeaderCell>
                     <TableHeaderCell align="center">Status</TableHeaderCell>
                     <TableHeaderCell>Pendências</TableHeaderCell>
@@ -292,6 +311,9 @@ export function EstoqueListaPage() {
                       >
                         <TableCell>#{equipamento.numero}</TableCell>
                         <TableCell>{equipamento.descricao}</TableCell>
+                        <TableCell>
+                          {formatarCodDescricao(equipamento.codigoCliente, equipamento.nomeCliente)}
+                        </TableCell>
                         <TableCell>
                           {[equipamento.marca, equipamento.modelo].filter(Boolean).join(" / ") || "-"}
                         </TableCell>

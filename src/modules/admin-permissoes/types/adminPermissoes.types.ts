@@ -175,6 +175,8 @@ export interface ConfigErpEstoqueUsados {
   chaveApi: string | null;
   urlNfEntrada: string | null;
   urlNfEntradaTeste: string | null;
+  urlNfSaida: string | null;
+  urlNfSaidaTeste: string | null;
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
   ultimaExecucaoNfEm: string | null;

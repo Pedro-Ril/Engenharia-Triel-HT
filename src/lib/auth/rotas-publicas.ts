@@ -56,6 +56,15 @@ const PREFIXOS_PUBLICOS = [
    */
   "/baixar",
   "/api/baixar",
+  /*
+   * Painel de BI do Estoque de Equipamentos Usados: roda numa TV (via
+   * TV Corporativa ou aberto direto em modo kiosk), sem ninguém
+   * logado — só esse sub-caminho é público, o resto do módulo
+   * continua exigindo login normalmente (ver
+   * src/app/estoque-equipamentos-usados/painel).
+   */
+  "/estoque-equipamentos-usados/painel",
+  "/api/estoque-equipamentos-usados/painel",
 ];
 
 export function ehRotaPublica(pathname: string): boolean {

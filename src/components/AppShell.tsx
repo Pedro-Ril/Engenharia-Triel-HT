@@ -29,7 +29,11 @@ interface PainelPortalProps extends AppShellProps {
  * físico. Sem o parâmetro, a rota funciona normalmente, com o
  * menu lateral como qualquer outra página.
  */
-const ROTAS_COM_TELA_CHEIA = ["/terminal-fabrica", "/chamados/dashboard"];
+const ROTAS_COM_TELA_CHEIA = [
+  "/terminal-fabrica",
+  "/chamados/dashboard",
+  "/estoque-equipamentos-usados/painel",
+];
 
 /*
  * Rotas que escondem o menu lateral/topo do portal só quando quem

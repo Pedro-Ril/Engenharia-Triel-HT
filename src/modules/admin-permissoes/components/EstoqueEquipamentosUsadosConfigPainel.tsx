@@ -48,6 +48,8 @@ export function EstoqueEquipamentosUsadosConfigPainel({
   const [chaveApi, setChaveApi] = useState("");
   const [urlNfEntrada, setUrlNfEntrada] = useState("");
   const [urlNfEntradaTeste, setUrlNfEntradaTeste] = useState("");
+  const [urlNfSaida, setUrlNfSaida] = useState("");
+  const [urlNfSaidaTeste, setUrlNfSaidaTeste] = useState("");
   const [intervaloVerificacaoNf, setIntervaloVerificacaoNf] = useState("");
   const [campoMascaraChave, setCampoMascaraChave] = useState(CHAVE_MASCARA_NUMERO_SEQUENCIAL);
   const [salvando, setSalvando] = useState(false);
@@ -65,6 +67,8 @@ export function EstoqueEquipamentosUsadosConfigPainel({
       setChaveApi(dados?.chaveApi ?? "");
       setUrlNfEntrada(dados?.urlNfEntrada ?? "");
       setUrlNfEntradaTeste(dados?.urlNfEntradaTeste ?? "");
+      setUrlNfSaida(dados?.urlNfSaida ?? "");
+      setUrlNfSaidaTeste(dados?.urlNfSaidaTeste ?? "");
       setIntervaloVerificacaoNf(
         dados?.intervaloVerificacaoNfMinutos ? String(dados.intervaloVerificacaoNfMinutos) : ""
       );
@@ -88,6 +92,8 @@ export function EstoqueEquipamentosUsadosConfigPainel({
         chaveApi: chaveApi.trim() || null,
         urlNfEntrada: urlNfEntrada.trim() || null,
         urlNfEntradaTeste: urlNfEntradaTeste.trim() || null,
+        urlNfSaida: urlNfSaida.trim() || null,
+        urlNfSaidaTeste: urlNfSaidaTeste.trim() || null,
         intervaloVerificacaoNfMinutos: intervaloVerificacaoNf.trim() ? Number(intervaloVerificacaoNf) : null,
         campoMascaraChave,
       });
@@ -238,6 +244,49 @@ export function EstoqueEquipamentosUsadosConfigPainel({
           {config?.ultimaExecucaoNfEm && (
             <p>Última verificação automática: {formatarData(config.ultimaExecucaoNfEm)}</p>
           )}
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            paddingTop: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
+          <div>
+            <strong>NF de saída — empréstimo, consignação e venda</strong>
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
+              Sem job automático — consultado na hora em que o usuário digita/sai do campo &ldquo;Número
+              da NF&rdquo; num desses três modais, preenchendo o destinatário e o valor automaticamente
+              quando encontra.
+            </p>
+          </div>
+
+          <FormGrid columns={2}>
+            <Field
+              label="URL de NF de saída — Produção"
+              htmlFor="urlNfSaida"
+              hint="Ex: http://proserver.trielht.com.br:1000/api/nfsaida"
+            >
+              <Input
+                id="urlNfSaida"
+                value={urlNfSaida}
+                onChange={(event) => setUrlNfSaida(event.target.value)}
+                disabled={salvando}
+              />
+            </Field>
+
+            <Field label="URL de NF de saída — Teste" htmlFor="urlNfSaidaTeste">
+              <Input
+                id="urlNfSaidaTeste"
+                value={urlNfSaidaTeste}
+                onChange={(event) => setUrlNfSaidaTeste(event.target.value)}
+                disabled={salvando}
+              />
+            </Field>
+          </FormGrid>
         </div>
 
         {config?.atualizadoEm && (

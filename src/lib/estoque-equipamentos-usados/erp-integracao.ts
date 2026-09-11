@@ -14,6 +14,8 @@ export interface ConfigErpEstoqueUsados {
   chaveApi: string | null;
   urlNfEntrada: string | null;
   urlNfEntradaTeste: string | null;
+  urlNfSaida: string | null;
+  urlNfSaidaTeste: string | null;
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
   ultimaExecucaoNfEm: string | null;
@@ -33,6 +35,8 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
     chave_api: string | null;
     url_nf_entrada: string | null;
     url_nf_entrada_teste: string | null;
+    url_nf_saida: string | null;
+    url_nf_saida_teste: string | null;
     intervalo_verificacao_nf_minutos: number | null;
     campo_mascara_chave: string;
     ultima_execucao_nf_em: string | null;
@@ -48,6 +52,8 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
       [chave_api],
       [url_nf_entrada],
       [url_nf_entrada_teste],
+      [url_nf_saida],
+      [url_nf_saida_teste],
       [intervalo_verificacao_nf_minutos],
       [campo_mascara_chave],
       CONVERT(VARCHAR(33), [ultima_execucao_nf_em], 126) AS [ultima_execucao_nf_em],
@@ -68,6 +74,8 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
     chaveApi: row?.chave_api ?? null,
     urlNfEntrada: row?.url_nf_entrada ?? null,
     urlNfEntradaTeste: row?.url_nf_entrada_teste ?? null,
+    urlNfSaida: row?.url_nf_saida ?? null,
+    urlNfSaidaTeste: row?.url_nf_saida_teste ?? null,
     intervaloVerificacaoNfMinutos: row?.intervalo_verificacao_nf_minutos ?? 5,
     campoMascaraChave: row?.campo_mascara_chave || CHAVE_MASCARA_NUMERO_SEQUENCIAL,
     ultimaExecucaoNfEm: row?.ultima_execucao_nf_em ?? null,
@@ -85,6 +93,8 @@ export async function salvarConfigErpEstoqueUsados(params: {
   chaveApi: string | null;
   urlNfEntrada: string | null;
   urlNfEntradaTeste: string | null;
+  urlNfSaida: string | null;
+  urlNfSaidaTeste: string | null;
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
   atualizadoPor: string;
@@ -100,6 +110,8 @@ export async function salvarConfigErpEstoqueUsados(params: {
   request.input("chaveApi", sql.NVarChar(200), params.chaveApi);
   request.input("urlNfEntrada", sql.NVarChar(300), params.urlNfEntrada);
   request.input("urlNfEntradaTeste", sql.NVarChar(300), params.urlNfEntradaTeste);
+  request.input("urlNfSaida", sql.NVarChar(300), params.urlNfSaida);
+  request.input("urlNfSaidaTeste", sql.NVarChar(300), params.urlNfSaidaTeste);
   request.input("intervaloVerificacaoNfMinutos", sql.Int, params.intervaloVerificacaoNfMinutos ?? 5);
   request.input("campoMascaraChave", sql.NVarChar(50), params.campoMascaraChave);
   request.input("atualizadoPor", sql.NVarChar(150), params.atualizadoPor);
@@ -118,13 +130,15 @@ export async function salvarConfigErpEstoqueUsados(params: {
         [chave_api] = @chaveApi,
         [url_nf_entrada] = @urlNfEntrada,
         [url_nf_entrada_teste] = @urlNfEntradaTeste,
+        [url_nf_saida] = @urlNfSaida,
+        [url_nf_saida_teste] = @urlNfSaidaTeste,
         [intervalo_verificacao_nf_minutos] = @intervaloVerificacaoNfMinutos,
         [campo_mascara_chave] = @campoMascaraChave,
         [atualizado_em] = SYSDATETIME(),
         [atualizado_por] = @atualizadoPor
     WHEN NOT MATCHED THEN
-      INSERT ([id], [url_validar_item], [url_validar_item_teste], [url_clientes], [url_clientes_teste], [usar_ambiente_teste], [chave_api], [url_nf_entrada], [url_nf_entrada_teste], [intervalo_verificacao_nf_minutos], [campo_mascara_chave], [atualizado_em], [atualizado_por])
-      VALUES (1, @urlValidarItem, @urlValidarItemTeste, @urlClientes, @urlClientesTeste, @usarAmbienteTeste, @chaveApi, @urlNfEntrada, @urlNfEntradaTeste, @intervaloVerificacaoNfMinutos, @campoMascaraChave, SYSDATETIME(), @atualizadoPor);
+      INSERT ([id], [url_validar_item], [url_validar_item_teste], [url_clientes], [url_clientes_teste], [usar_ambiente_teste], [chave_api], [url_nf_entrada], [url_nf_entrada_teste], [url_nf_saida], [url_nf_saida_teste], [intervalo_verificacao_nf_minutos], [campo_mascara_chave], [atualizado_em], [atualizado_por])
+      VALUES (1, @urlValidarItem, @urlValidarItemTeste, @urlClientes, @urlClientesTeste, @usarAmbienteTeste, @chaveApi, @urlNfEntrada, @urlNfEntradaTeste, @urlNfSaida, @urlNfSaidaTeste, @intervaloVerificacaoNfMinutos, @campoMascaraChave, SYSDATETIME(), @atualizadoPor);
   `);
 
   return buscarConfigErpEstoqueUsados();
@@ -306,6 +320,7 @@ export interface NfEntradaErp {
 
 interface RespostaNfEntradaErp {
   success: boolean;
+  message?: string;
   data?: Array<{
     numeroNf: number | string;
     dataEntrada: string;
@@ -337,6 +352,9 @@ export interface DetalhesChamadaNfErp {
   requestUrl?: string;
   responseStatus?: number;
   responseBody?: string;
+  /* Mensagem do próprio JSON de resposta do ERP (campo "message"), quando
+     a NF ainda não foi encontrada — mais útil que um texto genérico fixo. */
+  mensagemNaoEncontrado?: string;
 }
 
 /*
@@ -394,21 +412,43 @@ export async function consultarNfEntradaNoErp(
     const textoResposta = await resposta.text();
     if (detalhes) detalhes.responseBody = textoResposta;
 
-    if (!resposta.ok) {
-      throw new Error(`O serviço de NF de entrada do ERP respondeu com erro (${resposta.status}).`);
-    }
-
-    let json: RespostaNfEntradaErp;
+    /*
+     * Lê o JSON antes de decidir se a resposta é erro — o Focco sinaliza
+     * "nenhuma NF encontrada ainda" com HTTP 404 (não é falha de verdade,
+     * é o mesmo significado de "success: false"/"data" vazio num 200), e
+     * a mensagem de diagnóstico (campo "message") vem no corpo mesmo
+     * quando o status não é 2xx.
+     */
+    let json: RespostaNfEntradaErp | null = null;
     try {
       json = JSON.parse(textoResposta) as RespostaNfEntradaErp;
     } catch {
+      json = null;
+    }
+
+    if (resposta.status === 404) {
+      sucesso = true;
+      if (detalhes) detalhes.mensagemNaoEncontrado = json?.message;
+      return null;
+    }
+
+    if (!resposta.ok) {
+      throw new Error(
+        json?.message || `O serviço de NF de entrada do ERP respondeu com erro (${resposta.status}).`
+      );
+    }
+
+    if (!json) {
       throw new Error("O serviço de NF de entrada do ERP devolveu um corpo que não é JSON válido.");
     }
 
     sucesso = true;
 
     const primeiro = json.success ? json.data?.[0] : undefined;
-    if (!primeiro) return null;
+    if (!primeiro) {
+      if (detalhes) detalhes.mensagemNaoEncontrado = json.message;
+      return null;
+    }
 
     const dataEntradaIso = converterDataBrParaIso(String(primeiro.dataEntrada ?? ""));
 
@@ -424,6 +464,119 @@ export async function consultarNfEntradaNoErp(
   } finally {
     await registrarChamadaExternaSemFalhar({
       servico: "erp_estoque_usados_nf_entrada",
+      origem: "uso_real",
+      sucesso,
+      duracaoMs: performance.now() - inicio,
+      mensagemErro,
+    });
+  }
+}
+
+export interface NfSaidaErp {
+  codigoFornecedor: string;
+  valorTotal: number;
+  dataEmissaoIso: string | null;
+}
+
+interface RespostaNfSaidaErp {
+  success: boolean;
+  message?: string;
+  data?: Array<{
+    emprId: number;
+    numeroNf: number | string;
+    fornecedor?: { codigo: number | string } | null;
+    valorTotal: number;
+    dataEmissao?: string;
+  }>;
+}
+
+/*
+ * Consulta o endpoint de NF de SAÍDA do Focco (empréstimo, consignação
+ * ou venda) — diferente do de entrada: aqui não tem job automático, é
+ * chamado sob demanda quando o usuário digita/sai do campo "Número da
+ * NF" num dos modais de movimentação (ver EquipamentoDetalhePage).
+ */
+export async function consultarNfSaidaNoErp(
+  params: { codEmpresa: string; numeroNf: string; idItem: string | null },
+  detalhes?: DetalhesChamadaNfErp
+): Promise<NfSaidaErp | null> {
+  const config = await buscarConfigErpEstoqueUsados();
+  const url = config.usarAmbienteTeste ? config.urlNfSaidaTeste : config.urlNfSaida;
+
+  if (!url) {
+    const rotulo = config.usarAmbienteTeste ? "de teste" : "de produção";
+    throw new ValidationError(
+      `Configure o endpoint ${rotulo} de consulta de NF de saída em Administração → Equipamentos Usados → Integração ERP.`
+    );
+  }
+
+  const inicio = performance.now();
+  let sucesso = false;
+  let mensagemErro: string | null = null;
+
+  try {
+    const urlComParametros = new URL(url);
+    urlComParametros.searchParams.set("empr_id", params.codEmpresa);
+    urlComParametros.searchParams.set("num_nf", params.numeroNf);
+    if (params.idItem) urlComParametros.searchParams.set("id", params.idItem);
+
+    if (detalhes) detalhes.requestUrl = urlComParametros.toString();
+
+    const resposta = await fetch(urlComParametros.toString(), {
+      headers: {
+        Accept: "application/json",
+        ...(config.chaveApi ? { Authorization: `Bearer ${config.chaveApi}` } : {}),
+      },
+      cache: "no-store",
+    });
+
+    if (detalhes) detalhes.responseStatus = resposta.status;
+
+    const textoResposta = await resposta.text();
+    if (detalhes) detalhes.responseBody = textoResposta;
+
+    let json: RespostaNfSaidaErp | null = null;
+    try {
+      json = JSON.parse(textoResposta) as RespostaNfSaidaErp;
+    } catch {
+      json = null;
+    }
+
+    if (resposta.status === 404) {
+      sucesso = true;
+      if (detalhes) detalhes.mensagemNaoEncontrado = json?.message;
+      return null;
+    }
+
+    if (!resposta.ok) {
+      throw new Error(
+        json?.message || `O serviço de NF de saída do ERP respondeu com erro (${resposta.status}).`
+      );
+    }
+
+    if (!json) {
+      throw new Error("O serviço de NF de saída do ERP devolveu um corpo que não é JSON válido.");
+    }
+
+    sucesso = true;
+
+    const primeiro = json.success ? json.data?.[0] : undefined;
+    if (!primeiro) {
+      if (detalhes) detalhes.mensagemNaoEncontrado = json.message;
+      return null;
+    }
+
+    return {
+      codigoFornecedor: primeiro.fornecedor?.codigo !== undefined ? String(primeiro.fornecedor.codigo) : "",
+      valorTotal: Number(primeiro.valorTotal) || 0,
+      dataEmissaoIso: primeiro.dataEmissao ? converterDataBrParaIso(String(primeiro.dataEmissao)) : null,
+    };
+  } catch (error) {
+    mensagemErro = error instanceof Error ? error.message : "Erro desconhecido.";
+    throw error;
+  } finally {
+    await registrarChamadaExternaSemFalhar({
+      servico: "erp_estoque_usados_nf_saida",
       origem: "uso_real",
       sucesso,
       duracaoMs: performance.now() - inicio,

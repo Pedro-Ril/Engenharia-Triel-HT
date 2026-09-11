@@ -53,6 +53,8 @@ interface ConfigBody {
   chaveApi?: unknown;
   urlNfEntrada?: unknown;
   urlNfEntradaTeste?: unknown;
+  urlNfSaida?: unknown;
+  urlNfSaidaTeste?: unknown;
   intervaloVerificacaoNfMinutos?: unknown;
   campoMascaraChave?: unknown;
 }
@@ -105,6 +107,14 @@ async function handlePATCH(request: Request) {
       optionalText(body.urlNfEntradaTeste, "URL de NF de entrada (teste)", 300),
       "A URL de NF de entrada (teste)"
     );
+    const urlNfSaida = validarUrl(
+      optionalText(body.urlNfSaida, "URL de NF de saída", 300),
+      "A URL de NF de saída"
+    );
+    const urlNfSaidaTeste = validarUrl(
+      optionalText(body.urlNfSaidaTeste, "URL de NF de saída (teste)", 300),
+      "A URL de NF de saída (teste)"
+    );
     const intervaloVerificacaoNfMinutos =
       optionalInteger(body.intervaloVerificacaoNfMinutos, "intervalo de verificação de NF", 0) || null;
 
@@ -130,6 +140,8 @@ async function handlePATCH(request: Request) {
       chaveApi,
       urlNfEntrada,
       urlNfEntradaTeste,
+      urlNfSaida,
+      urlNfSaidaTeste,
       intervaloVerificacaoNfMinutos,
       campoMascaraChave: campoMascaraChave || CHAVE_MASCARA_NUMERO_SEQUENCIAL,
       atualizadoPor: acesso.usuario.samAccountName,

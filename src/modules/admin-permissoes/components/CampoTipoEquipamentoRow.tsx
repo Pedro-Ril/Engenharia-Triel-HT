@@ -70,6 +70,7 @@ export function CampoTipoEquipamentoRow({
           {campo.ehSistema && <Badge variant="info">Sistema</Badge>}
           {campo.vemDeIntegracao && <Badge variant="primary">Integração</Badge>}
           {campo.geraPendencia && <Badge variant="neutral">Vira status</Badge>}
+          {campo.geraPendencia && campo.travaMovimentacao && <Badge variant="danger">Trava movimentações</Badge>}
         </Stack>
       </TableCell>
 

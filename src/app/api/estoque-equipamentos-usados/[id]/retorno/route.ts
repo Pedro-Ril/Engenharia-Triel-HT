@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { isObject, optionalText, requiredText } from "@/lib/auth/validation";
+import { optionalText, requiredText } from "@/lib/auth/validation";
 import { registrarRetorno } from "@/lib/estoque-equipamentos-usados/estoque-equipamentos-usados";
+import {
+  parseAnexosMovimentacaoFormData,
+  salvarAnexosMovimentacao,
+} from "@/lib/estoque-equipamentos-usados/movimentacoes-anexos";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -26,14 +30,21 @@ async function handlePOST(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  try {
-    const parsedBody: unknown = await request.json();
-    if (!isObject(parsedBody)) {
-      throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");
-    }
+  let formData: FormData;
 
-    const numeroNf = requiredText(parsedBody.numeroNf, "número da NF", 30);
-    const observacoes = optionalText(parsedBody.observacoes, "observações", 1000);
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json(
+      { ok: false, message: "O corpo da requisição deve ser multipart/form-data." },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const numeroNf = requiredText(formData.get("numeroNf"), "número da NF", 30);
+    const observacoes = optionalText(formData.get("observacoes"), "observações", 1000);
+    const anexos = await parseAnexosMovimentacaoFormData(formData);
 
     const equipamento = await registrarRetorno({
       equipamentoId: id,
@@ -43,6 +54,11 @@ async function handlePOST(request: Request, context: RouteContext) {
       criadoPorUsuarioId: usuario.id,
       criadoPorNome: usuario.nomeExibicao,
     });
+
+    const movimentacao = equipamento.movimentacoes[equipamento.movimentacoes.length - 1];
+    if (movimentacao) {
+      await salvarAnexosMovimentacao(movimentacao.id, anexos, usuario.id, usuario.nomeExibicao);
+    }
 
     return NextResponse.json({ ok: true, message: "Retorno ao estoque registrado.", data: equipamento });
   } catch (error) {

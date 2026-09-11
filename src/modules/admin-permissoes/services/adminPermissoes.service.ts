@@ -713,6 +713,8 @@ export async function salvarConfigErpEstoqueUsados(dados: {
   chaveApi: string | null;
   urlNfEntrada: string | null;
   urlNfEntradaTeste: string | null;
+  urlNfSaida: string | null;
+  urlNfSaidaTeste: string | null;
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
 }): Promise<ApiEnvelope<ConfigErpEstoqueUsados>> {

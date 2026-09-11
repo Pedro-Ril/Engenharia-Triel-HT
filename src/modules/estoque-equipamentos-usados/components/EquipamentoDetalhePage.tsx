@@ -23,6 +23,7 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { DateInput } from "@/components/ui/DateInput";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FileUpload } from "@/components/ui/FileUpload";
@@ -45,7 +46,7 @@ import { Textarea } from "@/components/ui/Textarea";
 
 import {
   atualizarDadosEquipamento,
-  excluirEvidencia,
+  buscarNfSaida,
   listarTentativasNfEntrada,
   registrarBaixa,
   registrarConsignacao,
@@ -64,6 +65,7 @@ import type {
   StatusEquipamento,
   TentativaIntegracaoNf,
   TipoAcaoMovimentacao,
+  TipoNfIntegracao,
 } from "../types/estoque.types";
 import { CampoDinamicoInput } from "./CampoDinamicoInput";
 import { ClienteAutocomplete } from "./ClienteAutocomplete";
@@ -122,6 +124,13 @@ const STATUS_TENTATIVA_BADGE: Record<TentativaIntegracaoNf["status"], "success" 
   sucesso: "success",
   nao_encontrado: "warning",
   erro: "danger",
+};
+
+const TIPO_NF_LABEL: Record<TipoNfIntegracao, string> = {
+  entrada: "Entrada",
+  saida_emprestimo: "Saída — Empréstimo",
+  saida_consignacao: "Saída — Consignação",
+  saida_venda: "Saída — Venda",
 };
 
 const OPCOES_MOTIVO_BAIXA: { value: MotivoBaixa; label: string }[] = [
@@ -255,11 +264,23 @@ export function EquipamentoDetalhePage({
   const [numeroNf, setNumeroNf] = useState("");
   const [destinatarioNome, setDestinatarioNome] = useState("");
   const [motivoBaixa, setMotivoBaixa] = useState<MotivoBaixa>("venda");
+  const [valorMovimento, setValorMovimento] = useState("");
+  const [dataEmissaoNf, setDataEmissaoNf] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [anexosAcao, setAnexosAcao] = useState<File[]>([]);
   const [executando, setExecutando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [excluindoEvidenciaId, setExcluindoEvidenciaId] = useState<string | null>(null);
+  /*
+   * Empréstimo/consignação/baixa (por venda) dependem de uma NF de
+   * saída — consultada sob demanda ao sair do campo "Número da NF" (não
+   * tem job automático como a de entrada), preenchendo destinatário,
+   * valor e data de emissão sozinha quando encontra.
+   */
+  const [buscandoNfSaida, setBuscandoNfSaida] = useState(false);
+  const [mensagemNfSaida, setMensagemNfSaida] = useState<{
+    tipo: "success" | "warning" | "danger";
+    texto: string;
+  } | null>(null);
 
   const [editandoDados, setEditandoDados] = useState(false);
   const [nomeClienteEdit, setNomeClienteEdit] = useState(equipamento.nomeCliente ?? "");
@@ -269,6 +290,13 @@ export function EquipamentoDetalhePage({
     equipamento.camposValores ?? {}
   );
   const [evidenciasNovas, setEvidenciasNovas] = useState<Record<string, File[]>>({});
+  /*
+   * Excluir evidência só é permitido daqui de dentro (Editar dados
+   * técnicos) — marca o id, mas a exclusão de verdade só acontece junto
+   * com o "Salvar", passando pelo mesmo motivo obrigatório e ficando no
+   * histórico de alterações (ver handleSalvarDados/rota PATCH .../dados).
+   */
+  const [evidenciasParaExcluir, setEvidenciasParaExcluir] = useState<Set<string>>(new Set());
   const [motivoEdicaoDados, setMotivoEdicaoDados] = useState("");
   const [salvandoDados, setSalvandoDados] = useState(false);
   const [erroDados, setErroDados] = useState<string | null>(null);
@@ -342,14 +370,75 @@ export function EquipamentoDetalhePage({
     return mapa;
   }, [anexosMovimentacoes]);
 
+  /*
+   * Destinatário/Valor/Data de emissão dependem da NF de saída no ERP e
+   * não podem ser digitados/escolhidos livremente — só liberam pra
+   * edição manual se a última consulta deu erro ou não encontrou a NF
+   * (aí não há outro jeito de preencher). Numa baixa que não é por
+   * venda não existe consulta nenhuma, então os campos continuam
+   * livres como sempre.
+   */
+  const nfSaidaAplicavelNesteModal =
+    modalAberto === "emprestimo" ||
+    modalAberto === "consignacao" ||
+    (modalAberto === "baixa" && motivoBaixa === "venda");
+  const camposNfSaidaEditaveisManualmente =
+    !nfSaidaAplicavelNesteModal || (mensagemNfSaida !== null && mensagemNfSaida.tipo !== "success");
+
   function fecharModal() {
     setModalAberto(null);
     setNumeroNf("");
     setDestinatarioNome("");
     setMotivoBaixa("venda");
+    setValorMovimento("");
+    setDataEmissaoNf("");
     setObservacoes("");
     setAnexosAcao([]);
     setErro(null);
+    setMensagemNfSaida(null);
+  }
+
+  async function handleBuscarNfSaida() {
+    if (!numeroNf.trim()) return;
+
+    const tipoNf: TipoNfIntegracao | null =
+      modalAberto === "emprestimo"
+        ? "saida_emprestimo"
+        : modalAberto === "consignacao"
+          ? "saida_consignacao"
+          : modalAberto === "baixa" && motivoBaixa === "venda"
+            ? "saida_venda"
+            : null;
+
+    if (!tipoNf) return;
+
+    setBuscandoNfSaida(true);
+    setMensagemNfSaida(null);
+
+    try {
+      const resultado = await buscarNfSaida(equipamento.id, { numeroNf: numeroNf.trim(), tipoNf });
+
+      if (resultado.ok && resultado.data) {
+        const { encontrado, destinatarioNome: destinatarioEncontrado, valor, dataEmissaoIso, mensagem } =
+          resultado.data;
+
+        if (encontrado) {
+          if (destinatarioEncontrado) setDestinatarioNome(destinatarioEncontrado);
+          if (valor !== null) setValorMovimento(String(valor));
+          if (dataEmissaoIso) setDataEmissaoNf(dataEmissaoIso);
+          setMensagemNfSaida({ tipo: "success", texto: mensagem });
+        } else {
+          setMensagemNfSaida({ tipo: "warning", texto: mensagem });
+        }
+      } else {
+        setMensagemNfSaida({
+          tipo: "danger",
+          texto: resultado.message ?? "Não foi possível consultar a NF de saída.",
+        });
+      }
+    } finally {
+      setBuscandoNfSaida(false);
+    }
   }
 
   async function handleConfirmarAcao() {
@@ -357,11 +446,16 @@ export function EquipamentoDetalhePage({
     setExecutando(true);
 
     try {
+      const valorNumerico = valorMovimento.trim() ? Number(valorMovimento) : null;
+      const dataEmissaoNfFinal = dataEmissaoNf.trim() ? dataEmissaoNf : null;
+
       const resultado =
         modalAberto === "emprestimo"
           ? await registrarEmprestimo(equipamento.id, {
               numeroNf,
               destinatarioNome,
+              valor: valorNumerico,
+              dataEmissaoNf: dataEmissaoNfFinal,
               observacoes: observacoes || null,
               anexos: anexosAcao,
             })
@@ -369,16 +463,24 @@ export function EquipamentoDetalhePage({
             ? await registrarConsignacao(equipamento.id, {
                 numeroNf,
                 destinatarioNome,
+                valor: valorNumerico,
+                dataEmissaoNf: dataEmissaoNfFinal,
                 observacoes: observacoes || null,
                 anexos: anexosAcao,
               })
             : modalAberto === "retorno"
-              ? await registrarRetorno(equipamento.id, { numeroNf, observacoes: observacoes || null })
+              ? await registrarRetorno(equipamento.id, {
+                  numeroNf,
+                  observacoes: observacoes || null,
+                  anexos: anexosAcao,
+                })
               : modalAberto === "baixa"
                 ? await registrarBaixa(equipamento.id, {
                     numeroNf,
                     motivoBaixa,
                     destinatarioNome: destinatarioNome || null,
+                    valor: valorNumerico,
+                    dataEmissaoNf: dataEmissaoNfFinal,
                     observacoes: observacoes || null,
                     anexos: anexosAcao,
                   })
@@ -428,15 +530,8 @@ export function EquipamentoDetalhePage({
     }
   }
 
-  async function handleExcluirEvidencia(id: string) {
-    setExcluindoEvidenciaId(id);
-
-    try {
-      await excluirEvidencia(id);
-      router.refresh();
-    } finally {
-      setExcluindoEvidenciaId(null);
-    }
+  function marcarEvidenciaParaExcluir(id: string) {
+    setEvidenciasParaExcluir((atual) => new Set(atual).add(id));
   }
 
   function abrirEdicaoDados() {
@@ -445,6 +540,7 @@ export function EquipamentoDetalhePage({
     setValorEdit(equipamento.valor !== null ? String(equipamento.valor) : "");
     setValoresCamposEdit(equipamento.camposValores ?? {});
     setEvidenciasNovas({});
+    setEvidenciasParaExcluir(new Set());
     setMotivoEdicaoDados("");
     setErroDados(null);
     setEditandoDados(true);
@@ -461,6 +557,7 @@ export function EquipamentoDetalhePage({
       formData.set("valor", valorEdit);
       formData.set("camposValores", JSON.stringify(valoresCamposEdit));
       formData.set("motivo", motivoEdicaoDados);
+      formData.set("evidenciasExcluidas", JSON.stringify(Array.from(evidenciasParaExcluir)));
 
       for (const [blocoId, arquivos] of Object.entries(evidenciasNovas)) {
         for (const arquivo of arquivos) {
@@ -481,10 +578,19 @@ export function EquipamentoDetalhePage({
     }
   }
 
-  /* Empréstimo/consignação exigem NF de entrada vinculada — mesma regra do backend (registrarMovimentacao). */
-  const temNfEntrada = Boolean(equipamento.numeroNfEntrada);
-  const podeEmprestar = equipamento.status === "em_estoque" && temNfEntrada;
-  const podeConsignar = equipamento.status === "em_estoque" && temNfEntrada;
+  /*
+   * Empréstimo/consignação exigem a NF de entrada já CONFIRMADA pela
+   * integração com o ERP (não basta o número estar digitado) — mesma
+   * regra do backend (registrarMovimentacao). "Confirmada" aqui é o
+   * mesmo critério do card "Dados de Integração" logo abaixo: os 3
+   * campos que vêm de lá (código do item, ID configurado, data de
+   * entrada) precisam estar preenchidos, não "Aguardando integração".
+   */
+  const nfEntradaIntegradaComErp = Boolean(
+    equipamento.numeroNfEntrada && equipamento.erpCodigoItem && equipamento.erpIdItem && equipamento.erpDataEntrada
+  );
+  const podeEmprestar = equipamento.status === "em_estoque" && nfEntradaIntegradaComErp;
+  const podeConsignar = equipamento.status === "em_estoque" && nfEntradaIntegradaComErp;
   const podeRetornar = equipamento.status === "emprestado" || equipamento.status === "consignado";
   const podeBaixar = equipamento.status === "em_estoque";
 
@@ -497,9 +603,10 @@ export function EquipamentoDetalhePage({
   const cardAcoes = (
     <Card title="Ações">
       <Stack gap={12}>
-        {equipamento.status === "em_estoque" && !temNfEntrada && (
+        {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && (
           <Alert variant="warning">
-            Empréstimo e consignação ficam bloqueados até este equipamento ter uma NF de entrada vinculada.
+            Empréstimo e consignação ficam bloqueados até a NF de entrada deste equipamento ser confirmada pela
+            integração com o ERP (ver &quot;Dados de Integração&quot; abaixo).
           </Alert>
         )}
 
@@ -512,10 +619,12 @@ export function EquipamentoDetalhePage({
             Relatório do equipamento
           </Button>
 
-          <Button variant="secondary" onClick={abrirEdicaoDados}>
-            <Pencil size={16} />
-            Editar dados técnicos
-          </Button>
+          {equipamento.status !== "baixado" && (
+            <Button variant="secondary" onClick={abrirEdicaoDados}>
+              <Pencil size={16} />
+              Editar dados técnicos
+            </Button>
+          )}
 
           {historicoDados.length > 0 && (
             <Button variant="secondary" onClick={() => setHistoricoAberto(true)}>
@@ -620,11 +729,7 @@ export function EquipamentoDetalhePage({
           {blocoFixo && (
             <div>
               <p className={styles.infoLabel}>Evidências — {blocoFixo.nome}</p>
-              <EvidenciasGaleria
-                evidencias={evidenciasPorBloco.get(blocoFixo.id) ?? []}
-                onExcluir={handleExcluirEvidencia}
-                excluindo={excluindoEvidenciaId}
-              />
+              <EvidenciasGaleria evidencias={evidenciasPorBloco.get(blocoFixo.id) ?? []} />
             </div>
           )}
         </Stack>
@@ -671,11 +776,7 @@ export function EquipamentoDetalhePage({
 
               <div>
                 <p className={styles.infoLabel}>Evidências — {bloco.nome}</p>
-                <EvidenciasGaleria
-                  evidencias={evidenciasBloco}
-                  onExcluir={handleExcluirEvidencia}
-                  excluindo={excluindoEvidenciaId}
-                />
+                <EvidenciasGaleria evidencias={evidenciasBloco} />
               </div>
             </Stack>
           </Card>
@@ -689,23 +790,25 @@ export function EquipamentoDetalhePage({
         actions={
           <Button
             variant="secondary"
-            onClick={() => exportarPdfEstratoEquipamento(equipamento, anexosPorMovimentacao)}
+            onClick={() => exportarPdfEstratoEquipamento(equipamento, anexosPorMovimentacao, historicoDados)}
           >
             <Download size={16} />
             Exportar extrato
           </Button>
         }
       >
-        <Table minWidth={860}>
+        <Table minWidth={1540}>
           <TableHead>
             <TableRow>
-              <TableHeaderCell>Ação</TableHeaderCell>
-              <TableHeaderCell>NF</TableHeaderCell>
-              <TableHeaderCell>Destinatário</TableHeaderCell>
-              <TableHeaderCell>Status resultante</TableHeaderCell>
-              <TableHeaderCell>Anexos</TableHeaderCell>
-              <TableHeaderCell>Responsável</TableHeaderCell>
-              <TableHeaderCell>Data</TableHeaderCell>
+              <TableHeaderCell style={{ width: 110 }}>Ação</TableHeaderCell>
+              <TableHeaderCell style={{ width: 110 }}>NF</TableHeaderCell>
+              <TableHeaderCell style={{ width: 130 }}>Valor</TableHeaderCell>
+              <TableHeaderCell style={{ width: 110 }}>Emissão NF</TableHeaderCell>
+              <TableHeaderCell style={{ width: 260 }}>Destinatário</TableHeaderCell>
+              <TableHeaderCell style={{ width: 140 }}>Status resultante</TableHeaderCell>
+              <TableHeaderCell style={{ width: 220 }}>Anexos</TableHeaderCell>
+              <TableHeaderCell style={{ width: 220 }}>Responsável</TableHeaderCell>
+              <TableHeaderCell style={{ width: 100 }}>Data</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -716,6 +819,10 @@ export function EquipamentoDetalhePage({
                 <TableRow key={movimentacao.id}>
                   <TableCell>{ACAO_LABELS[movimentacao.tipoAcao]}</TableCell>
                   <TableCell>{movimentacao.numeroNf ?? "-"}</TableCell>
+                  <TableCell>{formatarMoeda(movimentacao.valor)}</TableCell>
+                  <TableCell>
+                    {movimentacao.dataEmissaoNf ? formatarData(movimentacao.dataEmissaoNf) : "-"}
+                  </TableCell>
                   <TableCell>{movimentacao.destinatarioNome ?? "-"}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_BADGE[movimentacao.statusResultante]}>
@@ -771,11 +878,43 @@ export function EquipamentoDetalhePage({
         }
       >
         <Stack gap={16}>
-          <Field label="Número da NF">
-            <Input value={numeroNf} onChange={(event) => setNumeroNf(event.target.value)} />
+          <Field
+            label="Número da NF"
+            hint="Ao sair do campo, o sistema busca a NF de saída no ERP e preenche destinatário, valor e data de emissão"
+          >
+            <Input
+              value={numeroNf}
+              onChange={(event) => setNumeroNf(event.target.value)}
+              onBlur={handleBuscarNfSaida}
+            />
           </Field>
-          <Field label="Destinatário">
-            <ClienteAutocomplete value={destinatarioNome} onChange={setDestinatarioNome} />
+          {buscandoNfSaida && <Loader label="Consultando NF de saída no ERP..." />}
+          {mensagemNfSaida && !buscandoNfSaida && (
+            <Alert variant={mensagemNfSaida.tipo}>{mensagemNfSaida.texto}</Alert>
+          )}
+          <Field
+            label="Destinatário"
+            hint={camposNfSaidaEditaveisManualmente ? undefined : "Preenchido automaticamente pela NF de saída"}
+          >
+            <ClienteAutocomplete
+              value={destinatarioNome}
+              onChange={setDestinatarioNome}
+              disabled={!camposNfSaidaEditaveisManualmente}
+            />
+          </Field>
+          <Field label="Valor">
+            <CurrencyInput
+              value={valorMovimento}
+              onValueChange={setValorMovimento}
+              disabled={!camposNfSaidaEditaveisManualmente}
+            />
+          </Field>
+          <Field label="Data de emissão da NF">
+            <DateInput
+              value={dataEmissaoNf}
+              onValueChange={setDataEmissaoNf}
+              disabled={!camposNfSaidaEditaveisManualmente}
+            />
           </Field>
           <Field label="Observações">
             <Textarea rows={3} value={observacoes} onChange={(event) => setObservacoes(event.target.value)} />
@@ -815,6 +954,15 @@ export function EquipamentoDetalhePage({
           <Field label="Observações">
             <Textarea rows={3} value={observacoes} onChange={(event) => setObservacoes(event.target.value)} />
           </Field>
+          <Field label="Anexos" hint="Comprovante de devolução, etc. — imagens, PDF, Word ou Excel">
+            <FileUpload
+              multiple
+              accept={ACEITA_EVIDENCIAS}
+              maxSizeMB={8}
+              files={anexosAcao}
+              onFilesChange={setAnexosAcao}
+            />
+          </Field>
           {erro && <Alert variant="danger">{erro}</Alert>}
         </Stack>
       </Modal>
@@ -844,8 +992,19 @@ export function EquipamentoDetalhePage({
             Esta ação é definitiva — depois da baixa, nenhuma outra movimentação é permitida para este
             equipamento.
           </Alert>
-          <Field label="Número da NF">
-            <Input value={numeroNf} onChange={(event) => setNumeroNf(event.target.value)} />
+          <Field
+            label="Número da NF"
+            hint={
+              motivoBaixa === "venda"
+                ? "Ao sair do campo, o sistema busca a NF de saída no ERP e preenche destinatário, valor e data de emissão"
+                : undefined
+            }
+          >
+            <Input
+              value={numeroNf}
+              onChange={(event) => setNumeroNf(event.target.value)}
+              onBlur={handleBuscarNfSaida}
+            />
           </Field>
           <Field label="Motivo">
             <Dropdown
@@ -854,8 +1013,37 @@ export function EquipamentoDetalhePage({
               onValueChange={(valor) => setMotivoBaixa(valor as MotivoBaixa)}
             />
           </Field>
-          <Field label="Destinatário" hint="Comprador, se aplicável">
-            <ClienteAutocomplete value={destinatarioNome} onChange={setDestinatarioNome} />
+          {buscandoNfSaida && <Loader label="Consultando NF de saída no ERP..." />}
+          {mensagemNfSaida && !buscandoNfSaida && (
+            <Alert variant={mensagemNfSaida.tipo}>{mensagemNfSaida.texto}</Alert>
+          )}
+          <Field
+            label="Destinatário"
+            hint={
+              camposNfSaidaEditaveisManualmente
+                ? "Comprador, se aplicável"
+                : "Preenchido automaticamente pela NF de saída"
+            }
+          >
+            <ClienteAutocomplete
+              value={destinatarioNome}
+              onChange={setDestinatarioNome}
+              disabled={!camposNfSaidaEditaveisManualmente}
+            />
+          </Field>
+          <Field label="Valor">
+            <CurrencyInput
+              value={valorMovimento}
+              onValueChange={setValorMovimento}
+              disabled={!camposNfSaidaEditaveisManualmente}
+            />
+          </Field>
+          <Field label="Data de emissão da NF">
+            <DateInput
+              value={dataEmissaoNf}
+              onValueChange={setDataEmissaoNf}
+              disabled={!camposNfSaidaEditaveisManualmente}
+            />
           </Field>
           <Field label="Observações">
             <Textarea rows={3} value={observacoes} onChange={(event) => setObservacoes(event.target.value)} />
@@ -916,8 +1104,8 @@ export function EquipamentoDetalhePage({
 
       <Modal
         open={tentativasNfAberto}
-        title="Tentativas de integração — NF de entrada"
-        description="Consultas automáticas ao ERP feitas a cada intervalo configurado, buscando a NF de entrada por empresa, cliente e número do carro."
+        title="Tentativas de integração — Notas Fiscais"
+        description="NF de entrada: consultas automáticas ao ERP a cada intervalo configurado. NF de saída (empréstimo, consignação, venda): consultada ao digitar o número no respectivo modal."
         size="large"
         onClose={() => setTentativasNfAberto(false)}
         footer={
@@ -940,9 +1128,10 @@ export function EquipamentoDetalhePage({
           ) : tentativasNf.length === 0 ? (
             <p>Nenhuma tentativa de integração registrada ainda para este equipamento.</p>
           ) : (
-            <Table minWidth={700}>
+            <Table minWidth={850}>
               <TableHead>
                 <TableRow>
+                  <TableHeaderCell>Tipo</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
                   <TableHeaderCell>Mensagem</TableHeaderCell>
                   <TableHeaderCell>Parâmetros da consulta</TableHeaderCell>
@@ -952,6 +1141,7 @@ export function EquipamentoDetalhePage({
               <TableBody>
                 {tentativasNf.map((tentativa) => (
                   <TableRow key={tentativa.id}>
+                    <TableCell>{TIPO_NF_LABEL[tentativa.tipoNf]}</TableCell>
                     <TableCell>
                       <button
                         type="button"
@@ -1084,6 +1274,18 @@ export function EquipamentoDetalhePage({
             </FormGrid>
           )}
 
+          {blocoFixo && (evidenciasPorBloco.get(blocoFixo.id) ?? []).length > 0 && (
+            <div>
+              <p className={styles.infoLabel}>Evidências já anexadas — {blocoFixo.nome}</p>
+              <EvidenciasGaleria
+                evidencias={(evidenciasPorBloco.get(blocoFixo.id) ?? []).filter(
+                  (evidencia) => !evidenciasParaExcluir.has(evidencia.id)
+                )}
+                onExcluir={marcarEvidenciaParaExcluir}
+              />
+            </div>
+          )}
+
           {blocoFixo && (
             <Field label={`Adicionar evidências — ${blocoFixo.nome}`} hint="Imagens, PDF, Word ou Excel">
               <FileUpload
@@ -1117,6 +1319,19 @@ export function EquipamentoDetalhePage({
                     />
                   ))}
                 </FormGrid>
+
+                {(evidenciasPorBloco.get(bloco.id) ?? []).length > 0 && (
+                  <div>
+                    <p className={styles.infoLabel}>Evidências já anexadas — {bloco.nome}</p>
+                    <EvidenciasGaleria
+                      evidencias={(evidenciasPorBloco.get(bloco.id) ?? []).filter(
+                        (evidencia) => !evidenciasParaExcluir.has(evidencia.id)
+                      )}
+                      onExcluir={marcarEvidenciaParaExcluir}
+                    />
+                  </div>
+                )}
+
                 <Field label={`Adicionar evidências — ${bloco.nome}`} hint="Imagens, PDF, Word ou Excel">
                   <FileUpload
                     multiple

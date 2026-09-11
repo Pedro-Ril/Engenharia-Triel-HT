@@ -9,9 +9,11 @@ import type {
   EquipamentoComEstrato,
   HistoricoAlteracaoDadosTecnicos,
   MotivoBaixa,
+  PainelBiEstoque,
   StatusEquipamento,
   TentativaIntegracaoNf,
   TipoEquipamento,
+  TipoNfIntegracao,
 } from "../types/estoque.types";
 
 interface ApiEnvelope<T> {
@@ -112,13 +114,6 @@ export async function atualizarDadosEquipamento(
   const response = await fetch(`/api/estoque-equipamentos-usados/${id}/dados`, {
     method: "PATCH",
     body: formData,
-  });
-  return parseResponse(response);
-}
-
-export async function excluirEvidencia(id: string): Promise<ApiEnvelope<null>> {
-  const response = await fetch(`/api/estoque-equipamentos-usados/evidencias/${id}`, {
-    method: "DELETE",
   });
   return parseResponse(response);
 }
@@ -267,6 +262,7 @@ export async function atualizarCampoTipoEquipamento(
     ordem: number;
     ativo: boolean;
     geraPendencia: boolean;
+    travaMovimentacao: boolean;
     vemDeIntegracao: boolean;
   }>
 ): Promise<ApiEnvelope<null>> {
@@ -327,6 +323,8 @@ export async function definirSequenciaEquipamentos(
 interface AcaoComDestinatarioDados {
   numeroNf: string;
   destinatarioNome: string;
+  valor: number | null;
+  dataEmissaoNf: string | null;
   observacoes: string | null;
   anexos?: File[];
 }
@@ -349,7 +347,13 @@ export async function registrarEmprestimo(
   const response = await fetch(`/api/estoque-equipamentos-usados/${id}/emprestimo`, {
     method: "POST",
     body: montarFormDataAcao(
-      { numeroNf: dados.numeroNf, destinatarioNome: dados.destinatarioNome, observacoes: dados.observacoes },
+      {
+        numeroNf: dados.numeroNf,
+        destinatarioNome: dados.destinatarioNome,
+        valor: dados.valor !== null ? String(dados.valor) : null,
+        dataEmissaoNf: dados.dataEmissaoNf,
+        observacoes: dados.observacoes,
+      },
       dados.anexos
     ),
   });
@@ -363,7 +367,13 @@ export async function registrarConsignacao(
   const response = await fetch(`/api/estoque-equipamentos-usados/${id}/consignacao`, {
     method: "POST",
     body: montarFormDataAcao(
-      { numeroNf: dados.numeroNf, destinatarioNome: dados.destinatarioNome, observacoes: dados.observacoes },
+      {
+        numeroNf: dados.numeroNf,
+        destinatarioNome: dados.destinatarioNome,
+        valor: dados.valor !== null ? String(dados.valor) : null,
+        dataEmissaoNf: dados.dataEmissaoNf,
+        observacoes: dados.observacoes,
+      },
       dados.anexos
     ),
   });
@@ -372,12 +382,11 @@ export async function registrarConsignacao(
 
 export async function registrarRetorno(
   id: string,
-  dados: { numeroNf: string; observacoes: string | null }
+  dados: { numeroNf: string; observacoes: string | null; anexos?: File[] }
 ): Promise<ApiEnvelope<EquipamentoComEstrato>> {
   const response = await fetch(`/api/estoque-equipamentos-usados/${id}/retorno`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(dados),
+    body: montarFormDataAcao({ numeroNf: dados.numeroNf, observacoes: dados.observacoes }, dados.anexos),
   });
   return parseResponse(response);
 }
@@ -388,6 +397,8 @@ export async function registrarBaixa(
     numeroNf: string;
     motivoBaixa: MotivoBaixa;
     destinatarioNome: string | null;
+    valor: number | null;
+    dataEmissaoNf: string | null;
     observacoes: string | null;
     anexos?: File[];
   }
@@ -399,10 +410,32 @@ export async function registrarBaixa(
         numeroNf: dados.numeroNf,
         motivoBaixa: dados.motivoBaixa,
         destinatarioNome: dados.destinatarioNome,
+        valor: dados.valor !== null ? String(dados.valor) : null,
+        dataEmissaoNf: dados.dataEmissaoNf,
         observacoes: dados.observacoes,
       },
       dados.anexos
     ),
+  });
+  return parseResponse(response);
+}
+
+export async function buscarNfSaida(
+  id: string,
+  dados: { numeroNf: string; tipoNf: TipoNfIntegracao }
+): Promise<
+  ApiEnvelope<{
+    encontrado: boolean;
+    destinatarioNome: string | null;
+    valor: number | null;
+    dataEmissaoIso: string | null;
+    mensagem: string;
+  }>
+> {
+  const response = await fetch(`/api/estoque-equipamentos-usados/${id}/nf-saida`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
   });
   return parseResponse(response);
 }
@@ -417,4 +450,14 @@ export async function validarEquipamentoNoErp(
     body: JSON.stringify({ codigoErp }),
   });
   return parseResponse(response);
+}
+
+/*
+ * Rota pública (roda numa TV sem sessão de usuário — ver
+ * src/lib/auth/rotas-publicas.ts) — usa fetch puro sem depender de
+ * cookie de login.
+ */
+export async function buscarPainelBiEstoque(): Promise<ApiEnvelope<PainelBiEstoque>> {
+  const response = await fetch("/api/estoque-equipamentos-usados/painel", { cache: "no-store" });
+  return parseResponse<PainelBiEstoque>(response);
 }

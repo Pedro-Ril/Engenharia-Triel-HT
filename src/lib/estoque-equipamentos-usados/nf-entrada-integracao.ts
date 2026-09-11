@@ -2,6 +2,7 @@ import "server-only";
 
 import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
+import { registrarLog } from "@/lib/monitoramento/logs";
 import {
   CHAVE_MASCARA_NUMERO_SEQUENCIAL,
   CHAVE_SISTEMA_MARCA,
@@ -43,17 +44,23 @@ function expressaoMascara(chave: string): { selectExpr: string; exigirNaoVazio: 
 export interface EquipamentoPendenteNf {
   id: string;
   numero: number;
+  descricao: string;
   status: StatusEquipamento;
   codigoEmpresa: string;
   codigoCliente: string;
   valorMascara: string;
+  numeroNfEntradaAtual: string | null;
 }
 
 /*
  * Só entram aqui equipamentos com os 3 parâmetros da consulta já
  * disponíveis (empresa, cliente com código e o campo mapeado como
  * "mascara" preenchidos) — sem isso não dá pra montar uma chamada válida
- * ao ERP, então nem conta como tentativa.
+ * ao ERP, então nem conta como tentativa. O filtro de "pendente" não é
+ * mais "sem NF de entrada" — desde que a NF passou a poder ser digitada
+ * na entrada, um equipamento pode já ter um número (o que a pessoa
+ * digitou) e mesmo assim continuar pendente de confirmação pela
+ * integração (ver nf_entrada_confirmada_em).
  */
 export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPendenteNf[]> {
   const config = await buscarConfigErpEstoqueUsados();
@@ -64,20 +71,24 @@ export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPenden
   const result = await pool.request().query<{
     id: string;
     numero: number;
+    descricao: string;
     status: StatusEquipamento;
     codigo_empresa: string | null;
     codigo_cliente: string | null;
     valor_mascara: string | null;
+    numero_nf_entrada: string | null;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), [id]) AS [id],
       [numero],
+      [descricao],
       [status],
       [codigo_empresa],
       [codigo_cliente],
-      ${selectExpr} AS [valor_mascara]
+      ${selectExpr} AS [valor_mascara],
+      [numero_nf_entrada]
     FROM dbo.com_estoque_equipamentos_usados
-    WHERE [numero_nf_entrada] IS NULL
+    WHERE [nf_entrada_confirmada_em] IS NULL
       AND [codigo_empresa] IS NOT NULL AND [codigo_empresa] <> ''
       AND [codigo_cliente] IS NOT NULL AND [codigo_cliente] <> ''
       ${exigirNaoVazio ? `AND ${selectExpr} IS NOT NULL AND ${selectExpr} <> ''` : ""};
@@ -86,10 +97,12 @@ export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPenden
   return result.recordset.map((row) => ({
     id: row.id,
     numero: row.numero,
+    descricao: row.descricao,
     status: row.status,
     codigoEmpresa: row.codigo_empresa as string,
     codigoCliente: row.codigo_cliente as string,
     valorMascara: row.valor_mascara as string,
+    numeroNfEntradaAtual: row.numero_nf_entrada,
   }));
 }
 
@@ -114,8 +127,10 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
     .query<{
       id: string;
       numero: number;
+      descricao: string;
       status: StatusEquipamento;
       numero_nf_entrada: string | null;
+      nf_entrada_confirmada_em: string | null;
       codigo_empresa: string | null;
       codigo_cliente: string | null;
       valor_mascara: string | null;
@@ -123,8 +138,10 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
       SELECT
         CONVERT(VARCHAR(36), [id]) AS [id],
         [numero],
+        [descricao],
         [status],
         [numero_nf_entrada],
+        CONVERT(VARCHAR(33), [nf_entrada_confirmada_em], 126) AS [nf_entrada_confirmada_em],
         [codigo_empresa],
         [codigo_cliente],
         ${selectExpr} AS [valor_mascara]
@@ -137,8 +154,8 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
     throw new ValidationError("Equipamento não encontrado.");
   }
 
-  if (row.numero_nf_entrada) {
-    throw new ValidationError("Este equipamento já tem NF de entrada preenchida.");
+  if (row.nf_entrada_confirmada_em) {
+    throw new ValidationError("Este equipamento já teve a NF de entrada confirmada pela integração com o ERP.");
   }
 
   if (!row.codigo_empresa) {
@@ -160,10 +177,12 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
   return {
     id: row.id,
     numero: row.numero,
+    descricao: row.descricao,
     status: row.status,
     codigoEmpresa: row.codigo_empresa,
     codigoCliente: row.codigo_cliente,
     valorMascara: row.valor_mascara,
+    numeroNfEntradaAtual: row.numero_nf_entrada,
   };
 }
 
@@ -217,9 +236,51 @@ async function preencherNfEntradaDoEquipamento(
         [erp_codigo_item] = COALESCE(NULLIF(@erpCodigoItem, ''), [erp_codigo_item]),
         [erp_id_item] = COALESCE(NULLIF(@erpIdItem, ''), [erp_id_item]),
         [erp_data_entrada] = COALESCE(@erpDataEntrada, [erp_data_entrada]),
+        [nf_entrada_confirmada_em] = SYSDATETIME(),
         [atualizado_em] = SYSDATETIME()
       WHERE [id] = @id;
     `);
+}
+
+/*
+ * A NF de entrada agora pode ter sido digitada por alguém na entrada —
+ * quando a integração confirma um número diferente desse, o ERP vence
+ * (é a fonte de verdade), mas a troca precisa ficar visível pra quem
+ * olhar depois: entra no mesmo "Histórico de alterações" das edições
+ * manuais de dados técnicos (dbo.portal_logs, origem
+ * "estoque-equipamentos-usados/dados"), com o autor identificado como a
+ * integração (ou quem clicou "Tentar agora").
+ */
+async function registrarDivergenciaNfEntrada(params: {
+  equipamentoId: string;
+  numero: number;
+  descricao: string;
+  numeroAnterior: string;
+  numeroNovo: string;
+  disparadoPor: string | null;
+}): Promise<void> {
+  const autor = params.disparadoPor ?? "Integração automática (ERP)";
+
+  await registrarLog({
+    nivel: "aviso",
+    origem: "estoque-equipamentos-usados/dados",
+    mensagem: `${autor} atualizou o número da NF de entrada do equipamento #${params.numero} (${params.descricao}) — divergência encontrada pela integração com o ERP.`,
+    detalhes: JSON.stringify({
+      equipamentoId: params.equipamentoId,
+      numero: params.numero,
+      descricao: params.descricao,
+      alteracoes: [
+        {
+          campo: "numeroNfEntrada",
+          rotulo: "NF de entrada",
+          de: params.numeroAnterior,
+          para: params.numeroNovo,
+        },
+      ],
+      motivo:
+        "Divergência encontrada pela integração automática do ERP — o número informado manualmente na entrada era diferente do localizado no ERP.",
+    }),
+  });
 }
 
 /*
@@ -249,7 +310,7 @@ export async function tentarBuscarNfEntrada(
       await registrarTentativaNf({
         equipamentoId: equipamento.id,
         status: "nao_encontrado",
-        mensagem: "NF ainda não localizada no ERP.",
+        mensagem: detalhes.mensagemNaoEncontrado || "NF ainda não localizada no ERP.",
         parametrosConsulta,
         disparadoPor,
         requestUrl: detalhes.requestUrl,
@@ -258,6 +319,9 @@ export async function tentarBuscarNfEntrada(
       });
       return;
     }
+
+    const numeroAnterior = equipamento.numeroNfEntradaAtual;
+    const divergiu = Boolean(numeroAnterior) && numeroAnterior !== resultado.numeroNf;
 
     await preencherNfEntradaDoEquipamento(equipamento.id, {
       numeroNfEntrada: resultado.numeroNf,
@@ -273,10 +337,23 @@ export async function tentarBuscarNfEntrada(
       criadoPorNome: disparadoPor ?? "Integração automática (ERP)",
     });
 
+    if (divergiu && numeroAnterior) {
+      await registrarDivergenciaNfEntrada({
+        equipamentoId: equipamento.id,
+        numero: equipamento.numero,
+        descricao: equipamento.descricao,
+        numeroAnterior,
+        numeroNovo: resultado.numeroNf,
+        disparadoPor,
+      });
+    }
+
     await registrarTentativaNf({
       equipamentoId: equipamento.id,
       status: "sucesso",
-      mensagem: `NF ${resultado.numeroNf} localizada e aplicada ao equipamento.`,
+      mensagem: divergiu
+        ? `NF ${resultado.numeroNf} localizada — divergia do número informado na entrada (${numeroAnterior}), atualizado automaticamente.`
+        : `NF ${resultado.numeroNf} localizada e aplicada ao equipamento.`,
       parametrosConsulta,
       disparadoPor,
       requestUrl: detalhes.requestUrl,
@@ -299,8 +376,11 @@ export async function tentarBuscarNfEntrada(
   }
 }
 
+export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda";
+
 export interface TentativaIntegracaoNf {
   id: string;
+  tipoNf: TipoNfIntegracao;
   status: "sucesso" | "nao_encontrado" | "erro";
   mensagem: string | null;
   parametrosConsulta: string | null;
@@ -313,6 +393,7 @@ export interface TentativaIntegracaoNf {
 
 interface TentativaRow {
   id: string;
+  tipo_nf: TipoNfIntegracao;
   status: TentativaIntegracaoNf["status"];
   mensagem: string | null;
   parametros_consulta: string | null;
@@ -332,6 +413,7 @@ export async function listarTentativasNf(equipamentoId: string): Promise<Tentati
     .query<TentativaRow>(`
       SELECT TOP (200)
         CONVERT(VARCHAR(36), [id]) AS [id],
+        [tipo_nf],
         [status],
         [mensagem],
         [parametros_consulta],
@@ -347,6 +429,7 @@ export async function listarTentativasNf(equipamentoId: string): Promise<Tentati
 
   return result.recordset.map((row) => ({
     id: row.id,
+    tipoNf: row.tipo_nf,
     status: row.status,
     mensagem: row.mensagem,
     parametrosConsulta: row.parametros_consulta,

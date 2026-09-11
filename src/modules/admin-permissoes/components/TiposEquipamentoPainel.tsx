@@ -96,6 +96,7 @@ function formCampoInicial() {
     obrigatorio: false,
     ordem: "0",
     geraPendencia: false,
+    travaMovimentacao: false,
     vemDeIntegracao: false,
   };
 }
@@ -331,6 +332,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
       obrigatorio: campo.obrigatorio,
       ordem: String(campo.ordem),
       geraPendencia: campo.geraPendencia,
+      travaMovimentacao: campo.travaMovimentacao,
       vemDeIntegracao: campo.vemDeIntegracao,
     });
     setErroCampo(null);
@@ -374,7 +376,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
            * sempre enviados juntos independente do tipo do campo.
            */
           ...(campoEditando.ehSistema
-            ? { geraPendencia: formCampo.geraPendencia }
+            ? { geraPendencia: formCampo.geraPendencia, travaMovimentacao: formCampo.travaMovimentacao }
             : { tipoDado: formCampo.tipoDado, opcoes }),
         });
 
@@ -391,6 +393,9 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                     obrigatorio: formCampo.obrigatorio,
                     ordem: Number(formCampo.ordem) || 0,
                     geraPendencia: campoEditando.ehSistema ? formCampo.geraPendencia : item.geraPendencia,
+                    travaMovimentacao: campoEditando.ehSistema
+                      ? formCampo.travaMovimentacao
+                      : item.travaMovimentacao,
                     vemDeIntegracao: formCampo.vemDeIntegracao,
                   }
                 : item
@@ -942,7 +947,21 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
               checked={formCampo.geraPendencia}
               disabled={formCampo.obrigatorio}
               onChange={(event) =>
-                setFormCampo((atual) => ({ ...atual, geraPendencia: event.target.checked }))
+                setFormCampo((atual) => ({
+                  ...atual,
+                  geraPendencia: event.target.checked,
+                  travaMovimentacao: event.target.checked ? atual.travaMovimentacao : false,
+                }))
+              }
+            />
+          )}
+
+          {campoEditando?.ehSistema && formCampo.geraPendencia && (
+            <Checkbox
+              label="Essa pendência trava movimentações (empréstimo, consignação, retorno e baixa) enquanto o campo estiver vazio"
+              checked={formCampo.travaMovimentacao}
+              onChange={(event) =>
+                setFormCampo((atual) => ({ ...atual, travaMovimentacao: event.target.checked }))
               }
             />
           )}
