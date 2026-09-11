@@ -69,7 +69,6 @@ export function NotificacoesEmailChamadosPainel() {
 
   useEffect(() => {
     const temporizador = setTimeout(() => {
-      setCarregando(true);
       setChamadoNumero(chamadoNumeroDigitado);
       setPagina(1);
     }, 400);
@@ -79,6 +78,17 @@ export function NotificacoesEmailChamadosPainel() {
   useEffect(() => {
     let cancelado = false;
 
+    /*
+     * setCarregando(true) fica dentro do efeito (não no timeout do
+     * debounce nem nos handlers de filtro) — o efeito só reexecuta
+     * quando chamadoNumero/evento/sucesso/pagina realmente mudam, então
+     * nunca fica "preso" em true. Colocar no timeout do debounce causava
+     * um bug real: ele dispara de novo a cada digitação mesmo sem
+     * mudança de valor, reancorando carregando=true sem nenhum efeito
+     * subsequente pra voltar a false (loader trava pra sempre).
+     */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCarregando(true);
     listarNotificacoesEmailChamados({
       chamadoNumero: chamadoNumero ? Number(chamadoNumero) : undefined,
       evento: (evento as EventoNotificacaoChamado) || undefined,
@@ -124,7 +134,6 @@ export function NotificacoesEmailChamadosPainel() {
               value={evento}
               options={OPCOES_EVENTO}
               onValueChange={(valor) => {
-                setCarregando(true);
                 setEvento(valor);
                 setPagina(1);
               }}
@@ -136,7 +145,6 @@ export function NotificacoesEmailChamadosPainel() {
               value={sucesso}
               options={OPCOES_STATUS}
               onValueChange={(valor) => {
-                setCarregando(true);
                 setSucesso(valor);
                 setPagina(1);
               }}
@@ -200,14 +208,7 @@ export function NotificacoesEmailChamadosPainel() {
               </TableBody>
             </Table>
 
-            <Pagination
-              page={pagina}
-              totalPages={totalPaginas}
-              onPageChange={(novaPagina) => {
-                setCarregando(true);
-                setPagina(novaPagina);
-              }}
-            />
+            <Pagination page={pagina} totalPages={totalPaginas} onPageChange={setPagina} />
           </>
         )}
       </Stack>
