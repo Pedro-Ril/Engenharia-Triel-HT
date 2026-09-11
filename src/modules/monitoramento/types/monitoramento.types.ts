@@ -1,14 +1,18 @@
 export type NivelLog = "info" | "aviso" | "erro";
 
-export interface LogSistema {
+export interface ModuloComLog {
+  chave: string;
+  nome: string;
+}
+
+export interface LogUnificado {
   id: string;
+  moduloChave: string;
+  moduloNome: string;
+  fonte: string;
   nivel: NivelLog;
-  origem: string;
   mensagem: string;
   detalhes: string | null;
-  metodo: string | null;
-  caminho: string | null;
-  ipOrigem: string | null;
   criadoEm: string;
 }
 

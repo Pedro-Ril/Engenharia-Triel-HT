@@ -1,6 +1,7 @@
 import type {
   AcessoModulo,
-  LogSistema,
+  LogUnificado,
+  ModuloComLog,
   NivelLog,
   ResultadoAtividade,
   ResumoApis,
@@ -46,22 +47,22 @@ export async function buscarAtividadeRecente(
 
 export interface FiltrosLogs {
   nivel?: NivelLog;
-  origem?: string;
+  modulo?: string;
   busca?: string;
   pagina: number;
   porPagina: number;
 }
 
 export interface ResultadoLogs {
-  itens: LogSistema[];
+  itens: LogUnificado[];
   total: number;
-  origens: string[];
+  modulos: ModuloComLog[];
 }
 
 export async function buscarLogs(filtros: FiltrosLogs): Promise<ResultadoLogs | null> {
   const params = new URLSearchParams();
   if (filtros.nivel) params.set("nivel", filtros.nivel);
-  if (filtros.origem) params.set("origem", filtros.origem);
+  if (filtros.modulo) params.set("modulo", filtros.modulo);
   if (filtros.busca) params.set("busca", filtros.busca);
   params.set("pagina", String(filtros.pagina));
   params.set("porPagina", String(filtros.porPagina));

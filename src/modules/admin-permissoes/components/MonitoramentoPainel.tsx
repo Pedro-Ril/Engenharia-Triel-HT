@@ -72,7 +72,8 @@ import {
 import type {
   AcessoModulo,
   EventoAtividade,
-  LogSistema,
+  LogUnificado,
+  ModuloComLog,
   NivelLog,
   ResumoApis,
   ResumoMonitoramento,
@@ -509,14 +510,14 @@ const POR_PAGINA_LOGS = 25;
 
 function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
   const [nivel, setNivel] = useState("");
-  const [origem, setOrigem] = useState("");
+  const [modulo, setModulo] = useState("");
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
 
-  const [itens, setItens] = useState<LogSistema[]>([]);
+  const [itens, setItens] = useState<LogUnificado[]>([]);
   const [total, setTotal] = useState(0);
-  const [origens, setOrigens] = useState<string[]>([]);
+  const [modulos, setModulos] = useState<ModuloComLog[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [expandidoId, setExpandidoId] = useState<string | null>(null);
   const [recarregarChave, setRecarregarChave] = useState(0);
@@ -538,8 +539,8 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
 
     setCarregando(true);
     buscarLogs({
-      nivel: (nivel as LogSistema["nivel"]) || undefined,
-      origem: origem || undefined,
+      nivel: (nivel as LogUnificado["nivel"]) || undefined,
+      modulo: modulo || undefined,
       busca: busca || undefined,
       pagina,
       porPagina: POR_PAGINA_LOGS,
@@ -549,7 +550,7 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
       if (resultado) {
         setItens(resultado.itens);
         setTotal(resultado.total);
-        setOrigens(resultado.origens);
+        setModulos(resultado.modulos);
       }
 
       setCarregando(false);
@@ -558,11 +559,11 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
     return () => {
       cancelado = true;
     };
-  }, [nivel, origem, busca, pagina, recarregarChave]);
+  }, [nivel, modulo, busca, pagina, recarregarChave]);
 
-  const opcoesOrigem = [
-    { value: "", label: "Todas as origens" },
-    ...origens.map((item) => ({ value: item, label: item })),
+  const opcoesModulo = [
+    { value: "", label: "Todos os módulos" },
+    ...modulos.map((item) => ({ value: item.chave, label: item.nome })),
   ];
 
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA_LOGS));
@@ -596,8 +597,8 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
 
   return (
     <Card
-      title="Logs de sistema"
-      description="Erros não tratados capturados automaticamente em qualquer rota do portal."
+      title="Logs"
+      description="Visão centralizada de erros de sistema, tentativas de integração, auditoria e outros eventos registrados pelos módulos do portal."
       actions={
         <Button variant="danger" onClick={() => setConfirmandoLimpeza(true)}>
           <Trash2 size={15} />
@@ -621,12 +622,12 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
           </div>
 
           <div className={styles.filtroCampo}>
-            <Field label="Origem">
+            <Field label="Módulo">
               <Dropdown
-                value={origem}
-                options={opcoesOrigem}
+                value={modulo}
+                options={opcoesModulo}
                 onValueChange={(valor) => {
-                  setOrigem(valor);
+                  setModulo(valor);
                   setPagina(1);
                 }}
               />
@@ -637,7 +638,7 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
             <Field label="Buscar">
               <Input
                 value={buscaDigitada}
-                placeholder="Mensagem ou caminho da rota"
+                placeholder="Mensagem ou fonte do evento"
                 onChange={(event) => setBuscaDigitada(event.target.value)}
               />
             </Field>
@@ -654,12 +655,13 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
           />
         ) : (
           <>
-            <Table minWidth={800}>
+            <Table minWidth={950}>
               <TableHead>
                 <TableRow>
                   <TableHeaderCell align="center">Nível</TableHeaderCell>
                   <TableHeaderCell>Mensagem</TableHeaderCell>
-                  <TableHeaderCell>Origem</TableHeaderCell>
+                  <TableHeaderCell>Módulo</TableHeaderCell>
+                  <TableHeaderCell>Fonte</TableHeaderCell>
                   <TableHeaderCell>Quando</TableHeaderCell>
                   <TableHeaderCell align="center"> </TableHeaderCell>
                 </TableRow>
@@ -682,7 +684,8 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
                       <TableCell>
                         <span className={styles.logMensagem}>{log.mensagem}</span>
                       </TableCell>
-                      <TableCell>{log.origem}</TableCell>
+                      <TableCell>{log.moduloNome}</TableCell>
+                      <TableCell>{log.fonte}</TableCell>
                       <TableCell>{formatarDataHora(log.criadoEm)}</TableCell>
                       <TableCell align="center">
                         {expandidoId === log.id ? (
@@ -695,18 +698,8 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
 
                     {expandidoId === log.id && (
                       <TableRow>
-                        <TableCell colSpan={5}>
+                        <TableCell colSpan={6}>
                           <div className={styles.logDetalhe}>
-                            {(log.metodo || log.caminho) && (
-                              <p>
-                                <strong>Rota:</strong> {log.metodo ?? ""} {log.caminho ?? "—"}
-                              </p>
-                            )}
-                            {log.ipOrigem && (
-                              <p>
-                                <strong>IP:</strong> {log.ipOrigem}
-                              </p>
-                            )}
                             {log.detalhes ? (
                               <pre className={styles.logStack}>{log.detalhes}</pre>
                             ) : (
@@ -734,7 +727,11 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
         variant="warning"
         message={
           <Stack gap={12}>
-            <span>Remove permanentemente os logs mais antigos que o período informado.</span>
+            <span>
+              Remove permanentemente os erros de sistema mais antigos que o período informado — as
+              demais fontes exibidas aqui (tentativas de integração, auditoria de módulos, etc.)
+              não são afetadas, cada uma mantém sua própria política de retenção.
+            </span>
             <Field label="Manter os últimos (dias)">
               <NumberInput
                 value={diasParaManter}
