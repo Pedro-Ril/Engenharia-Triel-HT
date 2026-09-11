@@ -166,6 +166,22 @@ export interface ConfigEstruturaSubstituicao {
   atualizadoPor: string | null;
 }
 
+export interface ConfigErpEstoqueUsados {
+  urlValidarItem: string | null;
+  urlValidarItemTeste: string | null;
+  urlClientes: string | null;
+  urlClientesTeste: string | null;
+  usarAmbienteTeste: boolean;
+  chaveApi: string | null;
+  urlNfEntrada: string | null;
+  urlNfEntradaTeste: string | null;
+  intervaloVerificacaoNfMinutos: number | null;
+  campoMascaraChave: string;
+  ultimaExecucaoNfEm: string | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
 export interface ConfigIntegraLantek {
   foccoApiBaseUrl: string | null;
   foccoApiChave: string | null;

@@ -18,6 +18,7 @@ import {
   Settings,
   Tv,
   Users,
+  Warehouse,
 } from "lucide-react";
 
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -72,6 +73,7 @@ import { PermissoesPainel } from "./PermissoesPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
 import { DesenhoAprovacaoTemplatesPainel } from "./DesenhoAprovacaoTemplatesPainel";
+import { EstoqueEquipamentosUsadosPainel } from "./EstoqueEquipamentosUsadosPainel";
 import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
@@ -154,6 +156,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "desenho-aprovacao-templates",
         label: "Templates de Desenho",
         icon: <FileSliders size={16} />,
+      },
+      {
+        valor: "estoque-tipos-equipamento",
+        label: "Equipamentos Usados",
+        icon: <Warehouse size={16} />,
       },
     ],
   },
@@ -501,6 +508,10 @@ export function AdminPermissoesPage() {
 
           {secao === "desenho-aprovacao-templates" && (
             <DesenhoAprovacaoTemplatesPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "estoque-tipos-equipamento" && (
+            <EstoqueEquipamentosUsadosPainel onFeedback={mostrarFeedback} />
           )}
         </div>
       </div>

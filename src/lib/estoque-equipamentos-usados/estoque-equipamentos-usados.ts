@@ -1,0 +1,788 @@
+import "server-only";
+
+import type { Request as SqlRequest } from "mssql";
+
+import { getSqlServerPool, sql } from "@/lib/database/sql-server";
+import { ValidationError } from "@/lib/auth/errors";
+import type { PortalUsuario } from "@/lib/auth/usuarios";
+import { COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA } from "./tipos-equipamento";
+
+export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "baixado";
+export type TipoAcaoMovimentacao =
+  | "entrada"
+  | "emprestimo"
+  | "consignacao"
+  | "retorno"
+  | "baixa"
+  | "nf_vinculada";
+export type MotivoBaixa = "venda" | "descarte" | "perda" | "outro";
+
+export interface Equipamento {
+  id: string;
+  numero: number;
+  tipoEquipamentoId: string | null;
+  nomeCliente: string | null;
+  codigoCliente: string | null;
+  valor: number | null;
+  descricao: string;
+  marca: string | null;
+  modelo: string | null;
+  numeroSerie: string | null;
+  codigoEmpresa: string | null;
+  erpCodigoItem: string | null;
+  erpIdItem: string | null;
+  erpDataEntrada: string | null;
+  erpValidadoEm: string | null;
+  erpValidadoPor: string | null;
+  status: StatusEquipamento;
+  numeroNfEntrada: string | null;
+  observacoes: string | null;
+  camposValores: Record<string, unknown> | null;
+  criadoPorNome: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface MovimentacaoEquipamento {
+  id: string;
+  equipamentoId: string;
+  tipoAcao: TipoAcaoMovimentacao;
+  numeroNf: string | null;
+  destinatarioNome: string | null;
+  motivoBaixa: MotivoBaixa | null;
+  statusResultante: StatusEquipamento;
+  observacoes: string | null;
+  dataAcao: string;
+  criadoPorNome: string;
+  criadoEm: string;
+}
+
+export interface EquipamentoComEstrato extends Equipamento {
+  movimentacoes: MovimentacaoEquipamento[];
+}
+
+const colunasEquipamento = `
+  CONVERT(VARCHAR(36), [id]) AS [id],
+  [numero],
+  CONVERT(VARCHAR(36), [tipo_equipamento_id]) AS [tipo_equipamento_id],
+  [nome_cliente],
+  [codigo_cliente],
+  [valor],
+  [descricao],
+  [marca],
+  [modelo],
+  [numero_serie],
+  [codigo_empresa],
+  [erp_codigo_item],
+  [erp_id_item],
+  CONVERT(VARCHAR(10), [erp_data_entrada], 23) AS [erp_data_entrada],
+  CONVERT(VARCHAR(33), [erp_validado_em], 126) AS [erp_validado_em],
+  [erp_validado_por],
+  [status],
+  [numero_nf_entrada],
+  [observacoes],
+  [campos_valores],
+  [criado_por_nome],
+  CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
+  CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em]
+`;
+
+interface EquipamentoRow {
+  id: string;
+  numero: number;
+  tipo_equipamento_id: string | null;
+  nome_cliente: string | null;
+  codigo_cliente: string | null;
+  valor: number | null;
+  descricao: string;
+  marca: string | null;
+  modelo: string | null;
+  numero_serie: string | null;
+  codigo_empresa: string | null;
+  erp_codigo_item: string | null;
+  erp_id_item: string | null;
+  erp_data_entrada: string | null;
+  erp_validado_em: string | null;
+  erp_validado_por: string | null;
+  status: StatusEquipamento;
+  numero_nf_entrada: string | null;
+  observacoes: string | null;
+  campos_valores: string | null;
+  criado_por_nome: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+function mapEquipamentoRow(row: EquipamentoRow): Equipamento {
+  return {
+    id: row.id,
+    numero: row.numero,
+    tipoEquipamentoId: row.tipo_equipamento_id,
+    nomeCliente: row.nome_cliente,
+    codigoCliente: row.codigo_cliente,
+    valor: row.valor,
+    descricao: row.descricao,
+    marca: row.marca,
+    modelo: row.modelo,
+    numeroSerie: row.numero_serie,
+    codigoEmpresa: row.codigo_empresa,
+    erpCodigoItem: row.erp_codigo_item,
+    erpIdItem: row.erp_id_item,
+    erpDataEntrada: row.erp_data_entrada,
+    erpValidadoEm: row.erp_validado_em,
+    erpValidadoPor: row.erp_validado_por,
+    status: row.status,
+    numeroNfEntrada: row.numero_nf_entrada,
+    observacoes: row.observacoes,
+    camposValores: row.campos_valores
+      ? (JSON.parse(row.campos_valores) as Record<string, unknown>)
+      : null,
+    criadoPorNome: row.criado_por_nome,
+    criadoEm: row.criado_em,
+    atualizadoEm: row.atualizado_em,
+  };
+}
+
+interface MovimentacaoRow {
+  id: string;
+  equipamento_id: string;
+  tipo_acao: TipoAcaoMovimentacao;
+  numero_nf: string | null;
+  destinatario_nome: string | null;
+  motivo_baixa: MotivoBaixa | null;
+  status_resultante: StatusEquipamento;
+  observacoes: string | null;
+  data_acao: string;
+  criado_por_nome: string;
+  criado_em: string;
+}
+
+function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
+  return {
+    id: row.id,
+    equipamentoId: row.equipamento_id,
+    tipoAcao: row.tipo_acao,
+    numeroNf: row.numero_nf,
+    destinatarioNome: row.destinatario_nome,
+    motivoBaixa: row.motivo_baixa,
+    statusResultante: row.status_resultante,
+    observacoes: row.observacoes,
+    dataAcao: row.data_acao,
+    criadoPorNome: row.criado_por_nome,
+    criadoEm: row.criado_em,
+  };
+}
+
+export interface CriarEquipamentoParams {
+  tipoEquipamentoId: string;
+  nomeCliente: string | null;
+  codigoCliente: string | null;
+  valor: number | null;
+  descricao: string;
+  marca: string | null;
+  modelo: string | null;
+  numeroSerie: string | null;
+  codigoEmpresa: string | null;
+  erpCodigoItem: string | null;
+  erpIdItem: string | null;
+  erpDataEntrada: string | null;
+  erpValidadoEm: string | null;
+  erpValidadoPor: string | null;
+  numeroNfEntrada: string | null;
+  observacoes: string | null;
+  camposValoresJson: string | null;
+  dataAcao: string;
+  criadoPorUsuarioId: string;
+  criadoPorNome: string;
+}
+
+/*
+ * Cria o equipamento e já registra a primeira linha do estrato
+ * (tipo_acao='entrada') na mesma transação — a entrada é, ela mesma,
+ * uma movimentação, não um evento separado.
+ */
+export async function criarEquipamento(params: CriarEquipamentoParams): Promise<Equipamento> {
+  const pool = await getSqlServerPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const resultadoInsert = await new sql.Request(transaction)
+      .input("tipoEquipamentoId", sql.UniqueIdentifier, params.tipoEquipamentoId)
+      .input("nomeCliente", sql.NVarChar(200), params.nomeCliente)
+      .input("codigoCliente", sql.NVarChar(30), params.codigoCliente)
+      .input("valor", sql.Decimal(12, 2), params.valor)
+      .input("descricao", sql.NVarChar(300), params.descricao)
+      .input("marca", sql.NVarChar(100), params.marca)
+      .input("modelo", sql.NVarChar(100), params.modelo)
+      .input("numeroSerie", sql.NVarChar(100), params.numeroSerie)
+      .input("codigoEmpresa", sql.NVarChar(20), params.codigoEmpresa)
+      .input("erpCodigoItem", sql.NVarChar(50), params.erpCodigoItem)
+      .input("erpIdItem", sql.NVarChar(50), params.erpIdItem)
+      .input("erpDataEntrada", sql.Date, params.erpDataEntrada)
+      .input("erpValidadoEm", sql.DateTime2, params.erpValidadoEm)
+      .input("erpValidadoPor", sql.NVarChar(150), params.erpValidadoPor)
+      .input("numeroNfEntrada", sql.NVarChar(30), params.numeroNfEntrada)
+      .input("observacoes", sql.NVarChar(1000), params.observacoes)
+      .input("camposValores", sql.NVarChar(sql.MAX), params.camposValoresJson)
+      .input("criadoPorUsuarioId", sql.UniqueIdentifier, params.criadoPorUsuarioId)
+      .input("criadoPorNome", sql.NVarChar(150), params.criadoPorNome)
+      .query(`
+        INSERT INTO dbo.com_estoque_equipamentos_usados
+          ([tipo_equipamento_id], [nome_cliente], [codigo_cliente], [valor], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
+           [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
+           [numero_nf_entrada], [observacoes], [campos_valores], [criado_por_usuario_id], [criado_por_nome])
+        OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
+        VALUES
+          (@tipoEquipamentoId, @nomeCliente, @codigoCliente, @valor, @descricao, @marca, @modelo, @numeroSerie, @codigoEmpresa,
+           @erpCodigoItem, @erpIdItem, @erpDataEntrada, @erpValidadoEm, @erpValidadoPor,
+           @numeroNfEntrada, @observacoes, @camposValores, @criadoPorUsuarioId, @criadoPorNome);
+      `);
+
+    const equipamentoId = resultadoInsert.recordset[0].id as string;
+
+    await new sql.Request(transaction)
+      .input("equipamentoId", sql.UniqueIdentifier, equipamentoId)
+      .input("numeroNf", sql.NVarChar(30), params.numeroNfEntrada)
+      .input("dataAcao", sql.Date, params.dataAcao)
+      .input("criadoPorUsuarioId", sql.UniqueIdentifier, params.criadoPorUsuarioId)
+      .input("criadoPorNome", sql.NVarChar(150), params.criadoPorNome)
+      .query(`
+        INSERT INTO dbo.com_estoque_equipamentos_usados_movimentacoes
+          ([equipamento_id], [tipo_acao], [numero_nf], [status_resultante], [data_acao],
+           [criado_por_usuario_id], [criado_por_nome])
+        VALUES
+          (@equipamentoId, 'entrada', @numeroNf, 'em_estoque', @dataAcao,
+           @criadoPorUsuarioId, @criadoPorNome);
+      `);
+
+    await transaction.commit();
+
+    const criado = await buscarEquipamentoPorId(equipamentoId);
+    if (!criado) {
+      throw new Error("Equipamento criado mas não encontrado logo em seguida.");
+    }
+    return criado;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+
+export async function buscarEquipamentoPorId(id: string): Promise<EquipamentoComEstrato | null> {
+  const pool = await getSqlServerPool();
+
+  const [equipamentoResult, movimentacoesResult] = await Promise.all([
+    pool
+      .request()
+      .input("id", sql.UniqueIdentifier, id)
+      .query<EquipamentoRow>(`
+        SELECT ${colunasEquipamento}
+        FROM dbo.com_estoque_equipamentos_usados
+        WHERE [id] = @id;
+      `),
+    pool
+      .request()
+      .input("id", sql.UniqueIdentifier, id)
+      .query<MovimentacaoRow>(`
+        SELECT
+          CONVERT(VARCHAR(36), [id]) AS [id],
+          CONVERT(VARCHAR(36), [equipamento_id]) AS [equipamento_id],
+          [tipo_acao],
+          [numero_nf],
+          [destinatario_nome],
+          [motivo_baixa],
+          [status_resultante],
+          [observacoes],
+          CONVERT(VARCHAR(10), [data_acao], 23) AS [data_acao],
+          [criado_por_nome],
+          CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em]
+        FROM dbo.com_estoque_equipamentos_usados_movimentacoes
+        WHERE [equipamento_id] = @id
+        ORDER BY [data_acao] ASC, [criado_em] ASC;
+      `),
+  ]);
+
+  const equipamentoRow = equipamentoResult.recordset[0];
+  if (!equipamentoRow) {
+    return null;
+  }
+
+  return {
+    ...mapEquipamentoRow(equipamentoRow),
+    movimentacoes: movimentacoesResult.recordset.map(mapMovimentacaoRow),
+  };
+}
+
+/*
+ * Exclusão definitiva é ação só de administrador (mesmo padrão de
+ * excluirTransferencia em src/lib/transferencia/transferencias.ts) — o
+ * ciclo de vida normal de um equipamento termina em "baixa", não em
+ * apagar o registro; exclusão é pra corrigir um cadastro errado, não
+ * uma operação do dia a dia. CASCADE em movimentações e evidências (e,
+ * a partir delas, anexos de movimentação) já limpa tudo numa DELETE só.
+ */
+export async function excluirEquipamento(
+  id: string,
+  usuario: Pick<PortalUsuario, "ehAdministrador">
+): Promise<Equipamento | null> {
+  if (!usuario.ehAdministrador) {
+    throw new ValidationError("Apenas administradores podem excluir equipamentos.");
+  }
+
+  const equipamento = await buscarEquipamentoPorId(id);
+  if (!equipamento) return null;
+
+  const pool = await getSqlServerPool();
+  await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .query(`DELETE FROM dbo.com_estoque_equipamentos_usados WHERE [id] = @id;`);
+
+  return equipamento;
+}
+
+export interface FiltrosEquipamentos {
+  status?: StatusEquipamento;
+  busca?: string;
+  codigoEmpresa?: string;
+  pendenciaChave?: string;
+  pagina: number;
+  porPagina: number;
+}
+
+export async function listarEquipamentos(
+  filtros: FiltrosEquipamentos
+): Promise<{ itens: Equipamento[]; total: number }> {
+  const pool = await getSqlServerPool();
+
+  function montarFiltros(request: SqlRequest): string {
+    const condicoes: string[] = [];
+
+    if (filtros.status) {
+      request.input("status", sql.VarChar(20), filtros.status);
+      condicoes.push("[status] = @status");
+    }
+
+    if (filtros.busca) {
+      request.input("busca", sql.NVarChar(300), `%${filtros.busca}%`);
+      condicoes.push(
+        "([descricao] LIKE @busca OR [numero_serie] LIKE @busca OR [erp_codigo_item] LIKE @busca OR CAST([numero] AS NVARCHAR(10)) LIKE @busca)"
+      );
+    }
+
+    if (filtros.codigoEmpresa) {
+      request.input("codigoEmpresa", sql.NVarChar(20), filtros.codigoEmpresa);
+      condicoes.push("[codigo_empresa] = @codigoEmpresa");
+    }
+
+    if (filtros.pendenciaChave) {
+      const coluna = COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA[filtros.pendenciaChave];
+      if (coluna === "valor") {
+        condicoes.push("[valor] IS NULL");
+      } else if (coluna) {
+        condicoes.push(`([${coluna}] IS NULL OR [${coluna}] = '')`);
+      }
+    }
+
+    return condicoes.length > 0 ? `WHERE ${condicoes.join(" AND ")}` : "";
+  }
+
+  const requestItens = pool.request();
+  const whereClause = montarFiltros(requestItens);
+
+  const offset = (filtros.pagina - 1) * filtros.porPagina;
+  requestItens.input("offset", sql.Int, offset);
+  requestItens.input("porPagina", sql.Int, filtros.porPagina);
+
+  const requestTotal = pool.request();
+  montarFiltros(requestTotal);
+
+  const [itensResult, totalResult] = await Promise.all([
+    requestItens.query<EquipamentoRow>(`
+      SELECT ${colunasEquipamento}
+      FROM dbo.com_estoque_equipamentos_usados
+      ${whereClause}
+      ORDER BY [criado_em] DESC
+      OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
+    `),
+    requestTotal.query<{ total: number }>(
+      `SELECT COUNT(*) AS [total] FROM dbo.com_estoque_equipamentos_usados ${whereClause};`
+    ),
+  ]);
+
+  return {
+    itens: itensResult.recordset.map(mapEquipamentoRow),
+    total: totalResult.recordset[0]?.total ?? 0,
+  };
+}
+
+interface RegistrarMovimentacaoParams {
+  equipamentoId: string;
+  tipoAcao: TipoAcaoMovimentacao;
+  numeroNf: string;
+  destinatarioNome: string | null;
+  motivoBaixa: MotivoBaixa | null;
+  observacoes: string | null;
+  dataAcao: string;
+  criadoPorUsuarioId: string;
+  criadoPorNome: string;
+}
+
+const STATUS_PERMITIDO_PARA_ACAO: Record<
+  Exclude<TipoAcaoMovimentacao, "entrada" | "nf_vinculada">,
+  { statusExigidos: StatusEquipamento[]; novoStatus: StatusEquipamento }
+> = {
+  emprestimo: { statusExigidos: ["em_estoque"], novoStatus: "emprestado" },
+  consignacao: { statusExigidos: ["em_estoque"], novoStatus: "consignado" },
+  retorno: { statusExigidos: ["emprestado", "consignado"], novoStatus: "em_estoque" },
+  baixa: { statusExigidos: ["em_estoque"], novoStatus: "baixado" },
+};
+
+const LABEL_STATUS: Record<StatusEquipamento, string> = {
+  em_estoque: "em estoque",
+  emprestado: "emprestado",
+  consignado: "em consignação",
+  baixado: "baixado",
+};
+
+async function registrarMovimentacao(
+  params: RegistrarMovimentacaoParams
+): Promise<EquipamentoComEstrato> {
+  const regra = STATUS_PERMITIDO_PARA_ACAO[params.tipoAcao as Exclude<TipoAcaoMovimentacao, "entrada" | "nf_vinculada">];
+
+  const pool = await getSqlServerPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const statusAtualResult = await new sql.Request(transaction)
+      .input("id", sql.UniqueIdentifier, params.equipamentoId)
+      .query<{ status: StatusEquipamento; numero_nf_entrada: string | null }>(`
+        SELECT [status], [numero_nf_entrada] FROM dbo.com_estoque_equipamentos_usados WITH (UPDLOCK, ROWLOCK)
+        WHERE [id] = @id;
+      `);
+
+    const linhaAtual = statusAtualResult.recordset[0];
+
+    if (!linhaAtual) {
+      throw new ValidationError("Equipamento não encontrado.");
+    }
+
+    const statusAtual = linhaAtual.status;
+
+    if (!regra.statusExigidos.includes(statusAtual)) {
+      throw new ValidationError(
+        `Esta ação não é permitida — o equipamento está ${LABEL_STATUS[statusAtual]}.`
+      );
+    }
+
+    /*
+     * Empréstimo/consignação só podem sair do estoque com a NF de
+     * entrada já vinculada — sem isso o equipamento não tem lastro
+     * documental de como entrou, então não pode circular pra fora.
+     */
+    if (
+      (params.tipoAcao === "emprestimo" || params.tipoAcao === "consignacao") &&
+      !linhaAtual.numero_nf_entrada
+    ) {
+      throw new ValidationError(
+        `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — este equipamento ainda não tem uma NF de entrada vinculada.`
+      );
+    }
+
+    await new sql.Request(transaction)
+      .input("id", sql.UniqueIdentifier, params.equipamentoId)
+      .input("status", sql.VarChar(20), regra.novoStatus)
+      .query(`
+        UPDATE dbo.com_estoque_equipamentos_usados
+        SET [status] = @status, [atualizado_em] = SYSDATETIME()
+        WHERE [id] = @id;
+      `);
+
+    await new sql.Request(transaction)
+      .input("equipamentoId", sql.UniqueIdentifier, params.equipamentoId)
+      .input("tipoAcao", sql.VarChar(20), params.tipoAcao)
+      .input("numeroNf", sql.NVarChar(30), params.numeroNf)
+      .input("destinatarioNome", sql.NVarChar(200), params.destinatarioNome)
+      .input("motivoBaixa", sql.VarChar(20), params.motivoBaixa)
+      .input("statusResultante", sql.VarChar(20), regra.novoStatus)
+      .input("observacoes", sql.NVarChar(1000), params.observacoes)
+      .input("dataAcao", sql.Date, params.dataAcao)
+      .input("criadoPorUsuarioId", sql.UniqueIdentifier, params.criadoPorUsuarioId)
+      .input("criadoPorNome", sql.NVarChar(150), params.criadoPorNome)
+      .query(`
+        INSERT INTO dbo.com_estoque_equipamentos_usados_movimentacoes
+          ([equipamento_id], [tipo_acao], [numero_nf], [destinatario_nome], [motivo_baixa],
+           [status_resultante], [observacoes], [data_acao], [criado_por_usuario_id], [criado_por_nome])
+        VALUES
+          (@equipamentoId, @tipoAcao, @numeroNf, @destinatarioNome, @motivoBaixa,
+           @statusResultante, @observacoes, @dataAcao, @criadoPorUsuarioId, @criadoPorNome);
+      `);
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+
+  const atualizado = await buscarEquipamentoPorId(params.equipamentoId);
+  if (!atualizado) {
+    throw new Error("Equipamento atualizado mas não encontrado logo em seguida.");
+  }
+  return atualizado;
+}
+
+export interface AcaoMovimentacaoParams {
+  equipamentoId: string;
+  numeroNf: string;
+  destinatarioNome: string | null;
+  observacoes: string | null;
+  dataAcao: string;
+  criadoPorUsuarioId: string;
+  criadoPorNome: string;
+}
+
+export function registrarEmprestimo(
+  params: AcaoMovimentacaoParams
+): Promise<EquipamentoComEstrato> {
+  return registrarMovimentacao({ ...params, tipoAcao: "emprestimo", motivoBaixa: null });
+}
+
+export function registrarConsignacao(
+  params: AcaoMovimentacaoParams
+): Promise<EquipamentoComEstrato> {
+  return registrarMovimentacao({ ...params, tipoAcao: "consignacao", motivoBaixa: null });
+}
+
+export function registrarRetorno(
+  params: Omit<AcaoMovimentacaoParams, "destinatarioNome">
+): Promise<EquipamentoComEstrato> {
+  return registrarMovimentacao({
+    ...params,
+    destinatarioNome: null,
+    tipoAcao: "retorno",
+    motivoBaixa: null,
+  });
+}
+
+export interface RegistrarBaixaParams extends AcaoMovimentacaoParams {
+  motivoBaixa: MotivoBaixa;
+}
+
+export function registrarBaixa(params: RegistrarBaixaParams): Promise<EquipamentoComEstrato> {
+  return registrarMovimentacao({ ...params, tipoAcao: "baixa" });
+}
+
+/*
+ * Registra no extrato o momento em que a NF de entrada foi vinculada ao
+ * equipamento (job automático ou botão "Tentar agora") — não muda o
+ * status, só deixa visível no histórico completo quando isso aconteceu.
+ * criadoPorUsuarioId fica null pro job automático (sem usuário logado
+ * por trás); a distinção manual/automático já fica no próprio nome.
+ */
+export async function registrarMovimentacaoNfVinculada(params: {
+  equipamentoId: string;
+  numeroNf: string;
+  statusAtual: StatusEquipamento;
+  criadoPorNome: string;
+}): Promise<void> {
+  const pool = await getSqlServerPool();
+
+  await pool
+    .request()
+    .input("equipamentoId", sql.UniqueIdentifier, params.equipamentoId)
+    .input("numeroNf", sql.NVarChar(30), params.numeroNf)
+    .input("statusResultante", sql.VarChar(20), params.statusAtual)
+    .input("criadoPorNome", sql.NVarChar(150), params.criadoPorNome)
+    .query(`
+      INSERT INTO dbo.com_estoque_equipamentos_usados_movimentacoes
+        ([equipamento_id], [tipo_acao], [numero_nf], [status_resultante], [data_acao], [criado_por_usuario_id], [criado_por_nome])
+      VALUES
+        (@equipamentoId, 'nf_vinculada', @numeroNf, @statusResultante, CAST(SYSUTCDATETIME() AS DATE), NULL, @criadoPorNome);
+    `);
+}
+
+export async function atualizarValidacaoErp(
+  equipamentoId: string,
+  dados: { erpCodigoItem: string; erpIdItem: string; erpDataEntrada: string; validadoPor: string }
+): Promise<void> {
+  const pool = await getSqlServerPool();
+
+  await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, equipamentoId)
+    .input("erpCodigoItem", sql.NVarChar(50), dados.erpCodigoItem)
+    .input("erpIdItem", sql.NVarChar(50), dados.erpIdItem)
+    .input("erpDataEntrada", sql.Date, dados.erpDataEntrada)
+    .input("validadoPor", sql.NVarChar(150), dados.validadoPor)
+    .query(`
+      UPDATE dbo.com_estoque_equipamentos_usados
+      SET
+        [erp_codigo_item] = @erpCodigoItem,
+        [erp_id_item] = @erpIdItem,
+        [erp_data_entrada] = @erpDataEntrada,
+        [erp_validado_em] = SYSDATETIME(),
+        [erp_validado_por] = @validadoPor,
+        [atualizado_em] = SYSDATETIME()
+      WHERE [id] = @id;
+    `);
+}
+
+/*
+ * "Editar dados técnicos" — completa/corrige nome do cliente, valor e os
+ * valores dos campos dinâmicos depois da entrada (o tipo de equipamento em
+ * si não é editável: trocar de tipo invalidaria os valores já gravados).
+ * camposValoresJson substitui o JSON inteiro (o formulário de edição
+ * sempre reenvia o conjunto completo já mesclado com o que existia).
+ */
+export async function atualizarDadosEquipamento(
+  equipamentoId: string,
+  dados: {
+    nomeCliente: string | null;
+    codigoCliente: string | null;
+    valor: number | null;
+    camposValoresJson: string | null;
+  }
+): Promise<void> {
+  const pool = await getSqlServerPool();
+
+  await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, equipamentoId)
+    .input("nomeCliente", sql.NVarChar(200), dados.nomeCliente)
+    .input("codigoCliente", sql.NVarChar(30), dados.codigoCliente)
+    .input("valor", sql.Decimal(12, 2), dados.valor)
+    .input("camposValores", sql.NVarChar(sql.MAX), dados.camposValoresJson)
+    .query(`
+      UPDATE dbo.com_estoque_equipamentos_usados
+      SET
+        [nome_cliente] = @nomeCliente,
+        [codigo_cliente] = @codigoCliente,
+        [valor] = @valor,
+        [campos_valores] = @camposValores,
+        [atualizado_em] = SYSDATETIME()
+      WHERE [id] = @id;
+    `);
+}
+
+/*
+ * "numero" é IDENTITY(1,1) — IDENT_CURRENT devolve o último valor já
+ * gerado (mesmo que a linha tenha sido excluída depois), que é
+ * exatamente "o próximo vai ser esse + 1" que o admin precisa ver.
+ */
+export async function obterUltimoNumeroGerado(): Promise<number> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool.request().query<{ valor: number | null }>(
+    `SELECT IDENT_CURRENT('dbo.com_estoque_equipamentos_usados') AS [valor];`
+  );
+
+  return result.recordset[0]?.valor ?? 0;
+}
+
+/*
+ * Reseeda o IDENTITY — recusa um valor menor que o maior "numero" já
+ * gravado numa linha viva, senão o próximo gerado colidiria com um
+ * equipamento existente (numero tem UNIQUE) na primeira entrada nova.
+ */
+export async function definirUltimoNumeroGerado(novoValor: number): Promise<void> {
+  if (!Number.isInteger(novoValor) || novoValor < 0) {
+    throw new ValidationError("Informe um número inteiro válido (0 ou maior).");
+  }
+
+  const pool = await getSqlServerPool();
+
+  const maxResult = await pool
+    .request()
+    .query<{ maximo: number | null }>(`SELECT MAX([numero]) AS [maximo] FROM dbo.com_estoque_equipamentos_usados;`);
+
+  const maximoAtual = maxResult.recordset[0]?.maximo ?? 0;
+
+  if (novoValor < maximoAtual) {
+    throw new ValidationError(
+      `Já existe um equipamento com número ${maximoAtual} — defina um valor igual ou maior, senão o próximo cadastro pode gerar um número duplicado.`
+    );
+  }
+
+  await pool
+    .request()
+    .input("novoValor", sql.Int, novoValor)
+    .query(`DBCC CHECKIDENT ('dbo.com_estoque_equipamentos_usados', RESEED, @novoValor);`);
+}
+
+export interface AlteracaoDadosTecnicosHistorico {
+  campo: string;
+  rotulo: string;
+  de: unknown;
+  para: unknown;
+}
+
+export interface HistoricoAlteracaoDadosTecnicos {
+  id: string;
+  alteracoes: AlteracaoDadosTecnicosHistorico[];
+  autorNome: string;
+  criadoEm: string;
+  motivo: string | null;
+}
+
+interface HistoricoLogRow {
+  id: string;
+  mensagem: string;
+  detalhes: string | null;
+  criado_em: Date;
+}
+
+/*
+ * Reaproveita dbo.portal_logs (já usado por Administração → Monitoramento
+ * → Logs) em vez de criar uma tabela de auditoria dedicada — a origem
+ * "estoque-equipamentos-usados/dados" identifica o tipo de evento, e o
+ * equipamentoId dentro de "detalhes" (JSON) filtra pra um equipamento
+ * específico via JSON_VALUE, sem precisar de coluna própria.
+ */
+export async function listarHistoricoAlteracoesDados(
+  equipamentoId: string
+): Promise<HistoricoAlteracaoDadosTecnicos[]> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool
+    .request()
+    .input("origem", sql.NVarChar(200), "estoque-equipamentos-usados/dados")
+    .input("equipamentoId", sql.UniqueIdentifier, equipamentoId).query<HistoricoLogRow>(`
+      SELECT [id], [mensagem], [detalhes], [criado_em]
+      FROM dbo.portal_logs
+      WHERE [origem] = @origem
+        AND JSON_VALUE([detalhes], '$.equipamentoId') = @equipamentoId
+      ORDER BY [criado_em] DESC;
+    `);
+
+  return result.recordset.map((row) => {
+    let alteracoes: AlteracaoDadosTecnicosHistorico[] = [];
+    let motivo: string | null = null;
+    let autorNome = row.mensagem.split(" ")[0] ?? "Usuário";
+
+    if (row.detalhes) {
+      try {
+        const detalhes = JSON.parse(row.detalhes) as {
+          alteracoes?: AlteracaoDadosTecnicosHistorico[];
+          motivo?: string;
+        };
+        alteracoes = detalhes.alteracoes ?? [];
+        motivo = detalhes.motivo ?? null;
+      } catch {
+        alteracoes = [];
+      }
+    }
+
+    const autorMatch = row.mensagem.match(/^(.*?) atualizou/);
+    if (autorMatch) autorNome = autorMatch[1];
+
+    return {
+      id: row.id,
+      alteracoes,
+      autorNome,
+      criadoEm: row.criado_em.toISOString(),
+      motivo,
+    };
+  });
+}

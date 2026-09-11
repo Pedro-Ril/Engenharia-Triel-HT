@@ -1,0 +1,28 @@
+.required {
+  margin-left: 3px;
+  color: var(--primary);
+}
+
+.destaque {
+  border-radius: 12px;
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  animation: destaquePulse 1.4s ease-in-out 2;
+}
+
+@keyframes destaquePulse {
+  0%,
+  100% {
+    outline-color: var(--primary);
+  }
+
+  50% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .destaque {
+    animation: none;
+  }
+}

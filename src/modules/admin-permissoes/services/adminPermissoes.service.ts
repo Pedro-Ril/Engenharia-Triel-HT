@@ -13,6 +13,7 @@ import type {
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
+  ConfigErpEstoqueUsados,
   ConfigEstruturaSubstituicao,
   ConfigIntegraLantek,
   ConfigMateriaPrima,
@@ -695,6 +696,32 @@ export async function salvarConfigEstruturaSubstituicao(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigEstruturaSubstituicao>(response);
+}
+
+export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUsados | null> {
+  const response = await fetch("/api/admin/estoque-equipamentos-usados/config");
+  const body = await parseResponse<ConfigErpEstoqueUsados>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigErpEstoqueUsados(dados: {
+  urlValidarItem: string | null;
+  urlValidarItemTeste: string | null;
+  urlClientes: string | null;
+  urlClientesTeste: string | null;
+  usarAmbienteTeste: boolean;
+  chaveApi: string | null;
+  urlNfEntrada: string | null;
+  urlNfEntradaTeste: string | null;
+  intervaloVerificacaoNfMinutos: number | null;
+  campoMascaraChave: string;
+}): Promise<ApiEnvelope<ConfigErpEstoqueUsados>> {
+  const response = await fetch("/api/admin/estoque-equipamentos-usados/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigErpEstoqueUsados>(response);
 }
 
 export async function buscarConfigIntegraLantek(): Promise<ConfigIntegraLantek | null> {

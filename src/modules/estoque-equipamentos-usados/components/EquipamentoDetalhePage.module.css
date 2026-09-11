@@ -1,0 +1,54 @@
+.infoCampo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.infoLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.infoValor {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.linkAnexo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  font-size: 12px;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+
+.linkAnexo:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.badgeClicavel {
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.blocoJson {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--bg-surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+}

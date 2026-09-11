@@ -27,6 +27,11 @@ export async function register() {
     "@/lib/transferencia/scheduler"
   );
   iniciarLimpezaTransferencias();
+
+  const { iniciarAgendadorNfEntrada } = await import(
+    "@/lib/estoque-equipamentos-usados/nf-entrada-scheduler"
+  );
+  iniciarAgendadorNfEntrada();
 }
 
 /*

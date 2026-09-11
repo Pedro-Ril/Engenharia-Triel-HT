@@ -26,3 +26,27 @@
   font-weight: 600;
   color: var(--primary);
 }
+
+.highlighted {
+  border-radius: 12px;
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  animation: fieldPulse 1.4s ease-in-out 2;
+}
+
+@keyframes fieldPulse {
+  0%,
+  100% {
+    outline-color: var(--primary);
+  }
+
+  50% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlighted {
+    animation: none;
+  }
+}

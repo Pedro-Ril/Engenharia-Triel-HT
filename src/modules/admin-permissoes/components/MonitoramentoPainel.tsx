@@ -20,6 +20,7 @@ import {
   ServerCog,
   Shuffle,
   Trash2,
+  Warehouse,
   Wrench,
   XCircle,
 } from "lucide-react";
@@ -106,6 +107,8 @@ const SERVICO_CONFIG: Record<
   erp_materia_prima: { label: "ERP · Matéria-Prima", icon: PackageSearch },
   email: { label: "Envio de e-mail", icon: Mail },
   erp_estrutura: { label: "ERP · Substituição de Estrutura", icon: Shuffle },
+  erp_estoque_usados: { label: "ERP · Estoque de Equipamentos Usados", icon: Warehouse },
+  erp_estoque_usados_clientes: { label: "ERP · Clientes (Estoque de Equip. Usados)", icon: Warehouse },
 };
 
 const STATUS_SERVICO_CONFIG: Record<
