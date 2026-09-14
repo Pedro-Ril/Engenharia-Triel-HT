@@ -416,10 +416,25 @@ function detectarResolucaoTela() {
   }
 }
 
+/*
+ * `caminhoInicial` pode vir com sua própria query string (ex:
+ * "/estoque-equipamentos-usados/painel?fullscreen=1", pra usar como
+ * página inicial de um terminal específico) — concatenar "?token=..."
+ * direto quebrava isso, produzindo dois "?" na mesma URL
+ * ("...painel?fullscreen=1?token=xxx"), o que faz o parâmetro
+ * "fullscreen" virar "1?token=xxx" em vez de "1" (o fullscreen
+ * automático nunca dispara) e o "token" nunca chegar como parâmetro de
+ * verdade (o pareamento quebra junto). URL/URLSearchParams monta isso
+ * certo nos dois casos, com ou sem query string já presente.
+ */
 function lancarKiosk(caminhoNavegador, token, hardwareId, caminhoInicial) {
-  const urlPlayer = token
-    ? `${PORTAL_URL}${caminhoInicial}?token=${encodeURIComponent(token)}`
-    : `${PORTAL_URL}${caminhoInicial}?hardwareId=${encodeURIComponent(hardwareId)}`;
+  const urlPlayerObj = new URL(caminhoInicial, PORTAL_URL);
+  if (token) {
+    urlPlayerObj.searchParams.set("token", token);
+  } else {
+    urlPlayerObj.searchParams.set("hardwareId", hardwareId);
+  }
+  const urlPlayer = urlPlayerObj.toString();
 
   const resolucaoTela = detectarResolucaoTela();
   if (resolucaoTela) {
