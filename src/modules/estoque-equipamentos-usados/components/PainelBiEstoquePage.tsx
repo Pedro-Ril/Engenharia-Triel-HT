@@ -56,14 +56,9 @@ const STATUS_COR: Record<StatusEquipamento, string> = {
   baixado: "#64748b",
 };
 
-/*
- * Só pro grafico "por cliente" — esse so tem 2 estados possiveis
- * (emprestado/consignado, nunca em_estoque/baixado), entao usa um par
- * verde/azul dedicado em vez do STATUS_COR acima (que usa laranja pra
- * emprestado, pensado pro grafico de status com os 4 estados juntos).
- */
-const COR_CLIENTE_EMPRESTADO = "#16a34a";
-const COR_CLIENTE_CONSIGNADO = "#2563eb";
+/* Mesmas cores de STATUS_COR acima, pro grafico "por cliente" ficar consistente com o de "por status". */
+const COR_CLIENTE_EMPRESTADO = STATUS_COR.emprestado;
+const COR_CLIENTE_CONSIGNADO = STATUS_COR.consignado;
 
 const ACAO_LABEL: Record<TipoAcaoMovimentacao, string> = {
   entrada: "Entrada",
