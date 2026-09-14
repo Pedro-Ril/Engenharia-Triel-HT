@@ -260,6 +260,28 @@
   color: var(--text);
 }
 
+.tileTituloComLegenda {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.tileTituloComLegenda .tileTitulo {
+  margin-bottom: 0;
+}
+
+.legendaInline {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 .tileCorpo {
   flex: 1;
   min-height: 0;
@@ -411,12 +433,11 @@
   border-radius: 999px;
   background: var(--bg-surface-muted);
   overflow: hidden;
+  display: flex;
 }
 
 .linhaRankingBarra {
   height: 100%;
-  border-radius: 999px;
-  background: var(--primary);
 }
 
 .linhaRankingValor {

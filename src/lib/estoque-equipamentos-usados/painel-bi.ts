@@ -37,6 +37,8 @@ export interface PainelBiMovimentacao {
 export interface PainelBiCliente {
   nomeCliente: string;
   quantidade: number;
+  quantidadeEmprestado: number;
+  quantidadeConsignado: number;
 }
 
 export interface PainelBiEstoque {
@@ -184,19 +186,27 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
       INNER JOIN dbo.com_estoque_equipamentos_usados AS e ON e.[id] = m.[equipamento_id]
       ORDER BY m.[criado_em] DESC;
     `),
-    pool.request().query<{ nomeCliente: string; quantidade: number }>(`
+    pool.request().query<{
+      nomeCliente: string;
+      quantidadeEmprestado: number;
+      quantidadeConsignado: number;
+    }>(`
       SELECT TOP (8)
-        dest.[destinatario_nome] AS [nomeCliente],
-        COUNT(*) AS [quantidade]
-      FROM dbo.com_estoque_equipamentos_usados AS e
-      CROSS APPLY (
-        SELECT TOP (1) m.[destinatario_nome]
-        FROM dbo.com_estoque_equipamentos_usados_movimentacoes AS m
-        WHERE m.[equipamento_id] = e.[id] AND m.[tipo_acao] IN ('emprestimo', 'consignacao')
-        ORDER BY m.[data_acao] DESC, m.[criado_em] DESC
-      ) AS dest
-      WHERE e.[status] IN ('emprestado', 'consignado') AND dest.[destinatario_nome] IS NOT NULL
-      GROUP BY dest.[destinatario_nome]
+        x.[nomeCliente],
+        SUM(CASE WHEN x.[status] = 'emprestado' THEN 1 ELSE 0 END) AS [quantidadeEmprestado],
+        SUM(CASE WHEN x.[status] = 'consignado' THEN 1 ELSE 0 END) AS [quantidadeConsignado]
+      FROM (
+        SELECT e.[status], dest.[destinatario_nome] AS [nomeCliente]
+        FROM dbo.com_estoque_equipamentos_usados AS e
+        CROSS APPLY (
+          SELECT TOP (1) m.[destinatario_nome]
+          FROM dbo.com_estoque_equipamentos_usados_movimentacoes AS m
+          WHERE m.[equipamento_id] = e.[id] AND m.[tipo_acao] IN ('emprestimo', 'consignacao')
+          ORDER BY m.[data_acao] DESC, m.[criado_em] DESC
+        ) AS dest
+        WHERE e.[status] IN ('emprestado', 'consignado') AND dest.[destinatario_nome] IS NOT NULL
+      ) AS x
+      GROUP BY x.[nomeCliente]
       ORDER BY COUNT(*) DESC;
     `),
     contarEquipamentosComPendencia(pool),
@@ -236,7 +246,9 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
     })),
     clientesComEquipamentoFora: clientesResult.recordset.map((row) => ({
       nomeCliente: row.nomeCliente,
-      quantidade: row.quantidade,
+      quantidade: row.quantidadeEmprestado + row.quantidadeConsignado,
+      quantidadeEmprestado: row.quantidadeEmprestado,
+      quantidadeConsignado: row.quantidadeConsignado,
     })),
     atualizadoEm: new Date().toISOString(),
   };

@@ -56,6 +56,15 @@ const STATUS_COR: Record<StatusEquipamento, string> = {
   baixado: "#64748b",
 };
 
+/*
+ * Só pro grafico "por cliente" — esse so tem 2 estados possiveis
+ * (emprestado/consignado, nunca em_estoque/baixado), entao usa um par
+ * verde/azul dedicado em vez do STATUS_COR acima (que usa laranja pra
+ * emprestado, pensado pro grafico de status com os 4 estados juntos).
+ */
+const COR_CLIENTE_EMPRESTADO = "#16a34a";
+const COR_CLIENTE_CONSIGNADO = "#2563eb";
+
 const ACAO_LABEL: Record<TipoAcaoMovimentacao, string> = {
   entrada: "Entrada",
   emprestimo: "Empréstimo",
@@ -453,7 +462,15 @@ export function PainelBiEstoquePage() {
         </div>
 
         <div className={styles.tile}>
-          <h2 className={styles.tileTitulo}>Equipamentos fora do estoque, por cliente</h2>
+          <div className={styles.tileTituloComLegenda}>
+            <h2 className={styles.tileTitulo}>Equipamentos fora do estoque, por cliente</h2>
+            <div className={styles.legendaInline}>
+              <span className={styles.legendaPonto} style={{ background: COR_CLIENTE_EMPRESTADO }} />
+              <span className={styles.legendaLabel}>Emprestado</span>
+              <span className={styles.legendaPonto} style={{ background: COR_CLIENTE_CONSIGNADO }} />
+              <span className={styles.legendaLabel}>Consignado</span>
+            </div>
+          </div>
           <div className={styles.listaCorpo}>
             {dados.clientesComEquipamentoFora.length === 0 && (
               <p className={styles.listaVazia}>Nenhum equipamento emprestado ou consignado no momento.</p>
@@ -465,7 +482,15 @@ export function PainelBiEstoquePage() {
                   <div
                     className={styles.linhaRankingBarra}
                     style={{
-                      width: `${maiorClienteFora > 0 ? (cliente.quantidade / maiorClienteFora) * 100 : 0}%`,
+                      width: `${maiorClienteFora > 0 ? (cliente.quantidadeEmprestado / maiorClienteFora) * 100 : 0}%`,
+                      background: COR_CLIENTE_EMPRESTADO,
+                    }}
+                  />
+                  <div
+                    className={styles.linhaRankingBarra}
+                    style={{
+                      width: `${maiorClienteFora > 0 ? (cliente.quantidadeConsignado / maiorClienteFora) * 100 : 0}%`,
+                      background: COR_CLIENTE_CONSIGNADO,
                     }}
                   />
                 </div>

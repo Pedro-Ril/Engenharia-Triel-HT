@@ -201,6 +201,8 @@ export interface PainelBiMovimentacao {
 export interface PainelBiCliente {
   nomeCliente: string;
   quantidade: number;
+  quantidadeEmprestado: number;
+  quantidadeConsignado: number;
 }
 
 export interface PainelBiEstoque {
