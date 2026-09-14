@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/Table";
 import { Textarea } from "@/components/ui/Textarea";
 import { Toast } from "@/components/ui/Toast";
+import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
 
 import {
   buscarAcessosTransferencia,
@@ -236,7 +237,11 @@ export function TransferenciaPageClient({ ehAdministrador }: TransferenciaPageCl
   }
 
   async function handleCopiarLink(link: string) {
-    await navigator.clipboard.writeText(link);
+    const sucesso = await copiarParaAreaDeTransferencia(link);
+    if (!sucesso) {
+      setToast({ open: true, variant: "danger", title: "Não foi possível copiar o link" });
+      return;
+    }
     setToast({ open: true, variant: "success", title: "Link copiado" });
   }
 

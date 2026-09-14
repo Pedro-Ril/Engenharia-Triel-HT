@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
 import { Stack } from "@/components/ui/Stack";
+import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
 
 import { buscarConfigTv } from "../services/tvCorporativa.service";
 import styles from "./AgenteTvPainel.module.css";
@@ -47,7 +48,8 @@ function ComandoCopiavel({ comando }: { comando: string }) {
   const [copiado, setCopiado] = useState(false);
 
   async function copiar() {
-    await navigator.clipboard.writeText(comando);
+    const sucesso = await copiarParaAreaDeTransferencia(comando);
+    if (!sucesso) return;
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
   }

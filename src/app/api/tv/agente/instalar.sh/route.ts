@@ -223,6 +223,14 @@ cat > "$KIOSK_HOME/.xinitrc" <<XINITRC
 xset -dpms
 xset s off
 xset s noblank
+# A autodeteccao do Xorg as vezes cai num modo "seguro" menor que a
+# resolucao real do monitor via HDMI (comum em Raspberry Pi/mini-PCs ARM) --
+# a janela do navegador em modo kiosk fica ocupando so uma fracao da tela
+# fisica nesse caso. --auto forca cada saida conectada a usar o modo nativo
+# reportado pelo EDID do proprio monitor, em vez do que o X escolheu sozinho.
+for SAIDA in \\$(xrandr --query 2>/dev/null | awk '/ connected/{print \\$1}'); do
+  xrandr --output "\\$SAIDA" --auto 2>/dev/null || true
+done
 export PORTAL_TV_URL="$PORTAL_URL"
 while true; do
   node "$DIR/agente.mjs" > "$DIR/agente.log" 2>&1

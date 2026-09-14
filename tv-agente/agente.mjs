@@ -389,14 +389,54 @@ function localizarNavegador() {
  * sozinho (não tem como: uma vez que o X toma conta da tela em modo
  * gráfico, o stdout do agente fica invisível pra quem olha a TV).
  */
+/*
+ * --kiosk sozinho conta com um window manager pra aplicar as dicas de
+ * fullscreen (EWMH) que o Chrome/Chromium pede — mas o X deste kiosk é
+ * deliberadamente "puro", sem nenhum WM rodando (ver instalar.sh), então
+ * não tem quem force a janela a ocupar a tela inteira. Visto ao vivo
+ * numa build de Chromium ARM (Raspberry Pi): a janela abria ocupando só
+ * metade da tela física, mesmo com --kiosk e com o X já na resolução
+ * nativa correta. Resolvido lendo a geometria real da tela via `xrandr`
+ * e passando --window-size/--window-position explícitos — não depende
+ * de nenhum WM pra funcionar.
+ */
+function detectarResolucaoTela() {
+  if (EH_WINDOWS) return null;
+
+  try {
+    const saida = execFileSync("xrandr", ["--query"], { encoding: "utf8" });
+    const match = saida.match(/ connected(?: primary)? (\d+)x(\d+)\+(\d+)\+(\d+)/);
+    if (!match) return null;
+
+    const [, largura, altura, x, y] = match;
+    return { largura: Number(largura), altura: Number(altura), x: Number(x), y: Number(y) };
+  } catch (error) {
+    console.error("Não foi possível detectar a resolução da tela via xrandr:", error.message);
+    return null;
+  }
+}
+
 function lancarKiosk(caminhoNavegador, token, hardwareId, caminhoInicial) {
   const urlPlayer = token
     ? `${PORTAL_URL}${caminhoInicial}?token=${encodeURIComponent(token)}`
     : `${PORTAL_URL}${caminhoInicial}?hardwareId=${encodeURIComponent(hardwareId)}`;
 
+  const resolucaoTela = detectarResolucaoTela();
+  if (resolucaoTela) {
+    console.log(
+      `Resolução da tela detectada via xrandr: ${resolucaoTela.largura}x${resolucaoTela.altura} em (${resolucaoTela.x},${resolucaoTela.y})`
+    );
+  }
+
   const flags = [
     `--app=${urlPlayer}`,
     "--kiosk",
+    ...(resolucaoTela
+      ? [
+          `--window-size=${resolucaoTela.largura},${resolucaoTela.altura}`,
+          `--window-position=${resolucaoTela.x},${resolucaoTela.y}`,
+        ]
+      : []),
     "--use-fake-ui-for-media-stream",
     "--auto-select-desktop-capture-source=Entire screen",
     "--lang=en-US",

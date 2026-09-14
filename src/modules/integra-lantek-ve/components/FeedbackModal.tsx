@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
 import styles from "@/modules/integra-lantek-shared/components/FeedbackModal.module.css";
 
 type ResumoOrdensAgrupado = {
@@ -99,7 +100,8 @@ export default function FeedbackModal({
   // Copia apenas os números das ordens, separados por vírgula
   async function handleCopiarOrdens(identificador: string, ordens: string[]) {
     try {
-      await navigator.clipboard.writeText(ordens.join(", "));
+      const sucesso = await copiarParaAreaDeTransferencia(ordens.join(", "));
+      if (!sucesso) return;
 
       setCopiadoGrupo(identificador);
 
