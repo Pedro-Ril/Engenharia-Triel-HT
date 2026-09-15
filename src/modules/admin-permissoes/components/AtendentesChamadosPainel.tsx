@@ -48,6 +48,7 @@ import { listarSetores, listarUsuarios } from "../services/adminPermissoes.servi
 import type { PortalSetor, PortalUsuarioAdmin } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 import styles from "./AdminPermissoes.module.css";
+import { ChamadosConfigPainel } from "./ChamadosConfigPainel";
 import { NotificacoesEmailChamadosPainel } from "./NotificacoesEmailChamadosPainel";
 
 function novaCategoriaInicial() {
@@ -604,6 +605,8 @@ export function AtendentesChamadosPainel({ onFeedback }: AtendentesChamadosPaine
           setErroExclusaoCategoria(null);
         }}
       />
+
+      <ChamadosConfigPainel onFeedback={onFeedback} />
 
       <NotificacoesEmailChamadosPainel />
     </Stack>

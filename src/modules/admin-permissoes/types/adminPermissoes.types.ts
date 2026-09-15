@@ -219,6 +219,12 @@ export interface TransferenciaConfig {
   atualizadoPor: string | null;
 }
 
+export interface ChamadosConfig {
+  urlPublica: string | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
 export interface ArquivoTransferenciaAdmin {
   id: string;
   nomeOriginal: string;

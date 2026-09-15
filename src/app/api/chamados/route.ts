@@ -7,6 +7,7 @@ import { optionalText, requiredText } from "@/lib/auth/validation";
 import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { getSetoresQueAtende } from "@/lib/chamados/autorizacao-chamados";
 import { criarChamado } from "@/lib/chamados/chamados";
+import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
 import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -106,7 +107,7 @@ async function handlePOST(request: Request) {
         solicitanteUsuarioId: solicitante?.id ?? null,
       },
       evento: "aberto",
-      origem: new URL(request.url).origin,
+      origem: await origemPublicaEfetivaChamados(request),
     });
 
     return NextResponse.json(

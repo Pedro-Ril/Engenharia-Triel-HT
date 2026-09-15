@@ -13,6 +13,7 @@ import type {
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
+  ChamadosConfig,
   ConfigErpEstoqueUsados,
   ConfigEstruturaSubstituicao,
   ConfigIntegraLantek,
@@ -805,6 +806,23 @@ export async function salvarConfigTransferencia(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<TransferenciaConfig>(response);
+}
+
+export async function buscarConfigChamados(): Promise<ChamadosConfig | null> {
+  const response = await fetch("/api/admin/chamados/config");
+  const body = await parseResponse<ChamadosConfig>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigChamados(dados: {
+  urlPublica: string | null;
+}): Promise<ApiEnvelope<ChamadosConfig>> {
+  const response = await fetch("/api/admin/chamados/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ChamadosConfig>(response);
 }
 
 export async function listarTransferenciasAdmin(): Promise<TransferenciaAdmin[]> {

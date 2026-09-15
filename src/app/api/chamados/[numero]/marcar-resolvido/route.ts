@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { buscarChamadoPorNumero, marcarComoResolvidoPendente } from "@/lib/chamados/chamados";
+import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
 import { carregarContextoAcao, lerNomeConfirmado } from "@/lib/chamados/api-helpers";
 import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -45,7 +46,7 @@ async function handlePOST(request: Request, context: RouteContext) {
       await notificarSolicitanteChamado({
         chamado,
         evento: "resolvido_pendente",
-        origem: new URL(request.url).origin,
+        origem: await origemPublicaEfetivaChamados(request),
         autorNome: usuario.nomeExibicao,
       });
     }

@@ -5,6 +5,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { requiredText } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import { adicionarMensagem, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
+import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
 import {
   notificarAtendenteChamado,
   notificarCopiaChamado,
@@ -97,26 +98,26 @@ async function handlePOST(request: Request, context: RouteContext) {
       anexos,
     });
 
-    if (ehAtendente && !interno && !ehDono) {
-      await notificarSolicitanteChamado({
-        chamado,
-        evento: "nova_resposta",
-        origem: new URL(request.url).origin,
-        autorNome,
-        autorUsuarioId: usuario?.id ?? null,
-      });
-    } else if (!ehAtendente && !interno) {
-      await notificarAtendenteChamado({
-        chamado,
-        origem: new URL(request.url).origin,
-        autorNome,
-      });
-      await notificarCopiaChamado({
-        chamado,
-        origem: new URL(request.url).origin,
-        autorNome,
-        autorUsuarioId: usuario?.id ?? null,
-      });
+    if (!interno) {
+      const origem = await origemPublicaEfetivaChamados(request);
+
+      if (ehAtendente && !ehDono) {
+        await notificarSolicitanteChamado({
+          chamado,
+          evento: "nova_resposta",
+          origem,
+          autorNome,
+          autorUsuarioId: usuario?.id ?? null,
+        });
+      } else if (!ehAtendente) {
+        await notificarAtendenteChamado({ chamado, origem, autorNome });
+        await notificarCopiaChamado({
+          chamado,
+          origem,
+          autorNome,
+          autorUsuarioId: usuario?.id ?? null,
+        });
+      }
     }
 
     return NextResponse.json(
