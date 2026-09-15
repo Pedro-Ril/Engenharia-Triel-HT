@@ -235,7 +235,7 @@ export function AbrirChamadoPage({
         ]}
       />
 
-      <Card>
+      <Card allowOverflow>
         <Stack gap={20}>
           {usuarioLogado ? (
             <Stack gap={12}>

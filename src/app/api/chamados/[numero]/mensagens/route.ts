@@ -5,7 +5,11 @@ import { ValidationError } from "@/lib/auth/errors";
 import { requiredText } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import { adicionarMensagem, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
-import { notificarAtendenteChamado, notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
+import {
+  notificarAtendenteChamado,
+  notificarCopiaChamado,
+  notificarSolicitanteChamado,
+} from "@/lib/chamados/notificacoes-email";
 import { parseAnexosFormData } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -99,12 +103,19 @@ async function handlePOST(request: Request, context: RouteContext) {
         evento: "nova_resposta",
         origem: new URL(request.url).origin,
         autorNome,
+        autorUsuarioId: usuario?.id ?? null,
       });
     } else if (!ehAtendente && !interno) {
       await notificarAtendenteChamado({
         chamado,
         origem: new URL(request.url).origin,
         autorNome,
+      });
+      await notificarCopiaChamado({
+        chamado,
+        origem: new URL(request.url).origin,
+        autorNome,
+        autorUsuarioId: usuario?.id ?? null,
       });
     }
 

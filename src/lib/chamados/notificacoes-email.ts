@@ -54,6 +54,8 @@ interface NotificarSolicitanteParams {
   evento: EventoNotificacaoChamado;
   origem: string;
   autorNome?: string | null;
+  /* Evita notificar quem acabou de escrever, caso essa pessoa também esteja na lista de cópia. */
+  autorUsuarioId?: string | null;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -182,7 +184,7 @@ function montarConteudo(
 /* Mesma mensagem de "nova_resposta", mas endereçada a quem acompanha em cópia (não é "seu chamado", é o chamado que essa pessoa acompanha). */
 function montarConteudoParaCopia(
   destinatarioNome: string,
-  chamado: ChamadoParaNotificar,
+  chamado: Pick<ChamadoParaNotificar, "numero" | "titulo">,
   autorNome: string | null | undefined,
   link: string
 ): ConteudoEmail {
@@ -289,12 +291,9 @@ async function enviarNotificacaoUnica(params: {
  * texto livre, pode ser telefone) é pulado silenciosamente, sem gerar
  * linha de log — a tabela representa tentativas reais de envio, não
  * todo evento do ciclo de vida.
- *
- * CC (ver adicionarUsuarioCopia) só recebe nas iterações
- * ("nova_resposta") -- não no restante do ciclo de vida do chamado.
  */
 export async function notificarSolicitanteChamado(params: NotificarSolicitanteParams): Promise<void> {
-  const { chamado, evento, origem, autorNome } = params;
+  const { chamado, evento, origem, autorNome, autorUsuarioId } = params;
   const destinatario = chamado.solicitanteContato?.trim() ?? "";
   const link = construirLink(chamado, origem);
 
@@ -312,22 +311,45 @@ export async function notificarSolicitanteChamado(params: NotificarSolicitantePa
   }
 
   if (evento === "nova_resposta") {
-    const copia = await listarCopiaDoChamado(chamado.id);
+    await notificarCopiaChamado({ chamado, origem, autorNome, autorUsuarioId });
+  }
+}
 
-    for (const pessoa of copia) {
-      if (!pessoa.email || !EMAIL_REGEX.test(pessoa.email)) continue;
+export interface NotificarCopiaParams {
+  chamado: Pick<ChamadoParaNotificar, "id" | "numero" | "titulo">;
+  origem: string;
+  autorNome?: string | null;
+  /* Quem acabou de escrever não recebe aviso da própria mensagem, mesmo estando em cópia. */
+  autorUsuarioId?: string | null;
+}
 
-      const conteudo = montarConteudoParaCopia(pessoa.nome, chamado, autorNome, link);
+/*
+ * Fan-out para quem está em cópia (ver adicionarUsuarioCopia) -- chamado
+ * nas DUAS direções da conversa: tanto quando o atendente responde
+ * (a partir de notificarSolicitanteChamado) quanto quando o
+ * solicitante ou outra pessoa em cópia escreve (a partir da rota de
+ * mensagens). CC só recebe nas iterações, não no restante do ciclo de
+ * vida do chamado (aberto/aceito/resolvido/etc).
+ */
+export async function notificarCopiaChamado(params: NotificarCopiaParams): Promise<void> {
+  const { chamado, origem, autorNome, autorUsuarioId } = params;
+  const copia = await listarCopiaDoChamado(chamado.id);
+  const link = `${origem}/chamados/${chamado.numero}`;
 
-      await enviarNotificacaoUnica({
-        chamadoNumero: chamado.numero,
-        chamadoTitulo: chamado.titulo,
-        evento,
-        destinatarioEmail: pessoa.email,
-        destinatarioNome: pessoa.nome,
-        ...conteudo,
-      });
-    }
+  for (const pessoa of copia) {
+    if (autorUsuarioId && pessoa.usuarioId === autorUsuarioId) continue;
+    if (!pessoa.email || !EMAIL_REGEX.test(pessoa.email)) continue;
+
+    const conteudo = montarConteudoParaCopia(pessoa.nome, chamado, autorNome, link);
+
+    await enviarNotificacaoUnica({
+      chamadoNumero: chamado.numero,
+      chamadoTitulo: chamado.titulo,
+      evento: "nova_resposta",
+      destinatarioEmail: pessoa.email,
+      destinatarioNome: pessoa.nome,
+      ...conteudo,
+    });
   }
 }
 

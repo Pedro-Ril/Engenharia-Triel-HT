@@ -507,6 +507,7 @@ export function ChamadoDetalhePage({
         <Card
           title="Pessoas em cópia"
           description="Recebem as respostas deste chamado por e-mail e podem acompanhar a conversa."
+          allowOverflow
         >
           <Stack gap={16}>
             {copia.length > 0 && (
