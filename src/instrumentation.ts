@@ -36,7 +36,14 @@ export async function register() {
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );
-  iniciarMediaMtxSeNecessario();
+  iniciarMediaMtxSeNecessario().then(async (online) => {
+    if (!online) return;
+
+    const { registrarTodasCamerasAtivasNoMediaMtx } = await import(
+      "@/lib/semaforo/cameras"
+    );
+    await registrarTodasCamerasAtivasNoMediaMtx();
+  });
 }
 
 /*

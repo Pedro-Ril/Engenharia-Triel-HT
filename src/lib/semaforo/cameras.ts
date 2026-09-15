@@ -400,3 +400,36 @@ export async function excluirCamera(id: string): Promise<void> {
     await removerCameraDoMediaMtx(camera.mediamtxPath);
   }
 }
+
+/*
+ * Re-registra no MediaMTX toda câmera ativa já verificada alguma vez --
+ * necessário porque o MediaMTX roda como processo filho (ver
+ * mediamtx-processo.ts) e começa sempre vazio (paths: {} no yml) a
+ * cada reinício do servidor; sem isso, toda câmera fica "not
+ * configured" no WHEP até alguém reabrir o cadastro dela no admin.
+ * Best-effort e usa a última stream_uri_rtsp já resolvida (mais
+ * rápido no boot e não depende de nenhuma câmera estar acessível
+ * agora) -- se uma tiver mudado de endereço de verdade, "Reverificar"
+ * no admin resolve.
+ */
+export async function registrarTodasCamerasAtivasNoMediaMtx(): Promise<void> {
+  const cameras = await listarCameras(true);
+
+  for (const camera of cameras) {
+    if (!camera.streamUriRtsp) continue;
+
+    try {
+      const senha = await buscarSenhaDecifrada(camera.id);
+      if (!senha) continue;
+
+      await registrarCameraNoMediaMtx({
+        mediamtxPath: camera.mediamtxPath,
+        streamUriRtsp: camera.streamUriRtsp,
+        usuario: camera.usuario,
+        senha,
+      });
+    } catch (error) {
+      console.error(`Erro ao re-registrar câmera "${camera.nome}" no MediaMTX:`, error);
+    }
+  }
+}
