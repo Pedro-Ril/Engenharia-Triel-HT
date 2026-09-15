@@ -32,6 +32,11 @@ export async function register() {
     "@/lib/estoque-equipamentos-usados/nf-entrada-scheduler"
   );
   iniciarAgendadorNfEntrada();
+
+  const { iniciarMediaMtxSeNecessario } = await import(
+    "@/lib/semaforo/mediamtx-processo"
+  );
+  iniciarMediaMtxSeNecessario();
 }
 
 /*

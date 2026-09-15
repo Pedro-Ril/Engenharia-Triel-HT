@@ -33,6 +33,7 @@ const ROTAS_COM_TELA_CHEIA = [
   "/terminal-fabrica",
   "/chamados/dashboard",
   "/estoque-equipamentos-usados/painel",
+  "/semaforo",
 ];
 
 /*

@@ -1,0 +1,42 @@
+/*
+ * Vídeo é o dado em si -- fundo preto e overlay translúcido não
+ * precisam de par claro/escuro, mesma exceção já documentada em
+ * SemaforoPage.module.css pro corpo físico do semáforo.
+ *
+ * "position:absolute;inset:0" em vez de "width/height:100%" de
+ * propósito -- o pai (grid item esticado, flex:1, etc) muitas vezes
+ * tem um tamanho só "visualmente" definido, não "explicitamente"
+ * definido no sentido que a spec de CSS exige pra resolver altura em
+ * porcentagem; nesse caso "height:100%" vira "auto" e o <video> caía
+ * pra sua proporção intrínseca (16:9) em vez de preencher a caixa.
+ * Absolute com inset:0 não depende disso -- sempre preenche a
+ * caixa de conteúdo do ancestral posicionado mais próximo. Exige que
+ * quem usa este componente tenha um ancestral "position: relative".
+ */
+.box {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.45);
+}

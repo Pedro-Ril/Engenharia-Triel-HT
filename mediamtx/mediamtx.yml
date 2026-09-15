@@ -1,0 +1,38 @@
+# Configuração do MediaMTX para o módulo Semáforo (câmeras ONVIF ao
+# vivo via WebRTC/WHEP). O binário (mediamtx.exe, Windows) é baixado
+# manualmente e não é versionado -- só este arquivo é committado. Ver
+# src/lib/semaforo/mediamtx-processo.ts (sobe o processo sozinho junto
+# com o servidor do portal) e src/lib/semaforo/mediamtx.ts (registra
+# cada câmera em tempo real via API, quando ela é salva no admin).
+#
+# Chaves omitidas aqui usam o padrão embutido do MediaMTX -- só
+# sobrescrevemos o que precisa ser diferente do padrão.
+
+logLevel: info
+
+# API de controle (registrar/remover câmera, checar status) -- só o
+# próprio servidor do portal fala com ela, por isso fica restrita a
+# localhost, nunca exposta na rede.
+api: yes
+apiAddress: 127.0.0.1:9997
+
+# WHEP (WebRTC) -- precisa estar acessível pelos navegadores na rede
+# local (é isso que o menu flutuante do Semáforo consome), por isso
+# NÃO é restrito a localhost.
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: ""
+
+# Só usamos WebRTC como saída -- desliga os outros protocolos de
+# servidor (incluindo MoQ, ligado por padrão desde o MediaMTX
+# v1.21) pra reduzir a superfície de portas abertas no servidor.
+rtsp: no
+rtmp: no
+hls: no
+srt: no
+moq: no
+
+# Câmeras são registradas em tempo real via API quando cadastradas no
+# admin (Administração > Semáforo) -- nenhuma fixa aqui.
+paths: {}

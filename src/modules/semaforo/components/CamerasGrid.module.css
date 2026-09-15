@@ -1,0 +1,39 @@
+/*
+ * "auto-fill, minmax(300px, 360px)" -- cards de tamanho médio fixo
+ * (não esticam pra preencher a linha, ao contrário de "1fr"), quantos
+ * couberem lado a lado; quando não cabem mais, quebram sozinhos pra
+ * próxima linha, sem precisar de media query.
+ */
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 360px));
+  gap: 16px;
+}
+
+/* "Ampliar card" -- ocupa a linha inteira da grade (mesmo tamanho da versão anterior, cheia), o resto continua no tamanho médio. */
+.itemAmpliado {
+  grid-column: 1 / -1;
+}
+
+/* aspect-ratio (não height:100%) dá uma altura de verdade pro CameraPreview preencher via position:absolute. */
+.caixaVideo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.caixaVideoExpandida {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mensagemVazia {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}

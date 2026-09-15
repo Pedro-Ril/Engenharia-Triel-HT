@@ -16,6 +16,7 @@ import {
   Megaphone,
   Send,
   Settings,
+  TrafficCone,
   Tv,
   Users,
   Warehouse,
@@ -70,6 +71,7 @@ import { DownloadsPainel } from "./DownloadsPainel";
 import { EmpresasPainel } from "./EmpresasPainel";
 import { MonitoramentoPainel } from "./MonitoramentoPainel";
 import { PermissoesPainel } from "./PermissoesPainel";
+import { SemaforoConfigPainel } from "./SemaforoConfigPainel";
 import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
 import { DesenhoAprovacaoTemplatesPainel } from "./DesenhoAprovacaoTemplatesPainel";
@@ -161,6 +163,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "estoque-tipos-equipamento",
         label: "Equipamentos Usados",
         icon: <Warehouse size={16} />,
+      },
+      {
+        valor: "semaforo-config",
+        label: "Semáforo",
+        icon: <TrafficCone size={16} />,
       },
     ],
   },
@@ -512,6 +519,10 @@ export function AdminPermissoesPage() {
 
           {secao === "estoque-tipos-equipamento" && (
             <EstoqueEquipamentosUsadosPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "semaforo-config" && (
+            <SemaforoConfigPainel onFeedback={mostrarFeedback} />
           )}
         </div>
       </div>
