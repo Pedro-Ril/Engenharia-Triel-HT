@@ -31,6 +31,8 @@ export interface ResultadoTesteCamera {
   perfilOnvif?: string | null;
   /* Presente quando a câmera não está em H264 -- MediaMTX não transcodifica, então a maioria dos navegadores não decodifica o vídeo via WebRTC nesse caso. */
   avisoCodec?: string | null;
+  /* Só quando sucesso:true -- URL WHEP de um path temporário de preview, registrado no MediaMTX antes mesmo da câmera existir no banco. */
+  whepUrl?: string;
 }
 
 /* Só o essencial pro menu flutuante montar a conexão WHEP -- nunca host/usuário/senha/stream_uri_rtsp. */

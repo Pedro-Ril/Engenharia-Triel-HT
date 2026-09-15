@@ -39,6 +39,7 @@ import {
   excluirCameraAdmin,
   iniciarMediamtx,
   listarCamerasAdmin,
+  removerPreviewCameraAdmin,
   reverificarCameraAdmin,
   salvarConfigSemaforoAdmin,
   testarConexaoCameraAdmin,
@@ -49,10 +50,9 @@ interface SemaforoConfigPainelProps {
   onFeedback: FeedbackHandler;
 }
 
-const WHEP_BASE_URL_PADRAO = "http://127.0.0.1:8889";
-
-function montarWhepUrl(mediamtxPath: string, whepBaseUrl: string | null | undefined): string {
-  return `${whepBaseUrl || WHEP_BASE_URL_PADRAO}/${mediamtxPath}/whep`;
+/* Path temporário (nunca persistido) usado só pra pré-visualizar a conexão antes de salvar a câmera de verdade -- reaproveitado (via PATCH) a cada novo teste da mesma sessão do modal. */
+function gerarCaminhoPreviewTemp(): string {
+  return `preview-${Math.random().toString(16).slice(2, 10)}`;
 }
 
 function formCameraInicial() {
@@ -93,6 +93,8 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
     mensagem: string;
     avisoCodec?: string | null;
   } | null>(null);
+  const [caminhoPreview, setCaminhoPreview] = useState("");
+  const [previewWhepUrl, setPreviewWhepUrl] = useState<string | null>(null);
 
   const [cameraExcluindo, setCameraExcluindo] = useState<Camera | null>(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
@@ -175,6 +177,8 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
     setFormCamera(formCameraInicial());
     setErroCamera(null);
     setResultadoTesteCamera(null);
+    setPreviewWhepUrl(null);
+    setCaminhoPreview(gerarCaminhoPreviewTemp());
     setModalAberto(true);
   }
 
@@ -190,24 +194,56 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
     });
     setErroCamera(null);
     setResultadoTesteCamera(null);
+    setPreviewWhepUrl(null);
     setModalAberto(true);
+
+    const caminho = gerarCaminhoPreviewTemp();
+    setCaminhoPreview(caminho);
+
+    /* Testa e já mostra o preview com os dados já salvos -- fallback de senha via id, sem precisar redigitar. */
+    executarTesteConexao({
+      id: camera.id,
+      host: camera.host,
+      portaOnvif: camera.portaOnvif,
+      usuario: camera.usuario,
+      caminhoPreview: caminho,
+    });
   }
 
   function fecharModalCamera() {
+    if (caminhoPreview) {
+      removerPreviewCameraAdmin(caminhoPreview);
+    }
+
     setModalAberto(false);
     setCameraEditando(null);
+    setResultadoTesteCamera(null);
+    setPreviewWhepUrl(null);
+    setCaminhoPreview("");
   }
 
-  async function handleTestarCamera() {
+  async function executarTesteConexao(params: {
+    id?: string;
+    host: string;
+    portaOnvif: number;
+    usuario: string;
+    senha?: string;
+    caminhoPreview: string;
+  }) {
+    if (testandoCamera) return;
+
     setResultadoTesteCamera(null);
+    setPreviewWhepUrl(null);
     setTestandoCamera(true);
 
     try {
       const resultado = await testarConexaoCameraAdmin({
-        host: formCamera.host,
-        portaOnvif: Number(formCamera.portaOnvif) || 80,
-        usuario: formCamera.usuario,
-        senha: formCamera.senha,
+        id: params.id,
+        host: params.host,
+        portaOnvif: params.portaOnvif,
+        usuario: params.usuario,
+        senha: params.senha,
+        mediamtxPathPreview: params.caminhoPreview,
       });
 
       if (resultado.ok && resultado.data) {
@@ -216,6 +252,7 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
           mensagem: resultado.data.mensagem,
           avisoCodec: resultado.data.avisoCodec,
         });
+        setPreviewWhepUrl(resultado.data.sucesso ? (resultado.data.whepUrl ?? null) : null);
       } else {
         setResultadoTesteCamera({
           sucesso: false,
@@ -225,6 +262,33 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
     } finally {
       setTestandoCamera(false);
     }
+  }
+
+  function handleTestarCamera() {
+    executarTesteConexao({
+      id: cameraEditando?.id,
+      host: formCamera.host,
+      portaOnvif: Number(formCamera.portaOnvif) || 80,
+      usuario: formCamera.usuario,
+      senha: formCamera.senha.trim() || undefined,
+      caminhoPreview,
+    });
+  }
+
+  /* Ao sair de host/usuário/senha, com os três preenchidos (ou editando, com senha em branco = mantém a atual), testa e já mostra o preview sozinho. */
+  function handleBlurCampoConexao() {
+    if (testandoCamera) return;
+    if (!formCamera.host.trim() || !formCamera.usuario.trim()) return;
+    if (!formCamera.senha.trim() && !cameraEditando) return;
+
+    handleTestarCamera();
+  }
+
+  /* Qualquer mudança em host/porta/usuário/senha invalida o preview/teste atual -- Salvar fica bloqueado até um novo teste bem-sucedido. */
+  function atualizarCampoConexao(campo: "host" | "portaOnvif" | "usuario" | "senha", valor: string) {
+    setFormCamera((atual) => ({ ...atual, [campo]: valor }));
+    setResultadoTesteCamera(null);
+    setPreviewWhepUrl(null);
   }
 
   async function handleSalvarCamera() {
@@ -253,12 +317,10 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
           });
 
       if (resultado.ok && resultado.data) {
-        await carregarCameras();
-
         const eraNova = !cameraEditando;
-        /* Mantém o modal aberto (em vez de fechar) -- agora que a câmera está salva, ela já tem mediamtx_path e dá pra mostrar o preview ao vivo aqui mesmo, sem precisar reabrir pela tabela. */
-        setCameraEditando(resultado.data);
-        setFormCamera((atual) => ({ ...atual, senha: "" }));
+
+        await carregarCameras();
+        fecharModalCamera();
         onFeedback(
           "success",
           eraNova ? "Câmera adicionada" : "Câmera atualizada",
@@ -409,7 +471,7 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
 
       <Card
         title="Câmeras"
-        description="Câmeras IP (ONVIF) usadas no menu flutuante de visualização ao vivo do Semáforo."
+        description="Câmeras IP (ONVIF) usadas no menu de visualização ao vivo do Semáforo."
         actions={
           <Button onClick={abrirNovaCamera}>
             <Plus size={16} />
@@ -524,7 +586,9 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
                 !formCamera.nome.trim() ||
                 !formCamera.host.trim() ||
                 !formCamera.usuario.trim() ||
-                (!cameraEditando && !formCamera.senha.trim())
+                (!cameraEditando && !formCamera.senha.trim()) ||
+                !previewWhepUrl ||
+                testandoCamera
               }
             >
               Salvar
@@ -543,7 +607,8 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
             <Field label="Host/IP">
               <Input
                 value={formCamera.host}
-                onChange={(event) => setFormCamera((atual) => ({ ...atual, host: event.target.value }))}
+                onChange={(event) => atualizarCampoConexao("host", event.target.value)}
+                onBlur={handleBlurCampoConexao}
                 placeholder="192.168.0.50"
               />
             </Field>
@@ -553,7 +618,8 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
             <Field label="Porta ONVIF">
               <NumberInput
                 value={formCamera.portaOnvif}
-                onChange={(event) => setFormCamera((atual) => ({ ...atual, portaOnvif: event.target.value }))}
+                onChange={(event) => atualizarCampoConexao("portaOnvif", event.target.value)}
+                onBlur={handleBlurCampoConexao}
               />
             </Field>
             <Field label="Ordem">
@@ -568,7 +634,8 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
             <Field label="Usuário">
               <Input
                 value={formCamera.usuario}
-                onChange={(event) => setFormCamera((atual) => ({ ...atual, usuario: event.target.value }))}
+                onChange={(event) => atualizarCampoConexao("usuario", event.target.value)}
+                onBlur={handleBlurCampoConexao}
               />
             </Field>
             <Field
@@ -580,30 +647,45 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
                 autoComplete="new-password"
                 placeholder={cameraEditando ? "••••••••" : ""}
                 value={formCamera.senha}
-                onChange={(event) => setFormCamera((atual) => ({ ...atual, senha: event.target.value }))}
+                onChange={(event) => atualizarCampoConexao("senha", event.target.value)}
+                onBlur={handleBlurCampoConexao}
               />
             </Field>
           </FormGrid>
 
-          {cameraEditando && (
-            <Field label="Pré-visualização">
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  aspectRatio: "16 / 9",
-                  borderRadius: 12,
-                  overflow: "hidden",
-                  border: "1px solid var(--border-soft)",
-                }}
-              >
-                <CameraPreview
-                  whepUrl={montarWhepUrl(cameraEditando.mediamtxPath, config?.mediamtxWhepBaseUrl)}
-                  ativo={modalAberto}
-                />
-              </div>
-            </Field>
-          )}
+          <Field label="Pré-visualização" hint="Obrigatória para salvar -- confirma que a câmera responde com esses dados.">
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: "16 / 9",
+                borderRadius: 12,
+                overflow: "hidden",
+                border: "1px solid var(--border-soft)",
+                background: "var(--bg-surface-muted)",
+              }}
+            >
+              {previewWhepUrl ? (
+                <CameraPreview whepUrl={previewWhepUrl} ativo={modalAberto} />
+              ) : (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    padding: 16,
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  Preencha host, usuário e senha e teste a conexão para ver o preview.
+                </div>
+              )}
+            </div>
+          </Field>
 
           {resultadoTesteCamera && (
             <Alert variant={resultadoTesteCamera.sucesso ? "success" : "danger"}>
@@ -620,7 +702,11 @@ export function SemaforoConfigPainel({ onFeedback }: SemaforoConfigPainelProps) 
               variant="secondary"
               onClick={handleTestarCamera}
               loading={testandoCamera}
-              disabled={!formCamera.host.trim() || !formCamera.usuario.trim() || !formCamera.senha.trim()}
+              disabled={
+                !formCamera.host.trim() ||
+                !formCamera.usuario.trim() ||
+                (!formCamera.senha.trim() && !cameraEditando)
+              }
             >
               Testar conexão
             </Button>

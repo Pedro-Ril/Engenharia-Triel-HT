@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
-import { buscarConfigSemaforo } from "@/lib/semaforo/config";
 import { listarCameras } from "@/lib/semaforo/cameras";
+import { montarWhepUrl } from "@/lib/semaforo/mediamtx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const WHEP_BASE_URL_PADRAO = "http://127.0.0.1:8889";
 
 /*
  * Só câmeras ativas, e só {id, nome, ordem, whepUrl} -- nunca host,
@@ -20,17 +18,18 @@ export async function GET() {
   if (acesso.negado) return acesso.negado;
 
   try {
-    const [cameras, config] = await Promise.all([listarCameras(true), buscarConfigSemaforo()]);
-    const whepBaseUrl = config.mediamtxWhepBaseUrl || process.env.MEDIAMTX_WHEP_BASE_URL || WHEP_BASE_URL_PADRAO;
+    const cameras = await listarCameras(true);
 
-    const data = cameras
-      .sort((a, b) => a.ordem - b.ordem)
-      .map((camera) => ({
-        id: camera.id,
-        nome: camera.nome,
-        ordem: camera.ordem,
-        whepUrl: `${whepBaseUrl}/${camera.mediamtxPath}/whep`,
-      }));
+    const data = await Promise.all(
+      cameras
+        .sort((a, b) => a.ordem - b.ordem)
+        .map(async (camera) => ({
+          id: camera.id,
+          nome: camera.nome,
+          ordem: camera.ordem,
+          whepUrl: await montarWhepUrl(camera.mediamtxPath),
+        }))
+    );
 
     return NextResponse.json({ ok: true, data });
   } catch (error) {

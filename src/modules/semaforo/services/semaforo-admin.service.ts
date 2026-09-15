@@ -98,10 +98,12 @@ export async function excluirCameraAdmin(id: string): Promise<ApiEnvelope<null>>
 }
 
 export async function testarConexaoCameraAdmin(dados: {
+  id?: string;
   host: string;
   portaOnvif: number;
   usuario: string;
-  senha: string;
+  senha?: string;
+  mediamtxPathPreview: string;
 }): Promise<ApiEnvelope<ResultadoTesteCamera>> {
   const response = await fetch("/api/admin/semaforo/cameras/testar-conexao", {
     method: "POST",
@@ -109,6 +111,13 @@ export async function testarConexaoCameraAdmin(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse(response);
+}
+
+/* Remove o path temporário de preview do MediaMTX -- chamar ao fechar o modal de cadastro/edição de câmera. */
+export async function removerPreviewCameraAdmin(mediamtxPathPreview: string): Promise<void> {
+  await fetch(`/api/admin/semaforo/cameras/testar-conexao?path=${encodeURIComponent(mediamtxPathPreview)}`, {
+    method: "DELETE",
+  }).catch(() => {});
 }
 
 export async function reverificarCameraAdmin(id: string): Promise<ApiEnvelope<ResultadoTesteCamera>> {

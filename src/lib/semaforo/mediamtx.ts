@@ -3,10 +3,22 @@ import "server-only";
 import { buscarConfigSemaforo } from "./config";
 
 const API_URL_PADRAO = "http://127.0.0.1:9997";
+const WHEP_BASE_URL_PADRAO = "http://127.0.0.1:8889";
 
 async function apiBaseUrl(): Promise<string> {
   const config = await buscarConfigSemaforo();
   return config.mediamtxApiUrl || process.env.MEDIAMTX_API_URL || API_URL_PADRAO;
+}
+
+async function whepBaseUrl(): Promise<string> {
+  const config = await buscarConfigSemaforo();
+  return config.mediamtxWhepBaseUrl || process.env.MEDIAMTX_WHEP_BASE_URL || WHEP_BASE_URL_PADRAO;
+}
+
+/* Única fonte de verdade da fórmula da URL WHEP -- usada tanto pela rota pública (câmeras ativas) quanto pelo preview de teste no admin (path temporário, antes de salvar). */
+export async function montarWhepUrl(mediamtxPath: string): Promise<string> {
+  const base = await whepBaseUrl();
+  return `${base}/${mediamtxPath}/whep`;
 }
 
 /* Injeta usuário/senha na URL RTSP em tempo de execução -- nunca ficam persistidas junto do stream_uri_rtsp cacheado. */
