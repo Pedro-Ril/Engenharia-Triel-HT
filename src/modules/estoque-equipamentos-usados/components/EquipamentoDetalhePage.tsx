@@ -33,6 +33,7 @@ import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import {
   Table,
@@ -125,6 +126,8 @@ const STATUS_TENTATIVA_BADGE: Record<TentativaIntegracaoNf["status"], "success" 
   nao_encontrado: "warning",
   erro: "danger",
 };
+
+const POR_PAGINA_TENTATIVAS_NF = 15;
 
 const TIPO_NF_LABEL: Record<TipoNfIntegracao, string> = {
   entrada: "Entrada",
@@ -256,6 +259,8 @@ export function EquipamentoDetalhePage({
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [tentativasNfAberto, setTentativasNfAberto] = useState(false);
   const [tentativasNf, setTentativasNf] = useState<TentativaIntegracaoNf[]>([]);
+  const [totalTentativasNf, setTotalTentativasNf] = useState(0);
+  const [paginaTentativasNf, setPaginaTentativasNf] = useState(1);
   const [carregandoTentativasNf, setCarregandoTentativasNf] = useState(false);
   const [tentandoNfAgora, setTentandoNfAgora] = useState(false);
   const [erroTentativaNf, setErroTentativaNf] = useState<string | null>(null);
@@ -499,17 +504,23 @@ export function EquipamentoDetalhePage({
     }
   }
 
-  async function abrirTentativasNf() {
-    setTentativasNfAberto(true);
+  async function carregarTentativasNf(pagina: number) {
     setCarregandoTentativasNf(true);
-    setErroTentativaNf(null);
 
     try {
-      const dados = await listarTentativasNfEntrada(equipamento.id);
-      setTentativasNf(dados);
+      const resultado = await listarTentativasNfEntrada(equipamento.id, pagina, POR_PAGINA_TENTATIVAS_NF);
+      setTentativasNf(resultado.itens);
+      setTotalTentativasNf(resultado.total);
+      setPaginaTentativasNf(pagina);
     } finally {
       setCarregandoTentativasNf(false);
     }
+  }
+
+  async function abrirTentativasNf() {
+    setTentativasNfAberto(true);
+    setErroTentativaNf(null);
+    await carregarTentativasNf(1);
   }
 
   async function handleTentarNfAgora() {
@@ -520,7 +531,9 @@ export function EquipamentoDetalhePage({
       const resultado = await tentarIntegracaoNfAgora(equipamento.id);
 
       if (resultado.ok) {
-        setTentativasNf(resultado.data ?? []);
+        setTentativasNf(resultado.data?.itens ?? []);
+        setTotalTentativasNf(resultado.data?.total ?? 0);
+        setPaginaTentativasNf(1);
         router.refresh();
       } else {
         setErroTentativaNf(resultado.message ?? "Não foi possível concluir a tentativa.");
@@ -1128,39 +1141,47 @@ export function EquipamentoDetalhePage({
           ) : tentativasNf.length === 0 ? (
             <p>Nenhuma tentativa de integração registrada ainda para este equipamento.</p>
           ) : (
-            <Table minWidth={850}>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Tipo</TableHeaderCell>
-                  <TableHeaderCell>Status</TableHeaderCell>
-                  <TableHeaderCell>Mensagem</TableHeaderCell>
-                  <TableHeaderCell>Parâmetros da consulta</TableHeaderCell>
-                  <TableHeaderCell>Quando</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tentativasNf.map((tentativa) => (
-                  <TableRow key={tentativa.id}>
-                    <TableCell>{TIPO_NF_LABEL[tentativa.tipoNf]}</TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        className={styles.badgeClicavel}
-                        onClick={() => setTentativaDetalhada(tentativa)}
-                        title="Ver requisição e resposta completas"
-                      >
-                        <Badge variant={STATUS_TENTATIVA_BADGE[tentativa.status]}>
-                          {STATUS_TENTATIVA_LABEL[tentativa.status]}
-                        </Badge>
-                      </button>
-                    </TableCell>
-                    <TableCell>{tentativa.mensagem ?? "-"}</TableCell>
-                    <TableCell>{tentativa.parametrosConsulta ?? "-"}</TableCell>
-                    <TableCell>{formatarDataHora(tentativa.iniciadoEm)}</TableCell>
+            <>
+              <Table minWidth={850}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Tipo</TableHeaderCell>
+                    <TableHeaderCell>Status</TableHeaderCell>
+                    <TableHeaderCell>Mensagem</TableHeaderCell>
+                    <TableHeaderCell>Parâmetros da consulta</TableHeaderCell>
+                    <TableHeaderCell>Quando</TableHeaderCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {tentativasNf.map((tentativa) => (
+                    <TableRow key={tentativa.id}>
+                      <TableCell>{TIPO_NF_LABEL[tentativa.tipoNf]}</TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className={styles.badgeClicavel}
+                          onClick={() => setTentativaDetalhada(tentativa)}
+                          title="Ver requisição e resposta completas"
+                        >
+                          <Badge variant={STATUS_TENTATIVA_BADGE[tentativa.status]}>
+                            {STATUS_TENTATIVA_LABEL[tentativa.status]}
+                          </Badge>
+                        </button>
+                      </TableCell>
+                      <TableCell>{tentativa.mensagem ?? "-"}</TableCell>
+                      <TableCell>{tentativa.parametrosConsulta ?? "-"}</TableCell>
+                      <TableCell>{formatarDataHora(tentativa.iniciadoEm)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <Pagination
+                page={paginaTentativasNf}
+                totalPages={Math.max(1, Math.ceil(totalTentativasNf / POR_PAGINA_TENTATIVAS_NF))}
+                onPageChange={carregarTentativasNf}
+              />
+            </>
           )}
         </Stack>
       </Modal>

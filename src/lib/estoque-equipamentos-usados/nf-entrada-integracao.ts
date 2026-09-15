@@ -404,41 +404,62 @@ interface TentativaRow {
   response_body: string | null;
 }
 
-export async function listarTentativasNf(equipamentoId: string): Promise<TentativaIntegracaoNf[]> {
+export async function listarTentativasNf(
+  equipamentoId: string,
+  pagina = 1,
+  porPagina = 15
+): Promise<{ itens: TentativaIntegracaoNf[]; total: number }> {
   const pool = await getSqlServerPool();
 
-  const result = await pool
-    .request()
-    .input("equipamentoId", sql.UniqueIdentifier, equipamentoId)
-    .query<TentativaRow>(`
-      SELECT TOP (200)
-        CONVERT(VARCHAR(36), [id]) AS [id],
-        [tipo_nf],
-        [status],
-        [mensagem],
-        [parametros_consulta],
-        [disparado_por],
-        CONVERT(VARCHAR(33), [iniciado_em], 126) AS [iniciado_em],
-        [request_url],
-        [response_status],
-        [response_body]
-      FROM dbo.com_estoque_integracao_nf_logs
-      WHERE [equipamento_id] = @equipamentoId
-      ORDER BY [iniciado_em] DESC;
-    `);
+  const offset = (pagina - 1) * porPagina;
 
-  return result.recordset.map((row) => ({
-    id: row.id,
-    tipoNf: row.tipo_nf,
-    status: row.status,
-    mensagem: row.mensagem,
-    parametrosConsulta: row.parametros_consulta,
-    disparadoPor: row.disparado_por,
-    iniciadoEm: row.iniciado_em,
-    requestUrl: row.request_url,
-    responseStatus: row.response_status,
-    responseBody: row.response_body,
-  }));
+  const [itensResult, totalResult] = await Promise.all([
+    pool
+      .request()
+      .input("equipamentoId", sql.UniqueIdentifier, equipamentoId)
+      .input("offset", sql.Int, offset)
+      .input("porPagina", sql.Int, porPagina)
+      .query<TentativaRow>(`
+        SELECT
+          CONVERT(VARCHAR(36), [id]) AS [id],
+          [tipo_nf],
+          [status],
+          [mensagem],
+          [parametros_consulta],
+          [disparado_por],
+          CONVERT(VARCHAR(33), [iniciado_em], 126) AS [iniciado_em],
+          [request_url],
+          [response_status],
+          [response_body]
+        FROM dbo.com_estoque_integracao_nf_logs
+        WHERE [equipamento_id] = @equipamentoId
+        ORDER BY [iniciado_em] DESC
+        OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
+      `),
+    pool
+      .request()
+      .input("equipamentoId", sql.UniqueIdentifier, equipamentoId)
+      .query<{ total: number }>(`
+        SELECT COUNT(*) AS [total] FROM dbo.com_estoque_integracao_nf_logs
+        WHERE [equipamento_id] = @equipamentoId;
+      `),
+  ]);
+
+  return {
+    itens: itensResult.recordset.map((row) => ({
+      id: row.id,
+      tipoNf: row.tipo_nf,
+      status: row.status,
+      mensagem: row.mensagem,
+      parametrosConsulta: row.parametros_consulta,
+      disparadoPor: row.disparado_por,
+      iniciadoEm: row.iniciado_em,
+      requestUrl: row.request_url,
+      responseStatus: row.response_status,
+      responseBody: row.response_body,
+    })),
+    total: totalResult.recordset[0]?.total ?? 0,
+  };
 }
 
 /*

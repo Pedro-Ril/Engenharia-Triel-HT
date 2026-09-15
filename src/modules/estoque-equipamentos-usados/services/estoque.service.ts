@@ -83,13 +83,23 @@ export async function listarHistoricoAlteracoesDados(id: string): Promise<Histor
   return body.data ?? [];
 }
 
-export async function listarTentativasNfEntrada(id: string): Promise<TentativaIntegracaoNf[]> {
-  const response = await fetch(`/api/estoque-equipamentos-usados/${id}/tentativas-nf`);
-  const body = await parseResponse<TentativaIntegracaoNf[]>(response);
-  return body.data ?? [];
+export interface ResultadoTentativasNf {
+  itens: TentativaIntegracaoNf[];
+  total: number;
 }
 
-export async function tentarIntegracaoNfAgora(id: string): Promise<ApiEnvelope<TentativaIntegracaoNf[]>> {
+export async function listarTentativasNfEntrada(
+  id: string,
+  pagina: number,
+  porPagina: number
+): Promise<ResultadoTentativasNf> {
+  const params = new URLSearchParams({ pagina: String(pagina), porPagina: String(porPagina) });
+  const response = await fetch(`/api/estoque-equipamentos-usados/${id}/tentativas-nf?${params.toString()}`);
+  const body = await parseResponse<ResultadoTentativasNf>(response);
+  return body.data ?? { itens: [], total: 0 };
+}
+
+export async function tentarIntegracaoNfAgora(id: string): Promise<ApiEnvelope<ResultadoTentativasNf>> {
   const response = await fetch(`/api/estoque-equipamentos-usados/${id}/tentativas-nf`, { method: "POST" });
   return parseResponse(response);
 }

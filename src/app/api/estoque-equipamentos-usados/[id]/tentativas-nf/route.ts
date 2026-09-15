@@ -30,8 +30,12 @@ async function handleGET(request: Request, context: RouteContext) {
     return NextResponse.json({ ok: false, message: "Equipamento inválido." }, { status: 400 });
   }
 
+  const url = new URL(request.url);
+  const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
+  const porPagina = Math.min(100, Math.max(1, Number(url.searchParams.get("porPagina")) || 15));
+
   try {
-    const tentativas = await listarTentativasNf(id);
+    const tentativas = await listarTentativasNf(id, pagina, porPagina);
     return NextResponse.json({ ok: true, data: tentativas });
   } catch (error) {
     console.error("Erro ao buscar tentativas de integração de NF de entrada:", error);
@@ -68,7 +72,8 @@ async function handlePOST(request: Request, context: RouteContext) {
     const pendente = await buscarEquipamentoPendenteNfParaTentativa(id);
     await tentarBuscarNfEntrada(pendente, usuario.nomeExibicao);
 
-    const tentativas = await listarTentativasNf(id);
+    /* Tentativa nova sempre é a mais recente — volta pra página 1 pra mostrá-la. */
+    const tentativas = await listarTentativasNf(id, 1, 15);
     return NextResponse.json({ ok: true, message: "Tentativa concluída.", data: tentativas });
   } catch (error) {
     if (error instanceof ValidationError) {
