@@ -45,6 +45,5 @@ next-env.d.ts
 # autogerado (só usado pelo servidor MoQ, desligado em mediamtx.yml,
 # mas ainda gerado por versões antigas do binário), nenhum dos dois
 # versionado. Config em mediamtx/mediamtx.yml continua committada.
-mediamtx/mediamtx.exe
 mediamtx/auto.crt
 mediamtx/auto.key
