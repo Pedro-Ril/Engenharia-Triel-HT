@@ -30,10 +30,11 @@ import type {
 const EVENTO_LABELS: Record<EventoNotificacaoChamado, string> = {
   aberto: "Abertura",
   aceito: "Aceito",
-  nova_resposta: "Nova resposta",
+  nova_resposta: "Nova resposta (pro solicitante/cópia)",
   resolvido_pendente: "Resolvido (aguardando confirmação)",
   reaberto: "Reaberto",
   fechado: "Fechado",
+  nova_mensagem_solicitante: "Nova mensagem (pro atendente)",
 };
 
 const OPCOES_EVENTO = [
@@ -116,7 +117,7 @@ export function NotificacoesEmailChamadosPainel() {
   return (
     <Card
       title="Notificações de e-mail"
-      description="Todo e-mail enviado ao solicitante sobre uma mudança no chamado (abertura, aceite, respostas, resolução, reabertura, encerramento)."
+      description="Todo e-mail enviado sobre uma mudança no chamado -- ao solicitante e cópia (abertura, aceite, respostas, resolução, reabertura, encerramento) ou ao atendente (nova mensagem do solicitante)."
     >
       <Stack gap={16}>
         <FormGrid columns={3}>

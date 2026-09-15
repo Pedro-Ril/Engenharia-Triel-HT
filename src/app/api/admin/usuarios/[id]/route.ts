@@ -12,9 +12,12 @@ export const dynamic = "force-dynamic";
 const uniqueIdentifierPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface UpdateUsuarioBody {
   codigoEmpresa?: unknown;
   ativo?: unknown;
+  email?: unknown;
 }
 
 interface RouteContext {
@@ -55,12 +58,17 @@ async function handlePATCH(request: Request, context: RouteContext) {
   try {
     const codigoEmpresa = optionalText(body.codigoEmpresa, "codigoEmpresa", 30);
     const ativo = optionalBoolean(body.ativo, "ativo", true);
+    const email = body.email !== undefined ? optionalText(body.email, "email", 256) : undefined;
+
+    if (email && !EMAIL_PATTERN.test(email)) {
+      throw new ValidationError("Informe um e-mail válido.");
+    }
 
     if (!ativo && id === acesso.usuario.id) {
       throw new ValidationError("Você não pode desativar o seu próprio usuário.");
     }
 
-    const usuario = await atualizarUsuarioAdmin(id, { codigoEmpresa, ativo });
+    const usuario = await atualizarUsuarioAdmin(id, { codigoEmpresa, ativo, email });
 
     if (!usuario) {
       return NextResponse.json(

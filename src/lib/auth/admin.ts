@@ -587,7 +587,7 @@ export async function excluirUsuario(id: string): Promise<boolean> {
 
 export async function atualizarUsuarioAdmin(
   id: string,
-  params: { codigoEmpresa: string | null; ativo: boolean }
+  params: { codigoEmpresa: string | null; ativo: boolean; email?: string | null }
 ): Promise<PortalUsuario | null> {
   const pool = await getSqlServerPool();
   const request = pool.request();
@@ -595,6 +595,15 @@ export async function atualizarUsuarioAdmin(
   request.input("id", sql.UniqueIdentifier, id);
   request.input("codigoEmpresa", sql.NVarChar(30), params.codigoEmpresa);
   request.input("ativo", sql.Bit, params.ativo);
+
+  /*
+   * "email" só entra no SET quando explicitamente enviado (`atualizarAtivo`/
+   * `salvarCodigoEmpresa` não reenviam o e-mail a cada chamada) -- gravado à
+   * mão, não editado manualmente, então nunca é sobrescrito pela sincronização
+   * com o AD enquanto o AD não tiver um e-mail de verdade (ver usuarios.ts).
+   */
+  const emailFornecido = params.email !== undefined;
+  request.input("email", sql.NVarChar(256), params.email ?? null);
 
   /*
    * Ao desativar, invalida qualquer sessão já emitida
@@ -606,6 +615,7 @@ export async function atualizarUsuarioAdmin(
     SET
       [codigo_empresa] = @codigoEmpresa,
       [ativo] = @ativo,
+      ${emailFornecido ? "[email] = @email," : ""}
       [sessao_invalidada_em] = CASE
         WHEN @ativo = 0 THEN SYSDATETIME()
         ELSE [sessao_invalidada_em]

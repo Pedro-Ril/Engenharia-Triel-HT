@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import { getUsuarioAutenticado, requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
-import { isObject } from "@/lib/auth/validation";
+import { isObject, optionalText } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import {
   atribuirAtendente,
+  atualizarDataPrevistaConclusao,
   atualizarPrioridade,
   atualizarPublico,
   buscarChamadoPorNumero,
@@ -52,7 +53,7 @@ async function handleGET(request: Request, context: RouteContext) {
       );
     }
 
-    const { podeVer, ehAtendente } = await verificarAcessoChamado(
+    const { podeVer, ehAtendente, ehDono, ehEmCopia } = await verificarAcessoChamado(
       chamado,
       usuario,
       nomeConfirmado
@@ -71,7 +72,7 @@ async function handleGET(request: Request, context: RouteContext) {
 
     return NextResponse.json({
       ok: true,
-      data: { ...chamado, mensagens: mensagensVisiveis, ehAtendente },
+      data: { ...chamado, mensagens: mensagensVisiveis, ehAtendente, ehDono, ehEmCopia },
     });
   } catch (error) {
     console.error("Erro ao buscar chamado:", error);
@@ -147,6 +148,13 @@ async function handlePATCH(request: Request, context: RouteContext) {
         throw new ValidationError("O campo publico deve ser verdadeiro ou falso.");
       }
       await atualizarPublico(chamado.id, parsedBody.publico);
+    }
+
+    if (parsedBody.dataPrevistaConclusao !== undefined) {
+      await atualizarDataPrevistaConclusao(
+        chamado.id,
+        optionalText(parsedBody.dataPrevistaConclusao, "data prevista de conclusão", 10)
+      );
     }
 
     const atualizado = await buscarChamadoPorNumero(numero);

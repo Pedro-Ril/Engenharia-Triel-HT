@@ -4,6 +4,8 @@ import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { ValidationError } from "@/lib/auth/errors";
 import { optionalText, requiredText } from "@/lib/auth/validation";
+import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
+import { getSetoresQueAtende } from "@/lib/chamados/autorizacao-chamados";
 import { criarChamado } from "@/lib/chamados/chamados";
 import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
 import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
@@ -17,6 +19,13 @@ export const dynamic = "force-dynamic";
  * houver sessão, o solicitante é identificado por ela (nome/
  * usuário não podem ser forjados pelo corpo da requisição); sem
  * sessão, o nome é obrigatório no formulário.
+ *
+ * "solicitanteAlvoId" (opcional) permite abrir EM NOME de outra
+ * pessoa -- só honrado se quem está logado for atendente de algum
+ * setor ou admin (getSetoresQueAtende); nesse caso o alvo vira o
+ * solicitante de verdade (aparece no "Meus chamados" dele, recebe
+ * e-mail como solicitante) e quem de fato abriu fica só registrado
+ * em criado_por_usuario_id.
  */
 async function handlePOST(request: Request) {
   let formData: FormData;
@@ -39,38 +48,62 @@ async function handlePOST(request: Request) {
     const titulo = requiredText(formData.get("titulo"), "título", 200);
     const descricao = requiredText(formData.get("descricao"), "descrição", 4000);
 
-    const solicitanteNome = usuario
-      ? usuario.nomeExibicao
+    let solicitante = usuario;
+    let criadoPorUsuarioId: string | null = null;
+
+    const solicitanteAlvoId = optionalText(formData.get("solicitanteAlvoId"), "usuário alvo", 36);
+
+    if (solicitanteAlvoId && usuario) {
+      const setoresAtendidos = await getSetoresQueAtende(usuario);
+      const podeAbrirEmNomeDe = setoresAtendidos === null || setoresAtendidos.length > 0;
+
+      if (!podeAbrirEmNomeDe) {
+        throw new ValidationError("Você não tem permissão para abrir um chamado em nome de outra pessoa.");
+      }
+
+      const alvo = await buscarUsuarioPorId(solicitanteAlvoId);
+      if (!alvo) {
+        throw new ValidationError("Usuário selecionado não encontrado.");
+      }
+
+      solicitante = alvo;
+      criadoPorUsuarioId = usuario.id;
+    }
+
+    const solicitanteNome = solicitante
+      ? solicitante.nomeExibicao
       : requiredText(formData.get("nome"), "nome", 200);
 
-    const solicitanteContato = usuario
-      ? optionalText(formData.get("contato"), "contato", 200) ?? usuario.email
+    const solicitanteContato = solicitante
+      ? optionalText(formData.get("contato"), "contato", 200) ?? solicitante.email
       : optionalText(formData.get("contato"), "contato", 200);
 
     const anexos = await parseAnexosFormData(formData, "anexos");
 
-    const { numero } = await criarChamado({
+    const { id, numero } = await criarChamado({
       setorId,
       categoriaId,
       prioridade,
       titulo,
       descricao,
-      solicitanteUsuarioId: usuario?.id ?? null,
+      solicitanteUsuarioId: solicitante?.id ?? null,
       solicitanteNome,
       solicitanteContato,
-      empresa: usuario?.codigoEmpresa ?? null,
-      solicitanteDepartamento: usuario?.departamento ?? null,
+      empresa: solicitante?.codigoEmpresa ?? null,
+      solicitanteDepartamento: solicitante?.departamento ?? null,
       ipOrigem: extrairIpOrigem(request),
       anexos,
+      criadoPorUsuarioId,
     });
 
     await notificarSolicitanteChamado({
       chamado: {
+        id,
         numero,
         titulo,
         solicitanteNome,
         solicitanteContato,
-        solicitanteUsuarioId: usuario?.id ?? null,
+        solicitanteUsuarioId: solicitante?.id ?? null,
       },
       evento: "aberto",
       origem: new URL(request.url).origin,

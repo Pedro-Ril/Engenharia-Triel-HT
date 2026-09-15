@@ -74,6 +74,8 @@ export interface AcessoChamadoDetalhe {
   ehAtendente: boolean;
   /* Dono real: sessão do solicitante OU nome confirmado corretamente (chamado anônimo). */
   ehDono: boolean;
+  /* Usuário adicionado em cópia (ver adicionarUsuarioCopia) -- acompanha e pode responder, mas não é o solicitante. */
+  ehEmCopia: boolean;
   /*
    * true quando o acesso foi negado por excesso de tentativas de
    * nome contra este chamado — permite mostrar uma mensagem
@@ -130,6 +132,22 @@ async function registrarTentativaNome(chamadoId: string, sucesso: boolean): Prom
   }
 }
 
+async function estaEmCopiaDoChamado(chamadoId: string, usuarioId: string): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+
+  const result = await request.query<{ total: number }>(`
+    SELECT COUNT(*) AS [total]
+    FROM dbo.portal_chamados_copia
+    WHERE [chamado_id] = @chamadoId AND [usuario_id] = @usuarioId;
+  `);
+
+  return (result.recordset[0]?.total ?? 0) > 0;
+}
+
 /*
  * Checagem de acesso ao detalhe/thread de UM chamado — usada
  * tanto pela página `/chamados/[numero]` (Server Component)
@@ -153,19 +171,36 @@ export async function verificarAcessoChamado(
     setoresAtendidos === null || setoresAtendidos.includes(chamado.setorId);
 
   const ehDonoPorSessao = usuario !== null && chamado.solicitanteUsuarioId === usuario.id;
+  const ehEmCopia = usuario !== null && (await estaEmCopiaDoChamado(chamado.id, usuario.id));
 
   const tentandoPorNome =
-    !chamado.solicitanteUsuarioId && !ehDonoPorSessao && !ehAtendente && Boolean(nomeConfirmado);
+    !chamado.solicitanteUsuarioId &&
+    !ehDonoPorSessao &&
+    !ehAtendente &&
+    !ehEmCopia &&
+    Boolean(nomeConfirmado);
 
   if (!tentandoPorNome) {
     const ehDono = ehDonoPorSessao;
-    return { podeVer: ehDono || ehAtendente, ehAtendente, ehDono, bloqueadoPorTentativas: false };
+    return {
+      podeVer: ehDono || ehAtendente || ehEmCopia,
+      ehAtendente,
+      ehDono,
+      ehEmCopia,
+      bloqueadoPorTentativas: false,
+    };
   }
 
   const falhasRecentes = await contarTentativasFalhasRecentes(chamado.id);
 
   if (falhasRecentes >= LIMITE_TENTATIVAS_NOME) {
-    return { podeVer: false, ehAtendente: false, ehDono: false, bloqueadoPorTentativas: true };
+    return {
+      podeVer: false,
+      ehAtendente: false,
+      ehDono: false,
+      ehEmCopia: false,
+      bloqueadoPorTentativas: true,
+    };
   }
 
   const nomeBate =
@@ -173,7 +208,13 @@ export async function verificarAcessoChamado(
 
   await registrarTentativaNome(chamado.id, nomeBate);
 
-  return { podeVer: nomeBate, ehAtendente: false, ehDono: nomeBate, bloqueadoPorTentativas: false };
+  return {
+    podeVer: nomeBate,
+    ehAtendente: false,
+    ehDono: nomeBate,
+    ehEmCopia: false,
+    bloqueadoPorTentativas: false,
+  };
 }
 
 /* Equivalente a requireAdminApi, para as rotas de API da fila de atendimento. */

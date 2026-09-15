@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Trash2,
   UserCheck,
+  X,
 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DateInput } from "@/components/ui/DateInput";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FileUpload } from "@/components/ui/FileUpload";
@@ -32,6 +34,7 @@ import { Textarea } from "@/components/ui/Textarea";
 
 import {
   aceitarChamado,
+  adicionarUsuarioCopiaChamado,
   atualizarChamado,
   confirmarResolucaoChamado,
   enviarMensagemChamado,
@@ -40,6 +43,7 @@ import {
   listarAtendentesDoSetor,
   marcarChamadoComoResolvido,
   reabrirChamado,
+  removerUsuarioCopiaChamado,
   transferirChamado,
 } from "../services/chamados.service";
 import type {
@@ -47,9 +51,11 @@ import type {
   ChamadosAtendente,
   PrioridadeChamado,
   SetorChamado,
+  UsuarioCopiaChamado,
 } from "../types/chamados.types";
 import { PrioridadeBadge, PRIORIDADE_LABELS, StatusBadge } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
+import { UsuarioAutocomplete } from "./UsuarioAutocomplete";
 
 interface ChamadoDetalhePageProps {
   chamado: Chamado;
@@ -59,6 +65,8 @@ interface ChamadoDetalhePageProps {
   /* false quando o acesso só foi liberado por o chamado ser público (visitante sem sessão/dono/atendente) — esconde ações e resposta. */
   podeResponder: boolean;
   ehAdministrador: boolean;
+  copiaAtual: UsuarioCopiaChamado[];
+  temNotificacaoFalha: boolean;
 }
 
 function formatarData(valorIso: string): string {
@@ -85,6 +93,8 @@ export function ChamadoDetalhePage({
   setoresParaTransferir,
   podeResponder,
   ehAdministrador,
+  copiaAtual,
+  temNotificacaoFalha,
 }: ChamadoDetalhePageProps) {
   const router = useRouter();
 
@@ -95,6 +105,9 @@ export function ChamadoDetalhePage({
   const [erro, setErro] = useState<string | null>(null);
   const [salvandoControle, setSalvandoControle] = useState(false);
   const [executandoAcao, setExecutandoAcao] = useState<string | null>(null);
+  const [copia, setCopia] = useState(copiaAtual);
+  const [salvandoCopia, setSalvandoCopia] = useState(false);
+  const [erroCopia, setErroCopia] = useState<string | null>(null);
   const [confirmandoReabrir, setConfirmandoReabrir] = useState(false);
   const [confirmandoExcluir, setConfirmandoExcluir] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
@@ -188,7 +201,7 @@ export function ChamadoDetalhePage({
   }
 
   async function handleAtualizar(
-    campo: "prioridade" | "atendenteUsuarioId" | "publico",
+    campo: "prioridade" | "atendenteUsuarioId" | "publico" | "dataPrevistaConclusao",
     valor: string | boolean
   ) {
     setErro(null);
@@ -200,7 +213,9 @@ export function ChamadoDetalhePage({
           ? { prioridade: valor as PrioridadeChamado }
           : campo === "atendenteUsuarioId"
             ? { atendenteUsuarioId: (valor as string) || null }
-            : { publico: valor as boolean };
+            : campo === "dataPrevistaConclusao"
+              ? { dataPrevistaConclusao: (valor as string) || null }
+              : { publico: valor as boolean };
 
       const resultado = await atualizarChamado(chamado.numero, dados);
 
@@ -213,6 +228,40 @@ export function ChamadoDetalhePage({
       setErro("Não foi possível salvar a alteração. Tente novamente.");
     } finally {
       setSalvandoControle(false);
+    }
+  }
+
+  async function handleAdicionarCopia(usuario: { id: string; nomeExibicao: string; email: string | null }) {
+    setErroCopia(null);
+    setSalvandoCopia(true);
+
+    try {
+      const resultado = await adicionarUsuarioCopiaChamado(chamado.numero, usuario.id);
+
+      if (resultado.ok && resultado.data) {
+        setCopia(resultado.data);
+      } else {
+        setErroCopia(resultado.message ?? "Não foi possível adicionar este usuário em cópia.");
+      }
+    } finally {
+      setSalvandoCopia(false);
+    }
+  }
+
+  async function handleRemoverCopia(usuarioId: string) {
+    setErroCopia(null);
+    setSalvandoCopia(true);
+
+    try {
+      const resultado = await removerUsuarioCopiaChamado(chamado.numero, usuarioId);
+
+      if (resultado.ok) {
+        setCopia((atual) => atual.filter((item) => item.usuarioId !== usuarioId));
+      } else {
+        setErroCopia(resultado.message ?? "Não foi possível remover este usuário da cópia.");
+      }
+    } finally {
+      setSalvandoCopia(false);
     }
   }
 
@@ -292,7 +341,9 @@ export function ChamadoDetalhePage({
           chamado.categoriaNome ? ` · ${chamado.categoriaNome}` : ""
         }${
           chamado.empresa ? ` · ${chamado.empresa}` : ""
-        } · aberto por ${chamado.solicitanteNome} em ${formatarData(chamado.criadoEm)}`}
+        } · aberto por ${chamado.solicitanteNome}${
+          chamado.criadoPorNome ? ` (registrado por ${chamado.criadoPorNome})` : ""
+        } em ${formatarData(chamado.criadoEm)}`}
         actions={
           <Stack direction="row" gap={8}>
             <StatusBadge status={chamado.status} />
@@ -310,6 +361,13 @@ export function ChamadoDetalhePage({
       />
 
       {erro && <Alert variant="danger">{erro}</Alert>}
+
+      {temNotificacaoFalha && (
+        <Alert variant="warning" title="Falha ao notificar por e-mail">
+          Uma ou mais notificações deste chamado não foram enviadas. Veja os detalhes em
+          Administração → Chamados → Notificações de e-mail.
+        </Alert>
+      )}
 
       {aguardandoConfirmacao && (
         <Alert variant="warning" title="Aguardando confirmação">
@@ -426,6 +484,14 @@ export function ChamadoDetalhePage({
               </Field>
             </FormGrid>
 
+            <Field label="Previsão de conclusão">
+              <DateInput
+                value={chamado.dataPrevistaConclusao ?? ""}
+                disabled={salvandoControle}
+                onValueChange={(valor) => handleAtualizar("dataPrevistaConclusao", valor)}
+              />
+            </Field>
+
             <Checkbox
               label="Chamado público"
               hint='Aparece na busca por título/descrição de "Consultar chamado", mesmo para quem não abriu o chamado nem está logado.'
@@ -433,6 +499,42 @@ export function ChamadoDetalhePage({
               disabled={salvandoControle}
               onChange={(event) => handleAtualizar("publico", event.target.checked)}
             />
+          </Stack>
+        </Card>
+      )}
+
+      {(chamado.ehAtendente || chamado.ehDono) && (
+        <Card
+          title="Pessoas em cópia"
+          description="Recebem as respostas deste chamado por e-mail e podem acompanhar a conversa."
+        >
+          <Stack gap={16}>
+            {copia.length > 0 && (
+              <div className={styles.copiaLista}>
+                {copia.map((pessoa) => (
+                  <span key={pessoa.usuarioId} className={styles.copiaChip} title={pessoa.email ?? undefined}>
+                    {pessoa.nome}
+                    <button
+                      type="button"
+                      className={styles.copiaChipRemover}
+                      aria-label={`Remover ${pessoa.nome} da cópia`}
+                      disabled={salvandoCopia}
+                      onClick={() => handleRemoverCopia(pessoa.usuarioId)}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <UsuarioAutocomplete
+              placeholder="Adicionar pessoa em cópia"
+              disabled={salvandoCopia}
+              onSelecionar={(usuario) => handleAdicionarCopia(usuario)}
+            />
+
+            {erroCopia && <Alert variant="danger">{erroCopia}</Alert>}
           </Stack>
         </Card>
       )}

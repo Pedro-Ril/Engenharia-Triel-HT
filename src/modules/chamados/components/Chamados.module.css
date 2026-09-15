@@ -3,6 +3,17 @@
   text-align: center;
 }
 
+.linkBotao {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .chartWrapper {
   width: 100%;
 }
@@ -204,6 +215,44 @@
 .anexoChip:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.copiaLista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.copiaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-soft);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.copiaChipRemover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.copiaChipRemover:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .filaFiltros {

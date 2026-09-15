@@ -9,7 +9,12 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { listarAtendentesDisponiveisParaSetor } from "@/lib/chamados/atendentes";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
-import { buscarChamadoPorNumero, listarSetoresParaChamado } from "@/lib/chamados/chamados";
+import {
+  buscarChamadoPorNumero,
+  listarCopiaDoChamado,
+  listarSetoresParaChamado,
+} from "@/lib/chamados/chamados";
+import { listarNotificacoesEmailChamados } from "@/lib/chamados/notificacoes-email";
 import { ChamadoDetalhePage } from "@/modules/chamados/components/ChamadoDetalhePage";
 
 interface PageProps {
@@ -35,11 +40,8 @@ export default async function Page({ params, searchParams }: PageProps) {
   }
 
   const nomeConfirmado = nome ?? null;
-  const { podeVer, ehAtendente, ehDono, bloqueadoPorTentativas } = await verificarAcessoChamado(
-    chamado,
-    usuario,
-    nomeConfirmado
-  );
+  const { podeVer, ehAtendente, ehDono, ehEmCopia, bloqueadoPorTentativas } =
+    await verificarAcessoChamado(chamado, usuario, nomeConfirmado);
 
   /*
    * Chamado marcado como público (ver atualizarPublico) pode ser
@@ -88,14 +90,21 @@ export default async function Page({ params, searchParams }: PageProps) {
       ])
     : [[], []];
 
+  const [copiaAtual, notificacoesComFalha] = await Promise.all([
+    listarCopiaDoChamado(chamado.id),
+    listarNotificacoesEmailChamados({ chamadoNumero: numero, sucesso: false, pagina: 1, porPagina: 1 }),
+  ]);
+
   return (
     <ChamadoDetalhePage
-      chamado={{ ...chamado, mensagens: mensagensVisiveis, ehAtendente, ehDono }}
+      chamado={{ ...chamado, mensagens: mensagensVisiveis, ehAtendente, ehDono, ehEmCopia }}
       nomeConfirmado={nomeConfirmado}
       atendentesDoSetor={atendentesDoSetor}
       setoresParaTransferir={setoresParaTransferir}
       podeResponder={podeVer}
       ehAdministrador={usuario?.ehAdministrador ?? false}
+      copiaAtual={copiaAtual}
+      temNotificacaoFalha={notificacoesComFalha.total > 0}
     />
   );
 }

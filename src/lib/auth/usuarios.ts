@@ -70,6 +70,10 @@ const usuarioSelectColumns = `
  * manual na UI. `ativo` nunca é tocado aqui: se um admin
  * desativou o usuário, o login no AD continuar válido não reabre
  * acesso sozinho (ver checagem em src/app/api/auth/login/route.ts).
+ * `email` só é sobrescrito quando o AD realmente tem um valor —
+ * um admin pode ter cadastrado manualmente o e-mail de alguém sem
+ * e-mail no AD (ver UsuariosPainel.tsx), e login nenhum pode apagar
+ * isso.
  */
 export async function upsertUsuarioLogin(
   diretorioUsuario: ActiveDirectoryUser
@@ -106,7 +110,7 @@ export async function upsertUsuarioLogin(
     WHEN MATCHED THEN
       UPDATE SET
         [nome_exibicao] = @nomeExibicao,
-        [email] = @email,
+        [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
         [eh_administrador] = @ehAdministrador,
         [departamento] = @departamento,
         [ultimo_login_em] = SYSDATETIME()
@@ -179,7 +183,7 @@ export async function upsertUsuarioImportado(
     WHEN MATCHED THEN
       UPDATE SET
         [nome_exibicao] = @nomeExibicao,
-        [email] = @email,
+        [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
         [eh_administrador] = @ehAdministrador,
         [departamento] = @departamento
     WHEN NOT MATCHED THEN
@@ -275,13 +279,66 @@ export async function atualizarDadosUsuarioDoAd(
     UPDATE dbo.portal_usuarios
     SET
       [nome_exibicao] = @nomeExibicao,
-      [email] = @email,
+      [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
       [eh_administrador] = @ehAdministrador,
       [departamento] = @departamento
     WHERE [sam_account_name] = @samAccountName;
   `);
 
   return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+export interface UsuarioParaSelecao {
+  id: string;
+  nomeExibicao: string;
+  email: string | null;
+}
+
+/*
+ * Busca enxuta (nome/e-mail, só usuários ativos) usada por qualquer
+ * autenticado -- ao contrário de listarUsuarios (admin.ts), que exige
+ * requireAdminApi. Alimenta os seletores de "usuário em cópia" e
+ * "abrir em nome de" em Chamados, onde quem usa nem sempre é admin.
+ */
+export async function buscarUsuariosParaSelecao(termo: string): Promise<UsuarioParaSelecao[]> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("termo", sql.NVarChar(200), `%${termo.trim()}%`);
+
+  const result = await request.query<{ id: string; nome_exibicao: string; email: string | null }>(`
+    SELECT TOP 20
+      CONVERT(VARCHAR(36), [id]) AS [id],
+      [nome_exibicao],
+      [email]
+    FROM dbo.portal_usuarios
+    WHERE [ativo] = 1
+      AND ([nome_exibicao] LIKE @termo OR [email] LIKE @termo)
+    ORDER BY [nome_exibicao];
+  `);
+
+  return result.recordset.map((row) => ({
+    id: row.id,
+    nomeExibicao: row.nome_exibicao,
+    email: row.email,
+  }));
+}
+
+/* Usado para resolver o alvo de "abrir chamado em nome de outra pessoa" (ver POST /api/chamados). */
+export async function buscarUsuarioPorId(id: string): Promise<PortalUsuario | null> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .query<PortalUsuarioRow>(`
+      SELECT ${usuarioSelectColumns}
+      FROM dbo.portal_usuarios
+      WHERE [id] = @id;
+    `);
+
+  const row = result.recordset[0];
+  return row ? mapRow(row) : null;
 }
 
 /*

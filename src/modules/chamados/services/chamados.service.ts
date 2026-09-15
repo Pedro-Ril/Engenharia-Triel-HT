@@ -10,7 +10,14 @@ import type {
   PrioridadeChamado,
   SetorAceiteChamados,
   StatusChamado,
+  UsuarioCopiaChamado,
 } from "../types/chamados.types";
+
+export interface UsuarioParaSelecao {
+  id: string;
+  nomeExibicao: string;
+  email: string | null;
+}
 
 interface ApiEnvelope<T> {
   ok: boolean;
@@ -52,12 +59,41 @@ export async function enviarMensagemChamado(
   return parseResponse(response);
 }
 
+export async function buscarUsuariosParaSelecao(termo: string): Promise<UsuarioParaSelecao[]> {
+  const response = await fetch(`/api/chamados/usuarios-busca?q=${encodeURIComponent(termo)}`);
+  const body = await parseResponse<UsuarioParaSelecao[]>(response);
+  return body.ok && body.data ? body.data : [];
+}
+
+export async function adicionarUsuarioCopiaChamado(
+  numero: number,
+  usuarioId: string
+): Promise<ApiEnvelope<UsuarioCopiaChamado[]>> {
+  const response = await fetch(`/api/chamados/${numero}/copia`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuarioId }),
+  });
+  return parseResponse(response);
+}
+
+export async function removerUsuarioCopiaChamado(
+  numero: number,
+  usuarioId: string
+): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/chamados/${numero}/copia/${usuarioId}`, {
+    method: "DELETE",
+  });
+  return parseResponse(response);
+}
+
 export async function atualizarChamado(
   numero: number,
   dados: {
     prioridade?: PrioridadeChamado;
     atendenteUsuarioId?: string | null;
     publico?: boolean;
+    dataPrevistaConclusao?: string | null;
   }
 ): Promise<ApiEnvelope<Chamado>> {
   const response = await fetch(`/api/chamados/${numero}`, {

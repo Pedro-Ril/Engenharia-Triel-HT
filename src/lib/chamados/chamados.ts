@@ -125,6 +125,10 @@ export interface Chamado extends ChamadoResumo {
   atendenteUsuarioId: string | null;
   resolvidoEm: string | null;
   fechadoEm: string | null;
+  dataPrevistaConclusao: string | null;
+  /* Quem de fato abriu, quando diferente do solicitante (delegação/"abrir em nome de") -- null no caso de sempre (abriu para si mesmo). */
+  criadoPorUsuarioId: string | null;
+  criadoPorNome: string | null;
   mensagens: ChamadoMensagem[];
 }
 
@@ -156,7 +160,10 @@ const colunasChamado = `
   CONVERT(VARCHAR(33), c.[criado_em], 126) AS [criado_em],
   CONVERT(VARCHAR(33), c.[atualizado_em], 126) AS [atualizado_em],
   CONVERT(VARCHAR(33), c.[resolvido_em], 126) AS [resolvido_em],
-  CONVERT(VARCHAR(33), c.[fechado_em], 126) AS [fechado_em]
+  CONVERT(VARCHAR(33), c.[fechado_em], 126) AS [fechado_em],
+  CONVERT(VARCHAR(10), c.[data_prevista_conclusao], 126) AS [data_prevista_conclusao],
+  CONVERT(VARCHAR(36), c.[criado_por_usuario_id]) AS [criado_por_usuario_id],
+  criadoPor.[nome_exibicao] AS [criado_por_nome]
 `;
 
 const juncoesChamado = `
@@ -165,6 +172,7 @@ const juncoesChamado = `
   LEFT JOIN dbo.portal_usuarios AS solicitante ON solicitante.[id] = c.[solicitante_usuario_id]
   LEFT JOIN dbo.portal_usuarios AS atendente ON atendente.[id] = c.[atendente_usuario_id]
   LEFT JOIN dbo.portal_chamados_categorias AS categoria ON categoria.[id] = c.[categoria_id]
+  LEFT JOIN dbo.portal_usuarios AS criadoPor ON criadoPor.[id] = c.[criado_por_usuario_id]
 `;
 
 interface ChamadoRow {
@@ -189,6 +197,9 @@ interface ChamadoRow {
   atualizado_em: string;
   resolvido_em: string | null;
   fechado_em: string | null;
+  data_prevista_conclusao: string | null;
+  criado_por_usuario_id: string | null;
+  criado_por_nome: string | null;
 }
 
 function mapChamadoRow(row: ChamadoRow): Chamado {
@@ -214,6 +225,9 @@ function mapChamadoRow(row: ChamadoRow): Chamado {
     atualizadoEm: row.atualizado_em,
     resolvidoEm: row.resolvido_em,
     fechadoEm: row.fechado_em,
+    dataPrevistaConclusao: row.data_prevista_conclusao,
+    criadoPorUsuarioId: row.criado_por_usuario_id,
+    criadoPorNome: row.criado_por_nome,
     mensagens: [],
   };
 }
@@ -257,6 +271,8 @@ export interface CriarChamadoParams {
   solicitanteDepartamento: string | null;
   ipOrigem: string | null;
   anexos: NovoAnexo[];
+  /* Quem de fato abriu, só quando diferente do solicitante (abertura delegada por um atendente/admin) — null no caso de sempre. */
+  criadoPorUsuarioId: string | null;
 }
 
 export async function criarChamado(
@@ -292,17 +308,18 @@ export async function criarChamado(
       params.solicitanteDepartamento
     );
     insertChamado.input("ipOrigem", sql.VarChar(64), params.ipOrigem);
+    insertChamado.input("criadoPorUsuarioId", sql.UniqueIdentifier, params.criadoPorUsuarioId);
 
     let chamadoResult;
 
     try {
       chamadoResult = await insertChamado.query<{ id: string; numero: number }>(`
         INSERT INTO dbo.portal_chamados
-          ([setor_id], [categoria_id], [prioridade], [titulo], [solicitante_usuario_id], [solicitante_nome], [solicitante_contato], [empresa], [solicitante_departamento], [ip_origem])
+          ([setor_id], [categoria_id], [prioridade], [titulo], [solicitante_usuario_id], [solicitante_nome], [solicitante_contato], [empresa], [solicitante_departamento], [ip_origem], [criado_por_usuario_id])
         OUTPUT
           CONVERT(VARCHAR(36), INSERTED.[id]) AS [id],
           INSERTED.[numero] AS [numero]
-        VALUES (@setorId, @categoriaId, @prioridade, @titulo, @solicitanteUsuarioId, @solicitanteNome, @solicitanteContato, @empresa, @solicitanteDepartamento, @ipOrigem);
+        VALUES (@setorId, @categoriaId, @prioridade, @titulo, @solicitanteUsuarioId, @solicitanteNome, @solicitanteContato, @empresa, @solicitanteDepartamento, @ipOrigem, @criadoPorUsuarioId);
       `);
     } catch (error) {
       if (error instanceof Error && /FK_portal_chamados_setor/i.test(error.message)) {
@@ -540,6 +557,95 @@ export async function listarChamadosDoUsuario(
   return result.recordset.map(mapChamadoRow);
 }
 
+/* Chamados em que o usuário foi adicionado como cópia (ver adicionarUsuarioCopia) -- não é o solicitante, mas acompanha e recebe as iterações por e-mail. */
+export async function listarChamadosEmCopia(usuarioId: string): Promise<ChamadoResumo[]> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+
+  const result = await request.query<ChamadoRow>(`
+    SELECT ${colunasChamado}
+    ${juncoesChamado}
+    INNER JOIN dbo.portal_chamados_copia AS copia ON copia.[chamado_id] = c.[id]
+    WHERE copia.[usuario_id] = @usuarioId
+    ORDER BY c.[criado_em] DESC;
+  `);
+
+  return result.recordset.map(mapChamadoRow);
+}
+
+export interface UsuarioCopiaChamado {
+  usuarioId: string;
+  nome: string;
+  email: string | null;
+}
+
+export async function listarCopiaDoChamado(chamadoId: string): Promise<UsuarioCopiaChamado[]> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+
+  const result = await request.query<{ usuario_id: string; nome_exibicao: string; email: string | null }>(`
+    SELECT
+      CONVERT(VARCHAR(36), u.[id]) AS [usuario_id],
+      u.[nome_exibicao],
+      u.[email]
+    FROM dbo.portal_chamados_copia AS copia
+    INNER JOIN dbo.portal_usuarios AS u ON u.[id] = copia.[usuario_id]
+    WHERE copia.[chamado_id] = @chamadoId
+    ORDER BY u.[nome_exibicao];
+  `);
+
+  return result.recordset.map((row) => ({
+    usuarioId: row.usuario_id,
+    nome: row.nome_exibicao,
+    email: row.email,
+  }));
+}
+
+/* Lança ValidationError (via FK do UNIQUE constraint) se o usuário já estiver em cópia -- ver UQ_chamados_copia na migração 0092. */
+export async function adicionarUsuarioCopia(
+  chamadoId: string,
+  usuarioId: string,
+  adicionadoPorUsuarioId: string
+): Promise<void> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+  request.input("adicionadoPorUsuarioId", sql.UniqueIdentifier, adicionadoPorUsuarioId);
+
+  try {
+    await request.query(`
+      INSERT INTO dbo.portal_chamados_copia ([chamado_id], [usuario_id], [adicionado_por_usuario_id])
+      VALUES (@chamadoId, @usuarioId, @adicionadoPorUsuarioId);
+    `);
+  } catch (error) {
+    if (error instanceof Error && /UQ_chamados_copia/i.test(error.message)) {
+      throw new ValidationError("Este usuário já está em cópia neste chamado.");
+    }
+    throw error;
+  }
+}
+
+export async function removerUsuarioCopia(chamadoId: string, usuarioId: string): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+
+  const result = await request.query(`
+    DELETE FROM dbo.portal_chamados_copia
+    WHERE [chamado_id] = @chamadoId AND [usuario_id] = @usuarioId;
+  `);
+
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
 export interface FiltrosFila {
   /* null = sem restrição de setor (admin vê tudo) — controla ACESSO, não é o filtro escolhido na tela. */
   setorIds: string[] | null;
@@ -742,6 +848,25 @@ export async function atualizarPublico(chamadoId: string, publico: boolean): Pro
   const result = await request.query(`
     UPDATE dbo.portal_chamados
     SET [publico] = @publico, [atualizado_em] = SYSDATETIME()
+    WHERE [id] = @chamadoId;
+  `);
+
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+export async function atualizarDataPrevistaConclusao(
+  chamadoId: string,
+  dataPrevistaConclusao: string | null
+): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("dataPrevistaConclusao", sql.Date, dataPrevistaConclusao);
+
+  const result = await request.query(`
+    UPDATE dbo.portal_chamados
+    SET [data_prevista_conclusao] = @dataPrevistaConclusao, [atualizado_em] = SYSDATETIME()
     WHERE [id] = @chamadoId;
   `);
 

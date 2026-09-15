@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Home, LifeBuoy } from "lucide-react";
+import { CheckCircle2, Home, LifeBuoy, X } from "lucide-react";
 import Link from "next/link";
 
 import { Alert } from "@/components/ui/Alert";
@@ -18,10 +18,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Stack } from "@/components/ui/Stack";
 import { Textarea } from "@/components/ui/Textarea";
 
-import { abrirChamado } from "../services/chamados.service";
+import { abrirChamado, adicionarUsuarioCopiaChamado } from "../services/chamados.service";
 import type { CategoriaChamado, PrioridadeChamado, SetorChamado } from "../types/chamados.types";
 import { PRIORIDADE_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
+import { UsuarioAutocomplete } from "./UsuarioAutocomplete";
 
 const OPCOES_PRIORIDADE = (Object.keys(PRIORIDADE_LABELS) as PrioridadeChamado[]).map(
   (prioridade) => ({ value: prioridade, label: PRIORIDADE_LABELS[prioridade].label })
@@ -31,9 +32,16 @@ interface AbrirChamadoPageProps {
   setores: SetorChamado[];
   categorias: CategoriaChamado[];
   usuarioLogado: { nomeExibicao: string; email: string | null } | null;
+  /* Atendente de algum setor ou admin -- só essas pessoas podem abrir um chamado em nome de outra. */
+  podeAbrirEmNomeDe: boolean;
 }
 
-export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirChamadoPageProps) {
+export function AbrirChamadoPage({
+  setores,
+  categorias,
+  usuarioLogado,
+  podeAbrirEmNomeDe,
+}: AbrirChamadoPageProps) {
   const [setorId, setSetorId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [prioridade, setPrioridade] = useState("");
@@ -42,9 +50,14 @@ export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirCh
   const [nome, setNome] = useState("");
   const [contato, setContato] = useState("");
   const [anexos, setAnexos] = useState<File[]>([]);
+  const [solicitanteAlvo, setSolicitanteAlvo] = useState<{ id: string; nomeExibicao: string } | null>(
+    null
+  );
+  const [copiaSelecionada, setCopiaSelecionada] = useState<{ id: string; nomeExibicao: string }[]>([]);
 
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [avisoCopia, setAvisoCopia] = useState<string | null>(null);
   const [numeroCriado, setNumeroCriado] = useState<number | null>(null);
 
   const categoriasDoSetor = useMemo(
@@ -104,6 +117,10 @@ export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirCh
         if (contato.trim()) formData.append("contato", contato.trim());
       }
 
+      if (solicitanteAlvo) {
+        formData.append("solicitanteAlvoId", solicitanteAlvo.id);
+      }
+
       for (const arquivo of anexos) {
         formData.append("anexos", arquivo);
       }
@@ -111,7 +128,21 @@ export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirCh
       const resultado = await abrirChamado(formData);
 
       if (resultado.ok && resultado.data) {
-        setNumeroCriado(resultado.data.numero);
+        const numero = resultado.data.numero;
+
+        if (copiaSelecionada.length > 0) {
+          const resultadosCopia = await Promise.all(
+            copiaSelecionada.map((pessoa) => adicionarUsuarioCopiaChamado(numero, pessoa.id))
+          );
+
+          if (resultadosCopia.some((item) => !item.ok)) {
+            setAvisoCopia(
+              "O chamado foi aberto, mas não foi possível adicionar todas as pessoas em cópia — adicione novamente pela tela do chamado."
+            );
+          }
+        }
+
+        setNumeroCriado(numero);
       } else {
         setErro(resultado.message ?? "Não foi possível abrir o chamado.");
       }
@@ -140,6 +171,8 @@ export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirCh
             <p className={styles.confirmacaoNumero}>
               Nº <strong>{numeroCriado}</strong>
             </p>
+
+            {avisoCopia && <Alert variant="warning">{avisoCopia}</Alert>}
 
             <p>
               Guarde este número — {usuarioLogado ? (
@@ -205,9 +238,73 @@ export function AbrirChamadoPage({ setores, categorias, usuarioLogado }: AbrirCh
       <Card>
         <Stack gap={20}>
           {usuarioLogado ? (
-            <Alert variant="info">
-              Abrindo como <strong>{usuarioLogado.nomeExibicao}</strong>.
-            </Alert>
+            <Stack gap={12}>
+              <Alert variant="info">
+                {solicitanteAlvo ? (
+                  <>
+                    Abrindo em nome de <strong>{solicitanteAlvo.nomeExibicao}</strong> — registrado por{" "}
+                    {usuarioLogado.nomeExibicao}.{" "}
+                    <button
+                      type="button"
+                      className={styles.linkBotao}
+                      onClick={() => setSolicitanteAlvo(null)}
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>Abrindo como <strong>{usuarioLogado.nomeExibicao}</strong>.</>
+                )}
+              </Alert>
+
+              <FormGrid columns={2}>
+                {podeAbrirEmNomeDe && !solicitanteAlvo && (
+                  <Field label="Abrir em nome de outra pessoa" hint="opcional — deixe em branco pra abrir para você mesmo">
+                    <UsuarioAutocomplete
+                      placeholder="Buscar usuário por nome ou e-mail"
+                      onSelecionar={(usuario) =>
+                        setSolicitanteAlvo({ id: usuario.id, nomeExibicao: usuario.nomeExibicao })
+                      }
+                    />
+                  </Field>
+                )}
+
+                <Field label="Pessoas em cópia" hint="opcional — recebem as respostas deste chamado por e-mail">
+                  <Stack gap={8}>
+                    {copiaSelecionada.length > 0 && (
+                      <div className={styles.copiaLista}>
+                        {copiaSelecionada.map((pessoa) => (
+                          <span key={pessoa.id} className={styles.copiaChip}>
+                            {pessoa.nomeExibicao}
+                            <button
+                              type="button"
+                              className={styles.copiaChipRemover}
+                              aria-label={`Remover ${pessoa.nomeExibicao} da cópia`}
+                              onClick={() =>
+                                setCopiaSelecionada((atual) => atual.filter((item) => item.id !== pessoa.id))
+                              }
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <UsuarioAutocomplete
+                      placeholder="Buscar usuário por nome ou e-mail"
+                      onSelecionar={(usuario) =>
+                        setCopiaSelecionada((atual) =>
+                          atual.some((item) => item.id === usuario.id)
+                            ? atual
+                            : [...atual, { id: usuario.id, nomeExibicao: usuario.nomeExibicao }]
+                        )
+                      }
+                    />
+                  </Stack>
+                </Field>
+              </FormGrid>
+            </Stack>
           ) : (
             <FormGrid columns={2}>
               <Field label="Seu nome" required>

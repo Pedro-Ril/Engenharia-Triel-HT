@@ -2,9 +2,12 @@ import "server-only";
 
 import type { Request as SqlRequest } from "mssql";
 
+import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { enviarEmail } from "@/lib/smtp/enviar-email";
 import { montarBotaoEmailHtml, montarEmailHtml, montarLinkEmailHtml } from "@/lib/smtp/template-email";
+
+import { listarCopiaDoChamado } from "./chamados";
 
 export type EventoNotificacaoChamado =
   | "aberto"
@@ -12,7 +15,9 @@ export type EventoNotificacaoChamado =
   | "nova_resposta"
   | "resolvido_pendente"
   | "reaberto"
-  | "fechado";
+  | "fechado"
+  /* Endereçado ao ATENDENTE (não ao solicitante) -- disparado quando quem escreve não é atendente (solicitante ou usuário em cópia). Ver notificarAtendenteChamado. */
+  | "nova_mensagem_solicitante";
 
 export interface NotificacaoEmailChamado {
   id: string;
@@ -36,6 +41,7 @@ export interface FiltrosNotificacoesEmailChamados {
 }
 
 interface ChamadoParaNotificar {
+  id: string;
   numero: number;
   titulo: string;
   solicitanteNome: string;
@@ -65,8 +71,11 @@ interface ConteudoEmail {
   corpoTexto: string;
 }
 
+/* Só os 6 eventos endereçados ao solicitante -- "nova_mensagem_solicitante" (endereçado ao atendente) tem sua própria montagem de conteúdo, em notificarAtendenteChamado. */
+type EventoParaSolicitante = Exclude<EventoNotificacaoChamado, "nova_mensagem_solicitante">;
+
 function montarConteudo(
-  evento: EventoNotificacaoChamado,
+  evento: EventoParaSolicitante,
   chamado: ChamadoParaNotificar,
   autorNome: string | null | undefined,
   link: string
@@ -170,6 +179,29 @@ function montarConteudo(
   }
 }
 
+/* Mesma mensagem de "nova_resposta", mas endereçada a quem acompanha em cópia (não é "seu chamado", é o chamado que essa pessoa acompanha). */
+function montarConteudoParaCopia(
+  destinatarioNome: string,
+  chamado: ChamadoParaNotificar,
+  autorNome: string | null | undefined,
+  link: string
+): ConteudoEmail {
+  const referencia = `#${chamado.numero} — ${chamado.titulo}`;
+
+  return {
+    assunto: `Nova resposta no chamado ${referencia} — Portal Triel-HT`,
+    corpoHtml: montarEmailHtml(`
+      <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${destinatarioNome}</strong>!</p>
+      <p style="margin: 0 0 18px;">
+        <strong>${autorNome}</strong> respondeu ao chamado <strong>${referencia}</strong>, que você acompanha em cópia.
+      </p>
+      ${montarBotaoEmailHtml("Ver resposta", link)}
+      ${montarLinkEmailHtml(link)}
+    `),
+    corpoTexto: `Olá, ${destinatarioNome}!\n\n${autorNome} respondeu ao chamado ${referencia}, que você acompanha em cópia.\n\n${link}`,
+  };
+}
+
 async function registrarNotificacaoEmail(params: {
   chamadoNumero: number;
   chamadoTitulo: string;
@@ -205,49 +237,145 @@ async function registrarNotificacaoEmail(params: {
 }
 
 /*
- * Nunca lança — a mutação no chamado já foi commitada antes desta função
- * ser chamada, então uma falha de e-mail (SMTP não configurado, servidor
- * fora do ar) não pode derrubar a resposta da rota. Endereço de contato
- * que não parece um e-mail (solicitante_contato é texto livre, pode ser
- * telefone) é pulado silenciosamente, sem gerar linha de log — a tabela
- * representa tentativas reais de envio, não todo evento do ciclo de vida.
+ * Núcleo genérico de envio -- nunca lança (mutação no chamado já foi
+ * commitada antes desta função ser chamada, uma falha de e-mail não
+ * pode derrubar a resposta da rota) e sempre registra a tentativa,
+ * sucesso ou falha, em portal_chamados_notificacoes_email.
  */
-export async function notificarSolicitanteChamado(params: NotificarSolicitanteParams): Promise<void> {
-  const { chamado, evento, origem, autorNome } = params;
-  const destinatario = chamado.solicitanteContato?.trim() ?? "";
-
-  if (!EMAIL_REGEX.test(destinatario)) {
-    return;
-  }
-
-  const link = construirLink(chamado, origem);
-  const { assunto, corpoHtml, corpoTexto } = montarConteudo(evento, chamado, autorNome, link);
-
+async function enviarNotificacaoUnica(params: {
+  chamadoNumero: number;
+  chamadoTitulo: string;
+  evento: EventoNotificacaoChamado;
+  destinatarioEmail: string;
+  destinatarioNome: string | null;
+  assunto: string;
+  corpoHtml: string;
+  corpoTexto: string;
+}): Promise<void> {
   try {
-    await enviarEmail({ destinatario, assunto, corpoHtml, corpoTexto });
+    await enviarEmail({
+      destinatario: params.destinatarioEmail,
+      assunto: params.assunto,
+      corpoHtml: params.corpoHtml,
+      corpoTexto: params.corpoTexto,
+    });
     await registrarNotificacaoEmail({
-      chamadoNumero: chamado.numero,
-      chamadoTitulo: chamado.titulo,
-      evento,
-      destinatarioEmail: destinatario,
-      destinatarioNome: chamado.solicitanteNome,
-      assunto,
+      chamadoNumero: params.chamadoNumero,
+      chamadoTitulo: params.chamadoTitulo,
+      evento: params.evento,
+      destinatarioEmail: params.destinatarioEmail,
+      destinatarioNome: params.destinatarioNome,
+      assunto: params.assunto,
       sucesso: true,
       erroMensagem: null,
     });
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : "Erro desconhecido.";
     await registrarNotificacaoEmail({
+      chamadoNumero: params.chamadoNumero,
+      chamadoTitulo: params.chamadoTitulo,
+      evento: params.evento,
+      destinatarioEmail: params.destinatarioEmail,
+      destinatarioNome: params.destinatarioNome,
+      assunto: params.assunto,
+      sucesso: false,
+      erroMensagem: mensagem.slice(0, 500),
+    });
+  }
+}
+
+/*
+ * Endereço de contato que não parece um e-mail (solicitante_contato é
+ * texto livre, pode ser telefone) é pulado silenciosamente, sem gerar
+ * linha de log — a tabela representa tentativas reais de envio, não
+ * todo evento do ciclo de vida.
+ *
+ * CC (ver adicionarUsuarioCopia) só recebe nas iterações
+ * ("nova_resposta") -- não no restante do ciclo de vida do chamado.
+ */
+export async function notificarSolicitanteChamado(params: NotificarSolicitanteParams): Promise<void> {
+  const { chamado, evento, origem, autorNome } = params;
+  const destinatario = chamado.solicitanteContato?.trim() ?? "";
+  const link = construirLink(chamado, origem);
+
+  if (EMAIL_REGEX.test(destinatario)) {
+    const conteudo = montarConteudo(evento as EventoParaSolicitante, chamado, autorNome, link);
+
+    await enviarNotificacaoUnica({
       chamadoNumero: chamado.numero,
       chamadoTitulo: chamado.titulo,
       evento,
       destinatarioEmail: destinatario,
       destinatarioNome: chamado.solicitanteNome,
-      assunto,
-      sucesso: false,
-      erroMensagem: mensagem.slice(0, 500),
+      ...conteudo,
     });
   }
+
+  if (evento === "nova_resposta") {
+    const copia = await listarCopiaDoChamado(chamado.id);
+
+    for (const pessoa of copia) {
+      if (!pessoa.email || !EMAIL_REGEX.test(pessoa.email)) continue;
+
+      const conteudo = montarConteudoParaCopia(pessoa.nome, chamado, autorNome, link);
+
+      await enviarNotificacaoUnica({
+        chamadoNumero: chamado.numero,
+        chamadoTitulo: chamado.titulo,
+        evento,
+        destinatarioEmail: pessoa.email,
+        destinatarioNome: pessoa.nome,
+        ...conteudo,
+      });
+    }
+  }
+}
+
+export interface NotificarAtendenteParams {
+  chamado: { id: string; numero: number; titulo: string; atendenteUsuarioId: string | null };
+  origem: string;
+  autorNome: string;
+}
+
+/*
+ * Espelho de notificarSolicitanteChamado, na direção contrária --
+ * disparado quando quem escreve NÃO é atendente (solicitante ou
+ * usuário em cópia), avisando o atendente responsável. Sem atendente
+ * atribuído ainda, não há para quem notificar (a fila de atendimento
+ * já mostra o chamado normalmente).
+ */
+export async function notificarAtendenteChamado(params: NotificarAtendenteParams): Promise<void> {
+  const { chamado, origem, autorNome } = params;
+
+  if (!chamado.atendenteUsuarioId) return;
+
+  const atendente = await buscarUsuarioPorId(chamado.atendenteUsuarioId);
+  if (!atendente?.email || !EMAIL_REGEX.test(atendente.email)) return;
+
+  const link = `${origem}/chamados/${chamado.numero}`;
+  const referencia = `#${chamado.numero} — ${chamado.titulo}`;
+  const assunto = `Nova mensagem no chamado ${referencia} — Portal Triel-HT`;
+
+  const corpoHtml = montarEmailHtml(`
+    <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${atendente.nomeExibicao}</strong>!</p>
+    <p style="margin: 0 0 18px;">
+      <strong>${autorNome}</strong> respondeu ao chamado <strong>${referencia}</strong>, que você atende.
+    </p>
+    ${montarBotaoEmailHtml("Ver chamado", link)}
+    ${montarLinkEmailHtml(link)}
+  `);
+  const corpoTexto = `Olá, ${atendente.nomeExibicao}!\n\n${autorNome} respondeu ao chamado ${referencia}, que você atende.\n\n${link}`;
+
+  await enviarNotificacaoUnica({
+    chamadoNumero: chamado.numero,
+    chamadoTitulo: chamado.titulo,
+    evento: "nova_mensagem_solicitante",
+    destinatarioEmail: atendente.email,
+    destinatarioNome: atendente.nomeExibicao,
+    assunto,
+    corpoHtml,
+    corpoTexto,
+  });
 }
 
 interface NotificacaoEmailRow {

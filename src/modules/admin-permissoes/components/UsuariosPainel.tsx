@@ -49,6 +49,9 @@ export function UsuariosPainel({
   const [codigosEmEdicao, setCodigosEmEdicao] = useState<
     Record<string, string>
   >({});
+  const [emailsEmEdicao, setEmailsEmEdicao] = useState<
+    Record<string, string>
+  >({});
   const [salvandoId, setSalvandoId] = useState<string | null>(null);
   const [usuarioExcluindo, setUsuarioExcluindo] =
     useState<PortalUsuarioAdmin | null>(null);
@@ -125,6 +128,38 @@ export function UsuariosPainel({
       if (resultado.ok && resultado.data) {
         onUsuarioAtualizado(resultado.data);
         setCodigosEmEdicao((atual) => {
+          const proximo = { ...atual };
+          delete proximo[usuario.id];
+          return proximo;
+        });
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível salvar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
+  async function salvarEmail(usuario: PortalUsuarioAdmin) {
+    const email = emailsEmEdicao[usuario.id];
+    if (email === undefined) return;
+
+    setSalvandoId(usuario.id);
+
+    try {
+      const resultado = await atualizarUsuario(usuario.id, {
+        codigoEmpresa: usuario.codigoEmpresa,
+        ativo: usuario.ativo,
+        email: email.trim() || null,
+      });
+
+      if (resultado.ok && resultado.data) {
+        onUsuarioAtualizado(resultado.data);
+        setEmailsEmEdicao((atual) => {
           const proximo = { ...atual };
           delete proximo[usuario.id];
           return proximo;
@@ -253,6 +288,7 @@ export function UsuariosPainel({
           {usuarios.map((usuario) => {
             const codigoAtual =
               codigosEmEdicao[usuario.id] ?? usuario.codigoEmpresa ?? "";
+            const emailAtual = emailsEmEdicao[usuario.id] ?? usuario.email ?? "";
 
             return (
               <TableRow key={usuario.id}>
@@ -263,7 +299,26 @@ export function UsuariosPainel({
                   </div>
                 </TableCell>
 
-                <TableCell>{usuario.email ?? "—"}</TableCell>
+                <TableCell>
+                  <Input
+                    className={styles.codigoInput}
+                    type="email"
+                    value={emailAtual}
+                    placeholder="sem e-mail"
+                    onChange={(event) =>
+                      setEmailsEmEdicao((atual) => ({
+                        ...atual,
+                        [usuario.id]: event.target.value,
+                      }))
+                    }
+                    onBlur={() => {
+                      if (emailsEmEdicao[usuario.id] !== undefined) {
+                        salvarEmail(usuario);
+                      }
+                    }}
+                    disabled={salvandoId === usuario.id}
+                  />
+                </TableCell>
 
                 <TableCell>{usuario.departamento ?? "—"}</TableCell>
 

@@ -93,6 +93,9 @@ const OPCOES_STATUS = [
   })),
 ];
 
+/* Situações em que a bola não está mais com o atendente -- ocultadas por padrão (toggle "Ocultar chamados resolvidos/fechados"). */
+const STATUS_OCULTAVEIS = new Set<StatusChamado>(["resolvido", "aguardando_confirmacao", "fechado"]);
+
 const OPCOES_PRIORIDADE = [
   { value: "", label: "Todas" },
   ...(Object.keys(PRIORIDADE_LABELS) as PrioridadeChamado[]).map((prioridade) => ({
@@ -173,7 +176,7 @@ export function FilaAtendimentoPage({
   }, [status, prioridade, setorId, empresa, departamento, categoriaId, busca]);
 
   const itensVisiveis = useMemo(
-    () => (ocultarFechados ? itens.filter((item) => item.status !== "fechado") : itens),
+    () => (ocultarFechados ? itens.filter((item) => !STATUS_OCULTAVEIS.has(item.status)) : itens),
     [itens, ocultarFechados]
   );
 
@@ -210,7 +213,7 @@ export function FilaAtendimentoPage({
 
   const colunasKanban = useMemo(() => {
     return (Object.keys(STATUS_LABELS) as StatusChamado[])
-      .filter((statusColuna) => !ocultarFechados || statusColuna !== "fechado")
+      .filter((statusColuna) => !ocultarFechados || !STATUS_OCULTAVEIS.has(statusColuna))
       .map((statusColuna) => ({
         status: statusColuna,
         label: STATUS_LABELS[statusColuna].label,
@@ -351,7 +354,7 @@ export function FilaAtendimentoPage({
           </div>
 
           <Checkbox
-            label="Ocultar chamados fechados"
+            label="Ocultar chamados resolvidos/fechados"
             checked={ocultarFechados}
             onChange={(event) => {
               setOcultarFechados(event.target.checked);

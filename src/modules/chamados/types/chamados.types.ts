@@ -64,9 +64,19 @@ export interface Chamado extends ChamadoResumo {
   atendenteUsuarioId: string | null;
   resolvidoEm: string | null;
   fechadoEm: string | null;
+  dataPrevistaConclusao: string | null;
+  criadoPorUsuarioId: string | null;
+  criadoPorNome: string | null;
   mensagens: ChamadoMensagem[];
   ehAtendente: boolean;
   ehDono: boolean;
+  ehEmCopia: boolean;
+}
+
+export interface UsuarioCopiaChamado {
+  usuarioId: string;
+  nome: string;
+  email: string | null;
 }
 
 export interface ChamadosAtendente {
@@ -134,7 +144,8 @@ export type EventoNotificacaoChamado =
   | "nova_resposta"
   | "resolvido_pendente"
   | "reaberto"
-  | "fechado";
+  | "fechado"
+  | "nova_mensagem_solicitante";
 
 export interface NotificacaoEmailChamado {
   id: string;
