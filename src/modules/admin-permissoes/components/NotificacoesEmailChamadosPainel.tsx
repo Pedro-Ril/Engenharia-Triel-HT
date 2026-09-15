@@ -35,6 +35,7 @@ const EVENTO_LABELS: Record<EventoNotificacaoChamado, string> = {
   reaberto: "Reaberto",
   fechado: "Fechado",
   nova_mensagem_solicitante: "Nova mensagem (pro atendente)",
+  adicionado_copia: "Adicionado em cópia",
 };
 
 const OPCOES_EVENTO = [

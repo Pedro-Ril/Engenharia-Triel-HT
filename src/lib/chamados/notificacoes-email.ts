@@ -17,7 +17,9 @@ export type EventoNotificacaoChamado =
   | "reaberto"
   | "fechado"
   /* Endereçado ao ATENDENTE (não ao solicitante) -- disparado quando quem escreve não é atendente (solicitante ou usuário em cópia). Ver notificarAtendenteChamado. */
-  | "nova_mensagem_solicitante";
+  | "nova_mensagem_solicitante"
+  /* Endereçado a UMA pessoa específica, no momento em que ela é colocada em cópia (na abertura ou depois). Ver notificarPessoaAdicionadaEmCopia. */
+  | "adicionado_copia";
 
 export interface NotificacaoEmailChamado {
   id: string;
@@ -73,8 +75,11 @@ interface ConteudoEmail {
   corpoTexto: string;
 }
 
-/* Só os 6 eventos endereçados ao solicitante -- "nova_mensagem_solicitante" (endereçado ao atendente) tem sua própria montagem de conteúdo, em notificarAtendenteChamado. */
-type EventoParaSolicitante = Exclude<EventoNotificacaoChamado, "nova_mensagem_solicitante">;
+/* Só os 6 eventos endereçados ao solicitante -- "nova_mensagem_solicitante" (endereçado ao atendente) e "adicionado_copia" (endereçado a uma pessoa específica) têm sua própria montagem de conteúdo. */
+type EventoParaSolicitante = Exclude<
+  EventoNotificacaoChamado,
+  "nova_mensagem_solicitante" | "adicionado_copia"
+>;
 
 function montarConteudo(
   evento: EventoParaSolicitante,
@@ -351,6 +356,55 @@ export async function notificarCopiaChamado(params: NotificarCopiaParams): Promi
       ...conteudo,
     });
   }
+}
+
+export interface NotificarPessoaAdicionadaEmCopiaParams {
+  chamado: Pick<ChamadoParaNotificar, "numero" | "titulo">;
+  destinatarioEmail: string;
+  destinatarioNome: string;
+  autorNome: string;
+  origem: string;
+}
+
+/*
+ * Disparado no exato momento em que alguém é colocado em cópia --
+ * na abertura (chamado ainda sem nenhuma iteração) ou depois, direto
+ * pela tela do chamado. Sem isso a pessoa só saberia que está em
+ * cópia quando a próxima resposta chegasse; a partir daqui ela já
+ * recebe esta e todas as próximas (ver notificarCopiaChamado).
+ */
+export async function notificarPessoaAdicionadaEmCopia(
+  params: NotificarPessoaAdicionadaEmCopiaParams
+): Promise<void> {
+  const { chamado, destinatarioEmail, destinatarioNome, autorNome, origem } = params;
+
+  if (!EMAIL_REGEX.test(destinatarioEmail)) return;
+
+  const link = `${origem}/chamados/${chamado.numero}`;
+  const referencia = `#${chamado.numero} — ${chamado.titulo}`;
+  const assunto = `Você foi incluído em cópia no chamado ${referencia} — Portal Triel-HT`;
+
+  const corpoHtml = montarEmailHtml(`
+    <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${destinatarioNome}</strong>!</p>
+    <p style="margin: 0 0 18px;">
+      <strong>${autorNome}</strong> incluiu você em cópia no chamado <strong>${referencia}</strong>.
+      A partir de agora, você vai receber as respostas deste chamado por e-mail.
+    </p>
+    ${montarBotaoEmailHtml("Ver chamado", link)}
+    ${montarLinkEmailHtml(link)}
+  `);
+  const corpoTexto = `Olá, ${destinatarioNome}!\n\n${autorNome} incluiu você em cópia no chamado ${referencia}. A partir de agora, você vai receber as respostas deste chamado por e-mail.\n\n${link}`;
+
+  await enviarNotificacaoUnica({
+    chamadoNumero: chamado.numero,
+    chamadoTitulo: chamado.titulo,
+    evento: "adicionado_copia",
+    destinatarioEmail,
+    destinatarioNome,
+    assunto,
+    corpoHtml,
+    corpoTexto,
+  });
 }
 
 export interface NotificarAtendenteParams {

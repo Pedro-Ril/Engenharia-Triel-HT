@@ -4,6 +4,8 @@ import { ValidationError } from "@/lib/auth/errors";
 import { isObject, requiredText } from "@/lib/auth/validation";
 import { carregarContextoAcao } from "@/lib/chamados/api-helpers";
 import { adicionarUsuarioCopia, listarCopiaDoChamado } from "@/lib/chamados/chamados";
+import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
+import { notificarPessoaAdicionadaEmCopia } from "@/lib/chamados/notificacoes-email";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -38,6 +40,17 @@ async function handlePOST(request: Request, context: RouteContext) {
 
     await adicionarUsuarioCopia(chamado.id, usuarioId, usuario.id);
     const copia = await listarCopiaDoChamado(chamado.id);
+
+    const pessoaAdicionada = copia.find((pessoa) => pessoa.usuarioId === usuarioId);
+    if (pessoaAdicionada?.email) {
+      await notificarPessoaAdicionadaEmCopia({
+        chamado,
+        destinatarioEmail: pessoaAdicionada.email,
+        destinatarioNome: pessoaAdicionada.nome,
+        autorNome: usuario.nomeExibicao,
+        origem: await origemPublicaEfetivaChamados(request),
+      });
+    }
 
     return NextResponse.json({ ok: true, message: "Usuário adicionado em cópia.", data: copia });
   } catch (error) {

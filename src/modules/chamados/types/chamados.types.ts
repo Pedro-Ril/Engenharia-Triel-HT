@@ -145,7 +145,8 @@ export type EventoNotificacaoChamado =
   | "resolvido_pendente"
   | "reaberto"
   | "fechado"
-  | "nova_mensagem_solicitante";
+  | "nova_mensagem_solicitante"
+  | "adicionado_copia";
 
 export interface NotificacaoEmailChamado {
   id: string;
