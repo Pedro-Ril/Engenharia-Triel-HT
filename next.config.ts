@@ -10,8 +10,14 @@ const nextConfig: NextConfig = {
    * function" ao usar sql.NVarChar/sql.UniqueIdentifier etc.
    * em runtime). Isso instrui o Next a carregar o pacote via
    * require() nativo do Node em vez de empacotar.
+   *
+   * O onvif quebra pelo mesmo motivo, mas na hora do build:
+   * "Module not found: Can't resolve 'onvif/promises'" -- é um
+   * subpath sem package.json próprio (resolve por index.js de
+   * diretório), e o Turbopack não segue essa resolução clássica
+   * do Node ao empacotar para produção.
    */
-  serverExternalPackages: ["mssql", "tedious"],
+  serverExternalPackages: ["mssql", "tedious", "onvif"],
 
   experimental: {
     /*
