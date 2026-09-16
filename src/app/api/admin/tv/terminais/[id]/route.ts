@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { isObject, optionalInteger, optionalText } from "@/lib/auth/validation";
+import { isObject, optionalBoolean, optionalInteger, optionalText } from "@/lib/auth/validation";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { atualizarTerminal, excluirTerminal } from "@/lib/tv/terminais";
 
@@ -22,6 +22,7 @@ interface AtualizarTerminalBody {
   gradeId?: unknown;
   caminhoInicial?: unknown;
   empresa?: unknown;
+  exibirCursor?: unknown;
 }
 
 async function handlePATCH(request: Request, context: RouteContext) {
@@ -88,6 +89,10 @@ async function handlePATCH(request: Request, context: RouteContext) {
 
     if (Object.prototype.hasOwnProperty.call(body, "empresa")) {
       params.empresa = optionalText(body.empresa, "empresa", 30);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "exibirCursor")) {
+      params.exibirCursor = optionalBoolean(body.exibirCursor, "exibirCursor", false);
     }
 
     const terminal = await atualizarTerminal(id, params);

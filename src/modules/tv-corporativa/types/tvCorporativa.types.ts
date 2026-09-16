@@ -18,6 +18,7 @@ export interface TerminalTv {
   agenteProximaVerificacaoEm: string | null;
   agenteSistemaOperacional: string | null;
   empresa: string | null;
+  exibirCursor: boolean;
 }
 
 export interface GradeTv {

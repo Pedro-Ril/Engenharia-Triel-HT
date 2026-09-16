@@ -546,6 +546,56 @@ function lancarKiosk(caminhoNavegador, token, hardwareId, caminhoInicial) {
   return spawn(caminhoNavegador, flags, { stdio: "inherit", env });
 }
 
+/*
+ * O Chrome em --kiosk esconde o cursor do mouse sozinho depois de um
+ * tempo parado (comportamento normal de fullscreen, igual a um player
+ * de vídeo) -- correto pra uma TV de sinalização passiva, sem ninguém
+ * mexendo no mouse. Mas alguns terminais (ex: TLT01) têm mouse de
+ * verdade, operado por alguém, e precisam do cursor sempre visível
+ * ("exibirCursor" em Dispositivos, ver /api/tv/agente/config). Como o
+ * Chrome não tem uma flag pra desligar esse auto-hide, o jeito padrão
+ * do mercado (usado por qualquer solução de "mouse jiggler" de kiosk)
+ * é forçar um movimento sintético mínimo, periodicamente, pra ele
+ * nunca contar como "parado".
+ */
+function iniciarNudgeCursor() {
+  if (EH_WINDOWS) {
+    const script = [
+      "Add-Type -AssemblyName System.Windows.Forms",
+      "while ($true) {",
+      "  $p = [System.Windows.Forms.Cursor]::Position",
+      "  [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(($p.X + 1), $p.Y)",
+      "  Start-Sleep -Milliseconds 200",
+      "  [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($p.X, $p.Y)",
+      "  Start-Sleep -Seconds 3",
+      "}",
+    ].join("; ");
+
+    return spawn("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", script], {
+      stdio: "ignore",
+    });
+  }
+
+  try {
+    execFileSync("which", ["xdotool"], { stdio: "ignore" });
+  } catch {
+    console.error(
+      'exibirCursor está ligado pra este terminal, mas "xdotool" não está instalado (necessário no Linux pra manter o cursor visível) -- rode "sudo apt-get install xdotool".'
+    );
+    return null;
+  }
+
+  const script =
+    "while true; do xdotool mousemove_relative -- 1 0; sleep 0.2; xdotool mousemove_relative -- -1 0; sleep 3; done";
+
+  return spawn("sh", ["-c", script], { stdio: "ignore" });
+}
+
+function pararNudgeCursor(processo) {
+  if (!processo) return;
+  processo.kill();
+}
+
 async function main() {
   garantirDiretorioDados();
 
@@ -564,6 +614,8 @@ async function main() {
 
   let caminhoAtual = CAMINHO_PADRAO;
   let processoAtual = null;
+  let exibindoCursorAtual = false;
+  let processoNudgeCursor = null;
 
   function iniciarESupervisionar() {
     processoAtual = lancarKiosk(caminhoNavegador, token, hardwareId, caminhoAtual);
@@ -652,6 +704,14 @@ async function main() {
         processoAtual.removeAllListeners("exit");
         processoAtual.kill();
         iniciarESupervisionar();
+      }
+
+      const novoExibirCursor = Boolean(corpo.data.exibirCursor);
+      if (novoExibirCursor !== exibindoCursorAtual) {
+        console.log(`Exibir cursor mudou (${exibindoCursorAtual} → ${novoExibirCursor}).`);
+        exibindoCursorAtual = novoExibirCursor;
+        pararNudgeCursor(processoNudgeCursor);
+        processoNudgeCursor = novoExibirCursor ? iniciarNudgeCursor() : null;
       }
     } catch (error) {
       console.error("Erro ao verificar atualização/configuração do agente:", error.message);

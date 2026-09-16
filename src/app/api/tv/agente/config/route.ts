@@ -17,7 +17,12 @@ export const dynamic = "force-dynamic";
  * decidir se precisa se auto-atualizar, ver tv-agente/agente.mjs) e o
  * caminho inicial configurado pra esse terminal específico (pra trocar
  * a página do kiosk sem precisar de uma atualização de código, só
- * mudando o campo em Dispositivos).
+ * mudando o campo em Dispositivos) e se esse terminal deve manter o
+ * cursor do mouse visível (ver tv-agente/agente.mjs, iniciarNudgeCursor
+ * — o Chrome em --kiosk esconde o cursor sozinho depois de um tempo
+ * parado, o que é o esperado pra uma TV de sinalização passiva, mas
+ * atrapalha um terminal com mouse de verdade sendo operado por
+ * alguém, ex: TLT01).
  *
  * O agente manda o próprio hash atual em ?hashAtual=, e telemetria
  * básica (IP local, %CPU, %memória) em ?ip=/&cpuPercentual=/&memoriaPercentual=
@@ -62,6 +67,7 @@ async function handleGET(request: Request) {
       data: {
         hash,
         caminhoInicial: acesso.terminal.caminhoInicial || "/tv",
+        exibirCursor: acesso.terminal.exibirCursor,
         comando,
       },
     });

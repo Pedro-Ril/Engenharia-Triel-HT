@@ -16,6 +16,7 @@ import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { Stack } from "@/components/ui/Stack";
+import { Switch } from "@/components/ui/Switch";
 import {
   Table,
   TableBody,
@@ -209,6 +210,26 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
     }
   }
 
+  async function handleAlterarExibirCursor(terminal: TerminalTv, exibirCursor: boolean) {
+    setSalvandoId(terminal.id);
+
+    try {
+      const resultado = await atualizarTerminal(terminal.id, { exibirCursor });
+
+      if (resultado.ok) {
+        await carregarTudo();
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível atualizar o cursor",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
   async function handleAlterarIntervalo(terminal: TerminalTv, valor: string) {
     const numero = Number(valor);
     if (!Number.isFinite(numero) || numero < 5) return;
@@ -348,6 +369,7 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
               <TableHeaderCell>Empresa</TableHeaderCell>
               <TableHeaderCell align="center">Intervalo (s)</TableHeaderCell>
               <TableHeaderCell>Página inicial</TableHeaderCell>
+              <TableHeaderCell align="center">Cursor</TableHeaderCell>
               <TableHeaderCell>Última atividade</TableHeaderCell>
               <TableHeaderCell>Agente</TableHeaderCell>
               <TableHeaderCell align="center">Ações</TableHeaderCell>
@@ -410,6 +432,18 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
                         disabled={salvandoId === terminal.id}
                       />
                     </div>
+                  </TableCell>
+
+                  <TableCell align="center">
+                    <Switch
+                      label=""
+                      compact
+                      checked={terminal.exibirCursor}
+                      disabled={salvandoId === terminal.id}
+                      onChange={(event) =>
+                        handleAlterarExibirCursor(terminal, event.target.checked)
+                      }
+                    />
                   </TableCell>
 
                   <TableCell>

@@ -38,6 +38,8 @@ export interface TerminalTv {
   agenteProximaVerificacaoEm: string | null;
   agenteSistemaOperacional: string | null;
   empresa: string | null;
+  /* Terminal com mouse de verdade, operado por alguém (ex: TLT01) -- ver tv-agente/agente.mjs, iniciarNudgeCursor. Padrão false: TV de sinalização passiva não precisa de cursor. */
+  exibirCursor: boolean;
 }
 
 const colunasTerminal = `
@@ -58,7 +60,8 @@ const colunasTerminal = `
   [agente_memoria_percentual],
   CONVERT(VARCHAR(33), [agente_proxima_verificacao_em], 126) AS [agente_proxima_verificacao_em],
   [agente_sistema_operacional],
-  [empresa]
+  [empresa],
+  [exibir_cursor]
 `;
 
 const colunasTerminalOutput = `
@@ -79,7 +82,8 @@ const colunasTerminalOutput = `
   INSERTED.[agente_memoria_percentual],
   CONVERT(VARCHAR(33), INSERTED.[agente_proxima_verificacao_em], 126) AS [agente_proxima_verificacao_em],
   INSERTED.[agente_sistema_operacional],
-  INSERTED.[empresa]
+  INSERTED.[empresa],
+  INSERTED.[exibir_cursor]
 `;
 
 interface TerminalRow {
@@ -101,6 +105,7 @@ interface TerminalRow {
   agente_proxima_verificacao_em?: string | null;
   agente_sistema_operacional?: string | null;
   empresa?: string | null;
+  exibir_cursor: boolean;
 }
 
 function mapTerminalRow(row: TerminalRow): TerminalTv {
@@ -123,6 +128,7 @@ function mapTerminalRow(row: TerminalRow): TerminalTv {
     agenteProximaVerificacaoEm: row.agente_proxima_verificacao_em ?? null,
     agenteSistemaOperacional: row.agente_sistema_operacional ?? null,
     empresa: row.empresa ?? null,
+    exibirCursor: row.exibir_cursor,
   };
 }
 
@@ -374,6 +380,7 @@ export async function atualizarTerminal(
     gradeId?: string | null;
     caminhoInicial?: string | null;
     empresa?: string | null;
+    exibirCursor?: boolean;
   },
   codigoEmpresaExigida?: string
 ): Promise<TerminalTv | null> {
@@ -400,6 +407,7 @@ export async function atualizarTerminal(
     Object.prototype.hasOwnProperty.call(params, "empresa")
   );
   request.input("empresa", sql.NVarChar(30), params.empresa ?? null);
+  request.input("exibirCursor", sql.Bit, params.exibirCursor ?? null);
   request.input("codigoEmpresaExigida", sql.NVarChar(30), codigoEmpresaExigida ?? null);
 
   const result = await request.query(`
@@ -410,6 +418,7 @@ export async function atualizarTerminal(
       [grade_id] = CASE WHEN @gradeId IS NOT NULL THEN @gradeId ELSE [grade_id] END,
       [caminho_inicial] = CASE WHEN @caminhoInicialInformado = 1 THEN @caminhoInicial ELSE [caminho_inicial] END,
       [empresa] = CASE WHEN @empresaInformada = 1 THEN @empresa ELSE [empresa] END,
+      [exibir_cursor] = COALESCE(@exibirCursor, [exibir_cursor]),
       [atualizado_em] = SYSDATETIME()
     OUTPUT ${colunasTerminalOutput}
     WHERE [id] = @id
@@ -655,6 +664,7 @@ export async function validarTokenDeTerminal(token: string): Promise<TerminalTv 
     caminho_inicial: string | null;
     criado_em: string;
     revogado_em: string | null;
+    exibir_cursor: boolean;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), [id]) AS [id],
@@ -666,7 +676,8 @@ export async function validarTokenDeTerminal(token: string): Promise<TerminalTv 
       CONVERT(VARCHAR(36), [grade_id]) AS [grade_id],
       [caminho_inicial],
       CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
-      CONVERT(VARCHAR(33), [revogado_em], 126) AS [revogado_em]
+      CONVERT(VARCHAR(33), [revogado_em], 126) AS [revogado_em],
+      [exibir_cursor]
     FROM dbo.portal_tv_terminais
     WHERE [id] = @id AND [status] = 'pareado';
   `);

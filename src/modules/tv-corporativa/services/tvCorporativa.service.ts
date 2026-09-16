@@ -50,6 +50,7 @@ export async function atualizarTerminal(
     gradeId?: string | null;
     caminhoInicial?: string | null;
     empresa?: string | null;
+    exibirCursor?: boolean;
   }
 ): Promise<ApiEnvelope<TerminalTv>> {
   const response = await fetch(`/api/admin/tv/terminais/${id}`, {
