@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Home, LifeBuoy, ShieldAlert } from "lucide-react";
+import { Home, LifeBuoy, LogIn, ShieldAlert } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { listarAtendentesDisponiveisParaSetor } from "@/lib/chamados/atendentes";
@@ -52,6 +54,8 @@ export default async function Page({ params, searchParams }: PageProps) {
    * não `chamado.publico`.
    */
   if (!podeVer && !chamado.publico) {
+    const proximoDestino = `/chamados/${numero}${nome ? `?nome=${encodeURIComponent(nome)}` : ""}`;
+
     return (
       <PageContainer>
         <Breadcrumb
@@ -68,6 +72,24 @@ export default async function Page({ params, searchParams }: PageProps) {
               Foram feitas muitas tentativas com nome incorreto para este chamado.
               Aguarde alguns minutos e tente novamente.
             </Alert>
+          ) : !usuario ? (
+            /*
+             * Sem sessão, "sem acesso" ainda não é definitivo -- a
+             * pessoa pode muito bem ter conta (solicitante, atendente
+             * do setor ou alguém em cópia) e só não estar logada
+             * neste navegador (ex: abriu o link do e-mail). Sugere
+             * login antes de dar a mensagem final de negado.
+             */
+            <EmptyState
+              icon={<LogIn size={28} />}
+              title="Entre para verificar seu acesso"
+              description='Este chamado pode estar vinculado à sua conta, como solicitante, atendente do setor ou pessoa em cópia. Se foi aberto sem login, use "Consultar chamado" com o número e o nome informados na abertura.'
+              action={
+                <Link href={`/login?next=${encodeURIComponent(proximoDestino)}`}>
+                  <Button>Entrar</Button>
+                </Link>
+              }
+            />
           ) : (
             <Alert variant="danger" icon={<ShieldAlert />} title="Sem acesso a este chamado">
               Confira se o número e o nome informados estão corretos, ou use{" "}

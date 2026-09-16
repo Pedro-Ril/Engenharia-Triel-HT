@@ -456,7 +456,7 @@ export function ChamadoDetalhePage({
       )}
 
       {chamado.ehAtendente && (
-        <Card title="Atribuição e prioridade">
+        <Card title="Atribuição e prioridade" allowOverflow>
           <Stack gap={16}>
             <FormGrid columns={2}>
               <Field label="Prioridade">
