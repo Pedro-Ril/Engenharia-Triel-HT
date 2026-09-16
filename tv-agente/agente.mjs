@@ -712,6 +712,14 @@ async function main() {
         exibindoCursorAtual = novoExibirCursor;
         pararNudgeCursor(processoNudgeCursor);
         processoNudgeCursor = novoExibirCursor ? iniciarNudgeCursor() : null;
+      } else if (exibindoCursorAtual && !processoNudgeCursor) {
+        /*
+         * Já estava ligado, mas iniciarNudgeCursor() falhou da última vez
+         * (ex: xdotool ainda não instalado no Linux) -- tenta de novo a
+         * cada poll, sem precisar reiniciar o agente inteiro depois de
+         * instalar a dependência que faltava.
+         */
+        processoNudgeCursor = iniciarNudgeCursor();
       }
     } catch (error) {
       console.error("Erro ao verificar atualização/configuração do agente:", error.message);

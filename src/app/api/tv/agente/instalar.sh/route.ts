@@ -27,7 +27,11 @@ export const dynamic = "force-dynamic";
  * nenhum navegador compatível já instalado — só sabe fazer isso via
  * apt (Debian/Ubuntu); noutra distro, para com uma mensagem clara em
  * vez de tentar adivinhar o gerenciador de pacotes certo. Precisa de
- * internet no mini-PC pra baixar os pacotes. O script gerado usa só
+ * internet no mini-PC pra baixar os pacotes. `xdotool` vai junto com
+ * o X porque é o que o agente usa pra manter o cursor visível em
+ * terminais com "exibirCursor" ligado em Dispositivos (ver
+ * tv-agente/agente.mjs, iniciarNudgeCursor) — sem ele, o agente só
+ * loga um aviso e não liga o nudge. O script gerado usa só
  * ASCII (sem acento/travessão) — mesmo bash lidando melhor com UTF-8
  * que o `irm | iex` do PowerShell, uma imagem mínima em locale C
  * ainda pode exibir/gravar acentuação errada, e evitar isso de
@@ -162,7 +166,7 @@ fi
 
 echo "Instalando X minimo (sem ambiente de desktop)..."
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils
+  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils xdotool
 else
   echo "Gerenciador de pacotes nao suportado para instalar o X automaticamente (so apt/Debian/Ubuntu por enquanto)." >&2
   exit 1
