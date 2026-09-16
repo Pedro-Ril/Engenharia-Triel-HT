@@ -547,19 +547,31 @@ function lancarKiosk(caminhoNavegador, token, hardwareId, caminhoInicial) {
 }
 
 /*
- * O Chrome em --kiosk esconde o cursor do mouse sozinho depois de um
- * tempo parado (comportamento normal de fullscreen, igual a um player
- * de vídeo) -- correto pra uma TV de sinalização passiva, sem ninguém
- * mexendo no mouse. Mas alguns terminais (ex: TLT01) têm mouse de
- * verdade, operado por alguém, e precisam do cursor sempre visível
- * ("exibirCursor" em Dispositivos, ver /api/tv/agente/config). Como o
- * Chrome não tem uma flag pra desligar esse auto-hide, o jeito padrão
- * do mercado (usado por qualquer solução de "mouse jiggler" de kiosk)
- * é forçar um movimento sintético mínimo, periodicamente, pra ele
- * nunca contar como "parado".
+ * Testado ao vivo (TLT01): o Chrome NÃO esconde o cursor sozinho por
+ * inatividade nesta página -- esse comportamento só existe pra
+ * conteúdo que usa a Fullscreen API de verdade (vídeo em tela cheia
+ * etc.), que o player da TV não usa. Quem escondia o cursor sempre
+ * foi só a flag "-nocursor" do próprio X (ver instalar.sh) -- sem
+ * ela, o X desenha o cursor normalmente o tempo todo, mesmo parado.
+ *
+ * Por isso, no Linux, pra uma TV passiva (exibirCursor desligado, o
+ * padrão) continuar sem cursor visível, o agente precisa rodar
+ * "unclutter" -- ferramenta padrão de kiosk que esconde o cursor
+ * depois de alguns segundos parado e mostra de novo em qualquer
+ * movimento -- e desligá-lo quando "exibirCursor" estiver ligado
+ * (ex: TLT01), deixando o cursor sempre visível.
+ *
+ * No Windows a situação é diferente (não testada ao vivo ainda): o
+ * agente roda como SYSTEM via tarefa agendada, o que pode impedir o
+ * cursor de ser desenhado nessa sessão de qualquer jeito -- mantém-se
+ * aqui o "nudge" (mover o mouse sinteticamente) como tentativa quando
+ * exibirCursor estiver ligado, mas isso ainda não foi confirmado
+ * funcionando de verdade num terminal Windows real.
  */
-function iniciarNudgeCursor() {
+function iniciarProcessoControleCursor(exibirCursor) {
   if (EH_WINDOWS) {
+    if (!exibirCursor) return null;
+
     const script = [
       "Add-Type -AssemblyName System.Windows.Forms",
       "while ($true) {",
@@ -576,24 +588,63 @@ function iniciarNudgeCursor() {
     });
   }
 
+  if (exibirCursor) return null;
+
   try {
-    execFileSync("which", ["xdotool"], { stdio: "ignore" });
+    execFileSync("which", ["unclutter"], { stdio: "ignore" });
   } catch {
     console.error(
-      'exibirCursor está ligado pra este terminal, mas "xdotool" não está instalado (necessário no Linux pra manter o cursor visível) -- rode "sudo apt-get install xdotool".'
+      '"unclutter" não está instalado (necessário no Linux pra esconder o cursor quando exibirCursor estiver desligado) -- rode "sudo apt-get install unclutter".'
     );
     return null;
   }
 
-  const script =
-    "while true; do xdotool mousemove_relative -- 1 0; sleep 0.2; xdotool mousemove_relative -- -1 0; sleep 3; done";
-
-  return spawn("sh", ["-c", script], { stdio: "ignore" });
+  return spawn("unclutter", ["--timeout", "3", "--jitter", "2"], { stdio: "ignore" });
 }
 
-function pararNudgeCursor(processo) {
+/* true = o agente deveria ter um processo de controle de cursor rodando agora, dado o valor atual de "exibirCursor". */
+function precisaDeProcessoControleCursor(exibirCursor) {
+  return EH_WINDOWS ? exibirCursor : !exibirCursor;
+}
+
+function pararProcessoControleCursor(processo) {
   if (!processo) return;
   processo.kill();
+}
+
+/*
+ * Um restart do agente (autoupdate, queda, reboot) não mata sozinho
+ * o processo de nudge que uma instância ANTERIOR possa ter deixado
+ * rodando -- ele não é filho do novo processo Node, e nada avisa esse
+ * órfão que o agente saiu. Sem essa limpeza, ligar/desligar
+ * "exibirCursor" no admin depois de um restart no meio do caminho não
+ * faz efeito nenhum: o cursor continua sendo movido por um processo
+ * que ninguém mais controla. Best-effort, roda uma vez no início do
+ * main() -- se não achar nada (comando falha), não é erro de verdade.
+ */
+function limparProcessoControleCursorOrfao() {
+  if (EH_WINDOWS) {
+    try {
+      execFileSync(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-Command",
+          "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*Windows.Forms.Cursor*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }",
+        ],
+        { stdio: "ignore" }
+      );
+    } catch {
+      /* Nenhum processo encontrado, ou powershell indisponível -- sem problema. */
+    }
+    return;
+  }
+
+  try {
+    execFileSync("pkill", ["-x", "unclutter"], { stdio: "ignore" });
+  } catch {
+    /* pkill sai com código != 0 quando não encontra nada -- não é erro de verdade aqui. */
+  }
 }
 
 async function main() {
@@ -612,10 +663,12 @@ async function main() {
   const caminhoNavegador = localizarNavegador();
   console.log("Iniciando modo kiosk com", caminhoNavegador);
 
+  limparProcessoControleCursorOrfao();
+
   let caminhoAtual = CAMINHO_PADRAO;
   let processoAtual = null;
   let exibindoCursorAtual = false;
-  let processoNudgeCursor = null;
+  let processoControleCursor = null;
 
   function iniciarESupervisionar() {
     processoAtual = lancarKiosk(caminhoNavegador, token, hardwareId, caminhoAtual);
@@ -707,19 +760,21 @@ async function main() {
       }
 
       const novoExibirCursor = Boolean(corpo.data.exibirCursor);
+      const precisaAgora = precisaDeProcessoControleCursor(novoExibirCursor);
+
       if (novoExibirCursor !== exibindoCursorAtual) {
         console.log(`Exibir cursor mudou (${exibindoCursorAtual} → ${novoExibirCursor}).`);
         exibindoCursorAtual = novoExibirCursor;
-        pararNudgeCursor(processoNudgeCursor);
-        processoNudgeCursor = novoExibirCursor ? iniciarNudgeCursor() : null;
-      } else if (exibindoCursorAtual && !processoNudgeCursor) {
+        pararProcessoControleCursor(processoControleCursor);
+        processoControleCursor = precisaAgora ? iniciarProcessoControleCursor(novoExibirCursor) : null;
+      } else if (precisaAgora && !processoControleCursor) {
         /*
-         * Já estava ligado, mas iniciarNudgeCursor() falhou da última vez
-         * (ex: xdotool ainda não instalado no Linux) -- tenta de novo a
-         * cada poll, sem precisar reiniciar o agente inteiro depois de
-         * instalar a dependência que faltava.
+         * Já devia estar rodando, mas iniciarProcessoControleCursor()
+         * falhou da última vez (ex: unclutter ainda não instalado no
+         * Linux) -- tenta de novo a cada poll, sem precisar reiniciar
+         * o agente inteiro depois de instalar a dependência que faltava.
          */
-        processoNudgeCursor = iniciarNudgeCursor();
+        processoControleCursor = iniciarProcessoControleCursor(novoExibirCursor);
       }
     } catch (error) {
       console.error("Erro ao verificar atualização/configuração do agente:", error.message);

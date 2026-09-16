@@ -27,11 +27,13 @@ export const dynamic = "force-dynamic";
  * nenhum navegador compatível já instalado — só sabe fazer isso via
  * apt (Debian/Ubuntu); noutra distro, para com uma mensagem clara em
  * vez de tentar adivinhar o gerenciador de pacotes certo. Precisa de
- * internet no mini-PC pra baixar os pacotes. `xdotool` vai junto com
- * o X porque é o que o agente usa pra manter o cursor visível em
- * terminais com "exibirCursor" ligado em Dispositivos (ver
- * tv-agente/agente.mjs, iniciarNudgeCursor) — sem ele, o agente só
- * loga um aviso e não liga o nudge. O script gerado usa só
+ * internet no mini-PC pra baixar os pacotes. `unclutter` vai junto
+ * com o X: sem "-nocursor" (removido — ver comentário mais abaixo),
+ * o cursor fica sempre visível por padrão, e é o agente quem liga o
+ * unclutter pra esconder o cursor nos terminais com "exibirCursor"
+ * desligado em Dispositivos (padrão — ver tv-agente/agente.mjs,
+ * iniciarProcessoControleCursor) — sem ele instalado, o agente só
+ * loga um aviso e o cursor fica visível. O script gerado usa só
  * ASCII (sem acento/travessão) — mesmo bash lidando melhor com UTF-8
  * que o `irm | iex` do PowerShell, uma imagem mínima em locale C
  * ainda pode exibir/gravar acentuação errada, e evitar isso de
@@ -166,7 +168,7 @@ fi
 
 echo "Instalando X minimo (sem ambiente de desktop)..."
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils xdotool
+  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils unclutter
 else
   echo "Gerenciador de pacotes nao suportado para instalar o X automaticamente (so apt/Debian/Ubuntu por enquanto)." >&2
   exit 1
@@ -245,13 +247,15 @@ chown tvkiosk:tvkiosk "$KIOSK_HOME/.xinitrc"
 chmod +x "$KIOSK_HOME/.xinitrc"
 
 # "startx -- -nocursor" (versao anterior) desliga o cursor no proprio
-# servidor X pra sempre -- diferente do Chrome escondendo por
-# inatividade, nenhum truque do lado do cliente (incluindo o nudge de
-# mouse do agente) consegue trazer o cursor de volta com essa flag
-# ligada. Sem ela, uma TV passiva continua sem cursor visivel na
-# pratica (o Chrome --kiosk ja esconde sozinho sem movimento de
-# mouse), mas um terminal com "exibirCursor" ligado (ex: TLT01)
-# consegue mostrar o cursor de verdade.
+# servidor X pra sempre -- e nada do lado do cliente consegue trazer
+# de volta enquanto essa flag estiver ligada, nem num terminal com
+# "exibirCursor" ligado (testado ao vivo no TLT01: o Chrome nao
+# esconde o cursor sozinho por inatividade nessa pagina -- isso so
+# existe pra conteudo com Fullscreen API de verdade). Sem "-nocursor",
+# o X sempre desenha o cursor; quem decide esconder ele agora e o
+# agente, ligando o "unclutter" nos terminais que devem ficar sem
+# cursor (o padrao) -- ver tv-agente/agente.mjs,
+# iniciarProcessoControleCursor.
 if ! grep -q "exec startx" "$KIOSK_HOME/.bash_profile" 2>/dev/null; then
   cat >> "$KIOSK_HOME/.bash_profile" <<'PROFILE'
 
