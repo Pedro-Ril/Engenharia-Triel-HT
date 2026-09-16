@@ -244,11 +244,19 @@ XINITRC
 chown tvkiosk:tvkiosk "$KIOSK_HOME/.xinitrc"
 chmod +x "$KIOSK_HOME/.xinitrc"
 
+# "startx -- -nocursor" (versao anterior) desliga o cursor no proprio
+# servidor X pra sempre -- diferente do Chrome escondendo por
+# inatividade, nenhum truque do lado do cliente (incluindo o nudge de
+# mouse do agente) consegue trazer o cursor de volta com essa flag
+# ligada. Sem ela, uma TV passiva continua sem cursor visivel na
+# pratica (o Chrome --kiosk ja esconde sozinho sem movimento de
+# mouse), mas um terminal com "exibirCursor" ligado (ex: TLT01)
+# consegue mostrar o cursor de verdade.
 if ! grep -q "exec startx" "$KIOSK_HOME/.bash_profile" 2>/dev/null; then
   cat >> "$KIOSK_HOME/.bash_profile" <<'PROFILE'
 
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  exec startx -- -nocursor
+  exec startx
 fi
 PROFILE
 fi
