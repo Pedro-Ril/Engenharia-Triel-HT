@@ -599,7 +599,16 @@ function iniciarProcessoControleCursor(exibirCursor) {
     return null;
   }
 
-  return spawn("unclutter", ["--timeout", "3", "--jitter", "2"], { stdio: "ignore" });
+  /*
+   * Flags de traço único -- testado ao vivo (TLT01): o pacote "unclutter"
+   * do apt instala a versão clássica (não "unclutter-xfixes"), cujas
+   * flags são "-idle"/"-jitter", não "--timeout"/"--jitter". Passar as
+   * flags erradas faz o processo imprimir a mensagem de uso e sair
+   * (código 1) na hora, sem nenhum erro visível pra este script -- só
+   * silenciosamente não escondia o cursor. "-root" garante que também
+   * some sobre a janela raiz, não só sobre a do Chrome.
+   */
+  return spawn("unclutter", ["-idle", "3", "-jitter", "2", "-root"], { stdio: "ignore" });
 }
 
 /* true = o agente deveria ter um processo de controle de cursor rodando agora, dado o valor atual de "exibirCursor". */
