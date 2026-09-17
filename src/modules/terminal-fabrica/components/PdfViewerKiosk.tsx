@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, X, ZoomIn, ZoomOut } from "lucide-react";
-import * as pdfjsLib from "pdfjs-dist";
+/*
+ * Build "legacy" (não a raiz "pdfjs-dist") -- a raiz assume DOMMatrix
+ * disponível já na avaliação do módulo, o que não existe em Node.js.
+ * Esse componente é "use client", mas o Next ainda avalia o módulo no
+ * lado do servidor como parte do SSR da página — sem a build legacy,
+ * o próprio pdf.js avisa "Please use the legacy build in Node.js
+ * environments" e a página quebra com "ReferenceError: DOMMatrix is
+ * not defined" antes mesmo de qualquer client component rodar.
+ */
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 import styles from "./PdfViewerKiosk.module.css";
@@ -19,7 +28,7 @@ import styles from "./PdfViewerKiosk.module.css";
  * na mesma barra do botão "Fechar".
  */
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
+  "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
   import.meta.url
 ).toString();
 
