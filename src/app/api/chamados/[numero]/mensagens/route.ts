@@ -100,6 +100,11 @@ async function handlePOST(request: Request, context: RouteContext) {
 
     if (!interno) {
       const origem = await origemPublicaEfetivaChamados(request);
+      const anexosNotificacao = mensagem.anexos.map((anexo) => ({
+        id: anexo.id,
+        nomeArquivo: anexo.nomeArquivo,
+        tamanhoBytes: anexo.tamanhoBytes,
+      }));
 
       if (ehAtendente && !ehDono) {
         await notificarSolicitanteChamado({
@@ -108,14 +113,24 @@ async function handlePOST(request: Request, context: RouteContext) {
           origem,
           autorNome,
           autorUsuarioId: usuario?.id ?? null,
+          mensagemTexto: texto,
+          anexos: anexosNotificacao,
         });
       } else if (!ehAtendente) {
-        await notificarAtendenteChamado({ chamado, origem, autorNome });
+        await notificarAtendenteChamado({
+          chamado,
+          origem,
+          autorNome,
+          mensagemTexto: texto,
+          anexos: anexosNotificacao,
+        });
         await notificarCopiaChamado({
           chamado,
           origem,
           autorNome,
           autorUsuarioId: usuario?.id ?? null,
+          mensagemTexto: texto,
+          anexos: anexosNotificacao,
         });
       }
     }

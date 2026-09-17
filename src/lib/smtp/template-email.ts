@@ -79,16 +79,23 @@ export function montarBotaoEmailHtml(texto: string, url: string): string {
  * Cartão com nome + tamanho de cada arquivo do lote — um só cartão
  * mesmo quando há vários arquivos, cada um em sua própria linha
  * separada por uma borda fina (em vez de um cartão por arquivo, que
- * ficaria repetitivo em lotes maiores).
+ * ficaria repetitivo em lotes maiores). `url` opcional -- quando
+ * presente, o nome do arquivo vira link (ex: anexos de chamado).
  */
-export function montarCartaoArquivosEmailHtml(arquivos: { nome: string; tamanho: string }[]): string {
+export function montarCartaoArquivosEmailHtml(
+  arquivos: { nome: string; tamanho: string; url?: string }[]
+): string {
   const linhas = arquivos
     .map(
       (arquivo, index) => `
         <tr>
           <td style="padding-top: ${index === 0 ? "0" : "12px"}; ${index > 0 ? `border-top: 1px solid ${COR.borda};` : ""}">
             <p style="margin: ${index === 0 ? "0" : "12px 0 0"}; font-size: 15px; font-weight: 700; color: ${COR.texto};">
-              ${arquivo.nome}
+              ${
+                arquivo.url
+                  ? `<a href="${arquivo.url}" style="color: ${COR.texto}; text-decoration: underline;">${arquivo.nome}</a>`
+                  : arquivo.nome
+              }
             </p>
             <p style="margin: 4px 0 0; font-size: 13px; color: ${COR.textoMuted};">
               ${arquivo.tamanho}
@@ -152,7 +159,7 @@ export function montarLinkEmailHtml(url: string): string {
  * claro, borda sutil, vermelho de marca), sem depender de nenhuma
  * folha de estilo externa.
  */
-export function montarEmailHtml(conteudoHtml: string): string {
+export function montarEmailHtml(conteudoHtml: string, opcoes?: { linkLogin?: string }): string {
   return `
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -190,6 +197,11 @@ export function montarEmailHtml(conteudoHtml: string): string {
                 <tr>
                   <td style="padding-top: 22px; text-align: center; font-family: ${FONTE}; font-size: 12px; color: ${COR.textoMuted};">
                     Este é um e-mail automático do Portal Triel-HT — não responda.
+                    ${
+                      opcoes?.linkLogin
+                        ? `<br /><br />Para acompanhar pelo portal, entre em <a href="${opcoes.linkLogin}" style="color: ${COR.primaria};">${opcoes.linkLogin}</a> com seu usuário e senha de rede.`
+                        : ""
+                    }
                   </td>
                 </tr>
               </table>

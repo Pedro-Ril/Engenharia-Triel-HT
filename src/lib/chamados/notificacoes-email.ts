@@ -5,7 +5,13 @@ import type { Request as SqlRequest } from "mssql";
 import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { enviarEmail } from "@/lib/smtp/enviar-email";
-import { montarBotaoEmailHtml, montarEmailHtml, montarLinkEmailHtml } from "@/lib/smtp/template-email";
+import {
+  montarBotaoEmailHtml,
+  montarCartaoArquivosEmailHtml,
+  montarCitacaoEmailHtml,
+  montarEmailHtml,
+  montarLinkEmailHtml,
+} from "@/lib/smtp/template-email";
 
 import { listarCopiaDoChamado } from "./chamados";
 
@@ -51,6 +57,13 @@ interface ChamadoParaNotificar {
   solicitanteUsuarioId: string | null;
 }
 
+/* Anexo de uma mensagem de chamado, só com o que o e-mail precisa (ver ChamadoAnexo em chamados.ts). */
+export interface AnexoNotificacao {
+  id: string;
+  nomeArquivo: string;
+  tamanhoBytes: number;
+}
+
 interface NotificarSolicitanteParams {
   chamado: ChamadoParaNotificar;
   evento: EventoNotificacaoChamado;
@@ -58,6 +71,9 @@ interface NotificarSolicitanteParams {
   autorNome?: string | null;
   /* Evita notificar quem acabou de escrever, caso essa pessoa também esteja na lista de cópia. */
   autorUsuarioId?: string | null;
+  /* Só faz sentido pra evento "nova_resposta" -- ver montarBlocoIteracao. */
+  mensagemTexto?: string;
+  anexos?: AnexoNotificacao[];
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,6 +83,63 @@ function construirLink(chamado: ChamadoParaNotificar, origem: string): string {
   return chamado.solicitanteUsuarioId
     ? base
     : `${base}?nome=${encodeURIComponent(chamado.solicitanteNome)}`;
+}
+
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatarTamanhoBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/*
+ * Conteúdo completo da mensagem (não só "fulano respondeu") -- texto
+ * na íntegra (escapado, já que é texto livre digitado por um usuário)
+ * e um cartão com link direto pra cada anexo, reaproveitando a mesma
+ * rota protegida que a tela do chamado já usa (GET /api/chamados/anexos/[id]).
+ * "sufixoLinkAnexo" carrega o "?nome=..." quando o destinatário é o
+ * solicitante anônimo (sem conta no portal) -- ver construirLink.
+ */
+function montarBlocoIteracaoHtml(
+  mensagemTexto: string | undefined,
+  anexos: AnexoNotificacao[] | undefined,
+  origem: string,
+  sufixoLinkAnexo: string
+): string {
+  if (!mensagemTexto) return "";
+
+  const citacao = montarCitacaoEmailHtml(escaparHtml(mensagemTexto).replace(/\n/g, "<br />"));
+  const cartaoAnexos =
+    anexos && anexos.length > 0
+      ? montarCartaoArquivosEmailHtml(
+          anexos.map((anexo) => ({
+            nome: anexo.nomeArquivo,
+            tamanho: formatarTamanhoBytes(anexo.tamanhoBytes),
+            url: `${origem}/api/chamados/anexos/${anexo.id}${sufixoLinkAnexo}`,
+          }))
+        )
+      : "";
+
+  return citacao + cartaoAnexos;
+}
+
+function montarBlocoIteracaoTexto(mensagemTexto: string | undefined, anexos: AnexoNotificacao[] | undefined): string {
+  if (!mensagemTexto) return "";
+
+  let bloco = `\n\n"${mensagemTexto}"`;
+  if (anexos && anexos.length > 0) {
+    bloco += `\n\nAnexos: ${anexos.map((anexo) => anexo.nomeArquivo).join(", ")} (baixe pelo portal)`;
+  }
+  return bloco;
 }
 
 interface ConteudoEmail {
@@ -85,7 +158,10 @@ function montarConteudo(
   evento: EventoParaSolicitante,
   chamado: ChamadoParaNotificar,
   autorNome: string | null | undefined,
-  link: string
+  link: string,
+  origem: string,
+  mensagemTexto?: string,
+  anexos?: AnexoNotificacao[]
 ): ConteudoEmail {
   const referencia = `#${chamado.numero} — ${chamado.titulo}`;
   const botaoTexto = "Ver chamado";
@@ -94,7 +170,7 @@ function montarConteudo(
     case "aberto":
       return {
         assunto: `Chamado #${chamado.numero} aberto — Portal Triel-HT`,
-        corpoHtml: montarEmailHtml(`
+        corpoHtml: `
           <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
           <p style="margin: 0 0 18px;">
             Recebemos seu chamado <strong>${referencia}</strong> e nossa equipe vai analisar em breve.
@@ -104,42 +180,48 @@ function montarConteudo(
           <p style="margin: 0; font-size: 13px; color: #6b7280;">
             Você será notificado por e-mail a cada atualização deste chamado.
           </p>
-        `),
+        `,
         corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\nRecebemos seu chamado ${referencia} e nossa equipe vai analisar em breve.\n\n${link}\n\nVocê será notificado por e-mail a cada atualização deste chamado.`,
       };
 
     case "aceito":
       return {
         assunto: `Chamado #${chamado.numero} em atendimento — Portal Triel-HT`,
-        corpoHtml: montarEmailHtml(`
+        corpoHtml: `
           <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
           <p style="margin: 0 0 18px;">
             <strong>${autorNome}</strong> assumiu o atendimento do seu chamado <strong>${referencia}</strong>.
           </p>
           ${montarBotaoEmailHtml(botaoTexto, link)}
           ${montarLinkEmailHtml(link)}
-        `),
+        `,
         corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\n${autorNome} assumiu o atendimento do seu chamado ${referencia}.\n\n${link}`,
       };
 
-    case "nova_resposta":
+    case "nova_resposta": {
+      const sufixoLinkAnexo = chamado.solicitanteUsuarioId
+        ? ""
+        : `?nome=${encodeURIComponent(chamado.solicitanteNome)}`;
+
       return {
         assunto: `Nova resposta no chamado #${chamado.numero} — Portal Triel-HT`,
-        corpoHtml: montarEmailHtml(`
+        corpoHtml: `
           <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
           <p style="margin: 0 0 18px;">
             <strong>${autorNome}</strong> respondeu ao seu chamado <strong>${referencia}</strong>.
           </p>
+          ${montarBlocoIteracaoHtml(mensagemTexto, anexos, origem, sufixoLinkAnexo)}
           ${montarBotaoEmailHtml("Ver resposta", link)}
           ${montarLinkEmailHtml(link)}
-        `),
-        corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\n${autorNome} respondeu ao seu chamado ${referencia}.\n\n${link}`,
+        `,
+        corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\n${autorNome} respondeu ao seu chamado ${referencia}.${montarBlocoIteracaoTexto(mensagemTexto, anexos)}\n\n${link}`,
       };
+    }
 
     case "resolvido_pendente":
       return {
         assunto: `Chamado #${chamado.numero} marcado como resolvido — confirme — Portal Triel-HT`,
-        corpoHtml: montarEmailHtml(`
+        corpoHtml: `
           <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
           <p style="margin: 0 0 18px;">
             <strong>${autorNome}</strong> marcou seu chamado <strong>${referencia}</strong> como resolvido.
@@ -149,28 +231,28 @@ function montarConteudo(
           </p>
           ${montarBotaoEmailHtml("Confirmar ou reabrir", link)}
           ${montarLinkEmailHtml(link)}
-        `),
+        `,
         corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\n${autorNome} marcou seu chamado ${referencia} como resolvido.\n\nSe o problema realmente foi resolvido, confirme no link abaixo. Caso contrário, você pode reabrir o chamado.\n\n${link}`,
       };
 
     case "reaberto":
       return {
         assunto: `Chamado #${chamado.numero} reaberto — Portal Triel-HT`,
-        corpoHtml: montarEmailHtml(`
+        corpoHtml: `
           <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
           <p style="margin: 0 0 18px;">
             <strong>${autorNome}</strong> reabriu seu chamado <strong>${referencia}</strong>. O atendimento continua.
           </p>
           ${montarBotaoEmailHtml(botaoTexto, link)}
           ${montarLinkEmailHtml(link)}
-        `),
+        `,
         corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\n${autorNome} reabriu seu chamado ${referencia}. O atendimento continua.\n\n${link}`,
       };
 
     case "fechado":
       return {
         assunto: `Chamado #${chamado.numero} encerrado — Portal Triel-HT`,
-        corpoHtml: montarEmailHtml(`
+        corpoHtml: `
           <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
           <p style="margin: 0 0 18px;">
             Seu chamado <strong>${referencia}</strong> foi encerrado por <strong>${autorNome}</strong>.
@@ -180,32 +262,36 @@ function montarConteudo(
           </p>
           ${montarBotaoEmailHtml(botaoTexto, link)}
           ${montarLinkEmailHtml(link)}
-        `),
+        `,
         corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\nSeu chamado ${referencia} foi encerrado por ${autorNome}.\n\nSe precisar, você pode reabri-lo a partir do link abaixo.\n\n${link}`,
       };
   }
 }
 
-/* Mesma mensagem de "nova_resposta", mas endereçada a quem acompanha em cópia (não é "seu chamado", é o chamado que essa pessoa acompanha). */
+/* Mesma mensagem de "nova_resposta", mas endereçada a quem acompanha em cópia (não é "seu chamado", é o chamado que essa pessoa acompanha). Sempre um usuário real do portal (nunca anônimo), então o link do anexo nunca precisa de "?nome=". */
 function montarConteudoParaCopia(
   destinatarioNome: string,
   chamado: Pick<ChamadoParaNotificar, "numero" | "titulo">,
   autorNome: string | null | undefined,
-  link: string
+  link: string,
+  origem: string,
+  mensagemTexto?: string,
+  anexos?: AnexoNotificacao[]
 ): ConteudoEmail {
   const referencia = `#${chamado.numero} — ${chamado.titulo}`;
 
   return {
     assunto: `Nova resposta no chamado ${referencia} — Portal Triel-HT`,
-    corpoHtml: montarEmailHtml(`
+    corpoHtml: `
       <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${destinatarioNome}</strong>!</p>
       <p style="margin: 0 0 18px;">
         <strong>${autorNome}</strong> respondeu ao chamado <strong>${referencia}</strong>, que você acompanha em cópia.
       </p>
+      ${montarBlocoIteracaoHtml(mensagemTexto, anexos, origem, "")}
       ${montarBotaoEmailHtml("Ver resposta", link)}
       ${montarLinkEmailHtml(link)}
-    `),
-    corpoTexto: `Olá, ${destinatarioNome}!\n\n${autorNome} respondeu ao chamado ${referencia}, que você acompanha em cópia.\n\n${link}`,
+    `,
+    corpoTexto: `Olá, ${destinatarioNome}!\n\n${autorNome} respondeu ao chamado ${referencia}, que você acompanha em cópia.${montarBlocoIteracaoTexto(mensagemTexto, anexos)}\n\n${link}`,
   };
 }
 
@@ -248,6 +334,12 @@ async function registrarNotificacaoEmail(params: {
  * commitada antes desta função ser chamada, uma falha de e-mail não
  * pode derrubar a resposta da rota) e sempre registra a tentativa,
  * sucesso ou falha, em portal_chamados_notificacoes_email.
+ *
+ * "corpoHtml" aqui é só o MIOLO do e-mail (o que cada evento monta) --
+ * o envelope completo (cartão + rodapé, ver montarEmailHtml) é
+ * montado uma vez só, aqui, pra garantir que TODO e-mail de chamado
+ * (presente e futuro) sempre leve o link de login no rodapé, sem
+ * depender de cada evento novo lembrar de incluir isso.
  */
 async function enviarNotificacaoUnica(params: {
   chamadoNumero: number;
@@ -258,13 +350,17 @@ async function enviarNotificacaoUnica(params: {
   assunto: string;
   corpoHtml: string;
   corpoTexto: string;
+  origem: string;
 }): Promise<void> {
+  const corpoHtmlCompleto = montarEmailHtml(params.corpoHtml, { linkLogin: `${params.origem}/login` });
+  const corpoTextoCompleto = `${params.corpoTexto}\n\n---\nPara acompanhar pelo portal, entre em ${params.origem}/login com seu usuário e senha de rede.`;
+
   try {
     await enviarEmail({
       destinatario: params.destinatarioEmail,
       assunto: params.assunto,
-      corpoHtml: params.corpoHtml,
-      corpoTexto: params.corpoTexto,
+      corpoHtml: corpoHtmlCompleto,
+      corpoTexto: corpoTextoCompleto,
     });
     await registrarNotificacaoEmail({
       chamadoNumero: params.chamadoNumero,
@@ -298,12 +394,20 @@ async function enviarNotificacaoUnica(params: {
  * todo evento do ciclo de vida.
  */
 export async function notificarSolicitanteChamado(params: NotificarSolicitanteParams): Promise<void> {
-  const { chamado, evento, origem, autorNome, autorUsuarioId } = params;
+  const { chamado, evento, origem, autorNome, autorUsuarioId, mensagemTexto, anexos } = params;
   const destinatario = chamado.solicitanteContato?.trim() ?? "";
   const link = construirLink(chamado, origem);
 
   if (EMAIL_REGEX.test(destinatario)) {
-    const conteudo = montarConteudo(evento as EventoParaSolicitante, chamado, autorNome, link);
+    const conteudo = montarConteudo(
+      evento as EventoParaSolicitante,
+      chamado,
+      autorNome,
+      link,
+      origem,
+      mensagemTexto,
+      anexos
+    );
 
     await enviarNotificacaoUnica({
       chamadoNumero: chamado.numero,
@@ -311,12 +415,13 @@ export async function notificarSolicitanteChamado(params: NotificarSolicitantePa
       evento,
       destinatarioEmail: destinatario,
       destinatarioNome: chamado.solicitanteNome,
+      origem,
       ...conteudo,
     });
   }
 
   if (evento === "nova_resposta") {
-    await notificarCopiaChamado({ chamado, origem, autorNome, autorUsuarioId });
+    await notificarCopiaChamado({ chamado, origem, autorNome, autorUsuarioId, mensagemTexto, anexos });
   }
 }
 
@@ -326,6 +431,8 @@ export interface NotificarCopiaParams {
   autorNome?: string | null;
   /* Quem acabou de escrever não recebe aviso da própria mensagem, mesmo estando em cópia. */
   autorUsuarioId?: string | null;
+  mensagemTexto?: string;
+  anexos?: AnexoNotificacao[];
 }
 
 /*
@@ -337,7 +444,7 @@ export interface NotificarCopiaParams {
  * vida do chamado (aberto/aceito/resolvido/etc).
  */
 export async function notificarCopiaChamado(params: NotificarCopiaParams): Promise<void> {
-  const { chamado, origem, autorNome, autorUsuarioId } = params;
+  const { chamado, origem, autorNome, autorUsuarioId, mensagemTexto, anexos } = params;
   const copia = await listarCopiaDoChamado(chamado.id);
   const link = `${origem}/chamados/${chamado.numero}`;
 
@@ -345,7 +452,7 @@ export async function notificarCopiaChamado(params: NotificarCopiaParams): Promi
     if (autorUsuarioId && pessoa.usuarioId === autorUsuarioId) continue;
     if (!pessoa.email || !EMAIL_REGEX.test(pessoa.email)) continue;
 
-    const conteudo = montarConteudoParaCopia(pessoa.nome, chamado, autorNome, link);
+    const conteudo = montarConteudoParaCopia(pessoa.nome, chamado, autorNome, link, origem, mensagemTexto, anexos);
 
     await enviarNotificacaoUnica({
       chamadoNumero: chamado.numero,
@@ -353,6 +460,7 @@ export async function notificarCopiaChamado(params: NotificarCopiaParams): Promi
       evento: "nova_resposta",
       destinatarioEmail: pessoa.email,
       destinatarioNome: pessoa.nome,
+      origem,
       ...conteudo,
     });
   }
@@ -384,7 +492,7 @@ export async function notificarPessoaAdicionadaEmCopia(
   const referencia = `#${chamado.numero} — ${chamado.titulo}`;
   const assunto = `Você foi incluído em cópia no chamado ${referencia} — Portal Triel-HT`;
 
-  const corpoHtml = montarEmailHtml(`
+  const corpoHtml = `
     <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${destinatarioNome}</strong>!</p>
     <p style="margin: 0 0 18px;">
       <strong>${autorNome}</strong> incluiu você em cópia no chamado <strong>${referencia}</strong>.
@@ -392,7 +500,7 @@ export async function notificarPessoaAdicionadaEmCopia(
     </p>
     ${montarBotaoEmailHtml("Ver chamado", link)}
     ${montarLinkEmailHtml(link)}
-  `);
+  `;
   const corpoTexto = `Olá, ${destinatarioNome}!\n\n${autorNome} incluiu você em cópia no chamado ${referencia}. A partir de agora, você vai receber as respostas deste chamado por e-mail.\n\n${link}`;
 
   await enviarNotificacaoUnica({
@@ -404,6 +512,7 @@ export async function notificarPessoaAdicionadaEmCopia(
     assunto,
     corpoHtml,
     corpoTexto,
+    origem,
   });
 }
 
@@ -411,6 +520,8 @@ export interface NotificarAtendenteParams {
   chamado: { id: string; numero: number; titulo: string; atendenteUsuarioId: string | null };
   origem: string;
   autorNome: string;
+  mensagemTexto?: string;
+  anexos?: AnexoNotificacao[];
 }
 
 /*
@@ -421,7 +532,7 @@ export interface NotificarAtendenteParams {
  * já mostra o chamado normalmente).
  */
 export async function notificarAtendenteChamado(params: NotificarAtendenteParams): Promise<void> {
-  const { chamado, origem, autorNome } = params;
+  const { chamado, origem, autorNome, mensagemTexto, anexos } = params;
 
   if (!chamado.atendenteUsuarioId) return;
 
@@ -432,15 +543,16 @@ export async function notificarAtendenteChamado(params: NotificarAtendenteParams
   const referencia = `#${chamado.numero} — ${chamado.titulo}`;
   const assunto = `Nova mensagem no chamado ${referencia} — Portal Triel-HT`;
 
-  const corpoHtml = montarEmailHtml(`
+  const corpoHtml = `
     <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${atendente.nomeExibicao}</strong>!</p>
     <p style="margin: 0 0 18px;">
       <strong>${autorNome}</strong> respondeu ao chamado <strong>${referencia}</strong>, que você atende.
     </p>
+    ${montarBlocoIteracaoHtml(mensagemTexto, anexos, origem, "")}
     ${montarBotaoEmailHtml("Ver chamado", link)}
     ${montarLinkEmailHtml(link)}
-  `);
-  const corpoTexto = `Olá, ${atendente.nomeExibicao}!\n\n${autorNome} respondeu ao chamado ${referencia}, que você atende.\n\n${link}`;
+  `;
+  const corpoTexto = `Olá, ${atendente.nomeExibicao}!\n\n${autorNome} respondeu ao chamado ${referencia}, que você atende.${montarBlocoIteracaoTexto(mensagemTexto, anexos)}\n\n${link}`;
 
   await enviarNotificacaoUnica({
     chamadoNumero: chamado.numero,
@@ -451,6 +563,7 @@ export async function notificarAtendenteChamado(params: NotificarAtendenteParams
     assunto,
     corpoHtml,
     corpoTexto,
+    origem,
   });
 }
 
