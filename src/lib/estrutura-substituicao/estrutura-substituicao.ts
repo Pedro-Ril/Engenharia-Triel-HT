@@ -401,7 +401,7 @@ export async function substituirItemNaEstrutura(params: {
   for (const [codigoPaiNivel, itensDoNivel] of niveisAfetados) {
     const descricaoPai = itensDoNivel[0]?.descricaoPai ?? null;
 
-    const itensFilho = itensDoNivel.map((item) => ({
+    const itensFilhoSubstituidos = itensDoNivel.map((item) => ({
       codigo: item.codigo === params.codigoAntigo ? params.codigoNovo : item.codigo,
       caracteristicas: [] as unknown[],
       sequencia: item.sequencia,
@@ -409,6 +409,28 @@ export async function substituirItemNaEstrutura(params: {
       dataInicial: item.dataInicial,
       dataFinal: item.dataFinal,
     }));
+
+    /*
+     * A dedup acima (chaveLinha/gruposPorPai) roda ANTES da troca de
+     * código, comparando o código ORIGINAL de cada linha -- por isso
+     * não pega o caso em que duas linhas de origem diferentes (ex:
+     * uma já com o código novo, outra ainda com o antigo, coexistindo
+     * durante o período de transição) têm a mesma
+     * sequência+quantidade+datas e SÓ colidem depois que a troca vira
+     * as duas em codigoNovo. Sem esse segundo filtro, essa colisão
+     * pós-troca ia direto pro payload enviado ao ERP (visto ao vivo:
+     * pelo menos 12 substituições em 2026-09-04 mandaram a mesma
+     * linha 2-3 vezes por esse motivo).
+     */
+    const chavesFilhoVistas = new Set<string>();
+    const itensFilho = itensFilhoSubstituidos.filter((item) => {
+      const chave = [item.codigo, item.sequencia, item.quantidade, item.dataInicial, item.dataFinal].join(
+        " "
+      );
+      if (chavesFilhoVistas.has(chave)) return false;
+      chavesFilhoVistas.add(chave);
+      return true;
+    });
 
     const payload = {
       cnpj: params.cnpj,
