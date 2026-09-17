@@ -69,8 +69,6 @@ interface NotificarSolicitanteParams {
   evento: EventoNotificacaoChamado;
   origem: string;
   autorNome?: string | null;
-  /* Evita notificar quem acabou de escrever, caso essa pessoa também esteja na lista de cópia. */
-  autorUsuarioId?: string | null;
   /* Só faz sentido pra evento "nova_resposta" -- ver montarBlocoIteracao. */
   mensagemTexto?: string;
   anexos?: AnexoNotificacao[];
@@ -394,7 +392,7 @@ async function enviarNotificacaoUnica(params: {
  * todo evento do ciclo de vida.
  */
 export async function notificarSolicitanteChamado(params: NotificarSolicitanteParams): Promise<void> {
-  const { chamado, evento, origem, autorNome, autorUsuarioId, mensagemTexto, anexos } = params;
+  const { chamado, evento, origem, autorNome, mensagemTexto, anexos } = params;
   const destinatario = chamado.solicitanteContato?.trim() ?? "";
   const link = construirLink(chamado, origem);
 
@@ -419,10 +417,6 @@ export async function notificarSolicitanteChamado(params: NotificarSolicitantePa
       ...conteudo,
     });
   }
-
-  if (evento === "nova_resposta") {
-    await notificarCopiaChamado({ chamado, origem, autorNome, autorUsuarioId, mensagemTexto, anexos });
-  }
 }
 
 export interface NotificarCopiaParams {
@@ -436,12 +430,15 @@ export interface NotificarCopiaParams {
 }
 
 /*
- * Fan-out para quem está em cópia (ver adicionarUsuarioCopia) -- chamado
- * nas DUAS direções da conversa: tanto quando o atendente responde
- * (a partir de notificarSolicitanteChamado) quanto quando o
- * solicitante ou outra pessoa em cópia escreve (a partir da rota de
- * mensagens). CC só recebe nas iterações, não no restante do ciclo de
- * vida do chamado (aberto/aceito/resolvido/etc).
+ * Fan-out para quem está em cópia (ver adicionarUsuarioCopia) --
+ * chamado SEMPRE que alguém escreve uma mensagem não-interna (ver
+ * src/app/api/chamados/[numero]/mensagens/route.ts), incondicional em
+ * relação a quem escreveu (atendente, solicitante, ou os dois ao
+ * mesmo tempo quando a pessoa é dona do próprio chamado e também seu
+ * atendente -- caso em que nem notificarSolicitanteChamado nem
+ * notificarAtendenteChamado disparam sozinhos, e a cópia não podia
+ * ficar de fora só por isso). CC só recebe nas iterações, não no
+ * restante do ciclo de vida do chamado (aberto/aceito/resolvido/etc).
  */
 export async function notificarCopiaChamado(params: NotificarCopiaParams): Promise<void> {
   const { chamado, origem, autorNome, autorUsuarioId, mensagemTexto, anexos } = params;

@@ -112,7 +112,6 @@ async function handlePOST(request: Request, context: RouteContext) {
           evento: "nova_resposta",
           origem,
           autorNome,
-          autorUsuarioId: usuario?.id ?? null,
           mensagemTexto: texto,
           anexos: anexosNotificacao,
         });
@@ -124,15 +123,22 @@ async function handlePOST(request: Request, context: RouteContext) {
           mensagemTexto: texto,
           anexos: anexosNotificacao,
         });
-        await notificarCopiaChamado({
-          chamado,
-          origem,
-          autorNome,
-          autorUsuarioId: usuario?.id ?? null,
-          mensagemTexto: texto,
-          anexos: anexosNotificacao,
-        });
       }
+
+      /*
+       * Sempre, incondicional a qual dos dois ramos acima disparou --
+       * inclusive quando NENHUM dispara (dono do chamado que também é
+       * o atendente dele: ehAtendente && ehDono, caso real visto no
+       * chamado #1022, onde a cópia ficava sem receber nada).
+       */
+      await notificarCopiaChamado({
+        chamado,
+        origem,
+        autorNome,
+        autorUsuarioId: usuario?.id ?? null,
+        mensagemTexto: texto,
+        anexos: anexosNotificacao,
+      });
     }
 
     return NextResponse.json(
