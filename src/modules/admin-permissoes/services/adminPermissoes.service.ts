@@ -153,7 +153,12 @@ export async function listarUsuarios(): Promise<PortalUsuarioAdmin[]> {
 
 export async function atualizarUsuario(
   id: string,
-  dados: { codigoEmpresa: string | null; ativo: boolean; email?: string | null }
+  dados: {
+    codigoEmpresa: string | null;
+    ativo: boolean;
+    email?: string | null;
+    departamento?: string | null;
+  }
 ): Promise<ApiEnvelope<PortalUsuarioAdmin>> {
   const response = await fetch(`/api/admin/usuarios/${id}`, {
     method: "PATCH",

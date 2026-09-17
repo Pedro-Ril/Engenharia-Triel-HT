@@ -6,6 +6,7 @@ import { Download, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
 import { Stack } from "@/components/ui/Stack";
@@ -176,6 +177,38 @@ export function UsuariosPainel({
     }
   }
 
+  /*
+   * Todo usuário precisa de um setor -- quem ficou sem (nenhum grupo
+   * "GRUPO X" no AD, ver extrairDepartamentoDoMemberOf em ldap.ts)
+   * escolhe manualmente um dos setores já em uso por outros usuários
+   * (dropdown, nunca texto livre, pra não criar setor duplicado por
+   * erro de digitação). Vale só até o AD passar a informar um setor
+   * de verdade pra essa pessoa (ver CASE guard em usuarios.ts).
+   */
+  async function salvarDepartamento(usuario: PortalUsuarioAdmin, departamento: string) {
+    setSalvandoId(usuario.id);
+
+    try {
+      const resultado = await atualizarUsuario(usuario.id, {
+        codigoEmpresa: usuario.codigoEmpresa,
+        ativo: usuario.ativo,
+        departamento: departamento || null,
+      });
+
+      if (resultado.ok && resultado.data) {
+        onUsuarioAtualizado(resultado.data);
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível salvar",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
   async function alternarAtivo(usuario: PortalUsuarioAdmin, ativo: boolean) {
     setSalvandoId(usuario.id);
 
@@ -231,6 +264,19 @@ export function UsuariosPainel({
       setConfirmandoExclusao(false);
     }
   }
+
+  const opcoesSetor = [
+    { value: "", label: "Selecione um setor" },
+    ...Array.from(
+      new Set(
+        usuarios
+          .map((usuario) => usuario.departamento)
+          .filter((departamento): departamento is string => Boolean(departamento))
+      )
+    )
+      .sort((a, b) => a.localeCompare(b, "pt-BR"))
+      .map((departamento) => ({ value: departamento, label: departamento })),
+  ];
 
   const botaoImportar = (
     <Stack direction="row" justify="end" gap={10}>
@@ -320,7 +366,14 @@ export function UsuariosPainel({
                   />
                 </TableCell>
 
-                <TableCell>{usuario.departamento ?? "—"}</TableCell>
+                <TableCell>
+                  <Dropdown
+                    value={usuario.departamento ?? ""}
+                    options={opcoesSetor}
+                    onValueChange={(valor) => salvarDepartamento(usuario, valor)}
+                    disabled={salvandoId === usuario.id}
+                  />
+                </TableCell>
 
                 <TableCell>
                   <Input

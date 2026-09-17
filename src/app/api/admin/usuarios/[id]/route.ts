@@ -18,6 +18,7 @@ interface UpdateUsuarioBody {
   codigoEmpresa?: unknown;
   ativo?: unknown;
   email?: unknown;
+  departamento?: unknown;
 }
 
 interface RouteContext {
@@ -59,6 +60,8 @@ async function handlePATCH(request: Request, context: RouteContext) {
     const codigoEmpresa = optionalText(body.codigoEmpresa, "codigoEmpresa", 30);
     const ativo = optionalBoolean(body.ativo, "ativo", true);
     const email = body.email !== undefined ? optionalText(body.email, "email", 256) : undefined;
+    const departamento =
+      body.departamento !== undefined ? optionalText(body.departamento, "departamento", 200) : undefined;
 
     if (email && !EMAIL_PATTERN.test(email)) {
       throw new ValidationError("Informe um e-mail válido.");
@@ -68,7 +71,7 @@ async function handlePATCH(request: Request, context: RouteContext) {
       throw new ValidationError("Você não pode desativar o seu próprio usuário.");
     }
 
-    const usuario = await atualizarUsuarioAdmin(id, { codigoEmpresa, ativo, email });
+    const usuario = await atualizarUsuarioAdmin(id, { codigoEmpresa, ativo, email, departamento });
 
     if (!usuario) {
       return NextResponse.json(

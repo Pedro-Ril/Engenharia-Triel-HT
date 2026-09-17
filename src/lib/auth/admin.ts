@@ -587,7 +587,12 @@ export async function excluirUsuario(id: string): Promise<boolean> {
 
 export async function atualizarUsuarioAdmin(
   id: string,
-  params: { codigoEmpresa: string | null; ativo: boolean; email?: string | null }
+  params: {
+    codigoEmpresa: string | null;
+    ativo: boolean;
+    email?: string | null;
+    departamento?: string | null;
+  }
 ): Promise<PortalUsuario | null> {
   const pool = await getSqlServerPool();
   const request = pool.request();
@@ -606,6 +611,17 @@ export async function atualizarUsuarioAdmin(
   request.input("email", sql.NVarChar(256), params.email ?? null);
 
   /*
+   * Mesma lógica do e-mail: "departamento" só entra no SET quando
+   * explicitamente enviado (o admin escolhe um setor já existente pra
+   * quem ficou sem, via dropdown em UsuariosPainel.tsx) -- e, como o
+   * AD tem prioridade sobre isso (ver usuarios.ts), essa escolha
+   * manual vale só até o próximo login/sincronização em que o AD
+   * realmente tiver um grupo "GRUPO X" pra essa pessoa.
+   */
+  const departamentoFornecido = params.departamento !== undefined;
+  request.input("departamento", sql.NVarChar(200), params.departamento ?? null);
+
+  /*
    * Ao desativar, invalida qualquer sessão já emitida
    * imediatamente (ver getUsuarioAutenticado), sem precisar
    * esperar o token expirar sozinho.
@@ -616,6 +632,7 @@ export async function atualizarUsuarioAdmin(
       [codigo_empresa] = @codigoEmpresa,
       [ativo] = @ativo,
       ${emailFornecido ? "[email] = @email," : ""}
+      ${departamentoFornecido ? "[departamento] = @departamento," : ""}
       [sessao_invalidada_em] = CASE
         WHEN @ativo = 0 THEN SYSDATETIME()
         ELSE [sessao_invalidada_em]

@@ -64,16 +64,17 @@ const usuarioSelectColumns = `
 
 /*
  * Cria ou atualiza o cadastro local do usuário a cada login
- * bem-sucedido no AD. `eh_administrador` e `departamento` são
- * recalculados toda vez a partir dos grupos do AD (ver
- * authenticateWithActiveDirectory em ./ldap.ts) — nunca um botão
- * manual na UI. `ativo` nunca é tocado aqui: se um admin
- * desativou o usuário, o login no AD continuar válido não reabre
- * acesso sozinho (ver checagem em src/app/api/auth/login/route.ts).
- * `email` só é sobrescrito quando o AD realmente tem um valor —
- * um admin pode ter cadastrado manualmente o e-mail de alguém sem
- * e-mail no AD (ver UsuariosPainel.tsx), e login nenhum pode apagar
- * isso.
+ * bem-sucedido no AD. `eh_administrador` é recalculado toda vez a
+ * partir dos grupos do AD (ver authenticateWithActiveDirectory em
+ * ./ldap.ts) — nunca um botão manual na UI. `ativo` nunca é tocado
+ * aqui: se um admin desativou o usuário, o login no AD continuar
+ * válido não reabre acesso sozinho (ver checagem em
+ * src/app/api/auth/login/route.ts). `email` e `departamento` só são
+ * sobrescritos quando o AD realmente tem um valor — um admin pode ter
+ * preenchido manualmente o e-mail ou o setor de alguém sem isso no AD
+ * (ex: sem grupo "GRUPO X", ver UsuariosPainel.tsx), e login/sync
+ * nenhum pode apagar isso; se o AD passar a ter o dado, ele volta a
+ * ser a fonte de verdade.
  */
 export async function upsertUsuarioLogin(
   diretorioUsuario: ActiveDirectoryUser
@@ -112,7 +113,7 @@ export async function upsertUsuarioLogin(
         [nome_exibicao] = @nomeExibicao,
         [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
         [eh_administrador] = @ehAdministrador,
-        [departamento] = @departamento,
+        [departamento] = CASE WHEN @departamento IS NOT NULL AND LTRIM(RTRIM(@departamento)) <> '' THEN @departamento ELSE [departamento] END,
         [ultimo_login_em] = SYSDATETIME()
     WHEN NOT MATCHED THEN
       INSERT
@@ -199,7 +200,7 @@ export async function upsertUsuarioImportado(
         [nome_exibicao] = @nomeExibicao,
         [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
         [eh_administrador] = @ehAdministrador,
-        [departamento] = @departamento,
+        [departamento] = CASE WHEN @departamento IS NOT NULL AND LTRIM(RTRIM(@departamento)) <> '' THEN @departamento ELSE [departamento] END,
         [ativo] = @contaAtiva
     WHEN NOT MATCHED AND @contaAtiva = 1 THEN
       INSERT
@@ -307,7 +308,7 @@ export async function atualizarDadosUsuarioDoAd(
       [nome_exibicao] = @nomeExibicao,
       [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
       [eh_administrador] = @ehAdministrador,
-      [departamento] = @departamento,
+      [departamento] = CASE WHEN @departamento IS NOT NULL AND LTRIM(RTRIM(@departamento)) <> '' THEN @departamento ELSE [departamento] END,
       [ativo] = @contaAtiva
     WHERE [sam_account_name] = @samAccountName;
   `);
