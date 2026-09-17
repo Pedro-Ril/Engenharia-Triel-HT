@@ -15,6 +15,29 @@ export interface ActiveDirectoryUser {
   memberOf: string[];
   ehAdministrador: boolean;
   departamento: string | null;
+  /* Conta habilitada no AD -- bit ACCOUNTDISABLE (0x2) de userAccountControl. Ver upsertUsuarioImportado/atualizarDadosUsuarioDoAd em usuarios.ts. */
+  contaAtiva: boolean;
+}
+
+/*
+ * userAccountControl é uma máscara de bits -- ACCOUNTDISABLE (0x2)
+ * marca a conta como desabilitada no AD (independente de senha
+ * expirada, bloqueio temporário etc., que são bits diferentes e não
+ * nos interessam aqui). Atributo ausente (não deveria acontecer para
+ * um objeto "user" de verdade) é tratado como conta ativa, por
+ * segurança -- não queremos desativar alguém por causa de um atributo
+ * que não veio na resposta.
+ */
+const AD_ACCOUNTDISABLE = 0x2;
+
+function contaEstaAtiva(userAccountControl: Entry[string] | undefined): boolean {
+  const bruto = toSingleString(userAccountControl);
+  if (bruto === null) return true;
+
+  const valor = Number(bruto);
+  if (Number.isNaN(valor)) return true;
+
+  return (valor & AD_ACCOUNTDISABLE) === 0;
 }
 
 function toSingleString(value: Entry[string] | undefined): string | null {
@@ -66,6 +89,7 @@ async function buscarUsuarioNoDiretorio(
         "displayName",
         "mail",
         "memberOf",
+        "userAccountControl",
       ],
     });
 
@@ -83,6 +107,7 @@ async function buscarUsuarioNoDiretorio(
       nomeExibicao: toSingleString(entry.displayName) ?? samAccountName,
       email: toSingleString(entry.mail),
       memberOf,
+      contaAtiva: contaEstaAtiva(entry.userAccountControl),
       departamento: extrairDepartamentoDoMemberOf(memberOf),
     };
   } finally {
@@ -201,6 +226,7 @@ export async function buscarMembrosDoGrupo(
         "displayName",
         "mail",
         "memberOf",
+        "userAccountControl",
       ],
     });
 
@@ -217,6 +243,7 @@ export async function buscarMembrosDoGrupo(
         email: toSingleString(entry.mail),
         memberOf,
         ehAdministrador: ehMembroDoGrupoAdmin(memberOf, config.grupoAdminDn),
+        contaAtiva: contaEstaAtiva(entry.userAccountControl),
         departamento: extrairDepartamentoDoMemberOf(memberOf),
       };
     });
@@ -263,6 +290,7 @@ export async function buscarUsuariosNoDiretorioPorSamAccountNames(
         "displayName",
         "mail",
         "memberOf",
+        "userAccountControl",
       ],
     });
 
@@ -279,6 +307,7 @@ export async function buscarUsuariosNoDiretorioPorSamAccountNames(
         email: toSingleString(entry.mail),
         memberOf,
         ehAdministrador: ehMembroDoGrupoAdmin(memberOf, config.grupoAdminDn),
+        contaAtiva: contaEstaAtiva(entry.userAccountControl),
         departamento: extrairDepartamentoDoMemberOf(memberOf),
       });
     }

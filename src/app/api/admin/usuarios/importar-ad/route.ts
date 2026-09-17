@@ -17,9 +17,14 @@ async function handlePOST() {
     const resultado = await importarUsuariosDoGrupoAd();
     const usuarios = await listarUsuarios();
 
+    const mensagemIgnorados =
+      resultado.ignorados > 0
+        ? ` ${resultado.ignorados} ignorado(s) por estar com a conta desabilitada no AD.`
+        : "";
+
     return NextResponse.json({
       ok: true,
-      message: `${resultado.encontrados} usuário(s) encontrado(s) no grupo: ${resultado.criados} novo(s), ${resultado.atualizados} já existiam e foram atualizados.`,
+      message: `${resultado.encontrados} usuário(s) encontrado(s) no grupo: ${resultado.criados} novo(s), ${resultado.atualizados} já existiam e foram atualizados.${mensagemIgnorados}`,
       data: { ...resultado, usuarios },
     });
   } catch (error) {

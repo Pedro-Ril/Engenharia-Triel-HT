@@ -137,8 +137,11 @@ export async function upsertUsuarioLogin(
 }
 
 export interface ResultadoUpsertImportado {
-  usuario: PortalUsuario;
+  /* null quando o candidato ainda não existia no portal E a conta está desabilitada no AD -- ver "ignorado" abaixo. */
+  usuario: PortalUsuario | null;
   criado: boolean;
+  /* Candidato novo (não existia no portal) com conta desabilitada no AD -- não deve ser importado. */
+  ignorado: boolean;
 }
 
 /*
@@ -146,13 +149,23 @@ export interface ResultadoUpsertImportado {
  * src/lib/auth/importacao-usuarios.ts) — cria o cadastro
  * ANTES do primeiro login, para o admin já poder liberar
  * acesso. Diferente de upsertUsuarioLogin: nunca toca
- * `ultimo_login_em` (a pessoa ainda não logou) nem
- * `ativo`/`sessao_invalidada_em` de quem já existia.
+ * `ultimo_login_em` (a pessoa ainda não logou).
+ *
+ * `ativo` agora espelha `contaAtiva` (bit ACCOUNTDISABLE do AD, ver
+ * ldap.ts) nos dois sentidos: quem já existe no portal e foi
+ * desativado no AD é desativado aqui também, e reativado se voltar a
+ * ficar ativo no AD -- mesmo que um admin tivesse desativado
+ * manualmente por outro motivo (o AD passa a ser a fonte de verdade
+ * pra isso). Um candidato NOVO (ainda sem cadastro) com conta
+ * desabilitada no AD não é criado -- por isso o "WHEN NOT MATCHED"
+ * só insere quando @contaAtiva = 1; sem nenhum match nesse caso, a
+ * MERGE não afeta nenhuma linha e a query não devolve nenhum registro
+ * (ver `ignorado` no retorno).
  */
 export async function upsertUsuarioImportado(
   diretorioUsuario: Pick<
     ActiveDirectoryUser,
-    "samAccountName" | "nomeExibicao" | "email" | "ehAdministrador" | "departamento"
+    "samAccountName" | "nomeExibicao" | "email" | "ehAdministrador" | "departamento" | "contaAtiva"
   >
 ): Promise<ResultadoUpsertImportado> {
   const pool = await getSqlServerPool();
@@ -173,6 +186,7 @@ export async function upsertUsuarioImportado(
   request.input("email", sql.NVarChar(256), diretorioUsuario.email);
   request.input("ehAdministrador", sql.Bit, diretorioUsuario.ehAdministrador);
   request.input("departamento", sql.NVarChar(200), diretorioUsuario.departamento);
+  request.input("contaAtiva", sql.Bit, diretorioUsuario.contaAtiva);
 
   const result = await request.query<PortalUsuarioRow & { acao: string }>(`
     SET XACT_ABORT ON;
@@ -185,8 +199,9 @@ export async function upsertUsuarioImportado(
         [nome_exibicao] = @nomeExibicao,
         [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
         [eh_administrador] = @ehAdministrador,
-        [departamento] = @departamento
-    WHEN NOT MATCHED THEN
+        [departamento] = @departamento,
+        [ativo] = @contaAtiva
+    WHEN NOT MATCHED AND @contaAtiva = 1 THEN
       INSERT
         ([sam_account_name], [nome_exibicao], [email], [eh_administrador], [departamento])
       VALUES
@@ -208,9 +223,14 @@ export async function upsertUsuarioImportado(
 
   const row = result.recordset[0];
 
+  if (!row) {
+    return { usuario: null, criado: false, ignorado: true };
+  }
+
   return {
     usuario: mapRow(row),
     criado: row.acao === "INSERT",
+    ignorado: false,
   };
 }
 
@@ -261,10 +281,15 @@ export async function listarTodosSamAccountNames(): Promise<string[]> {
  * pediu pra atualizar os dados) nem cria a linha se ela não
  * existir (isso é papel do "Importar do AD"). Devolve false se
  * o sam_account_name não corresponder a nenhum usuário.
+ *
+ * `ativo` passa a espelhar `contaAtiva` (conta habilitada/desabilitada
+ * no AD, ver ldap.ts) -- quem já existe no portal é desativado se a
+ * conta do AD foi desabilitada, e reativado se ela voltar a ficar
+ * habilitada, mesmo que a desativação anterior tivesse sido manual.
  */
 export async function atualizarDadosUsuarioDoAd(
   samAccountName: string,
-  dados: Pick<ActiveDirectoryUser, "nomeExibicao" | "email" | "ehAdministrador" | "departamento">
+  dados: Pick<ActiveDirectoryUser, "nomeExibicao" | "email" | "ehAdministrador" | "departamento" | "contaAtiva">
 ): Promise<boolean> {
   const pool = await getSqlServerPool();
   const request = pool.request();
@@ -274,6 +299,7 @@ export async function atualizarDadosUsuarioDoAd(
   request.input("email", sql.NVarChar(256), dados.email);
   request.input("ehAdministrador", sql.Bit, dados.ehAdministrador);
   request.input("departamento", sql.NVarChar(200), dados.departamento);
+  request.input("contaAtiva", sql.Bit, dados.contaAtiva);
 
   const result = await request.query(`
     UPDATE dbo.portal_usuarios
@@ -281,7 +307,8 @@ export async function atualizarDadosUsuarioDoAd(
       [nome_exibicao] = @nomeExibicao,
       [email] = CASE WHEN @email IS NOT NULL AND LTRIM(RTRIM(@email)) <> '' THEN @email ELSE [email] END,
       [eh_administrador] = @ehAdministrador,
-      [departamento] = @departamento
+      [departamento] = @departamento,
+      [ativo] = @contaAtiva
     WHERE [sam_account_name] = @samAccountName;
   `);
 

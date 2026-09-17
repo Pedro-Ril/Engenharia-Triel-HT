@@ -271,6 +271,7 @@ export interface ResultadoImportacaoAd {
   encontrados: number;
   criados: number;
   atualizados: number;
+  ignorados: number;
   usuarios: PortalUsuarioAdmin[];
 }
 

@@ -13,6 +13,8 @@ export interface ResultadoImportacaoAd {
   encontrados: number;
   criados: number;
   atualizados: number;
+  /* Candidatos novos (sem cadastro no portal) com conta desabilitada no AD -- não importados, ver upsertUsuarioImportado. */
+  ignorados: number;
 }
 
 /*
@@ -54,11 +56,14 @@ export async function importarUsuariosDoGrupoAd(): Promise<ResultadoImportacaoAd
 
   let criados = 0;
   let atualizados = 0;
+  let ignorados = 0;
 
   for (const candidato of candidatos) {
-    const { criado } = await upsertUsuarioImportado(candidato);
+    const { criado, ignorado } = await upsertUsuarioImportado(candidato);
 
-    if (criado) {
+    if (ignorado) {
+      ignorados += 1;
+    } else if (criado) {
       criados += 1;
     } else {
       atualizados += 1;
@@ -69,6 +74,7 @@ export async function importarUsuariosDoGrupoAd(): Promise<ResultadoImportacaoAd
     encontrados: candidatos.length,
     criados,
     atualizados,
+    ignorados,
   };
 }
 
