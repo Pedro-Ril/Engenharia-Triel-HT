@@ -63,10 +63,23 @@ export default function Sidebar({
   );
   const [saindo, setSaindo] = useState(false);
 
+  /*
+   * Clicar em qualquer espaço vazio do menu fechado expande ele --
+   * checar "e.target === e.currentTarget" (só o próprio <aside>)
+   * quebra toda vez que um elemento novo passa a cobrir esse espaço
+   * vazio (ex: o .menu virou flex:1 pra permitir rolagem interna, ver
+   * .menu no CSS, e passou a interceptar o clique antes de chegar no
+   * <aside>). Em vez disso, abre sempre que o clique não for em cima
+   * de um controle de verdade (botão/link, que já tem seu próprio
+   * onClick).
+   */
   const handleSidebarClick = (e: React.MouseEvent<HTMLElement>) => {
-    if (!open && e.target === e.currentTarget) {
-      setOpen(true);
-    }
+    if (open) return;
+
+    const alvo = e.target as HTMLElement;
+    if (alvo.closest("button, a")) return;
+
+    setOpen(true);
   };
 
   /* Fica aberto até o usuário clicar fora dele — não fecha sozinho por conta própria. */
@@ -160,7 +173,15 @@ export default function Sidebar({
 
       <div className={styles.sectionLabel}>{open ? "Navegação" : "⋯"}</div>
 
-      <nav className={styles.menu} onClick={(e) => e.stopPropagation()}>
+      {/*
+        Sem stopPropagation aqui de propósito -- o clique sobe até
+        handleSidebarClick no <aside>, que já ignora sozinho quando o
+        alvo é um botão/link de verdade (ver acima). Um
+        stopPropagation aqui bloquearia justamente o clique no espaço
+        vazio do menu (agora que .menu ocupa flex:1, é a maior parte
+        da área clicável do menu fechado) que deveria abrir o sidebar.
+      */}
+      <nav className={styles.menu}>
         {setores.map((setor) => {
           const SetorIcon = resolverIcone(setor.icone);
           const fechado = open && !setoresAbertos.has(setor.id);
