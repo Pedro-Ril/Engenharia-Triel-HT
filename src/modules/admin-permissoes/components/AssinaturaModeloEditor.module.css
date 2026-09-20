@@ -1,0 +1,77 @@
+.areaImagem {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  /* Faz "cqw" (usado no tamanho de fonte das alças, ver AssinaturaModeloEditor.tsx) resolver contra a largura RENDERIZADA desta área -- que é exatamente a largura da imagem, já que ela ocupa 100% do container. Sem isso as alças não escalariam junto com a imagem ao redimensionar a janela. */
+  container-type: inline-size;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-surface-muted);
+}
+
+.imagemFundo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.alca {
+  position: absolute;
+  transform: translate(0, -100%);
+  white-space: nowrap;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  padding: 2px 4px;
+  outline: 1px dashed transparent;
+  border-radius: 3px;
+}
+
+.alca:active {
+  cursor: grabbing;
+}
+
+.alcaSelecionada {
+  outline: 2px dashed var(--primary);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.painelCampo {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.miniaturaTabela {
+  width: 64px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg-surface-muted);
+}
+
+.corInput {
+  width: 40px;
+  height: 32px;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--border-input);
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.previewContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+  max-height: 70vh;
+  background: var(--bg-surface-muted);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.previewCanvas {
+  max-width: 100%;
+  height: auto;
+}

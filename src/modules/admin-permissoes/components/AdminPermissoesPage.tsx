@@ -14,6 +14,7 @@ import {
   KeyRound,
   Layers,
   Megaphone,
+  PenTool,
   Send,
   Settings,
   TrafficCone,
@@ -80,6 +81,7 @@ import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
 import { TvCorporativaPainel } from "@/modules/tv-corporativa/components/TvCorporativaPainel";
+import { AssinaturasPainel } from "./AssinaturasPainel";
 
 const toastInicial: ToastState = {
   open: false,
@@ -168,6 +170,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "semaforo-config",
         label: "Semáforo",
         icon: <TrafficCone size={16} />,
+      },
+      {
+        valor: "assinaturas",
+        label: "Assinaturas",
+        icon: <PenTool size={16} />,
       },
     ],
   },
@@ -524,6 +531,8 @@ export function AdminPermissoesPage() {
           {secao === "semaforo-config" && (
             <SemaforoConfigPainel onFeedback={mostrarFeedback} />
           )}
+
+          {secao === "assinaturas" && <AssinaturasPainel onFeedback={mostrarFeedback} />}
         </div>
       </div>
 

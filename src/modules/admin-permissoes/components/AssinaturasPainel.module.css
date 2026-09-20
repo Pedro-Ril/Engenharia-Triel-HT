@@ -1,0 +1,10 @@
+.filtrosLogs {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filtroCampo {
+  min-width: 180px;
+}
