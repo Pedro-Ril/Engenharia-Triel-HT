@@ -70,6 +70,20 @@ export const dynamic = "force-dynamic";
  * privilégio de root de verdade, o usuário sem privilégios do kiosk
  * não conseguiria reiniciar a máquina sozinho.
  *
+ * Instala e habilita o NetworkManager, e coloca o tvkiosk no grupo
+ * "netdev" — é o que dá ao agente (rodando como esse usuário sem
+ * privilégios) permissão de usar `nmcli` pra detectar cabo x Wi-Fi e
+ * conectar sozinho numa das redes cadastradas em TV Corporativa →
+ * Configurações, sem precisar de senha nem de root (ver
+ * tv-agente/agente.mjs, verificarConexaoRede/tentarReconectarWifi).
+ * IMPORTANTE: um terminal Linux instalado ANTES desta mudança não
+ * ganha isso sozinho — o autoupdate do agente só troca o arquivo
+ * `agente.mjs`, nunca re-executa este instalador. Terminais já em
+ * produção precisam rodar manualmente, uma única vez via SSH:
+ * `apt-get install -y network-manager && systemctl enable --now NetworkManager && usermod -aG netdev tvkiosk`
+ * (e reiniciar a sessão do tvkiosk, ou a máquina, pra o grupo novo
+ * valer).
+ *
  * stdout/stderr do agente (e do Chrome, herdado via stdio:'inherit'
  * em tv-agente/agente.mjs) são redirecionados pro arquivo
  * $DIR/agente.log em vez de ficar preso na tty1 (invisível assim que
@@ -201,6 +215,34 @@ fi
 echo "Liberando reinicio remoto sem senha (so o comando de reboot, nada mais)..."
 echo "tvkiosk ALL=(root) NOPASSWD: /sbin/reboot" > /etc/sudoers.d/tvkiosk-reboot
 chmod 440 /etc/sudoers.d/tvkiosk-reboot
+
+echo "Instalando NetworkManager (conexao automatica ao Wi-Fi)..."
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get install -y $APT_NONINTERATIVO network-manager
+else
+  echo "Gerenciador de pacotes nao suportado para instalar o NetworkManager automaticamente (so apt/Debian/Ubuntu por enquanto)." >&2
+  exit 1
+fi
+
+# Evita duas ferramentas de rede disputando a mesma interface -- se o
+# /etc/network/interfaces (comum em imagens minimas Debian/Ubuntu
+# Server) cuidar de alguma interface, o NetworkManager ignora ela por
+# padrao e a conexao automatica ao Wi-Fi configurada no portal nunca
+# teria efeito nela. Deixa so o stanza de loopback, que nao interfere
+# em nada e nao afeta a interface cabeada ja em uso (essa fica com o
+# NetworkManager, que tambem sobe sozinho via DHCP).
+if [ -f /etc/network/interfaces ]; then
+  printf 'auto lo\niface lo inet loopback\n' > /etc/network/interfaces
+fi
+
+systemctl enable --now NetworkManager
+
+# tvkiosk roda sem privilegio de root (ver useradd acima) -- "netdev" e
+# o grupo que as regras padrao de polkit do NetworkManager ja liberam
+# pra gerenciar conexoes (inclusive Wi-Fi, via nmcli) sem pedir senha,
+# sem precisar escrever regra de polkit nem sudoers a mais so pra isso
+# (ver tv-agente/agente.mjs, verificarConexaoRede/tentarReconectarWifi).
+usermod -aG netdev tvkiosk
 
 mkdir -p "$DIR"
 curl -fsSL "$PORTAL_URL/api/tv/agente/download?plataforma=linux" -o "$DIR/agente.mjs"

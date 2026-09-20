@@ -19,6 +19,19 @@ export interface TerminalTv {
   agenteSistemaOperacional: string | null;
   empresa: string | null;
   exibirCursor: boolean;
+  agenteTipoConexao: string | null;
+  agenteWifiSsid: string | null;
+  agenteWifiIntensidade: number | null;
+}
+
+export interface RedeWifiTv {
+  id: string;
+  ssid: string;
+  prioridade: number;
+  ativa: boolean;
+  criadoEm: string;
+  atualizadoEm: string;
+  atualizadoPor: string | null;
 }
 
 export interface GradeTv {

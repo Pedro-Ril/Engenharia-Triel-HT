@@ -47,3 +47,5 @@ next-env.d.ts
 # versionado. Config em mediamtx/mediamtx.yml continua committada.
 mediamtx/auto.crt
 mediamtx/auto.key
+
+Gerador_Assinaturas

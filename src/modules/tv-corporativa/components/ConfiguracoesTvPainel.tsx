@@ -18,6 +18,7 @@ import {
   statusSignaling,
 } from "../services/tvCorporativa.service";
 import type { FeedbackHandler } from "@/modules/admin-permissoes/types/toast.types";
+import { RedesWifiCard } from "./RedesWifiCard";
 
 interface ConfiguracoesTvPainelProps {
   onFeedback: FeedbackHandler;
@@ -137,60 +138,64 @@ export function ConfiguracoesTvPainel({ onFeedback }: ConfiguracoesTvPainelProps
   }
 
   return (
-    <Card
-      title="Armazenamento de mídias"
-      description="Diretório onde vídeos, fotos e documentos enviados pra grade de programação são gravados — pode ser um caminho local do servidor ou um compartilhamento de rede (UNC)."
-    >
-      <Stack gap={16}>
-        <Field
-          label="Diretório de mídias"
-          htmlFor="tv-diretorio-midias"
-          hint={'Ex: "D:\\PortalTrielHT\\tv-midias" ou "\\\\servidorgeral\\PortalTrielHT\\tv-midias"'}
-        >
-          <Input
-            id="tv-diretorio-midias"
-            value={diretorioMidias}
-            onChange={(event) => setDiretorioMidias(event.target.value)}
-            placeholder="\\servidorgeral\PortalTrielHT\tv-midias"
-          />
-        </Field>
+    <Stack gap={20}>
+      <Card
+        title="Armazenamento de mídias"
+        description="Diretório onde vídeos, fotos e documentos enviados pra grade de programação são gravados — pode ser um caminho local do servidor ou um compartilhamento de rede (UNC)."
+      >
+        <Stack gap={16}>
+          <Field
+            label="Diretório de mídias"
+            htmlFor="tv-diretorio-midias"
+            hint={'Ex: "D:\\PortalTrielHT\\tv-midias" ou "\\\\servidorgeral\\PortalTrielHT\\tv-midias"'}
+          >
+            <Input
+              id="tv-diretorio-midias"
+              value={diretorioMidias}
+              onChange={(event) => setDiretorioMidias(event.target.value)}
+              placeholder="\\servidorgeral\PortalTrielHT\tv-midias"
+            />
+          </Field>
 
-        <Field
-          label="URL do servidor de sinalização (visualização ao vivo)"
-          htmlFor="tv-signaling-url"
-          hint='Sobe sozinho junto com o servidor do portal (mesma máquina, porta separada — ver TV_SIGNALING_PORT) — necessário só pra "Ver ao vivo" em Dispositivos. Ex: "ws://192.168.5.142:3010" ou "wss://portal.trielht.com.br/tv-signaling" atrás de um proxy reverso.'
-        >
-          <Input
-            id="tv-signaling-url"
-            value={signalingUrl}
-            onChange={(event) => setSignalingUrl(event.target.value)}
-            placeholder="ws://192.168.5.142:3010"
-          />
-        </Field>
+          <Field
+            label="URL do servidor de sinalização (visualização ao vivo)"
+            htmlFor="tv-signaling-url"
+            hint='Sobe sozinho junto com o servidor do portal (mesma máquina, porta separada — ver TV_SIGNALING_PORT) — necessário só pra "Ver ao vivo" em Dispositivos. Ex: "ws://192.168.5.142:3010" ou "wss://portal.trielht.com.br/tv-signaling" atrás de um proxy reverso.'
+          >
+            <Input
+              id="tv-signaling-url"
+              value={signalingUrl}
+              onChange={(event) => setSignalingUrl(event.target.value)}
+              placeholder="ws://192.168.5.142:3010"
+            />
+          </Field>
 
-        <Field label="Status do servidor de sinalização">
-          <StatusSignaling onFeedback={onFeedback} />
-        </Field>
+          <Field label="Status do servidor de sinalização">
+            <StatusSignaling onFeedback={onFeedback} />
+          </Field>
 
-        <Field
-          label="URL do portal para o agente/instalador"
-          htmlFor="tv-url-agente"
-          hint='Endereço que os mini-PCs usam pra falar com o portal — pode ser diferente do endereço que você usa no navegador (ex: um IP de rede interna). Usado no comando de instalação (aba "Agente") e embutido nos scripts instalar.sh/instalar.ps1. Se deixar em branco, usa o mesmo endereço de onde a página foi acessada.'
-        >
-          <Input
-            id="tv-url-agente"
-            value={urlAgente}
-            onChange={(event) => setUrlAgente(event.target.value)}
-            placeholder="http://192.168.5.142:3000"
-          />
-        </Field>
+          <Field
+            label="URL do portal para o agente/instalador"
+            htmlFor="tv-url-agente"
+            hint='Endereço que os mini-PCs usam pra falar com o portal — pode ser diferente do endereço que você usa no navegador (ex: um IP de rede interna). Usado no comando de instalação (aba "Agente") e embutido nos scripts instalar.sh/instalar.ps1. Se deixar em branco, usa o mesmo endereço de onde a página foi acessada.'
+          >
+            <Input
+              id="tv-url-agente"
+              value={urlAgente}
+              onChange={(event) => setUrlAgente(event.target.value)}
+              placeholder="http://192.168.5.142:3000"
+            />
+          </Field>
 
-        <Stack direction="row" justify="end">
-          <Button onClick={handleSalvar} loading={salvando} disabled={!diretorioMidias.trim()}>
-            Salvar
-          </Button>
+          <Stack direction="row" justify="end">
+            <Button onClick={handleSalvar} loading={salvando} disabled={!diretorioMidias.trim()}>
+              Salvar
+            </Button>
+          </Stack>
         </Stack>
-      </Stack>
-    </Card>
+      </Card>
+
+      <RedesWifiCard onFeedback={onFeedback} />
+    </Stack>
   );
 }

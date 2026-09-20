@@ -7,6 +7,7 @@ import styles from "./TvPlayer.module.css";
 
 const CHAVE_HARDWARE_ID = "tv-hardware-id";
 const CHAVE_TOKEN = "tv-device-token";
+const CHAVE_IP = "tv-ultimo-ip";
 const INTERVALO_PAREAMENTO_MS = 3000;
 const INTERVALO_HEARTBEAT_MS = 60000;
 const INTERVALO_VERIFICAR_TRANSMISSAO_MS = 5000;
@@ -148,10 +149,30 @@ function obterOuCriarHardwareId(hardwareIdDaUrl: string | null): string {
   return novo;
 }
 
+/*
+ * Mesmo padrão de obterOuCriarHardwareId (URL manda, senão cai pro
+ * último valor salvo) -- sem isso, a tela de pareamento só mostrava o
+ * IP no exato carregamento em que o agente lançou o Chrome com
+ * ?ip=; qualquer F5/reload manual depois (a URL já vem sem query,
+ * ver replaceState abaixo) perdia a informação, mesmo sendo o MESMO
+ * terminal físico. Sem "criar" like hardwareId -- se nunca recebeu um
+ * IP de um agente de verdade, não tem o que mostrar.
+ */
+function obterIp(ipDaUrl: string | null): string | null {
+  if (ipDaUrl) {
+    localStorage.setItem(CHAVE_IP, ipDaUrl);
+    return ipDaUrl;
+  }
+
+  return localStorage.getItem(CHAVE_IP);
+}
+
 export function TvPlayer() {
   const [hardwareId, setHardwareId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [codigo, setCodigo] = useState<string | null>(null);
+  /* Só pra exibir na tela de pareamento (ver ?ip= abaixo) -- ajuda quem está pareando a identificar fisicamente o terminal certo na rede, ex: quando há vários lado a lado. Persistido (ver obterIp) só pra sobreviver a reload manual da mesma tela -- sem uso depois que já pareou. */
+  const [ip, setIp] = useState<string | null>(null);
   const [grade, setGrade] = useState<RespostaGradeAtual | null>(null);
   const [indiceAtual, setIndiceAtual] = useState(0);
   const avancarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -174,6 +195,7 @@ export function TvPlayer() {
     if (tokenDaUrl) {
       localStorage.setItem(CHAVE_TOKEN, tokenDaUrl);
     }
+    setIp(obterIp(params.get("ip")));
     if (tokenDaUrl || hardwareIdDaUrl) {
       window.history.replaceState(null, "", "/tv");
     }
@@ -409,6 +431,7 @@ export function TvPlayer() {
             Em Administração → TV Corporativa → Dispositivos, digite este código pra
             vincular esta tela.
           </p>
+          {ip && <p className={styles.ip}>IP: {ip}</p>}
         </div>
       </main>
     );

@@ -4,6 +4,7 @@ import type {
   GradeTv,
   MidiaTv,
   PastaMidia,
+  RedeWifiTv,
   SlotTv,
   TerminalTv,
 } from "../types/tvCorporativa.types";
@@ -301,5 +302,43 @@ export async function statusSignaling(): Promise<ApiEnvelope<{ online: boolean }
 
 export async function iniciarSignaling(): Promise<ApiEnvelope<{ online: boolean }>> {
   const response = await fetch("/api/admin/tv/signaling/iniciar", { method: "POST" });
+  return parseResponse(response);
+}
+
+/* Redes Wi-Fi */
+
+export async function listarRedesWifi(): Promise<RedeWifiTv[]> {
+  try {
+    const response = await fetch("/api/admin/tv/redes-wifi");
+    const body = await parseResponse<RedeWifiTv[]>(response);
+    return body.ok && body.data ? body.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function criarRedeWifi(ssid: string, senha: string): Promise<ApiEnvelope<RedeWifiTv>> {
+  const response = await fetch("/api/admin/tv/redes-wifi", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ssid, senha }),
+  });
+  return parseResponse(response);
+}
+
+export async function atualizarRedeWifi(
+  id: string,
+  dados: { ssid?: string; senha?: string; ativa?: boolean; prioridade?: number }
+): Promise<ApiEnvelope<RedeWifiTv>> {
+  const response = await fetch(`/api/admin/tv/redes-wifi/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse(response);
+}
+
+export async function excluirRedeWifi(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/tv/redes-wifi/${id}`, { method: "DELETE" });
   return parseResponse(response);
 }

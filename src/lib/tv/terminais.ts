@@ -40,6 +40,10 @@ export interface TerminalTv {
   empresa: string | null;
   /* Terminal com mouse de verdade, operado por alguém (ex: TLT01) -- ver tv-agente/agente.mjs, iniciarNudgeCursor. Padrão false: TV de sinalização passiva não precisa de cursor. */
   exibirCursor: boolean;
+  /* "cabeada"/"wifi"/"desconectado" -- null em terminal Windows, ou Linux com agente ainda não atualizado (ver verificarConexaoRede em tv-agente/agente.mjs). */
+  agenteTipoConexao: string | null;
+  agenteWifiSsid: string | null;
+  agenteWifiIntensidade: number | null;
 }
 
 const colunasTerminal = `
@@ -61,7 +65,10 @@ const colunasTerminal = `
   CONVERT(VARCHAR(33), [agente_proxima_verificacao_em], 126) AS [agente_proxima_verificacao_em],
   [agente_sistema_operacional],
   [empresa],
-  [exibir_cursor]
+  [exibir_cursor],
+  [agente_tipo_conexao],
+  [agente_wifi_ssid],
+  [agente_wifi_intensidade]
 `;
 
 const colunasTerminalOutput = `
@@ -83,7 +90,10 @@ const colunasTerminalOutput = `
   CONVERT(VARCHAR(33), INSERTED.[agente_proxima_verificacao_em], 126) AS [agente_proxima_verificacao_em],
   INSERTED.[agente_sistema_operacional],
   INSERTED.[empresa],
-  INSERTED.[exibir_cursor]
+  INSERTED.[exibir_cursor],
+  INSERTED.[agente_tipo_conexao],
+  INSERTED.[agente_wifi_ssid],
+  INSERTED.[agente_wifi_intensidade]
 `;
 
 interface TerminalRow {
@@ -106,6 +116,9 @@ interface TerminalRow {
   agente_sistema_operacional?: string | null;
   empresa?: string | null;
   exibir_cursor: boolean;
+  agente_tipo_conexao?: string | null;
+  agente_wifi_ssid?: string | null;
+  agente_wifi_intensidade?: number | null;
 }
 
 function mapTerminalRow(row: TerminalRow): TerminalTv {
@@ -129,6 +142,9 @@ function mapTerminalRow(row: TerminalRow): TerminalTv {
     agenteSistemaOperacional: row.agente_sistema_operacional ?? null,
     empresa: row.empresa ?? null,
     exibirCursor: row.exibir_cursor,
+    agenteTipoConexao: row.agente_tipo_conexao ?? null,
+    agenteWifiSsid: row.agente_wifi_ssid ?? null,
+    agenteWifiIntensidade: row.agente_wifi_intensidade ?? null,
   };
 }
 
@@ -510,6 +526,10 @@ export async function registrarVerificacaoAgenteSemFalhar(
     cpuPercentual: number | null;
     memoriaPercentual: number | null;
     sistemaOperacional: string | null;
+    /* tipoConexao/wifiSsid/wifiIntensidade só vêm preenchidos do agente Linux (ver verificarConexaoRede em tv-agente/agente.mjs) -- ausentes/null no Windows. */
+    tipoConexao?: string | null;
+    wifiSsid?: string | null;
+    wifiIntensidade?: number | null;
   }
 ): Promise<void> {
   try {
@@ -521,6 +541,9 @@ export async function registrarVerificacaoAgenteSemFalhar(
     request.input("cpuPercentual", sql.Float, telemetria.cpuPercentual);
     request.input("memoriaPercentual", sql.Float, telemetria.memoriaPercentual);
     request.input("sistemaOperacional", sql.VarChar(20), telemetria.sistemaOperacional);
+    request.input("tipoConexao", sql.VarChar(20), telemetria.tipoConexao ?? null);
+    request.input("wifiSsid", sql.NVarChar(64), telemetria.wifiSsid ?? null);
+    request.input("wifiIntensidade", sql.Int, telemetria.wifiIntensidade ?? null);
 
     await request.query(`
       UPDATE dbo.portal_tv_terminais
@@ -531,7 +554,10 @@ export async function registrarVerificacaoAgenteSemFalhar(
         [agente_ip] = @ip,
         [agente_cpu_percentual] = @cpuPercentual,
         [agente_memoria_percentual] = @memoriaPercentual,
-        [agente_sistema_operacional] = @sistemaOperacional
+        [agente_sistema_operacional] = @sistemaOperacional,
+        [agente_tipo_conexao] = @tipoConexao,
+        [agente_wifi_ssid] = @wifiSsid,
+        [agente_wifi_intensidade] = @wifiIntensidade
       WHERE [id] = @id;
     `);
   } catch (error) {

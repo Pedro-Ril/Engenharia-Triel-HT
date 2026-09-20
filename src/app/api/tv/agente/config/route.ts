@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { calcularHashAgente } from "@/lib/tv/agente-hash";
+import { listarRedesWifiParaAgente } from "@/lib/tv/redes-wifi";
 import {
   consumirComandoPendente,
   registrarVerificacaoAgenteSemFalhar,
@@ -38,6 +39,15 @@ export const dynamic = "force-dynamic";
  * — "reiniciar_maquina"/"atualizar_agente", pedidos pelo admin em
  * Dispositivos (ver solicitarComandoAgente) — executado só no próximo
  * poll do agente, então não resgata um agente travado.
+ *
+ * ?tipoConexao=&wifiSsid=&wifiIntensidade= (só do agente Linux, ver
+ * verificarConexaoRede em tv-agente/agente.mjs) alimentam as mesmas 3
+ * colunas novas em portal_tv_terminais. A resposta devolve
+ * "redesWifi" (SSID + senha decifrada, lista única compartilhada por
+ * todos os terminais, ver listarRedesWifiParaAgente) -- o agente
+ * Linux grava isso num cache local em disco pra conseguir tentar
+ * reconectar mesmo se a rede cair antes de conseguir falar de novo
+ * com o portal.
  */
 async function handleGET(request: Request) {
   const acesso = await requireTerminalApi(request);
@@ -51,16 +61,22 @@ async function handleGET(request: Request) {
       const cpuPercentual = params.get("cpuPercentual");
       const memoriaPercentual = params.get("memoriaPercentual");
 
+      const wifiIntensidade = params.get("wifiIntensidade");
+
       await registrarVerificacaoAgenteSemFalhar(acesso.terminal.id, hashAtual, {
         ip: params.get("ip"),
         cpuPercentual: cpuPercentual ? Number(cpuPercentual) : null,
         memoriaPercentual: memoriaPercentual ? Number(memoriaPercentual) : null,
         sistemaOperacional: params.get("sistemaOperacional"),
+        tipoConexao: params.get("tipoConexao"),
+        wifiSsid: params.get("wifiSsid"),
+        wifiIntensidade: wifiIntensidade ? Number(wifiIntensidade) : null,
       });
     }
 
     const hash = await calcularHashAgente();
     const comando = await consumirComandoPendente(acesso.terminal.id);
+    const redesWifi = await listarRedesWifiParaAgente();
 
     return NextResponse.json({
       ok: true,
@@ -69,6 +85,7 @@ async function handleGET(request: Request) {
         caminhoInicial: acesso.terminal.caminhoInicial || "/tv",
         exibirCursor: acesso.terminal.exibirCursor,
         comando,
+        redesWifi,
       },
     });
   } catch (error) {

@@ -1,0 +1,14 @@
+.checkboxCentro {
+  display: flex;
+  justify-content: center;
+}
+
+.alcaArrastar {
+  cursor: grab;
+  touch-action: none;
+  color: var(--text-faint);
+}
+
+.alcaArrastar:active {
+  cursor: grabbing;
+}

@@ -641,6 +641,24 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
                 <strong>IP:</strong> {terminalParaDetalharAgente.agenteIp ?? "—"}
               </span>
               <span>
+                <strong>Conexão:</strong>{" "}
+                {terminalParaDetalharAgente.agenteTipoConexao === "wifi"
+                  ? `Wi-Fi${
+                      terminalParaDetalharAgente.agenteWifiSsid
+                        ? ` (${terminalParaDetalharAgente.agenteWifiSsid}${
+                            terminalParaDetalharAgente.agenteWifiIntensidade !== null
+                              ? `, ${terminalParaDetalharAgente.agenteWifiIntensidade}%`
+                              : ""
+                          })`
+                        : ""
+                    }`
+                  : terminalParaDetalharAgente.agenteTipoConexao === "cabeada"
+                    ? "Cabeada"
+                    : terminalParaDetalharAgente.agenteTipoConexao === "desconectado"
+                      ? "Desconectado"
+                      : "—"}
+              </span>
+              <span>
                 <strong>CPU:</strong>{" "}
                 {terminalParaDetalharAgente.agenteCpuPercentual !== null
                   ? `${terminalParaDetalharAgente.agenteCpuPercentual.toFixed(1)}%`

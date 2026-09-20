@@ -40,6 +40,14 @@
  *      GET /api/tv/agente/comando) se o admin pediu "Reiniciar
  *      terminal"/"Atualizar agente" manualmente — separado do item 5
  *      pra esses comandos manuais chegarem em segundos, não minutos.
+ *   7. Só no Linux: verificar (INTERVALO_VERIFICAR_REDE_MS) se a
+ *      máquina está sem rede (nem cabo nem Wi-Fi) via `nmcli` e, nesse
+ *      caso, tentar conectar numa das redes Wi-Fi cadastradas em TV
+ *      Corporativa → Configurações (lista única, compartilhada por
+ *      todos os terminais — ver verificarConexaoRede/
+ *      tentarReconectarWifi). A lista fica cacheada em disco (mesma
+ *      pasta de token.json) pra o agente conseguir tentar reconectar
+ *      mesmo sem conseguir falar com o portal nesse momento.
  *
  * Sem dependências além do Node.js já instalado no mini-PC — nenhum
  * `npm install` necessário lá (ver /api/tv/agente/instalar.sh e
@@ -82,10 +90,18 @@ const DIRETORIO_DADOS = EH_WINDOWS
 
 const ARQUIVO_TOKEN = path.join(DIRETORIO_DADOS, "token.json");
 const ARQUIVO_HASH = path.join(DIRETORIO_DADOS, "versao.sha256");
+/* Última lista de redes Wi-Fi recebida do portal (ver verificarConfiguracaoAgente) -- cache local pra sobreviver a ficar sem rede pra falar com o portal (ver verificarEReconectarRede). */
+const ARQUIVO_REDES_WIFI = path.join(DIRETORIO_DADOS, "redes-wifi.json");
 const ARQUIVO_SCRIPT_ATUAL = fileURLToPath(import.meta.url);
 const INTERVALO_POLL_PAREAMENTO_MS = 5000;
 const INTERVALO_RELANCAR_MS = 3000;
 const INTERVALO_VERIFICAR_CONFIG_MS = 5 * 60 * 1000;
+/*
+ * Bem mais curto que INTERVALO_VERIFICAR_CONFIG_MS -- ficar minutos
+ * sem tentar reconectar depois de perder a rede é ruim demais pra uma
+ * TV de sinalização. Só usado no Linux (ver main()).
+ */
+const INTERVALO_VERIFICAR_REDE_MS = 30 * 1000;
 /*
  * Bem mais curto que INTERVALO_VERIFICAR_CONFIG_MS de propósito — só
  * pra "Reiniciar terminal"/"Atualizar agente" (comando manual do
@@ -285,6 +301,92 @@ function medirUsoMemoria() {
 }
 
 /*
+ * Só no Linux (ver instalar.sh -- instala e habilita o NetworkManager).
+ * "cabeada"/"wifi" vencem por prioridade nessa ordem: se qualquer
+ * interface ethernet estiver "connected", nem olha pra Wi-Fi. tipo
+ * null (não "desconectado") sinaliza falha em rodar o `nmcli` em si
+ * (não instalado ainda -- terminal antigo cujo instalador não rodou de
+ * novo, ver comentário em instalar.sh sobre autoupdate só trocar o
+ * agente.mjs) -- diferente de "desconectado" (nmcli funcionou, mas
+ * nenhuma interface está de fato conectada).
+ */
+function verificarConexaoRede() {
+  try {
+    const saidaStatus = execFileSync(
+      "nmcli",
+      ["-t", "-f", "DEVICE,TYPE,STATE", "device", "status"],
+      { encoding: "utf8" }
+    );
+    const dispositivos = saidaStatus
+      .trim()
+      .split("\n")
+      .map((linha) => linha.split(":"));
+
+    if (dispositivos.some(([, tipo, estado]) => tipo === "ethernet" && estado === "connected")) {
+      return { tipo: "cabeada", ssid: null, intensidade: null };
+    }
+
+    const conectadaWifi = dispositivos.some(
+      ([, tipo, estado]) => tipo === "wifi" && estado === "connected"
+    );
+    if (!conectadaWifi) {
+      return { tipo: "desconectado", ssid: null, intensidade: null };
+    }
+
+    const saidaRedes = execFileSync("nmcli", ["-t", "-f", "IN-USE,SSID,SIGNAL", "dev", "wifi"], {
+      encoding: "utf8",
+    });
+    const redeAtiva = saidaRedes
+      .trim()
+      .split("\n")
+      .map((linha) => linha.split(":"))
+      .find(([emUso]) => emUso === "*");
+
+    return {
+      tipo: "wifi",
+      ssid: redeAtiva?.[1] ?? null,
+      intensidade: redeAtiva?.[2] ? Number(redeAtiva[2]) : null,
+    };
+  } catch (error) {
+    console.error("Erro ao verificar estado da conexão de rede (nmcli):", error.message);
+    return { tipo: null, ssid: null, intensidade: null };
+  }
+}
+
+/* Tenta cada rede em ordem de prioridade, parando na primeira que conectar. Nunca lança -- só loga sucesso/erro (mesmo espírito de iniciarProcessoControleCursor). */
+function tentarReconectarWifi(redes) {
+  for (const rede of redes) {
+    try {
+      console.log(`Sem conexão -- tentando rede Wi-Fi "${rede.ssid}"...`);
+      execFileSync("nmcli", ["device", "wifi", "connect", rede.ssid, "password", rede.senha], {
+        stdio: "ignore",
+      });
+      console.log(`Conectado à rede Wi-Fi "${rede.ssid}".`);
+      return;
+    } catch (error) {
+      console.error(`Falha ao conectar na rede Wi-Fi "${rede.ssid}":`, error.message);
+    }
+  }
+}
+
+function salvarRedesWifiCache(redes) {
+  try {
+    writeFileSync(ARQUIVO_REDES_WIFI, JSON.stringify(redes), "utf8");
+  } catch (error) {
+    console.error("Erro ao gravar cache local de redes Wi-Fi:", error.message);
+  }
+}
+
+function lerRedesWifiCache() {
+  try {
+    return JSON.parse(readFileSync(ARQUIVO_REDES_WIFI, "utf8"));
+  } catch {
+    /* Ainda sem cache (agente nunca conseguiu falar com o portal) -- nada pra tentar. */
+    return [];
+  }
+}
+
+/*
  * Comando pedido pelo admin em Dispositivos (ver
  * POST /api/admin/tv/terminais/[id]/comando), entregue no próximo
  * poll deste agente — não resgata um agente travado, só funciona
@@ -433,6 +535,9 @@ function lancarKiosk(caminhoNavegador, token, hardwareId, caminhoInicial) {
     urlPlayerObj.searchParams.set("token", token);
   } else {
     urlPlayerObj.searchParams.set("hardwareId", hardwareId);
+    /* Só faz sentido antes de parear -- é a tela do código quem mostra isso, pra ajudar a identificar fisicamente o terminal certo (ex: vários lado a lado) na hora de digitar o código no admin. */
+    const ipLocal = obterIpLocal();
+    if (ipLocal) urlPlayerObj.searchParams.set("ip", ipLocal);
   }
   const urlPlayer = urlPlayerObj.toString();
 
@@ -678,6 +783,10 @@ async function main() {
   let processoAtual = null;
   let exibindoCursorAtual = false;
   let processoControleCursor = null;
+  /* Atualizados por verificarEReconectarRede (Linux, a cada INTERVALO_VERIFICAR_REDE_MS) e lidos por verificarConfiguracaoAgente pra reportar junto com IP/CPU/memória. */
+  let tipoConexaoAtual = null;
+  let wifiSsidAtual = null;
+  let wifiIntensidadeAtual = null;
 
   function iniciarESupervisionar() {
     processoAtual = lancarKiosk(caminhoNavegador, token, hardwareId, caminhoAtual);
@@ -731,12 +840,20 @@ async function main() {
         sistemaOperacional: EH_WINDOWS ? "windows" : "linux",
       });
       if (ip) parametros.set("ip", ip);
+      if (tipoConexaoAtual) parametros.set("tipoConexao", tipoConexaoAtual);
+      if (wifiSsidAtual) parametros.set("wifiSsid", wifiSsidAtual);
+      if (wifiIntensidadeAtual !== null) parametros.set("wifiIntensidade", String(wifiIntensidadeAtual));
 
       const resposta = await fetch(`${PORTAL_URL}/api/tv/agente/config?${parametros.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const corpo = await resposta.json();
       if (!corpo.ok) return;
+
+      /* Cacheia sempre que o portal responder com sucesso -- é essa cópia local que verificarEReconectarRede usa quando a rede cai e o agente não consegue mais falar com o portal. */
+      if (Array.isArray(corpo.data.redesWifi)) {
+        salvarRedesWifiCache(corpo.data.redesWifi);
+      }
 
       if (corpo.data.comando) {
         executarComandoRemoto(corpo.data.comando, processoAtual);
@@ -792,6 +909,32 @@ async function main() {
 
   verificarConfiguracaoAgente();
   setInterval(verificarConfiguracaoAgente, INTERVALO_VERIFICAR_CONFIG_MS);
+
+  /*
+   * Só no Linux -- verifica se a máquina está sem rede nenhuma (nem
+   * cabo, nem Wi-Fi) e, nesse caso, tenta conectar numa das redes
+   * cacheadas (ver ARQUIVO_REDES_WIFI). Também mantém
+   * tipoConexaoAtual/wifiSsidAtual/wifiIntensidadeAtual atualizados pra
+   * verificarConfiguracaoAgente reportar ao portal.
+   */
+  if (!EH_WINDOWS) {
+    async function verificarEReconectarRede() {
+      const estado = verificarConexaoRede();
+      tipoConexaoAtual = estado.tipo;
+      wifiSsidAtual = estado.ssid;
+      wifiIntensidadeAtual = estado.intensidade;
+
+      if (estado.tipo !== "desconectado") return;
+
+      const redesCache = lerRedesWifiCache();
+      if (redesCache.length > 0) {
+        tentarReconectarWifi(redesCache);
+      }
+    }
+
+    verificarEReconectarRede();
+    setInterval(verificarEReconectarRede, INTERVALO_VERIFICAR_REDE_MS);
+  }
 
   /*
    * Checagem separada e rápida só de comando pendente — reiniciar
