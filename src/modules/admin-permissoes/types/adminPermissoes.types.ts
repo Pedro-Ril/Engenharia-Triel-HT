@@ -221,6 +221,7 @@ export interface TransferenciaConfig {
 
 export interface ChamadosConfig {
   urlPublica: string | null;
+  diasAutoResolucao: number | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }

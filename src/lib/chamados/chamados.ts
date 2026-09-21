@@ -1037,7 +1037,8 @@ async function transicionarStatus(params: {
         [status] = @novoStatus,
         [atualizado_em] = SYSDATETIME(),
         [resolvido_em] = CASE WHEN @novoStatus = 'resolvido' THEN SYSDATETIME() ELSE [resolvido_em] END,
-        [fechado_em] = CASE WHEN @novoStatus = 'fechado' THEN SYSDATETIME() ELSE [fechado_em] END
+        [fechado_em] = CASE WHEN @novoStatus = 'fechado' THEN SYSDATETIME() ELSE [fechado_em] END,
+        [aguardando_confirmacao_em] = NULL
         ${params.novoStatus === "em_andamento" ? ", [resolvido_em] = NULL, [fechado_em] = NULL" : ""}
       WHERE [id] = @chamadoId
         AND [status] IN (${parametrosStatus.join(", ")});
@@ -1084,7 +1085,8 @@ export async function marcarComoResolvidoPendente(
       SET
         [status] = 'aguardando_confirmacao',
         [atendente_usuario_id] = ISNULL([atendente_usuario_id], @atendenteUsuarioId),
-        [atualizado_em] = SYSDATETIME()
+        [atualizado_em] = SYSDATETIME(),
+        [aguardando_confirmacao_em] = SYSDATETIME()
       WHERE [id] = @chamadoId
         AND [status] IN ('aberto', 'em_andamento');
     `);
@@ -1116,6 +1118,36 @@ export async function confirmarResolucao(
     statusPermitidos: ["aguardando_confirmacao"],
     novoStatus: "resolvido",
     mensagemSistema: `${autorNome} confirmou a resolução do chamado.`,
+  });
+}
+
+/* Chamados parados em "aguardando_confirmacao" há mais de diasLimite dias -- usado pelo agendador de auto-resolução (ver src/lib/chamados/scheduler.ts). */
+export async function listarChamadosParaAutoResolucao(
+  diasLimite: number
+): Promise<{ id: string; numero: number }[]> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool
+    .request()
+    .input("diasLimite", sql.Int, diasLimite)
+    .query<{ id: string; numero: number }>(`
+      SELECT CONVERT(VARCHAR(36), [id]) AS [id], [numero]
+      FROM dbo.portal_chamados
+      WHERE [status] = 'aguardando_confirmacao'
+        AND [aguardando_confirmacao_em] IS NOT NULL
+        AND [aguardando_confirmacao_em] <= DATEADD(DAY, -@diasLimite, SYSDATETIME());
+    `);
+
+  return result.recordset;
+}
+
+/* Mesma transição de confirmarResolucao, disparada pelo agendador em vez de um clique do solicitante -- sem autor humano. */
+export async function resolverAutomaticamente(chamadoId: string, diasLimite: number): Promise<boolean> {
+  return transicionarStatus({
+    chamadoId,
+    statusPermitidos: ["aguardando_confirmacao"],
+    novoStatus: "resolvido",
+    mensagemSistema: `Chamado resolvido automaticamente após ${diasLimite} dia(s) sem retorno do solicitante.`,
   });
 }
 

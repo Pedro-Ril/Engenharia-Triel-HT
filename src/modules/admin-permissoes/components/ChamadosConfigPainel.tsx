@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { Stack } from "@/components/ui/Stack";
 
 import { buscarConfigChamados, salvarConfigChamados } from "../services/adminPermissoes.service";
@@ -27,6 +28,7 @@ export function ChamadosConfigPainel({ onFeedback }: ChamadosConfigPainelProps) 
   const [config, setConfig] = useState<ChamadosConfig | null>(null);
 
   const [urlPublica, setUrlPublica] = useState("");
+  const [diasAutoResolucao, setDiasAutoResolucao] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -35,6 +37,7 @@ export function ChamadosConfigPainel({ onFeedback }: ChamadosConfigPainelProps) 
       const dados = await buscarConfigChamados();
       setConfig(dados);
       setUrlPublica(dados?.urlPublica ?? "");
+      setDiasAutoResolucao(dados?.diasAutoResolucao ? String(dados.diasAutoResolucao) : "");
       setCarregando(false);
     }
 
@@ -45,7 +48,10 @@ export function ChamadosConfigPainel({ onFeedback }: ChamadosConfigPainelProps) 
     setSalvando(true);
 
     try {
-      const resultado = await salvarConfigChamados({ urlPublica: urlPublica.trim() || null });
+      const resultado = await salvarConfigChamados({
+        urlPublica: urlPublica.trim() || null,
+        diasAutoResolucao: diasAutoResolucao.trim() ? Number(diasAutoResolucao) : null,
+      });
 
       if (resultado.ok && resultado.data) {
         setConfig(resultado.data);
@@ -82,6 +88,22 @@ export function ChamadosConfigPainel({ onFeedback }: ChamadosConfigPainelProps) 
             placeholder="https://portal.trielht.com.br"
             value={urlPublica}
             onChange={(event) => setUrlPublica(event.target.value)}
+            disabled={salvando}
+          />
+        </Field>
+
+        <Field
+          label="Fechar automaticamente após quantos dias (aguardando confirmação)"
+          htmlFor="chamadosDiasAutoResolucao"
+          hint="Um chamado marcado como resolvido pelo atendente que fica esperando confirmação do solicitante por mais que esse prazo vira 'resolvido' sozinho. Deixe em branco para desligar -- nesse caso o chamado espera indefinidamente."
+        >
+          <NumberInput
+            id="chamadosDiasAutoResolucao"
+            placeholder="Ex: 5"
+            min={1}
+            suffix="dias"
+            value={diasAutoResolucao}
+            onChange={(event) => setDiasAutoResolucao(event.target.value)}
             disabled={salvando}
           />
         </Field>

@@ -20,6 +20,7 @@ export type EventoNotificacaoChamado =
   | "aceito"
   | "nova_resposta"
   | "resolvido_pendente"
+  | "resolvido_automatico"
   | "reaberto"
   | "fechado"
   /* Endereçado ao ATENDENTE (não ao solicitante) -- disparado quando quem escreve não é atendente (solicitante ou usuário em cópia). Ver notificarAtendenteChamado. */
@@ -231,6 +232,24 @@ function montarConteudo(
           ${montarLinkEmailHtml(link)}
         `,
         corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\n${autorNome} marcou seu chamado ${referencia} como resolvido.\n\nSe o problema realmente foi resolvido, confirme no link abaixo. Caso contrário, você pode reabrir o chamado.\n\n${link}`,
+      };
+
+    case "resolvido_automatico":
+      return {
+        assunto: `Chamado #${chamado.numero} encerrado automaticamente — Portal Triel-HT`,
+        corpoHtml: `
+          <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${chamado.solicitanteNome}</strong>!</p>
+          <p style="margin: 0 0 18px;">
+            Seu chamado <strong>${referencia}</strong> foi encerrado automaticamente por falta de retorno
+            após ser marcado como resolvido.
+          </p>
+          <p style="margin: 0 0 18px; font-size: 13px; color: #6b7280;">
+            Se o problema não foi realmente resolvido, você ainda pode reabri-lo a partir do link abaixo.
+          </p>
+          ${montarBotaoEmailHtml(botaoTexto, link)}
+          ${montarLinkEmailHtml(link)}
+        `,
+        corpoTexto: `Olá, ${chamado.solicitanteNome}!\n\nSeu chamado ${referencia} foi encerrado automaticamente por falta de retorno após ser marcado como resolvido.\n\nSe o problema não foi realmente resolvido, você ainda pode reabri-lo a partir do link abaixo.\n\n${link}`,
       };
 
     case "reaberto":

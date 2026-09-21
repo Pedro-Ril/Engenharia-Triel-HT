@@ -33,6 +33,11 @@ export async function register() {
   );
   iniciarAgendadorNfEntrada();
 
+  const { iniciarAgendadorAutoResolucaoChamados } = await import(
+    "@/lib/chamados/scheduler"
+  );
+  iniciarAgendadorAutoResolucaoChamados();
+
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );

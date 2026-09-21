@@ -822,6 +822,7 @@ export async function buscarConfigChamados(): Promise<ChamadosConfig | null> {
 
 export async function salvarConfigChamados(dados: {
   urlPublica: string | null;
+  diasAutoResolucao: number | null;
 }): Promise<ApiEnvelope<ChamadosConfig>> {
   const response = await fetch("/api/admin/chamados/config", {
     method: "PATCH",
