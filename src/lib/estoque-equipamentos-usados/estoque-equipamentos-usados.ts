@@ -5,7 +5,11 @@ import type { Request as SqlRequest } from "mssql";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { ValidationError } from "@/lib/auth/errors";
 import type { PortalUsuario } from "@/lib/auth/usuarios";
-import { COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA, listarCamposComPendencia } from "./tipos-equipamento";
+import {
+  CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+  COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA,
+  listarCamposComPendencia,
+} from "./tipos-equipamento";
 import { buscarEmpresaPorCodigo } from "@/lib/empresas/empresas";
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "baixado";
@@ -637,7 +641,13 @@ export async function listarEquipamentos(
       condicoes.push("[codigo_empresa] = @codigoEmpresa");
     }
 
-    if (filtros.pendenciaChave) {
+    if (filtros.pendenciaChave === CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO) {
+      /* NF digitada, mas ainda faltando pelo menos um dos 3 campos que só a integração com o ERP preenche. */
+      condicoes.push(`(
+        [numero_nf_entrada] IS NOT NULL AND [numero_nf_entrada] <> ''
+        AND ([erp_codigo_item] IS NULL OR [erp_id_item] IS NULL OR [erp_data_entrada] IS NULL)
+      )`);
+    } else if (filtros.pendenciaChave) {
       const coluna = COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA[filtros.pendenciaChave];
       if (coluna === "valor") {
         condicoes.push("[valor] IS NULL");

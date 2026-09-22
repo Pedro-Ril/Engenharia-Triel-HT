@@ -87,6 +87,7 @@ import {
   CHAVE_SISTEMA_VALOR,
   CHAVES_SISTEMA_LARGURA_TOTAL,
   formatarMoeda,
+  nfEntradaIntegradaComErp as calcularNfEntradaIntegradaComErp,
 } from "../constants";
 import styles from "./EquipamentoDetalhePage.module.css";
 
@@ -599,9 +600,7 @@ export function EquipamentoDetalhePage({
    * campos que vêm de lá (código do item, ID configurado, data de
    * entrada) precisam estar preenchidos, não "Aguardando integração".
    */
-  const nfEntradaIntegradaComErp = Boolean(
-    equipamento.numeroNfEntrada && equipamento.erpCodigoItem && equipamento.erpIdItem && equipamento.erpDataEntrada
-  );
+  const nfEntradaIntegradaComErp = calcularNfEntradaIntegradaComErp(equipamento);
   const podeEmprestar = equipamento.status === "em_estoque" && nfEntradaIntegradaComErp;
   const podeConsignar = equipamento.status === "em_estoque" && nfEntradaIntegradaComErp;
   const podeRetornar = equipamento.status === "emprestado" || equipamento.status === "consignado";
@@ -618,8 +617,17 @@ export function EquipamentoDetalhePage({
       <Stack gap={12}>
         {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && (
           <Alert variant="warning">
-            Empréstimo e consignação ficam bloqueados até a NF de entrada deste equipamento ser confirmada pela
-            integração com o ERP (ver &quot;Dados de Integração&quot; abaixo).
+            {equipamento.numeroNfEntrada ? (
+              <>
+                A NF de entrada (nº {equipamento.numeroNfEntrada}) ainda não foi confirmada pela integração com o
+                ERP — empréstimo e consignação ficam bloqueados até lá (ver &quot;Dados de Integração&quot; abaixo).
+              </>
+            ) : (
+              <>
+                Empréstimo e consignação ficam bloqueados até a NF de entrada deste equipamento ser confirmada pela
+                integração com o ERP (ver &quot;Dados de Integração&quot; abaixo).
+              </>
+            )}
           </Alert>
         )}
 

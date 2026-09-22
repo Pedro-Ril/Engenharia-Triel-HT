@@ -46,6 +46,7 @@ export interface PainelBiEstoque {
   valorTotalEmEstoque: number;
   pendencias: number;
   semNfEntrada: number;
+  nfAguardandoValidacao: number;
   porStatus: PainelBiContagemStatus[];
   porTipo: PainelBiTipo[];
   entradasPorMes: PainelBiMes[];
@@ -88,9 +89,22 @@ async function contarEquipamentosComPendencia(
     request.input(parametro, sql.UniqueIdentifier, tipoId);
 
     const condicaoColunas = Array.from(colunas)
-      .map((coluna) =>
-        coluna === "valor" ? `[${coluna}] IS NULL` : `([${coluna}] IS NULL OR [${coluna}] = '')`
-      )
+      .map((coluna) => {
+        if (coluna === "valor") return `[${coluna}] IS NULL`;
+        /*
+         * NF de entrada tem dois jeitos de estar pendente: vazia, ou
+         * preenchida mas ainda sem os 3 campos que só a integração com o
+         * ERP completa — mesmo critério de EstoqueListaPage/CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+         * só que aqui basta uma condição (cobre os dois estados de uma vez).
+         */
+        if (coluna === "numero_nf_entrada") {
+          return `(
+            [numero_nf_entrada] IS NULL OR [numero_nf_entrada] = ''
+            OR [erp_codigo_item] IS NULL OR [erp_id_item] IS NULL OR [erp_data_entrada] IS NULL
+          )`;
+        }
+        return `([${coluna}] IS NULL OR [${coluna}] = '')`;
+      })
       .join(" OR ");
 
     condicoesPorTipo.push(`([tipo_equipamento_id] = @${parametro} AND (${condicaoColunas}))`);
@@ -117,14 +131,32 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
     clientesResult,
     pendencias,
   ] = await Promise.all([
-    /* "Sem NF de entrada" só considera quem está em_estoque de propósito —
-       já exclui baixado (e emprestado/consignado nunca chegam sem NF, é
-       pré-requisito pra sair do estoque). */
-    pool.request().query<{ total: number; valorTotalEmEstoque: number | null; semNfEntrada: number }>(`
+    /*
+     * "Sem NF de entrada" e "NF aguardando validação" só consideram quem
+     * está em_estoque de propósito — já exclui baixado (e
+     * emprestado/consignado nunca chegam nesses estados, é pré-requisito
+     * pra sair do estoque: registrarMovimentacao exige a NF confirmada).
+     * Diferente de "pendencias" (contarEquipamentosComPendencia), esses
+     * dois cards aparecem sempre, mesmo sem nenhum tipo com
+     * gera_pendencia marcado — NF de entrada é importante o bastante pra
+     * não depender de configuração de admin.
+     */
+    pool.request().query<{
+      total: number;
+      valorTotalEmEstoque: number | null;
+      semNfEntrada: number;
+      nfAguardandoValidacao: number;
+    }>(`
       SELECT
         COUNT(*) AS [total],
         SUM(CASE WHEN [status] = 'em_estoque' THEN [valor] ELSE 0 END) AS [valorTotalEmEstoque],
-        SUM(CASE WHEN [status] = 'em_estoque' AND [numero_nf_entrada] IS NULL THEN 1 ELSE 0 END) AS [semNfEntrada]
+        SUM(CASE WHEN [status] = 'em_estoque' AND [numero_nf_entrada] IS NULL THEN 1 ELSE 0 END) AS [semNfEntrada],
+        SUM(CASE
+          WHEN [status] = 'em_estoque'
+            AND [numero_nf_entrada] IS NOT NULL AND [numero_nf_entrada] <> ''
+            AND ([erp_codigo_item] IS NULL OR [erp_id_item] IS NULL OR [erp_data_entrada] IS NULL)
+          THEN 1 ELSE 0
+        END) AS [nfAguardandoValidacao]
       FROM dbo.com_estoque_equipamentos_usados;
     `),
     pool.request().query<{ status: StatusEquipamento; quantidade: number; valorTotal: number | null }>(`
@@ -218,6 +250,7 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
     totalEquipamentos: totais?.total ?? 0,
     valorTotalEmEstoque: totais?.valorTotalEmEstoque ?? 0,
     semNfEntrada: totais?.semNfEntrada ?? 0,
+    nfAguardandoValidacao: totais?.nfAguardandoValidacao ?? 0,
     pendencias,
     porStatus: porStatusResult.recordset.map((row) => ({
       status: row.status,

@@ -210,6 +210,7 @@ export interface PainelBiEstoque {
   valorTotalEmEstoque: number;
   pendencias: number;
   semNfEntrada: number;
+  nfAguardandoValidacao: number;
   porStatus: PainelBiContagemStatus[];
   porTipo: PainelBiTipo[];
   entradasPorMes: PainelBiMes[];

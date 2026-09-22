@@ -70,6 +70,19 @@ export const CHAVE_SISTEMA_DATA_ENTRADA_NF = "sistemaDataEntradaNf";
 export const CHAVE_SISTEMA_OBSERVACOES = "sistemaObservacoes";
 
 /*
+ * Pseudo-chave derivada (não tem linha própria em
+ * com_estoque_tipos_equipamento_campos) — representa o estado "NF de
+ * entrada digitada, mas ainda não confirmada pela integração com o ERP"
+ * (código do item/ID configurado/data de entrada ainda vazios).
+ * Reaproveita a mesma pendência configurada em CHAVE_SISTEMA_NUMERO_NF_ENTRADA:
+ * só existe pendência de NF (vazia OU aguardando validação) pra tipos
+ * onde o admin marcou "gera_pendencia" nesse campo — ver
+ * listarEquipamentos (filtro) e EstoqueListaPage/EquipamentoDetalhePage
+ * (badge/aviso).
+ */
+export const CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO = `${CHAVE_SISTEMA_NUMERO_NF_ENTRADA}AguardandoValidacao`;
+
+/*
  * "Descrição" mapeia pra uma coluna NOT NULL da tabela de equipamentos
  * (é a identidade do registro — título nas listas, PDF, breadcrumb) —
  * diferente dos outros 9 campos de sistema, não pode virar opcional nem
@@ -309,6 +322,40 @@ export async function atualizarTipoEquipamento(
   const atualizado = await buscarTipoEquipamentoPorId(id);
   if (!atualizado) throw new ValidationError("Tipo de equipamento não encontrado.");
   return atualizado;
+}
+
+/*
+ * Blocos e campos do tipo (com_estoque_tipos_equipamento_blocos/_campos)
+ * têm FK ON DELETE CASCADE pra tipo_equipamento_id — somem sozinhos.
+ * Já com_estoque_equipamentos_usados NÃO tem cascade (é dado real de
+ * negócio) — por isso a checagem abaixo, mesmo padrão de
+ * excluirBlocoTipo/excluirCampoTipo: existindo equipamento cadastrado
+ * com esse tipo, a exclusão é recusada e o admin é direcionado a
+ * desativar em vez de excluir.
+ */
+export async function excluirTipoEquipamento(id: string): Promise<void> {
+  const tipo = await buscarTipoEquipamentoPorId(id);
+  if (!tipo) throw new ValidationError("Tipo de equipamento não encontrado.");
+
+  const pool = await getSqlServerPool();
+
+  const usoResult = await pool
+    .request()
+    .input("tipoEquipamentoId", sql.UniqueIdentifier, id)
+    .query<{ total: number }>(`
+      SELECT COUNT(*) AS [total] FROM dbo.com_estoque_equipamentos_usados WHERE [tipo_equipamento_id] = @tipoEquipamentoId;
+    `);
+
+  if (usoResult.recordset[0].total > 0) {
+    throw new ValidationError(
+      "Já existem equipamentos cadastrados com este tipo — desative-o em vez de excluir."
+    );
+  }
+
+  await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .query(`DELETE FROM dbo.com_estoque_tipos_equipamento WHERE [id] = @id;`);
 }
 
 /* =========================================================
@@ -998,10 +1045,16 @@ export interface CampoPendenciaConfig {
 }
 
 /*
- * Lista os campos de sistema marcados como "gera_pendencia" (ativos, em
- * tipo ativo) — usado pra tela de estoque montar tanto as opções do
- * filtro "Pendência" (deduplicando por chave) quanto, por linha, quais
- * campos daquele tipo específico devem virar badge quando vazios.
+ * Lista os campos de sistema marcados como "gera_pendencia" (campo
+ * ativo) — usado pra tela de estoque montar tanto as opções do filtro
+ * "Pendência" (deduplicando por chave) quanto, por linha, quais campos
+ * daquele tipo específico devem virar badge quando vazios; também
+ * alimenta o bloqueio de movimentação (travaMovimentacao) em
+ * registrarMovimentacao. Propositalmente NÃO filtra por tipo ativo —
+ * desativar um tipo só impede cadastro NOVO daquele tipo (ver
+ * atualizarTipoEquipamento), não deve apagar o aviso/bloqueio de
+ * pendência de equipamentos que já existem e continuam em uso com
+ * aquele tipo.
  */
 export async function listarCamposComPendencia(): Promise<CampoPendenciaConfig[]> {
   const pool = await getSqlServerPool();
@@ -1018,8 +1071,7 @@ export async function listarCamposComPendencia(): Promise<CampoPendenciaConfig[]
       c.[rotulo],
       c.[trava_movimentacao]
     FROM dbo.com_estoque_tipos_equipamento_campos AS c
-    INNER JOIN dbo.com_estoque_tipos_equipamento AS t ON t.[id] = c.[tipo_equipamento_id]
-    WHERE c.[eh_sistema] = 1 AND c.[gera_pendencia] = 1 AND c.[ativo] = 1 AND t.[ativo] = 1;
+    WHERE c.[eh_sistema] = 1 AND c.[gera_pendencia] = 1 AND c.[ativo] = 1;
   `);
 
   return result.recordset.map((row) => ({

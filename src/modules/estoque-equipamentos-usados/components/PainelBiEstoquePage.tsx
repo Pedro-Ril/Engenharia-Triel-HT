@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Boxes,
+  FileClock,
   FileWarning,
   HandCoins,
   Handshake,
@@ -317,6 +318,12 @@ export function PainelBiEstoquePage() {
           rotulo="Sem NF de entrada"
           valor={String(dados.semNfEntrada)}
           destaque={dados.semNfEntrada > 0 ? "alerta" : "neutro"}
+        />
+        <KpiTile
+          icone={<FileClock size={22} />}
+          rotulo="NF aguardando validação"
+          valor={String(dados.nfAguardandoValidacao)}
+          destaque={dados.nfAguardandoValidacao > 0 ? "alerta" : "neutro"}
         />
         <KpiTile
           icone={<AlertTriangle size={22} />}

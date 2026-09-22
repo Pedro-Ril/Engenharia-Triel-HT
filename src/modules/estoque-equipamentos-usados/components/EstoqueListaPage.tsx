@@ -41,7 +41,12 @@ import {
   listarEquipamentos,
 } from "../services/estoque.service";
 import type { CampoPendenciaConfig, Equipamento, StatusEquipamento } from "../types/estoque.types";
-import { campoSistemaEstaVazio } from "../constants";
+import {
+  campoSistemaEstaVazio,
+  CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+  CHAVE_SISTEMA_NUMERO_NF_ENTRADA,
+  nfEntradaIntegradaComErp,
+} from "../constants";
 
 const STATUS_LABELS: Record<StatusEquipamento, string> = {
   em_estoque: "Em estoque",
@@ -124,12 +129,22 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
     for (const campo of pendenciasConfig) {
       if (!porChave.has(campo.chave)) porChave.set(campo.chave, campo.rotulo);
     }
-    return [
-      { value: "", label: "Todas" },
-      ...Array.from(porChave.entries())
-        .map(([chave, rotulo]) => ({ value: chave, label: `Sem ${rotulo}` }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    ];
+
+    const opcoes: { value: string; label: string }[] = [];
+    for (const [chave, rotulo] of porChave.entries()) {
+      opcoes.push({ value: chave, label: `Sem ${rotulo}` });
+
+      /* NF de entrada tem um segundo estado de pendência: digitada, mas ainda não confirmada pelo ERP. */
+      if (chave === CHAVE_SISTEMA_NUMERO_NF_ENTRADA) {
+        opcoes.push({
+          value: CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+          label: `${rotulo} aguardando validação no ERP`,
+        });
+      }
+    }
+    opcoes.sort((a, b) => a.label.localeCompare(b.label));
+
+    return [{ value: "", label: "Todas" }, ...opcoes];
   }, [pendenciasConfig]);
 
   useEffect(() => {
@@ -198,12 +213,41 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
 
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
-  function pendenciasDoEquipamento(equipamento: Equipamento): CampoPendenciaConfig[] {
-    return pendenciasConfig.filter(
-      (campo) =>
-        campo.tipoEquipamentoId === equipamento.tipoEquipamentoId &&
-        campoSistemaEstaVazio(equipamento, campo.chave)
-    );
+  interface PendenciaExibicao {
+    chave: string;
+    texto: string;
+  }
+
+  /*
+   * NF de entrada tem dois estados de pendência distintos a partir do
+   * mesmo campo configurado pelo admin: vazia (nunca digitada) ou
+   * digitada mas ainda aguardando confirmação da integração com o ERP —
+   * os outros campos de sistema continuam só "vazio ou não".
+   */
+  function pendenciasDoEquipamento(equipamento: Equipamento): PendenciaExibicao[] {
+    const resultado: PendenciaExibicao[] = [];
+
+    for (const campo of pendenciasConfig) {
+      if (campo.tipoEquipamentoId !== equipamento.tipoEquipamentoId) continue;
+
+      if (campo.chave === CHAVE_SISTEMA_NUMERO_NF_ENTRADA) {
+        if (!equipamento.numeroNfEntrada) {
+          resultado.push({ chave: campo.chave, texto: `Sem ${campo.rotulo}` });
+        } else if (!nfEntradaIntegradaComErp(equipamento)) {
+          resultado.push({
+            chave: CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+            texto: `${campo.rotulo} aguardando validação no ERP`,
+          });
+        }
+        continue;
+      }
+
+      if (campoSistemaEstaVazio(equipamento, campo.chave)) {
+        resultado.push({ chave: campo.chave, texto: `Sem ${campo.rotulo}` });
+      }
+    }
+
+    return resultado;
   }
 
   async function handleConfirmarExclusao() {
@@ -380,9 +424,9 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
                         <TableCell>
                           {pendencias.length > 0 ? (
                             <Stack direction="row" gap={6} wrap>
-                              {pendencias.map((campo) => (
-                                <Badge key={campo.chave} variant="warning">
-                                  Sem {campo.rotulo}
+                              {pendencias.map((pendencia) => (
+                                <Badge key={pendencia.chave} variant="warning">
+                                  {pendencia.texto}
                                 </Badge>
                               ))}
                             </Stack>

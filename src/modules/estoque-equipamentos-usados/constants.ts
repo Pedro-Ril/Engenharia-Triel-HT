@@ -19,6 +19,14 @@ export const CHAVE_SISTEMA_ID_CONFIGURADO = "sistemaIdConfigurado";
 export const CHAVE_SISTEMA_DATA_ENTRADA_NF = "sistemaDataEntradaNf";
 export const CHAVE_SISTEMA_OBSERVACOES = "sistemaObservacoes";
 
+/*
+ * Pseudo-chave derivada (não é um campo de sistema de verdade) — estado
+ * "NF de entrada digitada, mas ainda não confirmada pela integração com
+ * o ERP". Ver mesma constante em
+ * src/lib/estoque-equipamentos-usados/tipos-equipamento.ts.
+ */
+export const CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO = `${CHAVE_SISTEMA_NUMERO_NF_ENTRADA}AguardandoValidacao`;
+
 export const CHAVES_SISTEMA_SEMPRE_OBRIGATORIAS: string[] = [CHAVE_SISTEMA_DESCRICAO];
 
 /*
@@ -126,4 +134,22 @@ export function campoSistemaEstaVazio(equipamento: Equipamento, chave: string): 
     default:
       return false;
   }
+}
+
+/*
+ * Mesmo critério usado pra liberar empréstimo/consignação
+ * (registrarMovimentacao, no servidor) e pro card "Dados de Integração"
+ * do detalhe — NF de entrada só conta como confirmada quando os 3
+ * campos que vêm da integração (código do item, ID configurado, data de
+ * entrada) também estão preenchidos, não só o número digitado.
+ */
+export function nfEntradaIntegradaComErp(
+  equipamento: Pick<Equipamento, "numeroNfEntrada" | "erpCodigoItem" | "erpIdItem" | "erpDataEntrada">
+): boolean {
+  return Boolean(
+    equipamento.numeroNfEntrada &&
+      equipamento.erpCodigoItem &&
+      equipamento.erpIdItem &&
+      equipamento.erpDataEntrada
+  );
 }

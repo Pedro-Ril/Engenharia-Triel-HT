@@ -199,6 +199,13 @@ export async function atualizarTipoEquipamento(
   return parseResponse(response);
 }
 
+export async function excluirTipoEquipamento(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/estoque-equipamentos-usados/tipos/${id}`, {
+    method: "DELETE",
+  });
+  return parseResponse(response);
+}
+
 export async function listarBlocosDoTipoAdmin(tipoEquipamentoId: string): Promise<BlocoTipoEquipamento[]> {
   const response = await fetch(`/api/admin/estoque-equipamentos-usados/tipos/${tipoEquipamentoId}/blocos`);
   const body = await parseResponse<BlocoTipoEquipamento[]>(response);

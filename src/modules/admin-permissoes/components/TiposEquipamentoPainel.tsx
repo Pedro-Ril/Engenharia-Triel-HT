@@ -49,6 +49,7 @@ import {
   criarTipoEquipamento,
   excluirBlocoTipoEquipamento,
   excluirCampoTipoEquipamento,
+  excluirTipoEquipamento,
   listarBlocosDoTipoAdmin,
   listarCamposDoTipoAdmin,
   listarTiposEquipamentoAdmin,
@@ -119,6 +120,10 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
   const [novoTipoNome, setNovoTipoNome] = useState("");
   const [criandoTipo, setCriandoTipo] = useState(false);
   const [erroTipo, setErroTipo] = useState<string | null>(null);
+
+  const [tipoExcluindo, setTipoExcluindo] = useState<TipoEquipamento | null>(null);
+  const [confirmandoExclusaoTipo, setConfirmandoExclusaoTipo] = useState(false);
+  const [erroExclusaoTipo, setErroExclusaoTipo] = useState<string | null>(null);
 
   const [novoBlocoNome, setNovoBlocoNome] = useState("");
   const [criandoBloco, setCriandoBloco] = useState(false);
@@ -203,6 +208,24 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
       setTipos((atual) => atual.map((item) => (item.id === tipo.id ? (resultado.data as TipoEquipamento) : item)));
     } else {
       onFeedback("danger", "Não foi possível atualizar", resultado.message ?? "Tente novamente em instantes.");
+    }
+  }
+
+  async function handleConfirmarExclusaoTipo() {
+    if (!tipoExcluindo) return;
+
+    setErroExclusaoTipo(null);
+
+    const resultado = await excluirTipoEquipamento(tipoExcluindo.id);
+
+    if (resultado.ok) {
+      setTipos((atual) => atual.filter((item) => item.id !== tipoExcluindo.id));
+      if (tipoSelecionadoId === tipoExcluindo.id) setTipoSelecionadoId(null);
+      onFeedback("success", "Tipo excluído", `"${tipoExcluindo.nome}" foi removido.`);
+      setTipoExcluindo(null);
+      setConfirmandoExclusaoTipo(false);
+    } else {
+      setErroExclusaoTipo(resultado.message ?? "Não foi possível excluir o tipo de equipamento.");
     }
   }
 
@@ -576,6 +599,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                 <TableRow>
                   <TableHeaderCell>Nome</TableHeaderCell>
                   <TableHeaderCell align="center">Ativo</TableHeaderCell>
+                  <TableHeaderCell align="center"> </TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -601,6 +625,20 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                           }}
                         />
                       </div>
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        variant="danger"
+                        icon={<Trash2 size={13} />}
+                        label="Excluir tipo"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setErroExclusaoTipo(null);
+                          setTipoExcluindo(tipo);
+                          setConfirmandoExclusaoTipo(true);
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -805,6 +843,25 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
         onClose={() => {
           setBlocoExcluindo(null);
           setErroExclusaoBloco(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmandoExclusaoTipo}
+        title="Excluir tipo de equipamento?"
+        variant="danger"
+        message={
+          tipoExcluindo
+            ? erroExclusaoTipo ??
+              `"${tipoExcluindo.nome}" será removido, junto com seus blocos e campos. Se já houver equipamento cadastrado com esse tipo, a exclusão não será possível — desative-o nesse caso.`
+            : ""
+        }
+        confirmLabel="Excluir"
+        onConfirm={handleConfirmarExclusaoTipo}
+        onClose={() => {
+          setConfirmandoExclusaoTipo(false);
+          setTipoExcluindo(null);
+          setErroExclusaoTipo(null);
         }}
       />
 
