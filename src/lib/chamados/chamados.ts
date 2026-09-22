@@ -236,7 +236,9 @@ async function inserirAnexos(
   transaction: InstanceType<typeof sql.Transaction>,
   mensagemId: string,
   anexos: NovoAnexo[]
-): Promise<void> {
+): Promise<string[]> {
+  const idsGerados: string[] = [];
+
   for (const anexo of anexos) {
     const request = new sql.Request(transaction);
 
@@ -246,12 +248,17 @@ async function inserirAnexos(
     request.input("tamanhoBytes", sql.Int, anexo.tamanhoBytes);
     request.input("conteudo", sql.VarBinary(sql.MAX), anexo.conteudo);
 
-    await request.query(`
+    const result = await request.query<{ id: string }>(`
       INSERT INTO dbo.portal_chamados_anexos
         ([mensagem_id], [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo])
+      OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
       VALUES (@mensagemId, @nomeArquivo, @tipoMime, @tamanhoBytes, @conteudo);
     `);
+
+    idsGerados.push(result.recordset[0].id);
   }
+
+  return idsGerados;
 }
 
 export interface CriarChamadoParams {
@@ -784,7 +791,7 @@ export async function adicionarMensagem(
 
     const mensagemId = mensagemResult.recordset[0].id;
 
-    await inserirAnexos(transaction, mensagemId, params.anexos);
+    const idsAnexos = await inserirAnexos(transaction, mensagemId, params.anexos);
 
     const atualizarChamado = new sql.Request(transaction);
     atualizarChamado.input("chamadoId", sql.UniqueIdentifier, params.chamadoId);
@@ -797,7 +804,7 @@ export async function adicionarMensagem(
     await transaction.commit();
 
     const anexos = params.anexos.map((anexo, indice) => ({
-      id: `pendente-${indice}`,
+      id: idsAnexos[indice],
       nomeArquivo: anexo.nomeArquivo,
       tipoMime: anexo.tipoMime,
       tamanhoBytes: anexo.tamanhoBytes,
