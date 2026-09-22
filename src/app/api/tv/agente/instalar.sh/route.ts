@@ -235,6 +235,34 @@ if [ -f /etc/network/interfaces ]; then
   printf 'auto lo\niface lo inet loopback\n' > /etc/network/interfaces
 fi
 
+# Mesmo problema, versao Ubuntu Server moderno: o netplan (tambem
+# presente no Desktop, mas la o renderer padrao ja e NetworkManager)
+# normalmente vem com o renderer "networkd" nas imagens de Server --
+# nesse caso o NetworkManager fica de pe mas nao gerencia a interface
+# (nmcli mostra "unmanaged"), e a conexao automatica ao Wi-Fi
+# configurada no portal nunca funciona nela. Em vez de reescrever os
+# arquivos de netplan ja existentes (poderia apagar um IP estatico
+# configurado ali e derrubar a propria sessao SSH usada pra rodar este
+# instalador), adiciona um arquivo novo soh com o renderer padrao, com
+# nome que ordena por ultimo -- vira o renderer efetivo de qualquer
+# interface que os arquivos existentes nao reivindiquem com um
+# renderer proprio (o caso comum). "netplan apply" aplica na hora, sem
+# reiniciar a maquina -- pode causar uma queda breve da rede enquanto o
+# NetworkManager assume da interface (visto em relatos da comunidade
+# Ubuntu; nao chega a exigir reconectar por SSH de novo). Nao trava a
+# instalacao se falhar (ex: netplan ausente numa distro derivada
+# diferente) -- so avisa.
+if command -v netplan >/dev/null 2>&1; then
+  echo "Ajustando o netplan para o NetworkManager poder gerenciar a rede..."
+  cat > /etc/netplan/90-tv-corporativa-networkmanager.yaml <<'NETPLAN'
+network:
+  version: 2
+  renderer: NetworkManager
+NETPLAN
+  chmod 600 /etc/netplan/90-tv-corporativa-networkmanager.yaml
+  netplan apply || echo "Aviso: netplan apply falhou -- confira a rede manualmente." >&2
+fi
+
 systemctl enable --now NetworkManager
 
 # tvkiosk roda sem privilegio de root (ver useradd acima) -- "netdev" e
