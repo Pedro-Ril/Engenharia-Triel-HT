@@ -109,6 +109,18 @@ export async function excluirEquipamento(id: string): Promise<ApiEnvelope<null>>
   return parseResponse(response);
 }
 
+export async function duplicarEquipamento(
+  id: string,
+  novoNumero: number
+): Promise<ApiEnvelope<Equipamento>> {
+  const response = await fetch(`/api/estoque-equipamentos-usados/${id}/duplicar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ novoNumero }),
+  });
+  return parseResponse(response);
+}
+
 export async function criarEquipamento(formData: FormData): Promise<ApiEnvelope<EquipamentoComEstrato>> {
   const response = await fetch("/api/estoque-equipamentos-usados", {
     method: "POST",

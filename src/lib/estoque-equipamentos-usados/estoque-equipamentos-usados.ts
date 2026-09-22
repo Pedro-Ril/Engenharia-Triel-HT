@@ -351,6 +351,251 @@ export async function excluirEquipamento(
   return equipamento;
 }
 
+/*
+ * Duplicação completa é ação só de administrador, mesmo padrão de
+ * excluirEquipamento — cópia de tudo (linha principal, evidências,
+ * movimentações + anexos de movimentação, tentativas de integração de
+ * NF e histórico de alterações de dados técnicos em portal_logs), com
+ * um "numero" escolhido à mão em vez do próximo da sequência. "numero"
+ * é IDENTITY(1,1): SET IDENTITY_INSERT libera um INSERT explícito só
+ * pra essa linha (ON/OFF sempre dentro do try/finally logo em volta do
+ * único INSERT que precisa disso — é uma configuração da conexão, não
+ * transacional, e new sql.Request(transaction) fica preso à mesma
+ * conexão da transação inteira, então isso é seguro contanto que o OFF
+ * sempre rode antes do commit). Depois do commit, reancora o IDENTITY
+ * reaproveitando definirUltimoNumeroGerado, pra nenhum cadastro normal
+ * futuro colidir com o número escolhido aqui.
+ *
+ * com_estoque_movimentacoes_anexos referencia [movimentacao_id], não
+ * [equipamento_id] — por isso movimentações são copiadas uma a uma
+ * (loop), capturando o novo id de cada uma via OUTPUT antes de copiar
+ * seus anexos; as demais tabelas-filhas aceitam um INSERT...SELECT em
+ * bloco só trocando [equipamento_id].
+ *
+ * "histórico de alterações de dados" não é uma tabela própria — é um
+ * recorte de portal_logs (ver listarHistoricoAlteracoesDados) — cada
+ * linha correspondente é reinserida com [equipamentoId]/[numero]
+ * reescritos dentro do JSON de [detalhes] e a referência "#<numero>"
+ * trocada dentro de [mensagem], preservando o [criado_em] original
+ * (é histórico de verdade, não um evento de agora).
+ */
+export async function duplicarEquipamento(
+  id: string,
+  novoNumero: number,
+  usuario: Pick<PortalUsuario, "id" | "nomeExibicao" | "ehAdministrador">
+): Promise<Equipamento> {
+  if (!usuario.ehAdministrador) {
+    throw new ValidationError("Apenas administradores podem duplicar equipamentos.");
+  }
+
+  if (!Number.isInteger(novoNumero) || novoNumero <= 0) {
+    throw new ValidationError("Informe um número inteiro válido para o novo equipamento.");
+  }
+
+  const original = await buscarEquipamentoPorId(id);
+  if (!original) {
+    throw new ValidationError("Equipamento não encontrado.");
+  }
+
+  const pool = await getSqlServerPool();
+
+  const existenteResult = await pool
+    .request()
+    .input("numero", sql.Int, novoNumero)
+    .query<{ total: number }>(
+      `SELECT COUNT(*) AS [total] FROM dbo.com_estoque_equipamentos_usados WHERE [numero] = @numero;`
+    );
+
+  if ((existenteResult.recordset[0]?.total ?? 0) > 0) {
+    throw new ValidationError(`Já existe um equipamento com o número ${novoNumero}.`);
+  }
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  let novoEquipamentoId: string | null = null;
+
+  try {
+    /*
+     * SET IDENTITY_INSERT, o INSERT e o SET ... OFF precisam estar no
+     * MESMO batch (uma única chamada .query()) — em requests separados
+     * (mesmo presos à mesma transação/conexão via new sql.Request(transaction))
+     * o driver mssql não garante que o ON de um request ainda valha no
+     * INSERT do próximo, e o SQL Server recusa o INSERT explícito
+     * ("...when IDENTITY_INSERT is set to OFF"), confirmado ao vivo.
+     */
+    const novoEquipamentoResult = await new sql.Request(transaction)
+      .input("idOriginal", sql.UniqueIdentifier, id)
+      .input("novoNumero", sql.Int, novoNumero)
+      .input("criadoPorUsuarioId", sql.UniqueIdentifier, usuario.id)
+      .input("criadoPorNome", sql.NVarChar(150), usuario.nomeExibicao)
+      .query<{ id: string }>(`
+        SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados ON;
+
+        INSERT INTO dbo.com_estoque_equipamentos_usados
+          ([id], [numero], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
+           [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
+           [status], [numero_nf_entrada], [observacoes], [criado_por_usuario_id], [criado_por_nome],
+           [criado_em], [atualizado_em], [tipo_equipamento_id], [nome_cliente], [valor], [campos_valores],
+           [codigo_cliente], [nf_entrada_confirmada_em])
+        OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
+        SELECT
+          NEWID(), @novoNumero, [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
+          [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
+          [status], [numero_nf_entrada], [observacoes], @criadoPorUsuarioId, @criadoPorNome,
+          SYSDATETIME(), SYSDATETIME(), [tipo_equipamento_id], [nome_cliente], [valor], [campos_valores],
+          [codigo_cliente], [nf_entrada_confirmada_em]
+        FROM dbo.com_estoque_equipamentos_usados
+        WHERE [id] = @idOriginal;
+
+        SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados OFF;
+      `);
+
+    novoEquipamentoId = novoEquipamentoResult.recordset[0]?.id ?? null;
+
+    if (!novoEquipamentoId) {
+      throw new Error("Equipamento original não encontrado durante a duplicação.");
+    }
+
+    await new sql.Request(transaction)
+      .input("idOriginal", sql.UniqueIdentifier, id)
+      .input("novoEquipamentoId", sql.UniqueIdentifier, novoEquipamentoId)
+      .query(`
+        INSERT INTO dbo.com_estoque_equipamentos_usados_evidencias
+          ([id], [equipamento_id], [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo],
+           [criado_por_usuario_id], [criado_por_nome], [criado_em], [bloco_id])
+        SELECT NEWID(), @novoEquipamentoId, [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo],
+               [criado_por_usuario_id], [criado_por_nome], [criado_em], [bloco_id]
+        FROM dbo.com_estoque_equipamentos_usados_evidencias
+        WHERE [equipamento_id] = @idOriginal;
+      `);
+
+    await new sql.Request(transaction)
+      .input("idOriginal", sql.UniqueIdentifier, id)
+      .input("novoEquipamentoId", sql.UniqueIdentifier, novoEquipamentoId)
+      .query(`
+        INSERT INTO dbo.com_estoque_integracao_nf_logs
+          ([id], [equipamento_id], [iniciado_em], [finalizado_em], [status], [mensagem],
+           [parametros_consulta], [disparado_por], [request_url], [response_status], [response_body], [tipo_nf])
+        SELECT NEWID(), @novoEquipamentoId, [iniciado_em], [finalizado_em], [status], [mensagem],
+               [parametros_consulta], [disparado_por], [request_url], [response_status], [response_body], [tipo_nf]
+        FROM dbo.com_estoque_integracao_nf_logs
+        WHERE [equipamento_id] = @idOriginal;
+      `);
+
+    const movimentacoesOriginais = await new sql.Request(transaction)
+      .input("idOriginal", sql.UniqueIdentifier, id)
+      .query<{ id: string }>(`
+        SELECT CONVERT(VARCHAR(36), [id]) AS [id]
+        FROM dbo.com_estoque_equipamentos_usados_movimentacoes
+        WHERE [equipamento_id] = @idOriginal
+        ORDER BY [data_acao] ASC, [criado_em] ASC;
+      `);
+
+    for (const { id: movimentacaoOriginalId } of movimentacoesOriginais.recordset) {
+      const novaMovResult = await new sql.Request(transaction)
+        .input("movimentacaoOriginalId", sql.UniqueIdentifier, movimentacaoOriginalId)
+        .input("novoEquipamentoId", sql.UniqueIdentifier, novoEquipamentoId)
+        .query<{ id: string }>(`
+          INSERT INTO dbo.com_estoque_equipamentos_usados_movimentacoes
+            ([id], [equipamento_id], [tipo_acao], [numero_nf], [destinatario_nome], [motivo_baixa],
+             [status_resultante], [observacoes], [data_acao], [criado_por_usuario_id], [criado_por_nome],
+             [criado_em], [valor], [data_emissao_nf])
+          OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
+          SELECT NEWID(), @novoEquipamentoId, [tipo_acao], [numero_nf], [destinatario_nome], [motivo_baixa],
+                 [status_resultante], [observacoes], [data_acao], [criado_por_usuario_id], [criado_por_nome],
+                 [criado_em], [valor], [data_emissao_nf]
+          FROM dbo.com_estoque_equipamentos_usados_movimentacoes
+          WHERE [id] = @movimentacaoOriginalId;
+        `);
+
+      const novaMovimentacaoId = novaMovResult.recordset[0].id;
+
+      await new sql.Request(transaction)
+        .input("movimentacaoOriginalId", sql.UniqueIdentifier, movimentacaoOriginalId)
+        .input("novaMovimentacaoId", sql.UniqueIdentifier, novaMovimentacaoId)
+        .query(`
+          INSERT INTO dbo.com_estoque_movimentacoes_anexos
+            ([id], [movimentacao_id], [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo],
+             [criado_por_usuario_id], [criado_por_nome], [criado_em])
+          SELECT NEWID(), @novaMovimentacaoId, [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo],
+                 [criado_por_usuario_id], [criado_por_nome], [criado_em]
+          FROM dbo.com_estoque_movimentacoes_anexos
+          WHERE [movimentacao_id] = @movimentacaoOriginalId;
+        `);
+    }
+
+    const logsOriginais = await new sql.Request(transaction)
+      .input("origem", sql.NVarChar(200), "estoque-equipamentos-usados/dados")
+      .input("idOriginal", sql.UniqueIdentifier, id)
+      .query<{
+        nivel: string;
+        mensagem: string;
+        detalhes: string | null;
+        metodo: string | null;
+        caminho: string | null;
+        ip_origem: string | null;
+        criado_em: string;
+      }>(`
+        SELECT [nivel], [mensagem], [detalhes], [metodo], [caminho], [ip_origem],
+          CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em]
+        FROM dbo.portal_logs
+        WHERE [origem] = @origem
+          AND JSON_VALUE([detalhes], '$.equipamentoId') = @idOriginal;
+      `);
+
+    for (const log of logsOriginais.recordset) {
+      const mensagemAtualizada = log.mensagem.split(`#${original.numero}`).join(`#${novoNumero}`);
+
+      let detalhesAtualizados = log.detalhes;
+      if (log.detalhes) {
+        try {
+          const detalhes = JSON.parse(log.detalhes) as Record<string, unknown>;
+          detalhes.equipamentoId = novoEquipamentoId;
+          detalhes.numero = novoNumero;
+          detalhesAtualizados = JSON.stringify(detalhes);
+        } catch {
+          detalhesAtualizados = log.detalhes;
+        }
+      }
+
+      await new sql.Request(transaction)
+        .input("nivel", sql.VarChar(10), log.nivel)
+        .input("origem", sql.NVarChar(200), "estoque-equipamentos-usados/dados")
+        .input("mensagem", sql.NVarChar(2000), mensagemAtualizada.slice(0, 2000))
+        .input("detalhes", sql.NVarChar(sql.MAX), detalhesAtualizados)
+        .input("metodo", sql.VarChar(10), log.metodo)
+        .input("caminho", sql.NVarChar(500), log.caminho)
+        .input("ipOrigem", sql.VarChar(64), log.ip_origem)
+        .input("criadoEm", sql.DateTime2, log.criado_em)
+        .query(`
+          INSERT INTO dbo.portal_logs
+            ([nivel], [origem], [mensagem], [detalhes], [metodo], [caminho], [ip_origem], [criado_em])
+          VALUES
+            (@nivel, @origem, @mensagem, @detalhes, @metodo, @caminho, @ipOrigem, @criadoEm);
+        `);
+    }
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+
+  const maxResult = await pool
+    .request()
+    .query<{ maximo: number | null }>(
+      `SELECT MAX([numero]) AS [maximo] FROM dbo.com_estoque_equipamentos_usados;`
+    );
+  await definirUltimoNumeroGerado(maxResult.recordset[0]?.maximo ?? novoNumero);
+
+  const duplicado = await buscarEquipamentoPorId(novoEquipamentoId);
+  if (!duplicado) {
+    throw new Error("Equipamento duplicado mas não encontrado logo em seguida.");
+  }
+  return duplicado;
+}
+
 export interface FiltrosEquipamentos {
   status?: StatusEquipamento;
   busca?: string;

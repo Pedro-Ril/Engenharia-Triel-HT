@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Home, MonitorPlay, Plus, Trash2, Warehouse } from "lucide-react";
+import { Copy, Eye, Home, MonitorPlay, Plus, Trash2, Warehouse } from "lucide-react";
 
+import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +18,8 @@ import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
+import { Modal } from "@/components/ui/Modal";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Pagination } from "@/components/ui/Pagination";
@@ -30,7 +33,13 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
-import { excluirEquipamento, listarCamposComPendencia, listarEquipamentos } from "../services/estoque.service";
+import {
+  buscarSequenciaEquipamentos,
+  duplicarEquipamento,
+  excluirEquipamento,
+  listarCamposComPendencia,
+  listarEquipamentos,
+} from "../services/estoque.service";
 import type { CampoPendenciaConfig, Equipamento, StatusEquipamento } from "../types/estoque.types";
 import { campoSistemaEstaVazio } from "../constants";
 
@@ -72,7 +81,11 @@ function formatarCodDescricao(codigo: string | null, descricao: string | null): 
 
 const POR_PAGINA = 20;
 
-export function EstoqueListaPage() {
+interface EstoqueListaPageProps {
+  ehAdministrador: boolean;
+}
+
+export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
   const router = useRouter();
 
   const [buscaDigitada, setBuscaDigitada] = useState("");
@@ -91,6 +104,11 @@ export function EstoqueListaPage() {
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
+
+  const [equipamentoDuplicando, setEquipamentoDuplicando] = useState<Equipamento | null>(null);
+  const [novoNumeroDuplicar, setNovoNumeroDuplicar] = useState("");
+  const [duplicando, setDuplicando] = useState(false);
+  const [erroDuplicacao, setErroDuplicacao] = useState<string | null>(null);
 
   useEffect(() => {
     listarCamposComPendencia().then(setPendenciasConfig);
@@ -206,6 +224,43 @@ export function EstoqueListaPage() {
       }
     } finally {
       setExcluindo(false);
+    }
+  }
+
+  async function abrirDuplicacao(equipamento: Equipamento) {
+    setErroDuplicacao(null);
+    setEquipamentoDuplicando(equipamento);
+    setNovoNumeroDuplicar("");
+
+    const sequencia = await buscarSequenciaEquipamentos();
+    if (sequencia) {
+      setNovoNumeroDuplicar(String(sequencia.ultimoNumero + 1));
+    }
+  }
+
+  async function handleConfirmarDuplicacao() {
+    if (!equipamentoDuplicando) return;
+
+    const novoNumero = Number(novoNumeroDuplicar);
+    if (!Number.isInteger(novoNumero) || novoNumero <= 0) {
+      setErroDuplicacao("Informe um número inteiro válido.");
+      return;
+    }
+
+    setErroDuplicacao(null);
+    setDuplicando(true);
+
+    try {
+      const resultado = await duplicarEquipamento(equipamentoDuplicando.id, novoNumero);
+
+      if (resultado.ok && resultado.data) {
+        setEquipamentoDuplicando(null);
+        router.push(`/estoque-equipamentos-usados/${resultado.data.id}`);
+      } else {
+        setErroDuplicacao(resultado.message ?? "Não foi possível duplicar o equipamento.");
+      }
+    } finally {
+      setDuplicando(false);
     }
   }
 
@@ -347,18 +402,28 @@ export function EstoqueListaPage() {
                                 icon: <Eye size={15} />,
                                 onSelect: () => router.push(`/estoque-equipamentos-usados/${equipamento.id}`),
                               },
-                              {
-                                value: "excluir",
-                                label: "Excluir",
-                                icon: <Trash2 size={15} />,
-                                danger: true,
-                                separatorBefore: true,
-                                onSelect: () => {
-                                  setEquipamentoExcluindo(equipamento);
-                                  setErroExclusao(null);
-                                  setConfirmandoExclusao(true);
-                                },
-                              },
+                              ...(ehAdministrador
+                                ? [
+                                    {
+                                      value: "duplicar",
+                                      label: "Duplicar",
+                                      icon: <Copy size={15} />,
+                                      separatorBefore: true,
+                                      onSelect: () => abrirDuplicacao(equipamento),
+                                    },
+                                    {
+                                      value: "excluir",
+                                      label: "Excluir",
+                                      icon: <Trash2 size={15} />,
+                                      danger: true,
+                                      onSelect: () => {
+                                        setEquipamentoExcluindo(equipamento);
+                                        setErroExclusao(null);
+                                        setConfirmandoExclusao(true);
+                                      },
+                                    },
+                                  ]
+                                : []),
                             ]}
                           />
                         </TableCell>
@@ -393,6 +458,41 @@ export function EstoqueListaPage() {
           setErroExclusao(null);
         }}
       />
+
+      <Modal
+        open={equipamentoDuplicando !== null}
+        title={equipamentoDuplicando ? `Duplicar equipamento #${equipamentoDuplicando.numero}` : ""}
+        description="Copia o cadastro, evidências, movimentações e histórico completos para um novo registro com outro número."
+        onClose={() => {
+          if (duplicando) return;
+          setEquipamentoDuplicando(null);
+        }}
+        footer={
+          <Stack direction="row" gap={8} justify="end">
+            <Button variant="secondary" onClick={() => setEquipamentoDuplicando(null)} disabled={duplicando}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmarDuplicacao} loading={duplicando}>
+              Duplicar
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack gap={16}>
+          {erroDuplicacao && <Alert variant="danger">{erroDuplicacao}</Alert>}
+
+          <Field label="Novo número" htmlFor="novoNumeroDuplicar">
+            <NumberInput
+              id="novoNumeroDuplicar"
+              prefix="#"
+              min={1}
+              value={novoNumeroDuplicar}
+              onChange={(event) => setNovoNumeroDuplicar(event.target.value)}
+              disabled={duplicando}
+            />
+          </Field>
+        </Stack>
+      </Modal>
     </PageContainer>
   );
 }
