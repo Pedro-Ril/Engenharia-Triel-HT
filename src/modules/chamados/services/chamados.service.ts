@@ -4,6 +4,7 @@ import type {
   ChamadoMensagem,
   ChamadosAtendente,
   ChamadoResumo,
+  ChamadoResumoFila,
   EstatisticasChamados,
   EventoNotificacaoChamado,
   NotificacaoEmailChamado,
@@ -181,7 +182,7 @@ export async function pesquisarChamados(
 }
 
 export interface FilaAtendimentoData {
-  itens: ChamadoResumo[];
+  itens: ChamadoResumoFila[];
   total: number;
   pagina: number;
   totalPaginas: number;

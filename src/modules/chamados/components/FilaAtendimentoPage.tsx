@@ -45,7 +45,7 @@ import {
 import { listarFilaAtendimento } from "../services/chamados.service";
 import type {
   CategoriaChamado,
-  ChamadoResumo,
+  ChamadoResumoFila,
   PrioridadeChamado,
   SetorChamado,
   StatusChamado,
@@ -132,7 +132,7 @@ export function FilaAtendimentoPage({
   const [paginaLista, setPaginaLista] = useState(1);
   const [ocultarFechados, setOcultarFechados] = useState(true);
 
-  const [itens, setItens] = useState<ChamadoResumo[]>([]);
+  const [itens, setItens] = useState<ChamadoResumoFila[]>([]);
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(true);
 
@@ -435,9 +435,21 @@ export function FilaAtendimentoPage({
                   <TableRow
                     key={chamado.id}
                     style={{ cursor: "pointer" }}
-                    onClick={() => router.push(`/chamados/${chamado.numero}`)}
+                    onClick={() => router.push(`/chamados/${chamado.numero}?origem=atender`)}
                   >
-                    <TableCell>#{chamado.numero}</TableCell>
+                    <TableCell>
+                      {chamado.temInteracaoNova ? (
+                        <span
+                          className={styles.numeroComInteracaoNova}
+                          title="Tem interação nova que você ainda não viu"
+                        >
+                          <span className={styles.pontoInteracaoNova} aria-hidden="true" />#
+                          {chamado.numero}
+                        </span>
+                      ) : (
+                        `#${chamado.numero}`
+                      )}
+                    </TableCell>
                     <TableCell>{chamado.titulo}</TableCell>
                     <TableCell>{chamado.setorNome}</TableCell>
                     <TableCell>{chamado.categoriaNome ?? "—"}</TableCell>
@@ -526,10 +538,20 @@ export function FilaAtendimentoPage({
                     key={chamado.id}
                     type="button"
                     className={styles.kanbanCard}
-                    onClick={() => router.push(`/chamados/${chamado.numero}`)}
+                    onClick={() => router.push(`/chamados/${chamado.numero}?origem=atender`)}
                   >
                     <div className={styles.kanbanCardTopo}>
-                      <span className={styles.kanbanCardNumero}>#{chamado.numero}</span>
+                      {chamado.temInteracaoNova ? (
+                        <span
+                          className={`${styles.kanbanCardNumero} ${styles.numeroComInteracaoNova}`}
+                          title="Tem interação nova que você ainda não viu"
+                        >
+                          <span className={styles.pontoInteracaoNova} aria-hidden="true" />#
+                          {chamado.numero}
+                        </span>
+                      ) : (
+                        <span className={styles.kanbanCardNumero}>#{chamado.numero}</span>
+                      )}
                       <PrioridadeBadge prioridade={chamado.prioridade} />
                     </div>
 

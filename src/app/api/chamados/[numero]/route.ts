@@ -12,6 +12,7 @@ import {
   atualizarPublico,
   buscarChamadoPorNumero,
   excluirChamado,
+  registrarVisualizacaoChamadoSemFalhar,
 } from "@/lib/chamados/chamados";
 import { optionalUuid, requiredPrioridade } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -69,6 +70,10 @@ async function handleGET(request: Request, context: RouteContext) {
     const mensagensVisiveis = ehAtendente
       ? chamado.mensagens
       : chamado.mensagens.filter((mensagem) => !mensagem.interno);
+
+    if (usuario) {
+      await registrarVisualizacaoChamadoSemFalhar(chamado.id, usuario.id);
+    }
 
     return NextResponse.json({
       ok: true,

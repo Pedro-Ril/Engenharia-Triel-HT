@@ -666,11 +666,36 @@ export interface FiltrosFila {
   busca?: string;
   pagina: number;
   porPagina: number;
+  /* Quem está pedindo a fila — usado só pra calcular temInteracaoNova (ver abaixo), nunca pra restringir o resultado. */
+  usuarioAtualId: string;
+}
+
+export interface ChamadoResumoFila extends ChamadoResumo {
+  /*
+   * true quando existe pelo menos uma mensagem de outra pessoa (não do
+   * próprio usuarioAtualId — inclui mensagens de sistema, que têm
+   * autor_usuario_id NULL) criada depois da última vez que
+   * usuarioAtualId abriu este chamado (ver
+   * registrarVisualizacaoChamadoSemFalhar/portal_chamados_visualizacoes).
+   * Nunca visto ainda = qualquer mensagem de outra pessoa já conta.
+   * Só calculado aqui (fila de atendimento) — as demais listagens
+   * (listarChamadosDoUsuario, listarChamadosEmCopia, pesquisarChamados)
+   * continuam devolvendo só ChamadoResumo, sem esse campo.
+   */
+  temInteracaoNova: boolean;
+}
+
+interface ChamadoFilaRow extends ChamadoRow {
+  tem_interacao_nova: boolean;
+}
+
+function mapChamadoFilaRow(row: ChamadoFilaRow): ChamadoResumoFila {
+  return { ...mapChamadoRow(row), temInteracaoNova: row.tem_interacao_nova };
 }
 
 export async function listarFilaAtendimento(
   filtros: FiltrosFila
-): Promise<{ itens: ChamadoResumo[]; total: number }> {
+): Promise<{ itens: ChamadoResumoFila[]; total: number }> {
   const pool = await getSqlServerPool();
   const request = pool.request();
 
@@ -741,16 +766,65 @@ export async function listarFilaAtendimento(
 
   request.input("offset", sql.Int, offset);
   request.input("porPagina", sql.Int, porPagina);
+  request.input("usuarioAtualId", sql.UniqueIdentifier, filtros.usuarioAtualId);
 
-  const itensResult = await request.query<ChamadoRow>(`
-    SELECT ${colunasChamado}
+  const itensResult = await request.query<ChamadoFilaRow>(`
+    SELECT ${colunasChamado},
+      CASE WHEN EXISTS (
+        SELECT 1 FROM dbo.portal_chamados_mensagens AS m
+        WHERE m.[chamado_id] = c.[id]
+          AND (m.[autor_usuario_id] IS NULL OR m.[autor_usuario_id] <> @usuarioAtualId)
+          AND m.[criado_em] > ISNULL(
+            (SELECT v.[visualizado_em] FROM dbo.portal_chamados_visualizacoes AS v
+             WHERE v.[chamado_id] = c.[id] AND v.[usuario_id] = @usuarioAtualId),
+            '19000101'
+          )
+      ) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS [tem_interacao_nova]
     ${juncoesChamado}
     ${clausulaWhere}
     ORDER BY c.[criado_em] DESC
     OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
   `);
 
-  return { itens: itensResult.recordset.map(mapChamadoRow), total };
+  return { itens: itensResult.recordset.map(mapChamadoFilaRow), total };
+}
+
+/*
+ * Best-effort (nunca lança) -- chamada sempre que um usuário autenticado
+ * consegue ver um chamado (ver GET /api/chamados/[numero]), pra alimentar
+ * temInteracaoNova acima. UPDATE-primeiro-INSERT-se-não-existir em vez de
+ * MERGE (mais simples de acompanhar, e a tabela não tem volume que
+ * justifique otimizar isso).
+ */
+export async function registrarVisualizacaoChamadoSemFalhar(
+  chamadoId: string,
+  usuarioId: string
+): Promise<void> {
+  try {
+    const pool = await getSqlServerPool();
+    const request = pool.request();
+    request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+    request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+
+    const atualizado = await request.query(`
+      UPDATE dbo.portal_chamados_visualizacoes
+      SET [visualizado_em] = SYSDATETIME()
+      WHERE [chamado_id] = @chamadoId AND [usuario_id] = @usuarioId;
+    `);
+
+    if ((atualizado.rowsAffected[0] ?? 0) === 0) {
+      await pool
+        .request()
+        .input("chamadoId", sql.UniqueIdentifier, chamadoId)
+        .input("usuarioId", sql.UniqueIdentifier, usuarioId)
+        .query(`
+          INSERT INTO dbo.portal_chamados_visualizacoes ([chamado_id], [usuario_id])
+          VALUES (@chamadoId, @usuarioId);
+        `);
+    }
+  } catch (error) {
+    console.error("Erro ao registrar visualização de chamado:", error);
+  }
 }
 
 export interface AdicionarMensagemParams {

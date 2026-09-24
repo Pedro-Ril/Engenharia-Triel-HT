@@ -79,7 +79,7 @@ export function ConsultarChamadoForm() {
       return;
     }
 
-    router.push(`/chamados/${numeroLimpo}?nome=${encodeURIComponent(nome.trim())}`);
+    router.push(`/chamados/${numeroLimpo}?nome=${encodeURIComponent(nome.trim())}&origem=consultar`);
   }
 
   return (
@@ -127,7 +127,7 @@ export function ConsultarChamadoForm() {
                   key={chamado.id}
                   type="button"
                   className={styles.resultadoBusca}
-                  onClick={() => router.push(`/chamados/${chamado.numero}`)}
+                  onClick={() => router.push(`/chamados/${chamado.numero}?origem=consultar`)}
                 >
                   <div className={styles.resultadoBuscaInfo}>
                     <span className={styles.resultadoBuscaNumero}>

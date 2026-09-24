@@ -58,6 +58,11 @@ export interface ChamadoResumo {
   atualizadoEm: string;
 }
 
+/* Só a fila de atendimento devolve esse campo extra — ver listarFilaAtendimento no servidor. */
+export interface ChamadoResumoFila extends ChamadoResumo {
+  temInteracaoNova: boolean;
+}
+
 export interface Chamado extends ChamadoResumo {
   solicitanteUsuarioId: string | null;
   solicitanteContato: string | null;

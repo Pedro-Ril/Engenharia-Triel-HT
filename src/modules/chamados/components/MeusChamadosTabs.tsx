@@ -61,7 +61,7 @@ function TabelaChamados({ chamados, mensagemVazia }: { chamados: ChamadoResumo[]
           {chamados.map((chamado) => (
             <TableRow key={chamado.id}>
               <TableCell>
-                <Link href={`/chamados/${chamado.numero}`}>#{chamado.numero}</Link>
+                <Link href={`/chamados/${chamado.numero}?origem=meus`}>#{chamado.numero}</Link>
               </TableCell>
               <TableCell>{chamado.titulo}</TableCell>
               <TableCell>{chamado.setorNome}</TableCell>

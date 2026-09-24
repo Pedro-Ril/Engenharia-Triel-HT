@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
   CheckCircle2,
-  Home,
-  LifeBuoy,
   Lock,
   Paperclip,
   RotateCcw,
@@ -16,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
-import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -67,6 +65,8 @@ interface ChamadoDetalhePageProps {
   ehAdministrador: boolean;
   copiaAtual: UsuarioCopiaChamado[];
   temNotificacaoFalha: boolean;
+  /* Reflete de onde a pessoa veio (Atender/Consultar/Meus chamados) -- montado em src/app/chamados/[numero]/page.tsx. */
+  breadcrumbItems: BreadcrumbItem[];
 }
 
 function formatarData(valorIso: string): string {
@@ -95,6 +95,7 @@ export function ChamadoDetalhePage({
   ehAdministrador,
   copiaAtual,
   temNotificacaoFalha,
+  breadcrumbItems,
 }: ChamadoDetalhePageProps) {
   const router = useRouter();
 
@@ -352,13 +353,7 @@ export function ChamadoDetalhePage({
         }
       />
 
-      <Breadcrumb
-        items={[
-          { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
-          { label: `Nº ${chamado.numero}`, current: true },
-        ]}
-      />
+      <Breadcrumb items={breadcrumbItems} />
 
       {erro && <Alert variant="danger">{erro}</Alert>}
 

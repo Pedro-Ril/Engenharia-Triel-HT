@@ -21,7 +21,7 @@ async function handleGET(request: Request) {
   const resultadoAcesso = await requireAtendenteChamadosApi();
   if (resultadoAcesso.negado) return resultadoAcesso.negado;
 
-  const { setorIds } = resultadoAcesso.acesso;
+  const { setorIds, usuario } = resultadoAcesso.acesso;
   const url = new URL(request.url);
 
   const statusParam = url.searchParams.get("status");
@@ -51,6 +51,7 @@ async function handleGET(request: Request) {
       busca: busca || undefined,
       pagina,
       porPagina,
+      usuarioAtualId: usuario.id,
     });
 
     return NextResponse.json({

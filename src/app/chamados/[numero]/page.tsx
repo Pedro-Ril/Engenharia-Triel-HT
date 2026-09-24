@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Home, LifeBuoy, LogIn, ShieldAlert } from "lucide-react";
+import { Headset, Home, LifeBuoy, LogIn, ShieldAlert } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
-import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,17 +15,59 @@ import {
   buscarChamadoPorNumero,
   listarCopiaDoChamado,
   listarSetoresParaChamado,
+  registrarVisualizacaoChamadoSemFalhar,
 } from "@/lib/chamados/chamados";
 import { listarNotificacoesEmailChamados } from "@/lib/chamados/notificacoes-email";
 import { ChamadoDetalhePage } from "@/modules/chamados/components/ChamadoDetalhePage";
 
 interface PageProps {
   params: Promise<{ numero: string }>;
-  searchParams: Promise<{ nome?: string }>;
+  searchParams: Promise<{ nome?: string; origem?: string }>;
+}
+
+/*
+ * O "voltar" do breadcrumb reflete de onde a pessoa veio (Atender
+ * chamados, Consultar, Meus chamados), não sempre a mesma tela --
+ * cada lista que linka pra cá acrescenta "?origem=..." (ver
+ * FilaAtendimentoPage/ConsultarChamadoForm/MeusChamadosTabs). Sem
+ * origem reconhecida (link de e-mail, URL direta, acabou de abrir o
+ * chamado) cai no padrão de sempre: só "Chamados".
+ */
+function montarBreadcrumbChamado(origem: string | undefined, numero: number): BreadcrumbItem[] {
+  const inicio: BreadcrumbItem = { label: "Início", href: "/", icon: <Home size={14} /> };
+  const numeroAtual: BreadcrumbItem = { label: `Nº ${numero}`, current: true };
+
+  if (origem === "atender") {
+    return [
+      inicio,
+      { label: "Atender chamados", href: "/chamados/atender", icon: <Headset size={14} /> },
+      numeroAtual,
+    ];
+  }
+
+  if (origem === "consultar") {
+    return [
+      inicio,
+      { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
+      { label: "Consultar", href: "/chamados/consultar" },
+      numeroAtual,
+    ];
+  }
+
+  if (origem === "meus") {
+    return [
+      inicio,
+      { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
+      { label: "Meus chamados", href: "/chamados/meus" },
+      numeroAtual,
+    ];
+  }
+
+  return [inicio, { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> }, numeroAtual];
 }
 
 export default async function Page({ params, searchParams }: PageProps) {
-  const [{ numero: numeroParam }, { nome }] = await Promise.all([params, searchParams]);
+  const [{ numero: numeroParam }, { nome, origem }] = await Promise.all([params, searchParams]);
   const numero = Number(numeroParam);
 
   if (!Number.isInteger(numero) || numero <= 0) {
@@ -44,6 +86,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   const nomeConfirmado = nome ?? null;
   const { podeVer, ehAtendente, ehDono, ehEmCopia, bloqueadoPorTentativas } =
     await verificarAcessoChamado(chamado, usuario, nomeConfirmado);
+  const breadcrumbItems = montarBreadcrumbChamado(origem, numero);
 
   /*
    * Chamado marcado como público (ver atualizarPublico) pode ser
@@ -58,13 +101,7 @@ export default async function Page({ params, searchParams }: PageProps) {
 
     return (
       <PageContainer>
-        <Breadcrumb
-          items={[
-            { label: "Início", href: "/", icon: <Home size={14} /> },
-            { label: "Chamados", href: "/chamados", icon: <LifeBuoy size={14} /> },
-            { label: `Nº ${numero}`, current: true },
-          ]}
-        />
+        <Breadcrumb items={breadcrumbItems} />
 
         <Card>
           {bloqueadoPorTentativas ? (
@@ -101,6 +138,16 @@ export default async function Page({ params, searchParams }: PageProps) {
     );
   }
 
+  /*
+   * Alimenta o indicador "tem interação nova" da fila de atendimento
+   * (ver listarFilaAtendimento) -- só pra quem tem sessão de verdade
+   * (o acesso por nome confirmado, sem login, não tem usuario.id pra
+   * associar). Best-effort, nunca lança.
+   */
+  if (usuario) {
+    await registrarVisualizacaoChamadoSemFalhar(chamado.id, usuario.id);
+  }
+
   const mensagensVisiveis = ehAtendente
     ? chamado.mensagens
     : chamado.mensagens.filter((mensagem) => !mensagem.interno);
@@ -127,6 +174,7 @@ export default async function Page({ params, searchParams }: PageProps) {
       ehAdministrador={usuario?.ehAdministrador ?? false}
       copiaAtual={copiaAtual}
       temNotificacaoFalha={notificacoesComFalha.total > 0}
+      breadcrumbItems={breadcrumbItems}
     />
   );
 }

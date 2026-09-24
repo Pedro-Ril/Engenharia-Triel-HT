@@ -476,3 +476,20 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Sinaliza interação nova (de outra pessoa) que o atendente ainda não viu -- fila de atendimento, lista e kanban. */
+.numeroComInteracaoNova {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--danger-text);
+}
+
+.pontoInteracaoNova {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-text);
+}
