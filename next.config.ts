@@ -16,8 +16,13 @@ const nextConfig: NextConfig = {
    * subpath sem package.json próprio (resolve por index.js de
    * diretório), e o Turbopack não segue essa resolução clássica
    * do Node ao empacotar para produção.
+   *
+   * node-firebird (driver do banco de RH, módulo Aprovações) entra
+   * preventivamente pelo mesmo motivo do mssql/tedious -- é outro
+   * driver que fala o protocolo do banco na mão (parsing de buffer
+   * bruto), mesmo perfil de risco sob o Turbopack.
    */
-  serverExternalPackages: ["mssql", "tedious", "onvif"],
+  serverExternalPackages: ["mssql", "tedious", "onvif", "node-firebird"],
 
   experimental: {
     /*

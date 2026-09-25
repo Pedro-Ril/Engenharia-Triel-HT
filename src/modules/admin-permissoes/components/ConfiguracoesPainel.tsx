@@ -9,15 +9,22 @@ import {
   PackageSearch,
   Send,
   Shuffle,
+  Users,
   Wrench,
 } from "lucide-react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
-import type { ConfiguracaoAd, ConfiguracaoDb, ConfiguracaoSmtp } from "../types/adminPermissoes.types";
+import type {
+  ConfiguracaoAd,
+  ConfiguracaoDb,
+  ConfiguracaoFirebird,
+  ConfiguracaoSmtp,
+} from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { ConfiguracaoDbPainel } from "./ConfiguracaoDbPainel";
+import { ConfiguracaoFirebirdPainel } from "./ConfiguracaoFirebirdPainel";
 import { ConfiguracaoSmtpPainel } from "./ConfiguracaoSmtpPainel";
 import { EstruturaSubstituicaoConfigPainel } from "./EstruturaSubstituicaoConfigPainel";
 import { IntegraLantekConfigPainel } from "./IntegraLantekConfigPainel";
@@ -28,17 +35,20 @@ import { TransferenciaConfigPainel } from "./TransferenciaConfigPainel";
 interface ConfiguracoesPainelProps {
   configuracaoAd: ConfiguracaoAd | null;
   configuracaoDb: ConfiguracaoDb | null;
+  configuracaoFirebird: ConfiguracaoFirebird | null;
   configuracaoSmtp: ConfiguracaoSmtp | null;
   emailUsuarioLogado: string | null;
   onFeedback: FeedbackHandler;
   onConfiguracaoAdAtualizada: (configuracao: ConfiguracaoAd) => void;
   onConfiguracaoDbAtualizada: (configuracao: ConfiguracaoDb) => void;
+  onConfiguracaoFirebirdAtualizada: (configuracao: ConfiguracaoFirebird) => void;
   onConfiguracaoSmtpAtualizada: (configuracao: ConfiguracaoSmtp) => void;
 }
 
 type AbaConfiguracao =
   | "ad"
   | "banco"
+  | "firebird"
   | "smtp"
   | "materia-prima"
   | "estrutura"
@@ -49,6 +59,7 @@ type AbaConfiguracao =
 const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] = [
   { valor: "ad", label: "Active Directory", icon: KeyRound },
   { valor: "banco", label: "Banco de dados", icon: Database },
+  { valor: "firebird", label: "Firebird (ERP/RH)", icon: Users },
   { valor: "smtp", label: "E-mail (SMTP)", icon: Mail },
   { valor: "manutencao", label: "Manutenção", icon: Wrench },
   { valor: "materia-prima", label: "Matéria-Prima", icon: PackageSearch },
@@ -60,11 +71,13 @@ const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] =
 export function ConfiguracoesPainel({
   configuracaoAd,
   configuracaoDb,
+  configuracaoFirebird,
   configuracaoSmtp,
   emailUsuarioLogado,
   onFeedback,
   onConfiguracaoAdAtualizada,
   onConfiguracaoDbAtualizada,
+  onConfiguracaoFirebirdAtualizada,
   onConfiguracaoSmtpAtualizada,
 }: ConfiguracoesPainelProps) {
   const [aba, setAba] = useState<AbaConfiguracao>("ad");
@@ -95,6 +108,14 @@ export function ConfiguracoesPainel({
             configuracaoDb={configuracaoDb}
             onFeedback={onFeedback}
             onConfiguracaoAtualizada={onConfiguracaoDbAtualizada}
+          />
+        )}
+
+        {aba === "firebird" && (
+          <ConfiguracaoFirebirdPainel
+            configuracaoFirebird={configuracaoFirebird}
+            onFeedback={onFeedback}
+            onConfiguracaoAtualizada={onConfiguracaoFirebirdAtualizada}
           />
         )}
 

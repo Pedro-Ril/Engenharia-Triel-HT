@@ -18,6 +18,7 @@ import {
   Send,
   Settings,
   TrafficCone,
+  TrendingUp,
   Tv,
   Users,
   Warehouse,
@@ -39,6 +40,7 @@ import { buscarUsuarioAtual } from "@/modules/auth/services/auth.service";
 import {
   buscarConfiguracaoAd,
   buscarConfiguracaoDb,
+  buscarConfiguracaoFirebird,
   buscarConfiguracaoSmtp,
   buscarTemaPadrao,
   listarDownloadsAdmin,
@@ -53,6 +55,7 @@ import {
 import type {
   ConfiguracaoAd,
   ConfiguracaoDb,
+  ConfiguracaoFirebird,
   ConfiguracaoSmtp,
   Empresa,
   PortalModulo,
@@ -65,6 +68,7 @@ import type { ToastState } from "../types/toast.types";
 import { AdminNavegacao } from "./AdminNavegacao";
 import type { GrupoNavegacaoAdmin } from "./AdminNavegacao";
 import styles from "./AdminPermissoes.module.css";
+import { DiretoriaPainel } from "./DiretoriaPainel";
 import { AtendentesChamadosPainel } from "./AtendentesChamadosPainel";
 import { AtualizacoesPainel } from "./AtualizacoesPainel";
 import { ConfiguracoesPainel } from "./ConfiguracoesPainel";
@@ -176,6 +180,12 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         label: "Assinaturas",
         icon: <PenTool size={16} />,
       },
+      /* Tudo do centro de aprovações (escopo de quem solicita, cadastro de quem aprova, futuros tipos) vira aba dentro de DiretoriaPainel, não item novo aqui. */
+      {
+        valor: "diretoria",
+        label: "Diretoria",
+        icon: <TrendingUp size={16} />,
+      },
     ],
   },
 ];
@@ -193,6 +203,7 @@ export function AdminPermissoesPage() {
     null
   );
   const [configuracaoDb, setConfiguracaoDb] = useState<ConfiguracaoDb | null>(null);
+  const [configuracaoFirebird, setConfiguracaoFirebird] = useState<ConfiguracaoFirebird | null>(null);
   const [configuracaoSmtp, setConfiguracaoSmtp] = useState<ConfiguracaoSmtp | null>(null);
   const [downloads, setDownloads] = useState<DownloadAdmin[]>([]);
   const [wikiArtigos, setWikiArtigos] = useState<WikiArtigo[]>([]);
@@ -220,6 +231,7 @@ export function AdminPermissoesPage() {
         permissoesData,
         configuracaoAdData,
         configuracaoDbData,
+        configuracaoFirebirdData,
         configuracaoSmtpData,
         downloadsData,
         wikiArtigosData,
@@ -234,6 +246,7 @@ export function AdminPermissoesPage() {
         listarPermissoes(),
         buscarConfiguracaoAd(),
         buscarConfiguracaoDb(),
+        buscarConfiguracaoFirebird(),
         buscarConfiguracaoSmtp(),
         listarDownloadsAdmin(),
         listarWikiArtigosAdmin(),
@@ -249,6 +262,7 @@ export function AdminPermissoesPage() {
       setPermissoes(permissoesData);
       setConfiguracaoAd(configuracaoAdData);
       setConfiguracaoDb(configuracaoDbData);
+      setConfiguracaoFirebird(configuracaoFirebirdData);
       setConfiguracaoSmtp(configuracaoSmtpData);
       setDownloads(downloadsData);
       setWikiArtigos(wikiArtigosData);
@@ -437,11 +451,13 @@ export function AdminPermissoesPage() {
             <ConfiguracoesPainel
               configuracaoAd={configuracaoAd}
               configuracaoDb={configuracaoDb}
+              configuracaoFirebird={configuracaoFirebird}
               configuracaoSmtp={configuracaoSmtp}
               emailUsuarioLogado={emailUsuarioLogado}
               onFeedback={mostrarFeedback}
               onConfiguracaoAdAtualizada={setConfiguracaoAd}
               onConfiguracaoDbAtualizada={setConfiguracaoDb}
+              onConfiguracaoFirebirdAtualizada={setConfiguracaoFirebird}
               onConfiguracaoSmtpAtualizada={setConfiguracaoSmtp}
             />
           )}
@@ -533,6 +549,15 @@ export function AdminPermissoesPage() {
           )}
 
           {secao === "assinaturas" && <AssinaturasPainel onFeedback={mostrarFeedback} />}
+
+          {secao === "diretoria" && (
+            <DiretoriaPainel
+              usuarios={usuarios}
+              permissoes={permissoes}
+              modulos={modulos}
+              onFeedback={mostrarFeedback}
+            />
+          )}
         </div>
       </div>
 

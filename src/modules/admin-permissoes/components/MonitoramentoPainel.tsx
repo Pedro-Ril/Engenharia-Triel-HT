@@ -20,6 +20,7 @@ import {
   ServerCog,
   Shuffle,
   Trash2,
+  Users,
   Warehouse,
   Wrench,
   XCircle,
@@ -110,6 +111,7 @@ const SERVICO_CONFIG: Record<
   erp_estrutura: { label: "ERP · Substituição de Estrutura", icon: Shuffle },
   erp_estoque_usados: { label: "ERP · Estoque de Equipamentos Usados", icon: Warehouse },
   erp_estoque_usados_clientes: { label: "ERP · Clientes (Estoque de Equip. Usados)", icon: Warehouse },
+  erp_rh_firebird: { label: "ERP · RH (Firebird)", icon: Users },
 };
 
 const STATUS_SERVICO_CONFIG: Record<

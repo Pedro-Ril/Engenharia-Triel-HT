@@ -106,6 +106,40 @@ export interface ResultadoTesteConexaoDb {
   mensagemErro: string | null;
 }
 
+export interface ConfiguracaoFirebird {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  senhaConfigurada: boolean;
+  charset: string;
+  role: string;
+  poolMin: number;
+  poolMax: number;
+}
+
+export type TipoRegraEscopo = "unidade_permitida" | "setor_excluido" | "colaborador_excluido";
+
+export interface RegraEscopo {
+  id: string;
+  tipo: TipoRegraEscopo;
+  valor: string;
+  valorRotulo: string | null;
+}
+
+/* Quem decide as pendências do painel de aprovações: uma linha por usuário + tipo de aprovação que ele aprova. */
+export interface AprovacaoAtendente {
+  id: string;
+  usuarioId: string;
+  usuarioNome: string;
+  tipo: string;
+}
+
+export interface ResultadoTesteConexaoFirebird {
+  conectou: boolean;
+  mensagemErro: string | null;
+}
+
 export type TipoAtualizacaoItem = "novo" | "melhoria" | "correcao";
 
 export interface AtualizacaoTag {

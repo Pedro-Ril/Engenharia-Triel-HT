@@ -1,3 +1,4 @@
+import type { FuncionarioRh } from "@/modules/aprovacoes/types/aprovacoes.types";
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
 import type {
   AssetTemplate,
@@ -10,6 +11,7 @@ import type {
 import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 
 import type {
+  AprovacaoAtendente,
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
@@ -20,6 +22,7 @@ import type {
   ConfigMateriaPrima,
   ConfiguracaoAd,
   ConfiguracaoDb,
+  ConfiguracaoFirebird,
   ConfiguracaoSmtp,
   CriptografiaSmtp,
   Empresa,
@@ -30,9 +33,12 @@ import type {
   PortalPermissao,
   PortalSetor,
   PortalUsuarioAdmin,
+  RegraEscopo,
   ResultadoTesteConexaoAd,
   ResultadoTesteConexaoDb,
+  ResultadoTesteConexaoFirebird,
   ResumoBuscasTerminalFabrica,
+  TipoRegraEscopo,
   StatusManutencao,
   TemaPadrao,
   TipoAtualizacaoItem,
@@ -413,6 +419,50 @@ export async function reiniciarAplicacao(): Promise<ApiEnvelope<null>> {
     method: "POST",
   });
   return parseResponse<null>(response);
+}
+
+/* =========================================================
+   Configuração — Firebird / ERP-RH (.env)
+   ========================================================= */
+
+export async function buscarConfiguracaoFirebird(): Promise<ConfiguracaoFirebird | null> {
+  const response = await fetch("/api/admin/configuracao-firebird");
+  const body = await parseResponse<ConfiguracaoFirebird | null>(response);
+  return body.data ?? null;
+}
+
+export interface DadosConfiguracaoFirebird {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  senha: string | null;
+  charset: string;
+  role: string;
+  poolMin: number;
+  poolMax: number;
+}
+
+export async function testarConexaoFirebird(
+  dados: DadosConfiguracaoFirebird
+): Promise<ApiEnvelope<ResultadoTesteConexaoFirebird>> {
+  const response = await fetch("/api/admin/configuracao-firebird/testar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ResultadoTesteConexaoFirebird>(response);
+}
+
+export async function salvarConfiguracaoFirebird(
+  dados: DadosConfiguracaoFirebird
+): Promise<ApiEnvelope<ConfiguracaoFirebird>> {
+  const response = await fetch("/api/admin/configuracao-firebird", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfiguracaoFirebird>(response);
 }
 
 export interface BuscasTerminalFabricaData {
@@ -1070,4 +1120,75 @@ export async function preVisualizarVersaoTemplateAdmin(
     }
   );
   return parseResponse<{ svg: string }>(response);
+}
+
+/* =========================================================
+   Aprovações — escopo de colaboradores por usuário
+   ========================================================= */
+
+export async function listarFuncionariosRhAdmin(usuarioId: string): Promise<ApiEnvelope<FuncionarioRh[]>> {
+  const response = await fetch(`/api/admin/aprovacoes/rh/funcionarios?usuarioId=${usuarioId}`);
+  return parseResponse<FuncionarioRh[]>(response);
+}
+
+export async function listarRegrasEscopoUsuario(usuarioId: string): Promise<ApiEnvelope<RegraEscopo[]>> {
+  const response = await fetch(`/api/admin/aprovacoes/escopo?usuarioId=${usuarioId}`);
+  return parseResponse<RegraEscopo[]>(response);
+}
+
+export async function adicionarRegraEscopoUsuario(dados: {
+  usuarioId: string;
+  tipo: TipoRegraEscopo;
+  valor: string;
+  valorRotulo: string | null;
+}): Promise<ApiEnvelope<RegraEscopo>> {
+  const response = await fetch("/api/admin/aprovacoes/escopo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<RegraEscopo>(response);
+}
+
+export async function removerRegraEscopoUsuario(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/aprovacoes/escopo/${id}`, { method: "DELETE" });
+  return parseResponse<null>(response);
+}
+
+/* Contagem de todos os usuários de uma vez -- pra mostrar o badge de cada linha na lista de seleção, independente de qual está selecionado. */
+export async function contarRegrasEscopoPorUsuario(): Promise<ApiEnvelope<Record<string, number>>> {
+  const response = await fetch("/api/admin/aprovacoes/escopo/contagem");
+  return parseResponse<Record<string, number>>(response);
+}
+
+/* =========================================================
+   Aprovações — aprovadores (usuário x setor x tipo)
+   ========================================================= */
+
+export async function listarAtendentesAprovacoes(): Promise<ApiEnvelope<AprovacaoAtendente[]>> {
+  const response = await fetch("/api/admin/aprovacoes/atendentes");
+  return parseResponse<AprovacaoAtendente[]>(response);
+}
+
+export async function adicionarAtendenteAprovacao(dados: {
+  usuarioId: string;
+  tipo: string;
+}): Promise<ApiEnvelope<AprovacaoAtendente>> {
+  const response = await fetch("/api/admin/aprovacoes/atendentes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<AprovacaoAtendente>(response);
+}
+
+export async function removerAtendenteAprovacao(
+  usuarioId: string,
+  tipo: string
+): Promise<ApiEnvelope<null>> {
+  const parametros = new URLSearchParams({ usuarioId, tipo });
+  const response = await fetch(`/api/admin/aprovacoes/atendentes?${parametros.toString()}`, {
+    method: "DELETE",
+  });
+  return parseResponse<null>(response);
 }

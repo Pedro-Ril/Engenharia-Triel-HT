@@ -91,7 +91,8 @@ export type ServicoExterno =
   | "email"
   | "erp_estrutura"
   | "erp_estoque_usados"
-  | "erp_estoque_usados_clientes";
+  | "erp_estoque_usados_clientes"
+  | "erp_rh_firebird";
 
 export interface StatusServicoExterno {
   servico: ServicoExterno;

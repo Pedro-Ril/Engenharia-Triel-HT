@@ -10,7 +10,8 @@ export type ServicoExterno =
   | "erp_estoque_usados"
   | "erp_estoque_usados_clientes"
   | "erp_estoque_usados_nf_entrada"
-  | "erp_estoque_usados_nf_saida";
+  | "erp_estoque_usados_nf_saida"
+  | "erp_rh_firebird";
 export type OrigemChamadaExterna = "health_check" | "uso_real";
 
 export interface StatusServicoExterno {
@@ -264,6 +265,7 @@ export async function obterResumoChamadasExternas(): Promise<StatusServicoExtern
     statusErp,
     ultimaFalhaErpEstrutura,
     ultimaFalhaErpEstoqueUsados,
+    ultimaFalhaErpRhFirebird,
   ] = await Promise.all([
     obterResumoTabelaChamadas(pool),
     obterUltimaFalha(pool, "active_directory"),
@@ -271,6 +273,7 @@ export async function obterResumoChamadasExternas(): Promise<StatusServicoExtern
     obterStatusErp(pool),
     obterUltimaFalha(pool, "erp_estrutura"),
     obterUltimaFalha(pool, "erp_estoque_usados"),
+    obterUltimaFalha(pool, "erp_rh_firebird"),
   ]);
 
   return [
@@ -283,5 +286,6 @@ export async function obterResumoChamadasExternas(): Promise<StatusServicoExtern
       resumoTabela.get("erp_estoque_usados"),
       ultimaFalhaErpEstoqueUsados
     ),
+    montarStatus("erp_rh_firebird", resumoTabela.get("erp_rh_firebird"), ultimaFalhaErpRhFirebird),
   ];
 }
