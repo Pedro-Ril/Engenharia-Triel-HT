@@ -13,6 +13,8 @@ import {
 import {
   buscarConfigErpEstoqueUsados,
   consultarNfEntradaNoErp,
+  listarClientesErp,
+  selecionarNfEntrada,
   type DetalhesChamadaNfErp,
 } from "./erp-integracao";
 import { registrarMovimentacaoNfVinculada, type StatusEquipamento } from "./estoque-equipamentos-usados";
@@ -188,7 +190,7 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
 
 async function registrarTentativaNf(params: {
   equipamentoId: string;
-  status: "sucesso" | "nao_encontrado" | "erro";
+  status: "sucesso" | "nao_encontrado" | "erro" | "ambiguo";
   mensagem: string | null;
   parametrosConsulta: string;
   disparadoPor: string | null;
@@ -284,6 +286,37 @@ async function registrarDivergenciaNfEntrada(params: {
 }
 
 /*
+ * CNPJ do cliente do equipamento, resolvido na hora da consulta a partir
+ * do código -- não é gravado no equipamento de propósito: é chave de
+ * busca viva (se o ERP corrigir um CNPJ errado, a próxima tentativa já
+ * usa o certo), e assim vale também pros equipamentos cadastrados antes
+ * desta mudança.
+ *
+ * A lista inteira do ERP (~7,5 mil clientes) é buscada uma vez e
+ * reaproveitada durante a execução do job, que roda em loop.
+ */
+let cacheClientes: { em: number; porCodigo: Map<string, string | null> } | null = null;
+const VALIDADE_CACHE_CLIENTES_MS = 5 * 60 * 1000;
+
+async function buscarCnpjClienteErp(codigoCliente: string): Promise<string | null> {
+  const agora = Date.now();
+
+  if (!cacheClientes || agora - cacheClientes.em > VALIDADE_CACHE_CLIENTES_MS) {
+    const clientes = await listarClientesErp();
+
+    /* Lista vazia = ERP fora do ar ou URL não configurada; não vale cachear a falha. */
+    if (clientes.length === 0) return null;
+
+    cacheClientes = {
+      em: agora,
+      porCodigo: new Map(clientes.map((cliente) => [String(cliente.cod_cli), cliente.cnpj])),
+    };
+  }
+
+  return cacheClientes.porCodigo.get(String(codigoCliente)) ?? null;
+}
+
+/*
  * Uma tentativa pra um único equipamento — chamada em loop pelo job
  * (nf-entrada-scheduler.ts) pra cada equipamento pendente. Nunca lança:
  * qualquer falha (ERP fora do ar, endpoint não configurado) vira uma
@@ -293,7 +326,7 @@ export async function tentarBuscarNfEntrada(
   equipamento: EquipamentoPendenteNf,
   disparadoPor: string | null
 ): Promise<void> {
-  const parametrosConsulta = `cod_emp=${equipamento.codigoEmpresa}&mascara=${equipamento.valorMascara}&cod_for=${equipamento.codigoCliente}`;
+  const parametrosConsulta = `cod_emp=${equipamento.codigoEmpresa}&mascara=${equipamento.valorMascara}`;
   const detalhes: DetalhesChamadaNfErp = {};
 
   try {
@@ -301,7 +334,6 @@ export async function tentarBuscarNfEntrada(
       {
         codEmpresa: equipamento.codigoEmpresa,
         mascara: equipamento.valorMascara,
-        codFornecedor: equipamento.codigoCliente,
       },
       detalhes
     );
@@ -320,19 +352,70 @@ export async function tentarBuscarNfEntrada(
       return;
     }
 
+    const cnpjCliente = await buscarCnpjClienteErp(equipamento.codigoCliente);
+    const selecao = selecionarNfEntrada(resultado.candidatos, {
+      chaveMascara: equipamento.valorMascara,
+      cnpjCliente,
+    });
+
+    if (selecao.tipo === "nenhum") {
+      await registrarTentativaNf({
+        equipamentoId: equipamento.id,
+        status: "nao_encontrado",
+        mensagem: detalhes.mensagemNaoEncontrado || "NF ainda não localizada no ERP.",
+        parametrosConsulta,
+        disparadoPor,
+        requestUrl: detalhes.requestUrl,
+        responseStatus: detalhes.responseStatus,
+        responseBody: detalhes.responseBody,
+      });
+      return;
+    }
+
+    /*
+     * Com mais de uma página no ERP, uma escolha que não foi confirmada
+     * por CNPJ pode estar ignorando candidatas que nem chegaram a vir.
+     */
+    const incerta =
+      selecao.tipo === "ambiguo" || (resultado.haMaisPaginas && !selecao.confirmadoPorCnpj);
+
+    if (incerta) {
+      const candidatas = selecao.tipo === "ambiguo" ? selecao.candidatos : [selecao.nf];
+      const motivo =
+        selecao.tipo === "ambiguo"
+          ? selecao.motivo
+          : "O ERP devolveu mais resultados do que cabem numa página e o CNPJ não confirmou a escolha.";
+      const lista = candidatas
+        .map((c) => `NF ${c.numeroNf} (${c.fornecedorDescricao || "sem fornecedor"})`)
+        .join("; ");
+
+      await registrarTentativaNf({
+        equipamentoId: equipamento.id,
+        status: "ambiguo",
+        mensagem: `${motivo} Nenhuma NF foi aplicada. Candidatas: ${lista}`.slice(0, 500),
+        parametrosConsulta,
+        disparadoPor,
+        requestUrl: detalhes.requestUrl,
+        responseStatus: detalhes.responseStatus,
+        responseBody: detalhes.responseBody,
+      });
+      return;
+    }
+
+    const nf = selecao.nf;
     const numeroAnterior = equipamento.numeroNfEntradaAtual;
-    const divergiu = Boolean(numeroAnterior) && numeroAnterior !== resultado.numeroNf;
+    const divergiu = Boolean(numeroAnterior) && numeroAnterior !== nf.numeroNf;
 
     await preencherNfEntradaDoEquipamento(equipamento.id, {
-      numeroNfEntrada: resultado.numeroNf,
-      erpCodigoItem: resultado.codigoItem || null,
-      erpIdItem: resultado.idConfigurado || null,
-      erpDataEntrada: resultado.dataEntradaIso || null,
+      numeroNfEntrada: nf.numeroNf,
+      erpCodigoItem: nf.codigoItem || null,
+      erpIdItem: nf.idConfigurado || null,
+      erpDataEntrada: nf.dataEntradaIso || null,
     });
 
     await registrarMovimentacaoNfVinculada({
       equipamentoId: equipamento.id,
-      numeroNf: resultado.numeroNf,
+      numeroNf: nf.numeroNf,
       statusAtual: equipamento.status,
       criadoPorNome: disparadoPor ?? "Integração automática (ERP)",
     });
@@ -343,17 +426,21 @@ export async function tentarBuscarNfEntrada(
         numero: equipamento.numero,
         descricao: equipamento.descricao,
         numeroAnterior,
-        numeroNovo: resultado.numeroNf,
+        numeroNovo: nf.numeroNf,
         disparadoPor,
       });
     }
+
+    const comoCasou = selecao.confirmadoPorCnpj
+      ? "CNPJ do cliente confere com o do fornecedor da NF"
+      : "máscara compatível (sem CNPJ do cliente no ERP para confirmar)";
 
     await registrarTentativaNf({
       equipamentoId: equipamento.id,
       status: "sucesso",
       mensagem: divergiu
-        ? `NF ${resultado.numeroNf} localizada — divergia do número informado na entrada (${numeroAnterior}), atualizado automaticamente.`
-        : `NF ${resultado.numeroNf} localizada e aplicada ao equipamento.`,
+        ? `NF ${nf.numeroNf} localizada (${comoCasou}) — divergia do número informado na entrada (${numeroAnterior}), atualizado automaticamente.`
+        : `NF ${nf.numeroNf} localizada e aplicada ao equipamento (${comoCasou}).`,
       parametrosConsulta,
       disparadoPor,
       requestUrl: detalhes.requestUrl,
@@ -381,7 +468,7 @@ export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignac
 export interface TentativaIntegracaoNf {
   id: string;
   tipoNf: TipoNfIntegracao;
-  status: "sucesso" | "nao_encontrado" | "erro";
+  status: "sucesso" | "nao_encontrado" | "erro" | "ambiguo";
   mensagem: string | null;
   parametrosConsulta: string | null;
   disparadoPor: string | null;

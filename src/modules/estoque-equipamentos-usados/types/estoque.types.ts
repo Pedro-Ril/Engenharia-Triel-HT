@@ -4,10 +4,12 @@ export interface EmpresaOpcao {
   codigo: string | null;
 }
 
-/* Mesmo formato de dbo `/api/clientes` já usado em Liberação de Projeto. */
+/* Normalizado no servidor (listarClientesErp) — o ERP manda COD_CLI/DESCRICAO/CNPJ. */
 export interface ClienteEstoqueItem {
   cod_cli: string;
   descricao: string;
+  /* Só dígitos. Nem todo cliente do ERP tem CNPJ cadastrado. */
+  cnpj: string | null;
 }
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "baixado";
@@ -87,7 +89,8 @@ export interface HistoricoAlteracaoDadosTecnicos {
   motivo: string | null;
 }
 
-export type StatusTentativaIntegracaoNf = "sucesso" | "nao_encontrado" | "erro";
+/* "ambiguo": o ERP devolveu mais de uma NF possível e nada foi aplicado -- alguém precisa escolher. */
+export type StatusTentativaIntegracaoNf = "sucesso" | "nao_encontrado" | "erro" | "ambiguo";
 export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda";
 
 export interface TentativaIntegracaoNf {

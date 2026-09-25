@@ -119,12 +119,14 @@ const ACAO_LABELS: Record<TipoAcaoMovimentacao, string> = {
 const STATUS_TENTATIVA_LABEL: Record<TentativaIntegracaoNf["status"], string> = {
   sucesso: "Sucesso",
   nao_encontrado: "Ainda não encontrado",
+  ambiguo: "Precisa de conferência",
   erro: "Erro",
 };
 
 const STATUS_TENTATIVA_BADGE: Record<TentativaIntegracaoNf["status"], "success" | "warning" | "danger"> = {
   sucesso: "success",
   nao_encontrado: "warning",
+  ambiguo: "warning",
   erro: "danger",
 };
 

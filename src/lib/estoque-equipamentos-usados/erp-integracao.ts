@@ -260,6 +260,36 @@ export async function validarEquipamentoNoErp(
 export interface ClienteErpEstoqueUsados {
   cod_cli: string;
   descricao: string;
+  /* Só dígitos, sem máscara. Nem todo cliente do ERP tem (hoje ~23% vêm sem). */
+  cnpj: string | null;
+}
+
+/* Guarda só os dígitos: o ERP manda sem máscara, mas é o tipo de campo que um dia vem "12.345.678/0001-90". */
+export function normalizarCnpj(valor: unknown): string | null {
+  if (typeof valor !== "string") return null;
+  const digitos = valor.replace(/\D/g, "");
+  return digitos.length > 0 ? digitos : null;
+}
+
+/*
+ * O endpoint antigo devolvia um array puro com chaves minúsculas
+ * (cod_cli/descricao); o novo devolve { success, data } com chaves
+ * MAIÚSCULAS e CNPJ. Aceita os dois pra que trocar a URL na tela de
+ * administração não quebre o autocomplete de cliente.
+ */
+function mapearClienteErp(bruto: unknown): ClienteErpEstoqueUsados | null {
+  if (typeof bruto !== "object" || bruto === null) return null;
+  const linha = bruto as Record<string, unknown>;
+
+  const codigo = linha.cod_cli ?? linha.COD_CLI;
+  const descricao = linha.descricao ?? linha.DESCRICAO;
+  if (codigo === undefined || codigo === null) return null;
+
+  return {
+    cod_cli: String(codigo),
+    descricao: String(descricao ?? ""),
+    cnpj: normalizarCnpj(linha.cnpj ?? linha.CNPJ),
+  };
 }
 
 /*
@@ -296,7 +326,15 @@ export async function listarClientesErp(): Promise<ClienteErpEstoqueUsados[]> {
     const data: unknown = await resposta.json();
     sucesso = true;
 
-    return Array.isArray(data) ? (data as ClienteErpEstoqueUsados[]) : [];
+    const linhas = Array.isArray(data)
+      ? data
+      : Array.isArray((data as { data?: unknown })?.data)
+        ? ((data as { data: unknown[] }).data)
+        : [];
+
+    return linhas
+      .map(mapearClienteErp)
+      .filter((cliente): cliente is ClienteErpEstoqueUsados => cliente !== null);
   } catch (error) {
     mensagemErro = error instanceof Error ? error.message : "Erro desconhecido.";
     return [];
@@ -321,12 +359,33 @@ export interface NfEntradaErp {
 interface RespostaNfEntradaErp {
   success: boolean;
   message?: string;
+  paginacao?: { totalRegistros?: number; totalPaginas?: number };
   data?: Array<{
     numeroNf: number | string;
     dataEntrada: string;
     item?: { codItem: string } | null;
-    mascaraItem?: { id: number | string } | null;
+    mascaraItem?: { id: number | string; mascara?: string } | null;
+    fornecedor?: { codigo?: number | string; descricao?: string; cnpj?: string | null } | null;
   }>;
+}
+
+/* Uma linha de NF devolvida pelo ERP, antes de decidir qual é a certa. */
+export interface CandidatoNfEntrada {
+  numeroNf: string;
+  dataEntradaIso: string;
+  dataEntradaOriginal: string;
+  codigoItem: string;
+  idConfigurado: string;
+  mascara: string;
+  fornecedorCodigo: string;
+  fornecedorDescricao: string;
+  fornecedorCnpj: string | null;
+}
+
+export interface ResultadoConsultaNfEntrada {
+  candidatos: CandidatoNfEntrada[];
+  /* O ERP pagina em 50; com mais de uma página, o que veio pode não ser tudo. */
+  haMaisPaginas: boolean;
 }
 
 /*
@@ -339,6 +398,74 @@ function converterDataBrParaIso(data: string): string | null {
   if (!match) return null;
   const [, dia, mes, ano] = match;
   return `${ano}-${mes}-${dia}`;
+}
+
+export type ResultadoSelecaoNf =
+  | { tipo: "unico"; nf: CandidatoNfEntrada; confirmadoPorCnpj: boolean }
+  | { tipo: "nenhum" }
+  | { tipo: "ambiguo"; candidatos: CandidatoNfEntrada[]; motivo: string };
+
+/* A máscara do Focco é uma lista de campos separada por "#". */
+function segmentosMascara(mascara: string): string[] {
+  return mascara.split("#").map((parte) => parte.trim());
+}
+
+/*
+ * Qual das NFs devolvidas pelo ERP é a deste equipamento.
+ *
+ * A busca do ERP é um LIKE na máscara, então "994" traz junto "9994",
+ * "1994" e qualquer chassi que contenha 994 no meio. Dois critérios
+ * independentes separam o joio:
+ *
+ * 1. a chave tem que ser um SEGMENTO inteiro da máscara ("10500#2#994"),
+ *    não um pedaço de um segmento maior;
+ * 2. o CNPJ do fornecedor da NF tem que ser o CNPJ do cliente do
+ *    equipamento -- comparar código não funciona (cadastros diferentes)
+ *    e comparar nome é frágil.
+ *
+ * Quando sobra mais de um candidato, NÃO escolhe: devolve "ambiguo" pra
+ * alguém decidir. Preencher a NF errada é pior do que não preencher.
+ */
+export function selecionarNfEntrada(
+  candidatos: CandidatoNfEntrada[],
+  criterios: { chaveMascara: string; cnpjCliente: string | null }
+): ResultadoSelecaoNf {
+  if (candidatos.length === 0) return { tipo: "nenhum" };
+
+  const chave = criterios.chaveMascara.trim();
+  const porSegmento = candidatos.filter((candidato) =>
+    segmentosMascara(candidato.mascara).includes(chave)
+  );
+
+  /*
+   * Sem nenhum segmento exato a busca continua com todos: há tipos de
+   * equipamento cuja máscara não isola o número num campo próprio. Aí o
+   * CNPJ e a trava de ambiguidade seguram.
+   */
+  const base = porSegmento.length > 0 ? porSegmento : candidatos;
+
+  if (criterios.cnpjCliente) {
+    const porCnpj = base.filter((candidato) => candidato.fornecedorCnpj === criterios.cnpjCliente);
+
+    if (porCnpj.length === 1) return { tipo: "unico", nf: porCnpj[0], confirmadoPorCnpj: true };
+    if (porCnpj.length > 1) {
+      return {
+        tipo: "ambiguo",
+        candidatos: porCnpj,
+        motivo: "Mais de uma NF do mesmo cliente com essa máscara.",
+      };
+    }
+  }
+
+  if (base.length === 1) return { tipo: "unico", nf: base[0], confirmadoPorCnpj: false };
+
+  return {
+    tipo: "ambiguo",
+    candidatos: base,
+    motivo: criterios.cnpjCliente
+      ? "Nenhuma NF com o CNPJ do cliente e mais de uma máscara compatível."
+      : "Cliente sem CNPJ no ERP e mais de uma máscara compatível.",
+  };
 }
 
 /*
@@ -368,10 +495,9 @@ export async function consultarNfEntradaNoErp(
   params: {
     codEmpresa: string;
     mascara: string;
-    codFornecedor: string;
   },
   detalhes?: DetalhesChamadaNfErp
-): Promise<NfEntradaErp | null> {
+): Promise<ResultadoConsultaNfEntrada | null> {
   const config = await buscarConfigErpEstoqueUsados();
   const url = config.usarAmbienteTeste ? config.urlNfEntradaTeste : config.urlNfEntrada;
 
@@ -387,10 +513,17 @@ export async function consultarNfEntradaNoErp(
   let mensagemErro: string | null = null;
 
   try {
+    /*
+     * Deliberadamente SEM cod_for: o código de cliente e o de fornecedor
+     * vivem em cadastros diferentes no Focco (o 82668, por exemplo, é
+     * "RODO ALDO" como fornecedor e "ET DO BRASIL" como cliente). Mandar
+     * o código do cliente ali não só deixava de achar a NF certa como
+     * podia casar com a NF de outra empresa. A contraparte é conferida
+     * aqui, por CNPJ (ver selecionarNfEntrada).
+     */
     const urlComParametros = new URL(url);
     urlComParametros.searchParams.set("cod_emp", params.codEmpresa);
     urlComParametros.searchParams.set("mascara", params.mascara);
-    urlComParametros.searchParams.set("cod_for", params.codFornecedor);
 
     if (detalhes) detalhes.requestUrl = urlComParametros.toString();
 
@@ -444,19 +577,28 @@ export async function consultarNfEntradaNoErp(
 
     sucesso = true;
 
-    const primeiro = json.success ? json.data?.[0] : undefined;
-    if (!primeiro) {
+    const linhas = json.success ? (json.data ?? []) : [];
+    if (linhas.length === 0) {
       if (detalhes) detalhes.mensagemNaoEncontrado = json.message;
       return null;
     }
 
-    const dataEntradaIso = converterDataBrParaIso(String(primeiro.dataEntrada ?? ""));
-
     return {
-      numeroNf: String(primeiro.numeroNf),
-      dataEntradaIso: dataEntradaIso ?? "",
-      codigoItem: primeiro.item?.codItem ?? "",
-      idConfigurado: primeiro.mascaraItem?.id !== undefined ? String(primeiro.mascaraItem.id) : "",
+      candidatos: linhas.map((linha) => ({
+        numeroNf: String(linha.numeroNf),
+        dataEntradaIso: converterDataBrParaIso(String(linha.dataEntrada ?? "")) ?? "",
+        dataEntradaOriginal: String(linha.dataEntrada ?? ""),
+        codigoItem: linha.item?.codItem ?? "",
+        idConfigurado: linha.mascaraItem?.id !== undefined ? String(linha.mascaraItem.id) : "",
+        mascara: linha.mascaraItem?.mascara ?? "",
+        fornecedorCodigo:
+          linha.fornecedor?.codigo !== undefined && linha.fornecedor?.codigo !== null
+            ? String(linha.fornecedor.codigo)
+            : "",
+        fornecedorDescricao: linha.fornecedor?.descricao ?? "",
+        fornecedorCnpj: normalizarCnpj(linha.fornecedor?.cnpj),
+      })),
+      haMaisPaginas: (json.paginacao?.totalPaginas ?? 1) > 1,
     };
   } catch (error) {
     mensagemErro = error instanceof Error ? error.message : "Erro desconhecido.";
