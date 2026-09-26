@@ -92,7 +92,8 @@ export type ServicoExterno =
   | "erp_estrutura"
   | "erp_estoque_usados"
   | "erp_estoque_usados_clientes"
-  | "erp_rh_firebird";
+  | "erp_rh_firebird"
+  | "erp_3dx_estrutura";
 
 export interface StatusServicoExterno {
   servico: ServicoExterno;

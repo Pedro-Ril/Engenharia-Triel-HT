@@ -1,0 +1,100 @@
+.arvore {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.no {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.linha {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+/* Item que não está na última revisão — o motivo de existir desta tela. */
+.linhaDesatualizada {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.botaoExpandir {
+  flex-shrink: 0;
+
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+
+  color: var(--text-soft);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.botaoExpandir:hover:not(:disabled) {
+  background: var(--bg-hover-neutral);
+}
+
+.botaoExpandir:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.codigo {
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.descricao {
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+/* Recuo dos filhos, com um fio ligando ao pai. */
+.filhos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.resumoFiltro {
+  color: var(--text-muted);
+  font-size: 13px;
+}

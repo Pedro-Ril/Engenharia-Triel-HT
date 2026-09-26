@@ -112,6 +112,7 @@ const SERVICO_CONFIG: Record<
   erp_estoque_usados: { label: "ERP · Estoque de Equipamentos Usados", icon: Warehouse },
   erp_estoque_usados_clientes: { label: "ERP · Clientes (Estoque de Equip. Usados)", icon: Warehouse },
   erp_rh_firebird: { label: "ERP · RH (Firebird)", icon: Users },
+  erp_3dx_estrutura: { label: "3DX · Estrutura de Produto", icon: Shuffle },
 };
 
 const STATUS_SERVICO_CONFIG: Record<
