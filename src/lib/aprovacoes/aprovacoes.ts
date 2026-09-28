@@ -22,6 +22,8 @@ export interface ItemAumentoSalarial {
   id: string;
   aprovacaoId: string;
   aprovacaoNumero: number;
+  /* De que tipo de aprovação este item é -- o painel atende vários. */
+  tipo: TipoAprovacao;
   /* Observação do LOTE inteiro, compartilhada por todos os colaboradores. */
   observacaoGeral: string | null;
   criadoPorUsuarioId: string;
@@ -32,6 +34,8 @@ export interface ItemAumentoSalarial {
   funcionarioCpf: string | null;
   departamento: string | null;
   setor: string | null;
+  /* "YYYY-MM-DD", copiada do RH na criação (GER_FUNCIONARIO.FUN_DTADM). */
+  dataAdmissao: string | null;
   salarioAtual: number;
   valorReajuste: number;
   percentualReajuste: number;
@@ -69,6 +73,7 @@ interface ItemRow {
   item_id: string;
   aprovacao_id: string;
   aprovacao_numero: number;
+  tipo: TipoAprovacao;
   observacao_geral: string | null;
   criado_por_usuario_id: string;
   criado_por_nome: string;
@@ -78,6 +83,7 @@ interface ItemRow {
   funcionario_cpf: string | null;
   departamento: string | null;
   setor: string | null;
+  data_admissao: string | null;
   salario_atual: number;
   valor_reajuste: number;
   percentual_reajuste: number;
@@ -96,6 +102,7 @@ const colunasItem = `
   CONVERT(VARCHAR(36), i.[id]) AS [item_id],
   CONVERT(VARCHAR(36), a.[id]) AS [aprovacao_id],
   a.[numero] AS [aprovacao_numero],
+  a.[tipo],
   a.[observacao] AS [observacao_geral],
   CONVERT(VARCHAR(36), a.[criado_por_usuario_id]) AS [criado_por_usuario_id],
   a.[criado_por_nome],
@@ -105,6 +112,7 @@ const colunasItem = `
   i.[funcionario_cpf],
   i.[departamento],
   i.[setor],
+  CONVERT(VARCHAR(10), i.[data_admissao], 23) AS [data_admissao],
   i.[salario_atual],
   i.[valor_reajuste],
   i.[percentual_reajuste],
@@ -128,6 +136,7 @@ function mapItemRow(row: ItemRow): ItemAumentoSalarial {
     id: row.item_id,
     aprovacaoId: row.aprovacao_id,
     aprovacaoNumero: row.aprovacao_numero,
+    tipo: row.tipo,
     observacaoGeral: row.observacao_geral,
     criadoPorUsuarioId: row.criado_por_usuario_id,
     criadoPorNome: row.criado_por_nome,
@@ -137,6 +146,7 @@ function mapItemRow(row: ItemRow): ItemAumentoSalarial {
     funcionarioCpf: row.funcionario_cpf,
     departamento: row.departamento,
     setor: row.setor,
+    dataAdmissao: row.data_admissao,
     salarioAtual: row.salario_atual,
     valorReajuste: row.valor_reajuste,
     percentualReajuste: row.percentual_reajuste,
@@ -159,6 +169,7 @@ export interface ItemCriarSolicitacaoParams {
   funcionarioCpf: string | null;
   departamento: string | null;
   setor: string | null;
+  dataAdmissao: string | null;
   salarioAtual: number;
   valorReajuste: number;
   percentualReajuste: number;
@@ -235,6 +246,8 @@ export async function criarSolicitacaoAumentoSalarial(
         .input("funcionarioCpf", sql.VarChar(14), item.funcionarioCpf)
         .input("departamento", sql.NVarChar(200), item.departamento)
         .input("setor", sql.NVarChar(200), item.setor)
+        /* VarChar em vez de sql.Date: "YYYY-MM-DD" o SQL Server converte sem ambiguidade, e um Date do JS traria fuso junto. */
+        .input("dataAdmissao", sql.VarChar(10), item.dataAdmissao)
         .input("salarioAtual", sql.Decimal(14, 2), item.salarioAtual)
         .input("valorReajuste", sql.Decimal(14, 2), item.valorReajuste)
         .input("percentualReajuste", sql.Decimal(9, 4), item.percentualReajuste)
@@ -242,9 +255,9 @@ export async function criarSolicitacaoAumentoSalarial(
         .input("observacao", sql.NVarChar(2000), item.observacao)
         .query(`
           INSERT INTO dbo.portal_aprovacoes_aumento_salarial
-            ([aprovacao_id], [funcionario_codigo], [funcionario_nome], [funcionario_cpf], [departamento], [setor], [salario_atual], [valor_reajuste], [percentual_reajuste], [novo_salario], [observacao])
+            ([aprovacao_id], [funcionario_codigo], [funcionario_nome], [funcionario_cpf], [departamento], [setor], [data_admissao], [salario_atual], [valor_reajuste], [percentual_reajuste], [novo_salario], [observacao])
           VALUES
-            (@aprovacaoId, @funcionarioCodigo, @funcionarioNome, @funcionarioCpf, @departamento, @setor, @salarioAtual, @valorReajuste, @percentualReajuste, @novoSalario, @observacao);
+            (@aprovacaoId, @funcionarioCodigo, @funcionarioNome, @funcionarioCpf, @departamento, @setor, @dataAdmissao, @salarioAtual, @valorReajuste, @percentualReajuste, @novoSalario, @observacao);
         `);
     }
 
@@ -305,11 +318,34 @@ export async function buscarItemPorId(itemId: string): Promise<ItemAumentoSalari
   return row ? mapItemRow(row) : null;
 }
 
+export type OrdemPainel = "fila" | "colaborador" | "recentes";
+
 export interface FiltrosPainel {
   status?: StatusItemAprovacao | "todos";
   /* Nome do colaborador OU de quem solicitou. */
   busca?: string;
+  departamento?: string;
+  setor?: string;
+  /* Um tipo específico, ou vazio para todos os que a pessoa atende. */
+  tipo?: TipoAprovacao | "";
+  ordem?: OrdemPainel;
 }
+
+/*
+ * ORDER BY montado a partir de um conjunto fechado -- nunca de texto
+ * vindo da requisição.
+ *
+ * "fila" (padrão) é a ordem de trabalho: pendentes primeiro, mais
+ * antigos no topo; decididos depois, decisão mais recente primeiro.
+ */
+const ORDENACOES: Record<OrdemPainel, string> = {
+  fila: `
+    CASE WHEN i.[status] = 'pendente' THEN 0 ELSE 1 END,
+    CASE WHEN i.[status] = 'pendente' THEN i.[criado_em] END ASC,
+    i.[decidido_em] DESC`,
+  colaborador: "i.[funcionario_nome] ASC, i.[criado_em] ASC",
+  recentes: "i.[criado_em] DESC",
+};
 
 /*
  * Um item (colaborador) por linha -- não um lote por linha, já que cada
@@ -341,6 +377,12 @@ export async function listarItensPainel(
   request.input("busca", sql.NVarChar(200), busca);
   request.input("buscaLike", sql.NVarChar(204), `%${busca}%`);
 
+  request.input("tipoFiltro", sql.VarChar(40), (filtros.tipo ?? "").trim());
+  request.input("departamento", sql.NVarChar(200), (filtros.departamento ?? "").trim());
+  request.input("setor", sql.NVarChar(200), (filtros.setor ?? "").trim());
+
+  const ordem = ORDENACOES[filtros.ordem ?? "fila"] ?? ORDENACOES.fila;
+
   const result = await request.query<ItemRow>(`
     SELECT ${colunasItem}
     FROM dbo.portal_aprovacoes_aumento_salarial AS i
@@ -352,13 +394,49 @@ export async function listarItensPainel(
         OR i.[funcionario_nome] LIKE @buscaLike
         OR a.[criado_por_nome] LIKE @buscaLike
       )
-    ORDER BY
-      CASE WHEN i.[status] = 'pendente' THEN 0 ELSE 1 END,
-      CASE WHEN i.[status] = 'pendente' THEN i.[criado_em] END ASC,
-      i.[decidido_em] DESC;
+      AND (@tipoFiltro = '' OR a.[tipo] = @tipoFiltro)
+      AND (@departamento = '' OR i.[departamento] = @departamento)
+      AND (@setor = '' OR i.[setor] = @setor)
+    ORDER BY ${ordem};
   `);
 
   return result.recordset.map(mapItemRow);
+}
+
+/* Alimenta os dropdowns do painel: só o que realmente aparece na fila de quem está olhando. */
+export async function listarOpcoesFiltroPainel(
+  tiposAtendidos: TipoAprovacao[]
+): Promise<{ departamentos: string[]; setores: string[] }> {
+  if (tiposAtendidos.length === 0) return { departamentos: [], setores: [] };
+
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  const parametrosTipo = tiposAtendidos.map((tipo, indice) => {
+    const nome = `tipo${indice}`;
+    request.input(nome, sql.VarChar(40), tipo);
+    return `@${nome}`;
+  });
+
+  const result = await request.query<{ departamento: string | null; setor: string | null }>(`
+    SELECT DISTINCT i.[departamento], i.[setor]
+    FROM dbo.portal_aprovacoes_aumento_salarial AS i
+    INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = i.[aprovacao_id]
+    WHERE a.[tipo] IN (${parametrosTipo.join(", ")});
+  `);
+
+  const departamentos = new Set<string>();
+  const setores = new Set<string>();
+
+  for (const row of result.recordset) {
+    if (row.departamento) departamentos.add(row.departamento);
+    if (row.setor) setores.add(row.setor);
+  }
+
+  const ordenar = (valores: Set<string>) =>
+    Array.from(valores).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  return { departamentos: ordenar(departamentos), setores: ordenar(setores) };
 }
 
 export async function listarMinhasSolicitacoes(usuarioId: string): Promise<ItemAumentoSalarial[]> {
@@ -486,4 +564,98 @@ export function reprovarItem(
   ajuste: AjusteValoresDecisao | null = null
 ): Promise<ItemAumentoSalarial> {
   return decidirItem(itemId, usuario, "reprovado", comentario, ajuste);
+}
+
+export interface FalhaDecisaoLote {
+  itemId: string;
+  motivo: string;
+}
+
+export interface ResultadoDecisaoLote {
+  decididos: ItemAumentoSalarial[];
+  falhas: FalhaDecisaoLote[];
+}
+
+/*
+ * Decide vários colaboradores de uma vez no painel. Sem ajuste de
+ * valores de propósito: mexer em valor é conferência individual, não
+ * cabe numa ação que atinge a seleção inteira.
+ *
+ * Um item que falha (já decidido por outra pessoa no meio do caminho)
+ * não derruba os demais -- entra em `falhas` e a tela mostra o resumo.
+ */
+export async function decidirItensEmLote(
+  itemIds: string[],
+  usuario: Pick<PortalUsuario, "id" | "nomeExibicao">,
+  novoStatus: Extract<StatusItemAprovacao, "aprovado" | "reprovado">,
+  comentario: string | null
+): Promise<ResultadoDecisaoLote> {
+  if (itemIds.length === 0) {
+    throw new ValidationError("Selecione ao menos um colaborador.");
+  }
+
+  const decididos: ItemAumentoSalarial[] = [];
+  const falhas: FalhaDecisaoLote[] = [];
+
+  for (const itemId of itemIds) {
+    try {
+      decididos.push(await decidirItem(itemId, usuario, novoStatus, comentario, null));
+    } catch (error) {
+      falhas.push({
+        itemId,
+        motivo: error instanceof ValidationError ? error.message : "Erro inesperado ao decidir.",
+      });
+    }
+  }
+
+  return { decididos, falhas };
+}
+
+export interface RelatorioSolicitacao {
+  numero: number;
+  criadoPorNome: string;
+  criadoEm: string;
+  observacao: string | null;
+  aprovados: ItemAumentoSalarial[];
+  totalItens: number;
+  totalReprovados: number;
+}
+
+/*
+ * Relatório que o próprio solicitante dispara quando a solicitação
+ * termina. Duas regras de negócio moram aqui: só o dono da solicitação
+ * pede, e só depois que NÃO sobrou nada pendente -- relatório de algo
+ * pela metade daria a entender que a direção já bateu o martelo.
+ */
+export async function montarRelatorioSolicitacao(
+  numero: number,
+  usuarioId: string
+): Promise<RelatorioSolicitacao> {
+  const lote = await buscarLotePorNumero(numero);
+
+  if (!lote || lote.criadoPorUsuarioId !== usuarioId) {
+    throw new ValidationError("Solicitação não encontrada.");
+  }
+
+  if (lote.itens.some((item) => item.status === "pendente")) {
+    throw new ValidationError(
+      "Esta solicitação ainda tem colaboradores aguardando decisão da direção."
+    );
+  }
+
+  const aprovados = lote.itens.filter((item) => item.status === "aprovado");
+
+  if (aprovados.length === 0) {
+    throw new ValidationError("Nenhum colaborador desta solicitação foi aprovado.");
+  }
+
+  return {
+    numero: lote.numero,
+    criadoPorNome: lote.criadoPorNome,
+    criadoEm: lote.criadoEm,
+    observacao: lote.observacao,
+    aprovados,
+    totalItens: lote.itens.length,
+    totalReprovados: lote.itens.filter((item) => item.status === "reprovado").length,
+  };
 }

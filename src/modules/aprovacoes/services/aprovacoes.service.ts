@@ -61,19 +61,36 @@ export async function listarMinhasSolicitacoes(): Promise<ApiEnvelope<ItemAument
   return parseResponse(response);
 }
 
+export type OrdemPainel = "fila" | "colaborador" | "recentes";
+
 export interface FiltrosPainel {
   status: StatusAprovacao | "todos";
   busca: string;
+  departamento: string;
+  setor: string;
+  /* Vazio = todos os tipos que a pessoa atende. */
+  tipo: string;
+  ordem: OrdemPainel;
 }
 
 /* `tiposAtendidos` vazio = o usuário abre a tela mas ainda não é aprovador de nenhum tipo (é o que diferencia "fila vazia" de "sem cadastro"). */
 export interface RespostaPainel {
   itens: ItemAumentoSalarial[];
   tiposAtendidos: TipoAprovacao[];
+  /* Valores que existem na fila de quem está olhando -- alimentam os dropdowns. */
+  departamentos: string[];
+  setores: string[];
 }
 
 export async function listarItensPainel(filtros: FiltrosPainel): Promise<ApiEnvelope<RespostaPainel>> {
-  const parametros = new URLSearchParams({ status: filtros.status, busca: filtros.busca });
+  const parametros = new URLSearchParams({
+    status: filtros.status,
+    busca: filtros.busca,
+    departamento: filtros.departamento,
+    setor: filtros.setor,
+    tipo: filtros.tipo,
+    ordem: filtros.ordem,
+  });
   const response = await fetch(`/api/aprovacoes/painel?${parametros.toString()}`);
   return parseResponse(response);
 }
@@ -112,5 +129,30 @@ export async function reprovarItemAprovacao(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ comentario, ajuste }),
   });
+  return parseResponse(response);
+}
+
+export interface ResultadoDecisaoLote {
+  decididos: number;
+  falhas: { itemId: string; motivo: string }[];
+}
+
+/* Decide a seleção inteira de uma vez no painel. Sem ajuste de valores: isso é conferência individual. */
+export async function decidirItensEmLote(
+  itemIds: string[],
+  acao: "aprovar" | "reprovar",
+  comentario: string | null
+): Promise<ApiEnvelope<ResultadoDecisaoLote>> {
+  const response = await fetch("/api/aprovacoes/itens/lote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itemIds, acao, comentario }),
+  });
+  return parseResponse(response);
+}
+
+/* Relatório dos colaboradores APROVADOS, enviado para o e-mail configurado na administração. */
+export async function enviarRelatorioSolicitacao(numero: number): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/aprovacoes/${numero}/relatorio`, { method: "POST" });
   return parseResponse(response);
 }

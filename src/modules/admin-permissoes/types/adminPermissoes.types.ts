@@ -127,6 +127,14 @@ export interface RegraEscopo {
   valorRotulo: string | null;
 }
 
+/* Configuração do módulo de aprovações: para onde vai o relatório que o solicitante dispara. */
+export interface ConfigAprovacoes {
+  emailRelatorio: string | null;
+  urlPublica: string | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
 /* Quem decide as pendências do painel de aprovações: uma linha por usuário + tipo de aprovação que ele aprova. */
 export interface AprovacaoAtendente {
   id: string;

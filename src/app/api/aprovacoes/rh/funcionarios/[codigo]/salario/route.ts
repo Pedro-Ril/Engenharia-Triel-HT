@@ -52,7 +52,15 @@ async function handleGET(request: Request, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({ ok: true, data: { salarioAtual: detalhe.salarioAtual, cpf: detalhe.cpf } });
+    /* Devolve só o que a tela usa: depto/setor vieram junto, mas serviram apenas pra checar o escopo acima. */
+    return NextResponse.json({
+      ok: true,
+      data: {
+        salarioAtual: detalhe.salarioAtual,
+        cpf: detalhe.cpf,
+        dataAdmissao: detalhe.dataAdmissao,
+      },
+    });
   } catch (error) {
     if (error instanceof ValidationError) {
       return NextResponse.json({ ok: false, message: error.message }, { status: 503 });

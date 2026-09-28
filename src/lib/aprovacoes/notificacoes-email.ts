@@ -4,8 +4,9 @@ import { enviarEmail } from "@/lib/smtp/enviar-email";
 import { montarBotaoEmailHtml, montarEmailHtml, montarLinkEmailHtml } from "@/lib/smtp/template-email";
 import { registrarLog } from "@/lib/monitoramento/logs";
 
-import type { AprovacaoLote, ItemAumentoSalarial } from "./aprovacoes";
+import type { AprovacaoLote, ItemAumentoSalarial, RelatorioSolicitacao } from "./aprovacoes";
 import { listarEmailsAtendentes } from "./atendentes";
+import { gerarSenhaRelatorio, montarAnexosRelatorio } from "./relatorio-anexos";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -104,4 +105,76 @@ export async function notificarSolicitanteDecisao(
   const corpoTexto = `Houve uma atualização na sua solicitação de reajuste salarial #${item.aprovacaoNumero}.\n\nAcesse "Minhas Solicitações" para ver a situação de cada colaborador:\n${link}`;
 
   await enviarSemFalhar({ destinatario: solicitanteEmail, assunto, corpoHtml, corpoTexto });
+}
+
+
+/* Escapa o que vem de cadastro (nome, setor, observação) antes de entrar no HTML do e-mail. */
+function escaparHtml(valor: string): string {
+  return valor
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/*
+ * Relatório que o solicitante dispara quando a solicitação termina.
+ * Os dados (nome, salário, valores) vão só nos ANEXOS, protegidos por
+ * senha -- o corpo leva resumo e a senha. Repetir a tabela no corpo em
+ * texto puro anularia a proteção dos arquivos.
+ *
+ * Vai para um endereço único definido pelo administrador, diferente
+ * dos avisos, que vão para vários aprovadores.
+ */
+export async function enviarRelatorioSolicitacao(
+  relatorio: RelatorioSolicitacao,
+  destinatario: string,
+  origem: string
+): Promise<void> {
+  if (!EMAIL_REGEX.test(destinatario)) {
+    throw new Error("O e-mail de destino do relatório está inválido.");
+  }
+
+  const senha = gerarSenhaRelatorio();
+  const anexos = await montarAnexosRelatorio(relatorio, senha);
+
+  const link = `${origem}/aprovacoes/minhas-solicitacoes`;
+  const assunto = `Reajuste salarial aprovado — solicitação #${relatorio.numero} — Portal Triel-HT`;
+  const resumo =
+    `${relatorio.aprovados.length} de ${relatorio.totalItens} colaborador(es) aprovado(s)` +
+    (relatorio.totalReprovados > 0 ? ` e ${relatorio.totalReprovados} reprovado(s)` : "");
+
+  const corpoHtml = montarEmailHtml(`
+    <p style="margin: 0 0 18px; font-size: 16px;">Olá!</p>
+    <p style="margin: 0 0 18px;">
+      A solicitação de reajuste salarial <strong>#${relatorio.numero}</strong>, criada por
+      <strong>${escaparHtml(relatorio.criadoPorNome)}</strong>, foi concluída: ${resumo}.
+    </p>
+    <p style="margin: 0 0 18px;">
+      O detalhamento dos aprovados está nos dois anexos (PDF e Excel). Os arquivos são
+      <strong>protegidos por senha</strong>:
+    </p>
+    <p style="margin: 0 0 18px; font-size: 20px; letter-spacing: 3px; font-family: monospace;">
+      <strong>${senha}</strong>
+    </p>
+    <p style="margin: 0 0 18px; color: #666; font-size: 13px;">
+      A senha vale só para estes arquivos e muda a cada envio.
+    </p>
+    ${montarBotaoEmailHtml("Ver no portal", link)}
+    ${montarLinkEmailHtml(link)}
+  `);
+
+  const corpoTexto = [
+    `Solicitação de reajuste salarial #${relatorio.numero}, criada por ${relatorio.criadoPorNome}, foi concluída.`,
+    resumo + ".",
+    "",
+    "O detalhamento dos aprovados está nos dois anexos (PDF e Excel), protegidos por senha.",
+    `Senha dos arquivos: ${senha}`,
+    "A senha vale só para estes arquivos e muda a cada envio.",
+    "",
+    link,
+  ].join("\n");
+
+  /* Diferente dos avisos: se o relatório falhar, quem clicou precisa saber -- por isso não passa por enviarSemFalhar. */
+  await enviarEmail({ destinatario, assunto, corpoHtml, corpoTexto, anexos });
 }

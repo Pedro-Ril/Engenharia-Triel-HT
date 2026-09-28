@@ -31,12 +31,20 @@ import { buscarSalarioFuncionario, criarSolicitacaoAumento } from "../services/a
 import type { FuncionarioRh } from "../types/aprovacoes.types";
 import { AdicionarColaboradorField } from "./AdicionarColaboradorField";
 
+function formatarDataAdmissao(valorIso: string | null): string {
+  if (!valorIso) return "-";
+  const [ano, mes, dia] = valorIso.slice(0, 10).split("-");
+  return dia && mes && ano ? `${dia}/${mes}/${ano}` : "-";
+}
+
 interface LinhaColaborador {
   funcionario: FuncionarioRh;
   salarioAtual: number | null;
   carregandoSalario: boolean;
   erroSalario: string | null;
   cpf: string | null;
+  /* "YYYY-MM-DD", vem do RH junto com o salário. */
+  dataAdmissao: string | null;
   valorReajuste: string;
   percentualReajuste: string;
   observacao: string;
@@ -65,6 +73,7 @@ export function SolicitarAumentoPage() {
         carregandoSalario: true,
         erroSalario: null,
         cpf: null,
+        dataAdmissao: null,
         valorReajuste: "",
         percentualReajuste: "",
         observacao: "",
@@ -81,6 +90,7 @@ export function SolicitarAumentoPage() {
               ...linha,
               salarioAtual: resultado.data.salarioAtual,
               cpf: resultado.data.cpf,
+              dataAdmissao: resultado.data.dataAdmissao,
               carregandoSalario: false,
             };
           }
@@ -167,6 +177,7 @@ export function SolicitarAumentoPage() {
           funcionarioCpf: linha.cpf,
           departamento: linha.funcionario.departamento,
           setor: linha.funcionario.setor,
+          dataAdmissao: linha.dataAdmissao,
           salarioAtual: linha.salarioAtual as number,
           valorReajuste: Number(linha.valorReajuste),
           percentualReajuste: Number(linha.percentualReajuste),
@@ -245,11 +256,12 @@ export function SolicitarAumentoPage() {
                 description="Busque acima e adicione ao menos um colaborador à solicitação."
               />
             ) : (
-              <Table minWidth={1100}>
+              <Table minWidth={1250}>
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Colaborador</TableHeaderCell>
                     <TableHeaderCell>Depto / Setor</TableHeaderCell>
+                    <TableHeaderCell align="center">Admissão</TableHeaderCell>
                     <TableHeaderCell align="center">Salário atual</TableHeaderCell>
                     <TableHeaderCell align="center">Valor do reajuste</TableHeaderCell>
                     <TableHeaderCell align="center">%</TableHeaderCell>
@@ -271,6 +283,9 @@ export function SolicitarAumentoPage() {
                         <TableCell>
                           {linha.funcionario.departamento ?? "-"}
                           {linha.funcionario.setor ? ` / ${linha.funcionario.setor}` : ""}
+                        </TableCell>
+                        <TableCell align="center">
+                          {linha.carregandoSalario ? "Buscando..." : formatarDataAdmissao(linha.dataAdmissao)}
                         </TableCell>
                         <TableCell align="center">
                           {linha.carregandoSalario

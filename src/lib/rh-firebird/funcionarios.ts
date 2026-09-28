@@ -106,6 +106,21 @@ export async function listarFuncionariosAtivos(codigoEmpresa: string): Promise<F
   }
 }
 
+/*
+ * O driver devolve DATE do Firebird como Date em UTC às 03:00 (meia-noite
+ * em Brasília), então a data do calendário em UTC é sempre a correta --
+ * por isso o corte direto no toISOString não desloca o dia.
+ */
+function formatarDataIso(valor: unknown): string | null {
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+    return valor.toISOString().slice(0, 10);
+  }
+  if (typeof valor === "string" && valor.trim()) {
+    return valor.slice(0, 10);
+  }
+  return null;
+}
+
 interface DetalheFuncionarioRow {
   /*
    * Confirmado ao vivo via `SELECT * FROM SP_RH_SALFUNC('2', <FUN_COD>,
@@ -116,6 +131,7 @@ interface DetalheFuncionarioRow {
    */
   MVSAL_VLR: number | string | null;
   FUN_CPFNUM: string | number | null;
+  FUN_DTADM: Date | string | null;
   DEPARTAMENTO: string | null;
   SETOR: string | null;
 }
@@ -123,6 +139,8 @@ interface DetalheFuncionarioRow {
 export interface DetalheAtualFuncionario {
   salarioAtual: number | null;
   cpf: string | null;
+  /* "YYYY-MM-DD" -- GER_FUNCIONARIO.FUN_DTADM. */
+  dataAdmissao: string | null;
   /* Usados só server-side pra checar o escopo do usuário (ver escopo-colaboradores.ts) -- não precisa necessariamente ir pro cliente, já tem essa info na lista. */
   departamento: string | null;
   setor: string | null;
@@ -145,7 +163,7 @@ export async function buscarDetalheAtualFuncionario(
 
   try {
     const linhas = await fbQuery<DetalheFuncionarioRow>(`
-      SELECT FIRST 1 SL.MVSAL_VLR, FUN.FUN_CPFNUM, DP.DEP_DESC AS DEPARTAMENTO, ST.SET_DESC AS SETOR
+      SELECT FIRST 1 SL.MVSAL_VLR, FUN.FUN_CPFNUM, FUN.FUN_DTADM, DP.DEP_DESC AS DEPARTAMENTO, ST.SET_DESC AS SETOR
       FROM GER_FUNCIONARIO FUN
       LEFT JOIN SP_RH_SALFUNC(FUN.FUN_CODEMP, FUN.FUN_COD, CURRENT_DATE) SL ON 1=1
       LEFT JOIN SP_GER_MOVFUNC(FUN.FUN_CODEMP, FUN.FUN_COD, CURRENT_DATE) SP ON 1=1
@@ -162,6 +180,7 @@ export async function buscarDetalheAtualFuncionario(
     return {
       salarioAtual: valor === null || valor === undefined ? null : Number(valor),
       cpf: formatarCpf(linha?.FUN_CPFNUM ?? null),
+      dataAdmissao: formatarDataIso(linha?.FUN_DTADM),
       departamento: linha?.DEPARTAMENTO ?? null,
       setor: linha?.SETOR ?? null,
     };

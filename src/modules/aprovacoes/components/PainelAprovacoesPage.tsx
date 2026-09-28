@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Home, PencilLine, ShieldOff, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ClipboardCheck, Eye, Home, PencilLine, ShieldOff, XCircle } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
+import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
@@ -23,14 +25,17 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Stack } from "@/components/ui/Stack";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
 import { Textarea } from "@/components/ui/Textarea";
+import { rotuloTipoAprovacao, type TipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 
 import { statusAprovacaoConfig } from "../constants/approval-status";
 import {
   aprovarItemAprovacao,
   buscarItemAprovacao,
+  decidirItensEmLote,
   listarItensPainel,
   reprovarItemAprovacao,
   type AjusteValoresDecisao,
+  type OrdemPainel,
 } from "../services/aprovacoes.service";
 import type { ItemAumentoSalarial, StatusAprovacao } from "../types/aprovacoes.types";
 
@@ -43,8 +48,22 @@ const OPCOES_STATUS: { value: FiltroStatus; label: string }[] = [
   { value: "todos", label: "Todos" },
 ];
 
+const OPCOES_ORDEM: { value: OrdemPainel; label: string }[] = [
+  { value: "fila", label: "Fila (pendentes primeiro)" },
+  { value: "colaborador", label: "Colaborador (A-Z)" },
+  { value: "recentes", label: "Mais recentes" },
+];
+
+const TODOS = "";
+
 function formatarData(valorIso: string): string {
   return new Date(valorIso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function formatarDataAdmissao(valorIso: string | null): string {
+  if (!valorIso) return "-";
+  const [ano, mes, dia] = valorIso.slice(0, 10).split("-");
+  return dia && mes && ano ? `${dia}/${mes}/${ano}` : "-";
 }
 
 function formatarMoeda(valor: number): string {
@@ -57,13 +76,26 @@ function formatarReajuste(valor: number, percentual: number): string {
 
 export function PainelAprovacoesPage() {
   const [itens, setItens] = useState<ItemAumentoSalarial[]>([]);
-  const [tiposAtendidos, setTiposAtendidos] = useState<string[]>([]);
+  const [tiposAtendidos, setTiposAtendidos] = useState<TipoAprovacao[]>([]);
+  const [departamentos, setDepartamentos] = useState<string[]>([]);
+  const [setores, setSetores] = useState<string[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState<string | null>(null);
+  const [avisoLote, setAvisoLote] = useState<string | null>(null);
 
   const [status, setStatus] = useState<FiltroStatus>("pendente");
+  const [tipo, setTipo] = useState<string>(TODOS);
+  const [departamento, setDepartamento] = useState(TODOS);
+  const [setor, setSetor] = useState(TODOS);
+  const [ordem, setOrdem] = useState<OrdemPainel>("fila");
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [busca, setBusca] = useState("");
+
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [acaoLote, setAcaoLote] = useState<"aprovar" | "reprovar" | null>(null);
+  const [comentarioLote, setComentarioLote] = useState("");
+  const [erroComentarioLote, setErroComentarioLote] = useState(false);
+  const [processandoLote, setProcessandoLote] = useState(false);
 
   const [itemIdSelecionado, setItemIdSelecionado] = useState<string | null>(null);
   const [detalhe, setDetalhe] = useState<ItemAumentoSalarial | null>(null);
@@ -86,23 +118,43 @@ export function PainelAprovacoesPage() {
     return () => clearTimeout(timer);
   }, [buscaDigitada]);
 
-  function carregarLista(filtroStatus: FiltroStatus, filtroBusca: string) {
+  function carregarLista() {
     setCarregando(true);
-    listarItensPainel({ status: filtroStatus, busca: filtroBusca }).then((resultado) => {
+    listarItensPainel({ status, busca, tipo, departamento, setor, ordem }).then((resultado) => {
       if (resultado.ok && resultado.data) {
         setItens(resultado.data.itens);
         setTiposAtendidos(resultado.data.tiposAtendidos);
+        setDepartamentos(resultado.data.departamentos);
+        setSetores(resultado.data.setores);
         setErroLista(null);
       } else {
         setErroLista(resultado.message ?? "Não foi possível carregar as pendências.");
       }
+      /* A seleção não sobrevive a uma troca de filtro: o que estava marcado pode nem estar mais na tela. */
+      setSelecionados([]);
       setCarregando(false);
     });
   }
 
-  useEffect(() => {
-    carregarLista(status, busca);
-  }, [status, busca]);
+  useEffect(carregarLista, [status, busca, tipo, departamento, setor, ordem]);
+
+  const pendentesVisiveis = useMemo(
+    () => itens.filter((item) => item.status === "pendente"),
+    [itens]
+  );
+
+  const todosSelecionados =
+    pendentesVisiveis.length > 0 && selecionados.length === pendentesVisiveis.length;
+
+  function alternarSelecao(itemId: string) {
+    setSelecionados((atual) =>
+      atual.includes(itemId) ? atual.filter((id) => id !== itemId) : [...atual, itemId]
+    );
+  }
+
+  function alternarTodos() {
+    setSelecionados(todosSelecionados ? [] : pendentesVisiveis.map((item) => item.id));
+  }
 
   function abrirDetalhe(itemId: string) {
     setItemIdSelecionado(itemId);
@@ -175,7 +227,7 @@ export function PainelAprovacoesPage() {
       if (resultado.ok) {
         setItemIdSelecionado(null);
         setDetalhe(null);
-        carregarLista(status, busca);
+        carregarLista();
       } else {
         setErroModal(resultado.message ?? "Não foi possível aprovar o colaborador.");
       }
@@ -205,13 +257,45 @@ export function PainelAprovacoesPage() {
         setConfirmandoReprovar(false);
         setItemIdSelecionado(null);
         setDetalhe(null);
-        carregarLista(status, busca);
+        carregarLista();
       } else {
         setErroModal(resultado.message ?? "Não foi possível reprovar o colaborador.");
         setConfirmandoReprovar(false);
       }
     } finally {
       setProcessando(false);
+    }
+  }
+
+  async function handleConfirmarLote() {
+    if (!acaoLote) return;
+
+    if (acaoLote === "reprovar" && !comentarioLote.trim()) {
+      setErroComentarioLote(true);
+      return;
+    }
+
+    setProcessandoLote(true);
+    setAvisoLote(null);
+
+    try {
+      const resultado = await decidirItensEmLote(
+        selecionados,
+        acaoLote,
+        comentarioLote.trim() || null
+      );
+
+      if (resultado.ok) {
+        setAvisoLote(resultado.message ?? null);
+        setAcaoLote(null);
+        setComentarioLote("");
+        carregarLista();
+      } else {
+        setErroLista(resultado.message ?? "Não foi possível concluir a decisão em lote.");
+        setAcaoLote(null);
+      }
+    } finally {
+      setProcessandoLote(false);
     }
   }
 
@@ -245,6 +329,43 @@ export function PainelAprovacoesPage() {
               />
             </Field>
 
+            {/* O painel atende vários tipos de aprovação -- hoje só um existe, mas a fila já sabe separar. */}
+            <Field label="Tipo de solicitação">
+              <Dropdown
+                value={tipo}
+                options={[
+                  { value: TODOS, label: "Todos os tipos" },
+                  ...tiposAtendidos.map((valor) => ({
+                    value: valor,
+                    label: rotuloTipoAprovacao(valor),
+                  })),
+                ]}
+                onValueChange={setTipo}
+              />
+            </Field>
+
+            <Field label="Departamento">
+              <Dropdown
+                value={departamento}
+                options={[
+                  { value: TODOS, label: "Todos os departamentos" },
+                  ...departamentos.map((nome) => ({ value: nome, label: nome })),
+                ]}
+                onValueChange={setDepartamento}
+              />
+            </Field>
+
+            <Field label="Setor">
+              <Dropdown
+                value={setor}
+                options={[
+                  { value: TODOS, label: "Todos os setores" },
+                  ...setores.map((nome) => ({ value: nome, label: nome })),
+                ]}
+                onValueChange={setSetor}
+              />
+            </Field>
+
             <Field label="Colaborador ou solicitante">
               <Input
                 value={buscaDigitada}
@@ -252,9 +373,51 @@ export function PainelAprovacoesPage() {
                 onChange={(event) => setBuscaDigitada(event.target.value)}
               />
             </Field>
+
+            <Field label="Ordenar por">
+              <Dropdown
+                value={ordem}
+                options={OPCOES_ORDEM}
+                onValueChange={(valor) => setOrdem(valor as OrdemPainel)}
+              />
+            </Field>
           </FormGrid>
 
           {erroLista && <Alert variant="danger">{erroLista}</Alert>}
+          {avisoLote && <Alert variant="success">{avisoLote}</Alert>}
+
+          {selecionados.length > 0 && (
+            <Stack direction="row" gap={12} align="center" justify="between" wrap>
+              <strong>{selecionados.length} colaborador(es) selecionado(s)</strong>
+
+              <Stack direction="row" gap={8} wrap>
+                <Button variant="secondary" onClick={() => setSelecionados([])}>
+                  Limpar seleção
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    setComentarioLote("");
+                    setErroComentarioLote(false);
+                    setAcaoLote("reprovar");
+                  }}
+                >
+                  <XCircle size={16} />
+                  Reprovar selecionados
+                </Button>
+                <Button
+                  onClick={() => {
+                    setComentarioLote("");
+                    setErroComentarioLote(false);
+                    setAcaoLote("aprovar");
+                  }}
+                >
+                  <CheckCircle2 size={16} />
+                  Aprovar selecionados
+                </Button>
+              </Stack>
+            </Stack>
+          )}
 
           {carregando ? (
             <Loader label="Carregando solicitações..." />
@@ -270,20 +433,45 @@ export function PainelAprovacoesPage() {
               title={busca ? "Nenhum resultado para essa busca" : "Nenhuma solicitação nesta situação"}
             />
           ) : (
-            <Table>
+            <Table minWidth={1250}>
               <TableHead>
                 <TableRow>
+                  <TableHeaderCell align="center">
+                    <Checkbox
+                      label=""
+                      aria-label="Selecionar todos os pendentes"
+                      checked={todosSelecionados}
+                      disabled={pendentesVisiveis.length === 0}
+                      onChange={alternarTodos}
+                    />
+                  </TableHeaderCell>
                   <TableHeaderCell>Nº</TableHeaderCell>
+                  <TableHeaderCell>Tipo</TableHeaderCell>
                   <TableHeaderCell>Colaborador</TableHeaderCell>
+                  <TableHeaderCell>Departamento / Setor</TableHeaderCell>
+                  <TableHeaderCell>Admissão</TableHeaderCell>
                   <TableHeaderCell>Solicitante</TableHeaderCell>
                   <TableHeaderCell>Enviada em</TableHeaderCell>
                   <TableHeaderCell align="center">Status</TableHeaderCell>
+                  <TableHeaderCell align="center">Ações</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {itens.map((item) => (
                   <TableRow key={item.id} style={{ cursor: "pointer" }} onClick={() => abrirDetalhe(item.id)}>
+                    <TableCell align="center">
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <Checkbox
+                          label=""
+                          aria-label={`Selecionar ${item.funcionarioNome}`}
+                          checked={selecionados.includes(item.id)}
+                          disabled={item.status !== "pendente"}
+                          onChange={() => alternarSelecao(item.id)}
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell>#{item.aprovacaoNumero}</TableCell>
+                    <TableCell>{rotuloTipoAprovacao(item.tipo)}</TableCell>
                     <TableCell>
                       <Stack direction="row" gap={8} align="center" wrap>
                         <span>{item.resumoTitulo}</span>
@@ -295,12 +483,31 @@ export function PainelAprovacoesPage() {
                         )}
                       </Stack>
                     </TableCell>
+                    <TableCell>
+                      {item.departamento ?? "-"}
+                      {item.setor ? ` / ${item.setor}` : ""}
+                    </TableCell>
+                    <TableCell>{formatarDataAdmissao(item.dataAdmissao)}</TableCell>
                     <TableCell>{item.criadoPorNome}</TableCell>
                     <TableCell>{formatarData(item.criadoEm)}</TableCell>
                     <TableCell align="center">
                       <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
                         {statusAprovacaoConfig[item.status].label}
                       </Badge>
+                    </TableCell>
+                    <TableCell align="center">
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <IconButton
+                          icon={<Eye size={15} />}
+                          label={
+                            item.status === "pendente"
+                              ? `Analisar ${item.funcionarioNome}`
+                              : `Ver ${item.funcionarioNome}`
+                          }
+                          size="small"
+                          onClick={() => abrirDetalhe(item.id)}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -356,6 +563,9 @@ export function PainelAprovacoesPage() {
               )}
 
               <FormGrid columns={2}>
+                <Field label="Tipo de solicitação">
+                  <span>{rotuloTipoAprovacao(detalhe.tipo)}</span>
+                </Field>
                 <Field label="Colaborador">
                   <span>{detalhe.funcionarioNome}</span>
                 </Field>
@@ -367,6 +577,9 @@ export function PainelAprovacoesPage() {
                 </Field>
                 <Field label="Setor">
                   <span>{detalhe.setor ?? "-"}</span>
+                </Field>
+                <Field label="Admissão">
+                  <span>{formatarDataAdmissao(detalhe.dataAdmissao)}</span>
                 </Field>
                 <Field label="Salário atual">
                   <span>{formatarMoeda(detalhe.salarioAtual)}</span>
@@ -488,6 +701,49 @@ export function PainelAprovacoesPage() {
           if (processando) return;
           setConfirmandoReprovar(false);
           setErroComentarioReprovar(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={acaoLote !== null}
+        title={
+          acaoLote === "reprovar"
+            ? `Reprovar ${selecionados.length} colaborador(es)?`
+            : `Aprovar ${selecionados.length} colaborador(es)?`
+        }
+        variant={acaoLote === "reprovar" ? "danger" : "warning"}
+        confirmLabel={acaoLote === "reprovar" ? "Reprovar todos" : "Aprovar todos"}
+        loading={processandoLote}
+        message={
+          <Stack gap={12}>
+            <span>
+              {acaoLote === "reprovar"
+                ? "O motivo abaixo será registrado em todos os colaboradores selecionados."
+                : "A decisão vale para todos os selecionados, com os valores como estão hoje — para ajustar valor ou percentual, decida o colaborador individualmente."}
+            </span>
+            <Textarea
+              rows={3}
+              value={comentarioLote}
+              onChange={(event) => {
+                setComentarioLote(event.target.value);
+                if (erroComentarioLote) setErroComentarioLote(false);
+              }}
+              placeholder={
+                acaoLote === "reprovar" ? "Motivo da reprovação (obrigatório)" : "Comentário (opcional)"
+              }
+              disabled={processandoLote}
+              hasError={erroComentarioLote}
+            />
+            {erroComentarioLote && (
+              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da reprovação.</span>
+            )}
+          </Stack>
+        }
+        onConfirm={handleConfirmarLote}
+        onClose={() => {
+          if (processandoLote) return;
+          setAcaoLote(null);
+          setErroComentarioLote(false);
         }}
       />
     </PageContainer>

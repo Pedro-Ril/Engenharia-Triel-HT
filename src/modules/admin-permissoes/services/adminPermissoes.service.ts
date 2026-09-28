@@ -12,6 +12,7 @@ import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 
 import type {
   AprovacaoAtendente,
+  ConfigAprovacoes,
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
@@ -1191,4 +1192,21 @@ export async function removerAtendenteAprovacao(
     method: "DELETE",
   });
   return parseResponse<null>(response);
+}
+
+export async function buscarConfigAprovacoes(): Promise<ApiEnvelope<ConfigAprovacoes>> {
+  const response = await fetch("/api/admin/aprovacoes/config");
+  return parseResponse<ConfigAprovacoes>(response);
+}
+
+export async function salvarConfigAprovacoes(dados: {
+  emailRelatorio: string | null;
+  urlPublica: string | null;
+}): Promise<ApiEnvelope<ConfigAprovacoes>> {
+  const response = await fetch("/api/admin/aprovacoes/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigAprovacoes>(response);
 }

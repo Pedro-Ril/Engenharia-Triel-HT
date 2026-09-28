@@ -8,6 +8,7 @@ import { aprovarItem } from "@/lib/aprovacoes/aprovacoes";
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
 import { notificarSolicitanteDecisao } from "@/lib/aprovacoes/notificacoes-email";
 import { optionalAjusteValores } from "@/lib/aprovacoes/validacao";
+import { origemPublicaEfetivaAprovacoes } from "@/lib/aprovacoes/config";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
 
@@ -43,7 +44,7 @@ async function handlePOST(request: Request, context: RouteContext) {
     });
 
     const solicitante = await buscarUsuarioPorId(item.criadoPorUsuarioId);
-    const origem = new URL(request.url).origin;
+    const origem = await origemPublicaEfetivaAprovacoes(request);
     await notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem);
 
     return NextResponse.json({ ok: true, message: "Colaborador aprovado.", data: item });

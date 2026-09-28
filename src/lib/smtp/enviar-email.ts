@@ -8,12 +8,19 @@ import type { PortalUsuario } from "@/lib/auth/usuarios";
 import { getConfiguracaoSmtp, type ConfiguracaoSmtp } from "./smtp-config";
 import { montarEmailHtml } from "./template-email";
 
+export interface AnexoEmail {
+  nomeArquivo: string;
+  conteudo: Buffer;
+  tipoConteudo: string;
+}
+
 export interface EnviarEmailParams {
   /* Aceita um ou vários endereços — vários destinatários viram um único e-mail com todos em "para". */
   destinatario: string | string[];
   assunto: string;
   corpoHtml: string;
   corpoTexto?: string;
+  anexos?: AnexoEmail[];
 }
 
 /*
@@ -63,6 +70,11 @@ export async function enviarEmailComConfig(
       subject: params.assunto,
       html: params.corpoHtml,
       text: params.corpoTexto,
+      attachments: params.anexos?.map((anexo) => ({
+        filename: anexo.nomeArquivo,
+        content: anexo.conteudo,
+        contentType: anexo.tipoConteudo,
+      })),
     });
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : "Erro desconhecido.";

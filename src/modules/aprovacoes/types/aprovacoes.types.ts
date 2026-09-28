@@ -11,6 +11,8 @@ export interface ItemAumentoSalarial {
   id: string;
   aprovacaoId: string;
   aprovacaoNumero: number;
+  /* De que tipo de aprovação este item é -- o painel atende vários. */
+  tipo: TipoAprovacao;
   /* Observação do LOTE inteiro, compartilhada por todos os colaboradores. */
   observacaoGeral: string | null;
   criadoPorUsuarioId: string;
@@ -21,6 +23,8 @@ export interface ItemAumentoSalarial {
   funcionarioCpf: string | null;
   departamento: string | null;
   setor: string | null;
+  /* "YYYY-MM-DD" -- data de admissão do colaborador no RH, congelada na criação. */
+  dataAdmissao: string | null;
   salarioAtual: number;
   valorReajuste: number;
   percentualReajuste: number;
@@ -59,4 +63,5 @@ export interface FuncionarioRh {
 export interface DetalheAtualFuncionario {
   salarioAtual: number;
   cpf: string | null;
+  dataAdmissao: string | null;
 }

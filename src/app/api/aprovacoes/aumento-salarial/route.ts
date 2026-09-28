@@ -10,6 +10,7 @@ import {
 } from "@/lib/aprovacoes/aprovacoes";
 import { buscarEscopoUsuario, validarEscopoOuFalhar } from "@/lib/aprovacoes/escopo-colaboradores";
 import { notificarDirecaoNovaSolicitacao } from "@/lib/aprovacoes/notificacoes-email";
+import { origemPublicaEfetivaAprovacoes } from "@/lib/aprovacoes/config";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
 
@@ -32,6 +33,13 @@ function requiredNumber(value: unknown, fieldName: string): number {
   return numero;
 }
 
+/* Só aceita "YYYY-MM-DD" -- é o formato que a tela recebe do RH e devolve aqui; qualquer outra coisa entra como nulo em vez de sujar a coluna DATE. */
+function optionalDataIso(valor: unknown): string | null {
+  if (typeof valor !== "string" || !valor.trim()) return null;
+  const texto = valor.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : null;
+}
+
 function parseItem(valor: unknown, indice: number): ItemCriarSolicitacaoParams {
   if (!isObject(valor)) {
     throw new ValidationError(`O colaborador na posição ${indice + 1} está com formato inválido.`);
@@ -43,6 +51,7 @@ function parseItem(valor: unknown, indice: number): ItemCriarSolicitacaoParams {
     funcionarioCpf: optionalText(valor.funcionarioCpf, "CPF", 14),
     departamento: optionalText(valor.departamento, "departamento", 200),
     setor: optionalText(valor.setor, "setor", 200),
+    dataAdmissao: optionalDataIso(valor.dataAdmissao),
     salarioAtual: requiredNumber(valor.salarioAtual, "salário atual"),
     valorReajuste: requiredNumber(valor.valorReajuste, "valor do reajuste"),
     percentualReajuste: requiredNumber(valor.percentualReajuste, "percentual do reajuste"),
@@ -90,7 +99,7 @@ async function handlePOST(request: Request) {
       ipOrigem: extrairIpOrigem(request),
     });
 
-    const origem = new URL(request.url).origin;
+    const origem = await origemPublicaEfetivaAprovacoes(request);
     await notificarDirecaoNovaSolicitacao(lote, origem);
 
     return NextResponse.json(
