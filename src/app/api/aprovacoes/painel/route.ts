@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 
 import { acessoPainelAprovacoes } from "@/lib/aprovacoes/autorizacao-aprovacoes";
 import {
+  contarPendentesPorTipo,
   listarItensPainel,
   listarOpcoesFiltroPainel,
+  listarSolicitacoesPainel,
   type FiltrosPainel,
   type OrdemPainel,
   type StatusItemAprovacao,
 } from "@/lib/aprovacoes/aprovacoes";
+import { buscarConfigAprovacoes } from "@/lib/aprovacoes/config";
 import { ehTipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -36,14 +39,24 @@ async function handleGET(request: Request) {
   };
 
   try {
-    const [itens, opcoes] = await Promise.all([
+    const [itens, solicitacoes, opcoes, pendentesPorTipo, config] = await Promise.all([
       listarItensPainel(acesso.tiposAtendidos, filtros),
+      listarSolicitacoesPainel(acesso.tiposAtendidos, filtros),
       listarOpcoesFiltroPainel(acesso.tiposAtendidos),
+      contarPendentesPorTipo(acesso.tiposAtendidos),
+      buscarConfigAprovacoes(),
     ]);
 
     return NextResponse.json({
       ok: true,
-      data: { itens, tiposAtendidos: acesso.tiposAtendidos, ...opcoes },
+      data: {
+        itens,
+        solicitacoes,
+        tiposAtendidos: acesso.tiposAtendidos,
+        pendentesPorTipo,
+        modoPadrao: config.modoPainelPadrao,
+        ...opcoes,
+      },
     });
   } catch (error) {
     console.error("Erro ao listar itens do painel de aprovações:", error);

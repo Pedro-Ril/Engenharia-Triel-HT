@@ -52,6 +52,11 @@
   max-width: 1200px;
 }
 
+/* Para tabela larga dentro do modal (ex: decidir uma solicitação inteira, colaborador a colaborador). */
+.xlarge {
+  max-width: 1440px;
+}
+
 .header {
   display: flex;
   align-items: flex-start;

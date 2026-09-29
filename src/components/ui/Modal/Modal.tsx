@@ -10,7 +10,7 @@ import styles from "./Modal.module.css";
 const SELETOR_FOCAVEL =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-type ModalSize = "small" | "medium" | "large";
+type ModalSize = "small" | "medium" | "large" | "xlarge";
 
 interface ModalProps {
   open: boolean;

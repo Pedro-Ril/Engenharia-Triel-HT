@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalText } from "@/lib/auth/validation";
-import { buscarConfigAprovacoes, salvarConfigAprovacoes } from "@/lib/aprovacoes/config";
+import {
+  buscarConfigAprovacoes,
+  salvarConfigAprovacoes,
+  type ModoPainel,
+} from "@/lib/aprovacoes/config";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -38,8 +42,10 @@ async function handlePUT(request: Request) {
 
     const emailRelatorio = optionalText(body.emailRelatorio, "e-mail do relatório", 200);
     const urlPublica = optionalText(body.urlPublica, "URL pública", 300);
+    const modoPainelPadrao = (body.modoPainelPadrao ?? "colaborador") as ModoPainel;
+
     const config = await salvarConfigAprovacoes(
-      { emailRelatorio, urlPublica },
+      { emailRelatorio, urlPublica, modoPainelPadrao },
       acesso.usuario.nomeExibicao
     );
 

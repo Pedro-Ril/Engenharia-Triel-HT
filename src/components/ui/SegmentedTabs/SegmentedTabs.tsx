@@ -6,7 +6,8 @@ import styles from "./SegmentedTabs.module.css";
 
 export interface SegmentedTabsItem<T extends string> {
   valor: T;
-  label: string;
+  /* Nó, e não só texto, pra uma aba poder carregar contador (ex: pendências na fila). */
+  label: ReactNode;
   icon?: ReactNode;
 }
 

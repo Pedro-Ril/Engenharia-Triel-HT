@@ -128,9 +128,12 @@ export interface RegraEscopo {
 }
 
 /* Configuração do módulo de aprovações: para onde vai o relatório que o solicitante dispara. */
+export type ModoPainelAprovacoes = "colaborador" | "solicitacao";
+
 export interface ConfigAprovacoes {
   emailRelatorio: string | null;
   urlPublica: string | null;
+  modoPainelPadrao: ModoPainelAprovacoes;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }

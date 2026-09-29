@@ -6,6 +6,8 @@ import type { PortalUsuario } from "@/lib/auth/usuarios";
 
 import type { TipoAprovacao } from "./tipos-aprovacao";
 
+export const MAXIMO_COLABORADORES_POR_SOLICITACAO = 100;
+
 export type StatusItemAprovacao = "pendente" | "aprovado" | "reprovado";
 
 export type { TipoAprovacao };
@@ -56,6 +58,8 @@ export interface ItemAumentoSalarial {
   comentarioDecisao: string | null;
   /* Texto curto pronto pra lista (ex: "João Silva — +R$ 500,00 (8%)"). */
   resumoTitulo: string;
+  /* Último envio do relatório da SOLICITAÇÃO (repetido em cada item dela). */
+  relatorioEnviado: EnvioRelatorio | null;
 }
 
 export interface AprovacaoLote {
@@ -67,6 +71,34 @@ export interface AprovacaoLote {
   criadoPorNome: string;
   criadoEm: string;
   itens: ItemAumentoSalarial[];
+}
+
+export interface EnvioRelatorio {
+  em: string;
+  por: string;
+  para: string;
+}
+
+/* Marca o último envio do relatório -- a tela usa isso pra dizer que já foi e evitar reenvio às cegas. */
+export async function registrarEnvioRelatorio(
+  numero: number,
+  enviadoPor: string,
+  enviadoPara: string
+): Promise<void> {
+  const pool = await getSqlServerPool();
+
+  await pool
+    .request()
+    .input("numero", sql.Int, numero)
+    .input("por", sql.NVarChar(200), enviadoPor)
+    .input("para", sql.NVarChar(200), enviadoPara)
+    .query(`
+      UPDATE dbo.portal_aprovacoes
+      SET [relatorio_enviado_em] = SYSDATETIME(),
+          [relatorio_enviado_por] = @por,
+          [relatorio_enviado_para] = @para
+      WHERE [numero] = @numero;
+    `);
 }
 
 interface ItemRow {
@@ -96,6 +128,9 @@ interface ItemRow {
   decidido_em: string | null;
   comentario_decisao: string | null;
   observacao: string | null;
+  relatorio_enviado_em: string | null;
+  relatorio_enviado_por: string | null;
+  relatorio_enviado_para: string | null;
 }
 
 const colunasItem = `
@@ -107,6 +142,9 @@ const colunasItem = `
   CONVERT(VARCHAR(36), a.[criado_por_usuario_id]) AS [criado_por_usuario_id],
   a.[criado_por_nome],
   CONVERT(VARCHAR(33), a.[criado_em], 126) AS [criado_em],
+  CONVERT(VARCHAR(33), a.[relatorio_enviado_em], 126) AS [relatorio_enviado_em],
+  a.[relatorio_enviado_por],
+  a.[relatorio_enviado_para],
   i.[funcionario_codigo],
   i.[funcionario_nome],
   i.[funcionario_cpf],
@@ -160,6 +198,13 @@ function mapItemRow(row: ItemRow): ItemAumentoSalarial {
     decididoEm: row.decidido_em,
     comentarioDecisao: row.comentario_decisao,
     resumoTitulo: `${row.funcionario_nome} — +${formatarMoeda(row.valor_reajuste)} (${Number(row.percentual_reajuste).toFixed(2)}%)`,
+    relatorioEnviado: row.relatorio_enviado_em
+      ? {
+          em: row.relatorio_enviado_em,
+          por: row.relatorio_enviado_por ?? "-",
+          para: row.relatorio_enviado_para ?? "-",
+        }
+      : null,
   };
 }
 
@@ -192,6 +237,17 @@ export async function criarSolicitacaoAumentoSalarial(
 ): Promise<AprovacaoLote> {
   if (!params.itens || params.itens.length === 0) {
     throw new ValidationError("Adicione ao menos um colaborador à solicitação.");
+  }
+
+  /*
+   * Teto para não existir solicitação impossível de decidir e de
+   * relatar: cada colaborador vira uma linha no painel, uma decisão
+   * individual e uma linha no PDF/Excel do relatório.
+   */
+  if (params.itens.length > MAXIMO_COLABORADORES_POR_SOLICITACAO) {
+    throw new ValidationError(
+      `Uma solicitação aceita no máximo ${MAXIMO_COLABORADORES_POR_SOLICITACAO} colaboradores. Divida em mais de uma.`
+    );
   }
 
   const codigosVistos = new Set<string>();
@@ -401,6 +457,137 @@ export async function listarItensPainel(
   `);
 
   return result.recordset.map(mapItemRow);
+}
+
+export interface SolicitacaoResumoPainel {
+  numero: number;
+  tipo: TipoAprovacao;
+  criadoPorNome: string;
+  criadoEm: string;
+  totalItens: number;
+  totalReajuste: number;
+  pendentes: number;
+}
+
+/*
+ * Resumo por SOLICITAÇÃO para o modo agrupado do painel.
+ *
+ * Os filtros decidem QUAIS solicitações aparecem (basta um colaborador
+ * dentro dela bater), mas as contagens são sempre sobre a solicitação
+ * INTEIRA. Somar só o que passou pelo filtro faria um lote de 5 com 3
+ * já decididos aparecer como "2 colaboradores", e o modal -- que busca
+ * o lote completo -- contradiria a lista.
+ */
+export async function listarSolicitacoesPainel(
+  tiposAtendidos: TipoAprovacao[],
+  filtros: FiltrosPainel = {}
+): Promise<SolicitacaoResumoPainel[]> {
+  if (tiposAtendidos.length === 0) return [];
+
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  const parametrosTipo = tiposAtendidos.map((tipo, indice) => {
+    const nome = `tipo${indice}`;
+    request.input(nome, sql.VarChar(40), tipo);
+    return `@${nome}`;
+  });
+
+  const status = filtros.status ?? "pendente";
+  request.input("status", sql.VarChar(20), status === "todos" ? "" : status);
+
+  const busca = (filtros.busca ?? "").trim();
+  request.input("busca", sql.NVarChar(200), busca);
+  request.input("buscaLike", sql.NVarChar(204), `%${busca}%`);
+  request.input("tipoFiltro", sql.VarChar(40), (filtros.tipo ?? "").trim());
+  request.input("departamento", sql.NVarChar(200), (filtros.departamento ?? "").trim());
+  request.input("setor", sql.NVarChar(200), (filtros.setor ?? "").trim());
+
+  const result = await request.query<{
+    numero: number;
+    tipo: TipoAprovacao;
+    criado_por_nome: string;
+    criado_em: string;
+    total_itens: number;
+    total_reajuste: number;
+    pendentes: number;
+  }>(`
+    SELECT
+      a.[numero],
+      a.[tipo],
+      a.[criado_por_nome],
+      CONVERT(VARCHAR(33), a.[criado_em], 126) AS [criado_em],
+      COUNT(*) AS [total_itens],
+      SUM(i.[valor_reajuste]) AS [total_reajuste],
+      SUM(CASE WHEN i.[status] = 'pendente' THEN 1 ELSE 0 END) AS [pendentes]
+    FROM dbo.portal_aprovacoes AS a
+    INNER JOIN dbo.portal_aprovacoes_aumento_salarial AS i ON i.[aprovacao_id] = a.[id]
+    WHERE a.[tipo] IN (${parametrosTipo.join(", ")})
+      AND EXISTS (
+        SELECT 1
+        FROM dbo.portal_aprovacoes_aumento_salarial AS f
+        WHERE f.[aprovacao_id] = a.[id]
+          AND (@status = '' OR f.[status] = @status)
+          AND (@tipoFiltro = '' OR a.[tipo] = @tipoFiltro)
+          AND (@departamento = '' OR f.[departamento] = @departamento)
+          AND (@setor = '' OR f.[setor] = @setor)
+          AND (
+            @busca = ''
+            OR f.[funcionario_nome] LIKE @buscaLike
+            OR a.[criado_por_nome] LIKE @buscaLike
+          )
+      )
+    GROUP BY a.[numero], a.[tipo], a.[criado_por_nome], a.[criado_em]
+    ORDER BY
+      CASE WHEN SUM(CASE WHEN i.[status] = 'pendente' THEN 1 ELSE 0 END) > 0 THEN 0 ELSE 1 END,
+      a.[criado_em] DESC;
+  `);
+
+  return result.recordset.map((row) => ({
+    numero: row.numero,
+    tipo: row.tipo,
+    criadoPorNome: row.criado_por_nome,
+    criadoEm: row.criado_em,
+    totalItens: row.total_itens,
+    totalReajuste: Number(row.total_reajuste),
+    pendentes: row.pendentes,
+  }));
+}
+
+/*
+ * Quantas pendências cada tipo tem, sem considerar os filtros da tela.
+ * É o contador das abas por tipo: com a fila separada por módulo, é o
+ * que impede uma solicitação de ficar esquecida numa aba que ninguém
+ * abriu.
+ */
+export async function contarPendentesPorTipo(
+  tiposAtendidos: TipoAprovacao[]
+): Promise<Record<string, number>> {
+  if (tiposAtendidos.length === 0) return {};
+
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  const parametrosTipo = tiposAtendidos.map((tipo, indice) => {
+    const nome = `tipo${indice}`;
+    request.input(nome, sql.VarChar(40), tipo);
+    return `@${nome}`;
+  });
+
+  const result = await request.query<{ tipo: string; total: number }>(`
+    SELECT a.[tipo], COUNT(*) AS [total]
+    FROM dbo.portal_aprovacoes_aumento_salarial AS i
+    INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = i.[aprovacao_id]
+    WHERE a.[tipo] IN (${parametrosTipo.join(", ")})
+      AND i.[status] = 'pendente'
+    GROUP BY a.[tipo];
+  `);
+
+  const contagem: Record<string, number> = {};
+  for (const tipo of tiposAtendidos) contagem[tipo] = 0;
+  for (const row of result.recordset) contagem[row.tipo] = row.total;
+
+  return contagem;
 }
 
 /* Alimenta os dropdowns do painel: só o que realmente aparece na fila de quem está olhando. */

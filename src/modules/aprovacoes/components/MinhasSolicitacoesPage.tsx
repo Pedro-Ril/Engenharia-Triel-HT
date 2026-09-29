@@ -19,8 +19,12 @@ import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
+import { rotuloTipoAprovacao, type TipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
+
+import { AbasTipoAprovacao } from "./AbasTipoAprovacao";
 
 import { statusAprovacaoConfig } from "../constants/approval-status";
 import { enviarRelatorioSolicitacao, listarMinhasSolicitacoes } from "../services/aprovacoes.service";
@@ -42,11 +46,14 @@ const OPCOES_ORDEM: { value: OrdemMinhas; label: string }[] = [
 ];
 
 const TODOS = "";
+const POR_PAGINA = 15;
 
 /* Uma solicitação e os colaboradores dentro dela -- é assim que a tela pensa agora. */
 interface Solicitacao {
   numero: number;
+  tipo: TipoAprovacao;
   criadoEm: string;
+  relatorioEnviado: { em: string; por: string; para: string } | null;
   observacaoGeral: string | null;
   itens: ItemAumentoSalarial[];
   pendentes: number;
@@ -102,10 +109,12 @@ export function MinhasSolicitacoesPage() {
   const [detalhe, setDetalhe] = useState<Solicitacao | null>(null);
 
   const [status, setStatus] = useState<FiltroStatus>("todos");
+  const [tipo, setTipo] = useState<string>(TODOS);
   const [departamento, setDepartamento] = useState(TODOS);
   const [setor, setSetor] = useState(TODOS);
   const [ordem, setOrdem] = useState<OrdemMinhas>("recentes");
   const [busca, setBusca] = useState("");
+  const [pagina, setPagina] = useState(1);
 
   const [enviandoRelatorio, setEnviandoRelatorio] = useState<number | null>(null);
   const [feedbackRelatorio, setFeedbackRelatorio] = useState<{
@@ -119,6 +128,20 @@ export function MinhasSolicitacoesPage() {
       setCarregando(false);
     });
   }, []);
+
+  const tipos = useMemo(() => {
+    const valores = new Set(itens.map((item) => item.tipo));
+    return Array.from(valores).sort((a, b) =>
+      rotuloTipoAprovacao(a).localeCompare(rotuloTipoAprovacao(b), "pt-BR")
+    );
+  }, [itens]);
+
+  /* A lista é sempre de UM módulo, como no painel: a aba escolhe qual. */
+  useEffect(() => {
+    if (tipos.length > 0 && !tipos.includes(tipo as TipoAprovacao)) {
+      setTipo(tipos[0]);
+    }
+  }, [tipos, tipo]);
 
   const departamentos = useMemo(() => {
     const valores = new Set(itens.map((item) => item.departamento).filter(Boolean) as string[]);
@@ -140,7 +163,9 @@ export function MinhasSolicitacoesPage() {
       if (!solicitacao) {
         solicitacao = {
           numero: item.aprovacaoNumero,
+          tipo: item.tipo,
           criadoEm: item.criadoEm,
+          relatorioEnviado: item.relatorioEnviado,
           observacaoGeral: item.observacaoGeral,
           itens: [],
           pendentes: 0,
@@ -163,6 +188,19 @@ export function MinhasSolicitacoesPage() {
     return Array.from(mapa.values());
   }, [itens]);
 
+  /* Quantas solicitações de cada tipo ainda esperam a direção -- é o badge da aba. */
+  const aguardandoPorTipo = useMemo(() => {
+    const contagem: Record<string, number> = {};
+
+    for (const solicitacao of solicitacoes) {
+      if (solicitacao.pendentes > 0) {
+        contagem[solicitacao.tipo] = (contagem[solicitacao.tipo] ?? 0) + 1;
+      }
+    }
+
+    return contagem;
+  }, [solicitacoes]);
+
   /*
    * Os filtros continuam sendo sobre COLABORADOR (departamento, setor,
    * nome): a solicitação fica na lista quando pelo menos um colaborador
@@ -174,13 +212,20 @@ export function MinhasSolicitacoesPage() {
     const termo = busca.trim().toLowerCase();
 
     const filtradas = solicitacoes.filter((solicitacao) => {
-      if (termo && String(solicitacao.numero).includes(termo)) return true;
+      if (tipo && solicitacao.tipo !== tipo) return false;
+
+      /*
+       * Buscar pelo número satisfaz o termo, mas NÃO dispensa os demais
+       * filtros -- senão "Com aprovados" + busca "1" traria qualquer
+       * solicitação cujo número contenha 1, aprovada ou não.
+       */
+      const numeroCasa = termo.length > 0 && String(solicitacao.numero).includes(termo);
 
       return solicitacao.itens.some((item) => {
         if (status !== "todos" && item.status !== status) return false;
         if (departamento && item.departamento !== departamento) return false;
         if (setor && item.setor !== setor) return false;
-        if (termo && !item.funcionarioNome.toLowerCase().includes(termo)) return false;
+        if (termo && !numeroCasa && !item.funcionarioNome.toLowerCase().includes(termo)) return false;
         return true;
       });
     });
@@ -190,7 +235,19 @@ export function MinhasSolicitacoesPage() {
         ? b.criadoEm.localeCompare(a.criadoEm)
         : a.criadoEm.localeCompare(b.criadoEm)
     );
-  }, [solicitacoes, status, departamento, setor, ordem, busca]);
+  }, [solicitacoes, status, tipo, departamento, setor, ordem, busca]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [status, tipo, departamento, setor, ordem, busca]);
+
+  /* Paginação no cliente: a lista do próprio usuário já veio inteira; o que incomoda é a rolagem sem fim. */
+  const totalPaginas = Math.max(1, Math.ceil(solicitacoesFiltradas.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const solicitacoesPagina = solicitacoesFiltradas.slice(
+    (paginaAtual - 1) * POR_PAGINA,
+    (paginaAtual - 1) * POR_PAGINA + POR_PAGINA
+  );
 
   function podeEnviarRelatorio(solicitacao: Solicitacao): boolean {
     return solicitacao.pendentes === 0 && solicitacao.aprovados > 0;
@@ -209,6 +266,12 @@ export function MinhasSolicitacoesPage() {
           resultado.message ??
           (resultado.ok ? "Relatório enviado." : "Não foi possível enviar o relatório."),
       });
+
+      /* Recarrega pra trazer o registro do envio (quem mandou, quando, pra onde). */
+      if (resultado.ok) {
+        const atualizada = await listarMinhasSolicitacoes();
+        if (atualizada.ok && atualizada.data) setItens(atualizada.data);
+      }
     } finally {
       setEnviandoRelatorio(null);
     }
@@ -239,6 +302,14 @@ export function MinhasSolicitacoesPage() {
 
       <Card>
         <Stack gap={16}>
+          <AbasTipoAprovacao
+            tipos={tipos}
+            ativo={tipo}
+            contagem={aguardandoPorTipo}
+            onSelecionar={setTipo}
+            rotuloAcessivel="Tipo de solicitação"
+          />
+
           <FormGrid columns={3}>
             <Field label="Situação">
               <Dropdown
@@ -298,10 +369,11 @@ export function MinhasSolicitacoesPage() {
           ) : solicitacoesFiltradas.length === 0 ? (
             <EmptyState icon={<TrendingUp size={28} />} title="Nenhuma solicitação com esses filtros" />
           ) : (
-            <Table minWidth={900}>
+            <Table minWidth={1000}>
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Nº</TableHeaderCell>
+                  <TableHeaderCell>Tipo</TableHeaderCell>
                   <TableHeaderCell>Colaboradores</TableHeaderCell>
                   <TableHeaderCell>Enviada em</TableHeaderCell>
                   <TableHeaderCell align="center">Situação</TableHeaderCell>
@@ -310,7 +382,7 @@ export function MinhasSolicitacoesPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {solicitacoesFiltradas.map((solicitacao) => {
+                {solicitacoesPagina.map((solicitacao) => {
                   const concluida = solicitacao.pendentes === 0;
 
                   return (
@@ -320,6 +392,7 @@ export function MinhasSolicitacoesPage() {
                       onClick={() => setDetalhe(solicitacao)}
                     >
                       <TableCell>#{solicitacao.numero}</TableCell>
+                      <TableCell>{rotuloTipoAprovacao(solicitacao.tipo)}</TableCell>
                       <TableCell>
                         {solicitacao.itens.length === 1
                           ? solicitacao.itens[0].funcionarioNome
@@ -344,9 +417,11 @@ export function MinhasSolicitacoesPage() {
                             <IconButton
                               icon={<Mail size={15} />}
                               label={
-                                podeEnviarRelatorio(solicitacao)
-                                  ? `Enviar relatório da solicitação #${solicitacao.numero}`
-                                  : "O relatório fica disponível quando a direção decidir todos os colaboradores e houver ao menos um aprovado"
+                                !podeEnviarRelatorio(solicitacao)
+                                  ? "O relatório fica disponível quando a direção decidir todos os colaboradores e houver ao menos um aprovado"
+                                  : solicitacao.relatorioEnviado
+                                    ? `Reenviar relatório — último envio em ${formatarData(solicitacao.relatorioEnviado.em)} por ${solicitacao.relatorioEnviado.por} para ${solicitacao.relatorioEnviado.para}`
+                                    : `Enviar relatório da solicitação #${solicitacao.numero}`
                               }
                               size="small"
                               disabled={
@@ -363,6 +438,12 @@ export function MinhasSolicitacoesPage() {
                 })}
               </TableBody>
             </Table>
+          )}
+
+          {!carregando && totalPaginas > 1 && (
+            <Stack direction="row" justify="center">
+              <Pagination page={paginaAtual} totalPages={totalPaginas} onPageChange={setPagina} />
+            </Stack>
           )}
         </Stack>
       </Card>
@@ -384,7 +465,7 @@ export function MinhasSolicitacoesPage() {
                 onClick={() => handleEnviarRelatorio(detalhe.numero)}
               >
                 <Mail size={16} />
-                Enviar relatório
+                {detalhe.relatorioEnviado ? "Reenviar relatório" : "Enviar relatório"}
               </Button>
             </Stack>
           )
@@ -393,6 +474,9 @@ export function MinhasSolicitacoesPage() {
         {detalhe && (
           <Stack gap={16}>
             <FormGrid columns={3}>
+              <Field label="Tipo de solicitação">
+                <span>{rotuloTipoAprovacao(detalhe.tipo)}</span>
+              </Field>
               <Field label="Enviada em">
                 <span>{formatarData(detalhe.criadoEm)}</span>
               </Field>
@@ -408,6 +492,14 @@ export function MinhasSolicitacoesPage() {
               <Field label="Observação geral da solicitação">
                 <p>{detalhe.observacaoGeral}</p>
               </Field>
+            )}
+
+            {detalhe.relatorioEnviado && (
+              <Alert variant="info">
+                Relatório enviado em {formatarData(detalhe.relatorioEnviado.em)} por{" "}
+                {detalhe.relatorioEnviado.por} para {detalhe.relatorioEnviado.para}. Enviar de novo
+                gera novos anexos, com uma senha nova.
+              </Alert>
             )}
 
             {!podeEnviarRelatorio(detalhe) && (

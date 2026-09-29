@@ -74,9 +74,27 @@ export interface FiltrosPainel {
 }
 
 /* `tiposAtendidos` vazio = o usuário abre a tela mas ainda não é aprovador de nenhum tipo (é o que diferencia "fila vazia" de "sem cadastro"). */
+export type ModoPainel = "colaborador" | "solicitacao";
+
+/* Resumo por solicitação, com contagens sobre o lote INTEIRO (o filtro decide quais aparecem, não o que é somado). */
+export interface SolicitacaoResumoPainel {
+  numero: number;
+  tipo: TipoAprovacao;
+  criadoPorNome: string;
+  criadoEm: string;
+  totalItens: number;
+  totalReajuste: number;
+  pendentes: number;
+}
+
 export interface RespostaPainel {
   itens: ItemAumentoSalarial[];
+  solicitacoes: SolicitacaoResumoPainel[];
   tiposAtendidos: TipoAprovacao[];
+  /* Pendências por tipo, ignorando os filtros -- alimenta o contador das abas. */
+  pendentesPorTipo: Record<string, number>;
+  /* Com o que a tela abre, definido pelo admin -- o usuário pode trocar depois. */
+  modoPadrao: ModoPainel;
   /* Valores que existem na fila de quem está olhando -- alimentam os dropdowns. */
   departamentos: string[];
   setores: string[];
@@ -154,5 +172,11 @@ export async function decidirItensEmLote(
 /* Relatório dos colaboradores APROVADOS, enviado para o e-mail configurado na administração. */
 export async function enviarRelatorioSolicitacao(numero: number): Promise<ApiEnvelope<null>> {
   const response = await fetch(`/api/aprovacoes/${numero}/relatorio`, { method: "POST" });
+  return parseResponse(response);
+}
+
+/* A solicitação inteira, com todos os colaboradores -- usada pelo modo agrupado do painel. */
+export async function buscarLoteAprovacao(numero: number): Promise<ApiEnvelope<AprovacaoLote>> {
+  const response = await fetch(`/api/aprovacoes/${numero}`);
   return parseResponse(response);
 }

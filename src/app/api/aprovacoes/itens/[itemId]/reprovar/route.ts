@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
@@ -50,7 +50,12 @@ async function handlePOST(request: Request, context: RouteContext) {
 
     const solicitante = await buscarUsuarioPorId(item.criadoPorUsuarioId);
     const origem = await origemPublicaEfetivaAprovacoes(request);
-    await notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem);
+    /*
+     * O aviso sai DEPOIS da resposta (after do Next): e-mail aqui já é
+     * "melhor esforço" -- falha vira log e nunca derruba a ação --
+     * então não faz sentido segurar a tela esperando o SMTP.
+     */
+    after(() => notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem));
 
     return NextResponse.json({ ok: true, message: "Colaborador reprovado.", data: item });
   } catch (error) {

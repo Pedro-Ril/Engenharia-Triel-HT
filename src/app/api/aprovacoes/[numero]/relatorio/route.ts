@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
-import { montarRelatorioSolicitacao } from "@/lib/aprovacoes/aprovacoes";
+import { montarRelatorioSolicitacao, registrarEnvioRelatorio } from "@/lib/aprovacoes/aprovacoes";
 import {
   buscarConfigAprovacoes,
   origemPublicaEfetivaAprovacoes,
@@ -39,12 +39,13 @@ async function handlePOST(request: Request, context: RouteContext) {
 
     if (!config.emailRelatorio) {
       throw new ValidationError(
-        "Nenhum e-mail de destino configurado para o relatório — peça ao administrador em Administração → Diretoria → Relatório."
+        "Nenhum e-mail de destino configurado para o relatório — peça ao administrador em Administração → Diretoria → Configurações."
       );
     }
 
     const relatorio = await montarRelatorioSolicitacao(numero, usuario.id);
     await enviarRelatorioSolicitacao(relatorio, config.emailRelatorio, await origemPublicaEfetivaAprovacoes(request));
+    await registrarEnvioRelatorio(numero, usuario.nomeExibicao, config.emailRelatorio);
 
     await registrarLog({
       nivel: "info",

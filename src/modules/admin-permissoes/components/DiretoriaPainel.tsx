@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Gavel, Mail, ShieldCheck } from "lucide-react";
+import { Gavel, Settings, ShieldCheck } from "lucide-react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
@@ -25,12 +25,12 @@ interface DiretoriaPainelProps {
  * Tipos novos de aprovação aparecem sozinhos na aba de aprovadores; se
  * precisarem de escopo próprio, entram como uma aba nova aqui.
  */
-type AbaDiretoria = "escopo" | "aprovadores" | "relatorio";
+type AbaDiretoria = "escopo" | "aprovadores" | "configuracoes";
 
 const ABAS: { valor: AbaDiretoria; label: string; icon: typeof ShieldCheck }[] = [
   { valor: "escopo", label: "Reajuste Salarial", icon: ShieldCheck },
   { valor: "aprovadores", label: "Aprovadores", icon: Gavel },
-  { valor: "relatorio", label: "Relatório", icon: Mail },
+  { valor: "configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export function DiretoriaPainel({ usuarios, permissoes, modulos, onFeedback }: DiretoriaPainelProps) {
@@ -67,7 +67,7 @@ export function DiretoriaPainel({ usuarios, permissoes, modulos, onFeedback }: D
           />
         )}
 
-        {aba === "relatorio" && <AprovacoesConfigPainel onFeedback={onFeedback} />}
+        {aba === "configuracoes" && <AprovacoesConfigPainel onFeedback={onFeedback} />}
       </div>
     </>
   );

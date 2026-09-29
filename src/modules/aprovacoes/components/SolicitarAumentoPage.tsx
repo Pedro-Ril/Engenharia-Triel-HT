@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Home, ListChecks, Trash2, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Home,
+  ListChecks,
+  RotateCcw,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -30,6 +38,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { buscarSalarioFuncionario, criarSolicitacaoAumento } from "../services/aprovacoes.service";
 import type { FuncionarioRh } from "../types/aprovacoes.types";
 import { AdicionarColaboradorField } from "./AdicionarColaboradorField";
+import styles from "./SolicitarAumentoPage.module.css";
 
 function formatarDataAdmissao(valorIso: string | null): string {
   if (!valorIso) return "-";
@@ -64,26 +73,20 @@ export function SolicitarAumentoPage() {
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [numeroCriado, setNumeroCriado] = useState<number | null>(null);
 
-  function handleAdicionar(funcionario: FuncionarioRh) {
-    setLinhas((atual) => [
-      ...atual,
-      {
-        funcionario,
-        salarioAtual: null,
-        carregandoSalario: true,
-        erroSalario: null,
-        cpf: null,
-        dataAdmissao: null,
-        valorReajuste: "",
-        percentualReajuste: "",
-        observacao: "",
-      },
-    ]);
+  /* Separada de handleAdicionar pra poder repetir quando o RH falha, sem tirar e recolocar o colaborador. */
+  function buscarDadosDoRh(codigo: string) {
+    setLinhas((atual) =>
+      atual.map((linha) =>
+        linha.funcionario.codigo === codigo
+          ? { ...linha, carregandoSalario: true, erroSalario: null }
+          : linha
+      )
+    );
 
-    buscarSalarioFuncionario(funcionario.codigo).then((resultado) => {
+    buscarSalarioFuncionario(codigo).then((resultado) => {
       setLinhas((atual) =>
         atual.map((linha) => {
-          if (linha.funcionario.codigo !== funcionario.codigo) return linha;
+          if (linha.funcionario.codigo !== codigo) return linha;
 
           if (resultado.ok && resultado.data) {
             return {
@@ -103,6 +106,25 @@ export function SolicitarAumentoPage() {
         })
       );
     });
+  }
+
+  function handleAdicionar(funcionario: FuncionarioRh) {
+    setLinhas((atual) => [
+      ...atual,
+      {
+        funcionario,
+        salarioAtual: null,
+        carregandoSalario: true,
+        erroSalario: null,
+        cpf: null,
+        dataAdmissao: null,
+        valorReajuste: "",
+        percentualReajuste: "",
+        observacao: "",
+      },
+    ]);
+
+    buscarDadosDoRh(funcionario.codigo);
   }
 
   function handleRemover(codigo: string) {
@@ -154,17 +176,42 @@ export function SolicitarAumentoPage() {
     );
   }
 
+  const totalReajuste = useMemo(
+    () => linhas.reduce((total, linha) => total + (Number(linha.valorReajuste) || 0), 0),
+    [linhas]
+  );
+
+  const comFalhaNoRh = linhas.filter((linha) => linha.erroSalario !== null);
+  const semValor = linhas.filter(
+    (linha) =>
+      linha.erroSalario === null &&
+      !linha.carregandoSalario &&
+      !(Number(linha.valorReajuste) > 0 && Number(linha.percentualReajuste) > 0)
+  );
+  const carregandoAlgum = linhas.some((linha) => linha.carregandoSalario);
+
   const podeEnviar =
-    linhas.length > 0 &&
-    linhas.every(
-      (linha) =>
-        linha.salarioAtual !== null &&
-        !linha.carregandoSalario &&
-        Number(linha.valorReajuste) > 0 &&
-        Number(linha.percentualReajuste) > 0
-    );
+    linhas.length > 0 && !carregandoAlgum && comFalhaNoRh.length === 0 && semValor.length === 0;
+
+  /*
+   * Só cobre recarregar/fechar a aba -- navegação interna do Next não
+   * dispara beforeunload. Ainda assim pega o caso mais comum de perder
+   * uma solicitação inteira montada.
+   */
+  useEffect(() => {
+    if (linhas.length === 0 || numeroCriado) return;
+
+    function avisar(evento: BeforeUnloadEvent) {
+      evento.preventDefault();
+    }
+
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [linhas.length, numeroCriado]);
 
   async function handleEnviar() {
+    if (enviando || !podeEnviar) return;
+
     setEnviando(true);
     setErroEnvio(null);
 
@@ -267,7 +314,7 @@ export function SolicitarAumentoPage() {
                     <TableHeaderCell align="center">%</TableHeaderCell>
                     <TableHeaderCell align="center">Novo salário</TableHeaderCell>
                     <TableHeaderCell>Observação (colaborador)</TableHeaderCell>
-                    <TableHeaderCell align="center"> </TableHeaderCell>
+                    <TableHeaderCell align="center">Ações</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -288,11 +335,22 @@ export function SolicitarAumentoPage() {
                           {linha.carregandoSalario ? "Buscando..." : formatarDataAdmissao(linha.dataAdmissao)}
                         </TableCell>
                         <TableCell align="center">
-                          {linha.carregandoSalario
-                            ? "Buscando..."
-                            : linha.salarioAtual !== null
-                              ? linha.salarioAtual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-                              : (linha.erroSalario ?? "-")}
+                          {linha.carregandoSalario ? (
+                            "Buscando..."
+                          ) : linha.salarioAtual !== null ? (
+                            linha.salarioAtual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                          ) : (
+                            <Stack direction="row" gap={6} align="center" justify="center">
+                              <span style={{ color: "var(--danger-text)" }}>Falhou</span>
+                              <IconButton
+                                icon={<RotateCcw size={14} />}
+                                label={`Tentar buscar ${linha.funcionario.nome} no RH de novo`}
+                                size="small"
+                                onClick={() => buscarDadosDoRh(linha.funcionario.codigo)}
+                                disabled={enviando}
+                              />
+                            </Stack>
+                          )}
                         </TableCell>
                         <TableCell align="center">
                           <CurrencyInput
@@ -354,9 +412,47 @@ export function SolicitarAumentoPage() {
               />
             </Field>
 
+            {comFalhaNoRh.length > 0 && (
+              <Alert variant="danger" title="Não foi possível buscar no RH">
+                {comFalhaNoRh.map((linha) => linha.funcionario.nome).join(", ")} —{" "}
+                {comFalhaNoRh[0].erroSalario} Tente de novo pelo botão na linha, ou remova o
+                colaborador para seguir com os demais.
+              </Alert>
+            )}
+
             {erroEnvio && <Alert variant="danger">{erroEnvio}</Alert>}
 
-            <Stack direction="row" justify="end">
+            <Stack direction="row" gap={16} align="center" justify="between" wrap>
+              {linhas.length > 0 ? (
+                <div className={styles.resumo}>
+                  <div className={styles.bloco}>
+                    <span className={styles.rotulo}>Colaboradores</span>
+                    <span className={styles.valor}>{linhas.length}</span>
+                  </div>
+
+                  <div className={styles.separador} />
+
+                  <div className={styles.bloco}>
+                    <span className={styles.rotulo}>Total do reajuste</span>
+                    <span className={`${styles.valor} ${styles.valorTotal}`}>
+                      {totalReajuste.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+
+                  {semValor.length > 0 && (
+                    <>
+                      <div className={styles.separador} />
+                      <span className={styles.pendencia}>
+                        <AlertTriangle size={15} />
+                        {semValor.length} sem valor preenchido
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <span />
+              )}
+
               <Button onClick={handleEnviar} disabled={!podeEnviar} loading={enviando}>
                 Enviar para aprovação
               </Button>

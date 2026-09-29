@@ -1202,6 +1202,7 @@ export async function buscarConfigAprovacoes(): Promise<ApiEnvelope<ConfigAprova
 export async function salvarConfigAprovacoes(dados: {
   emailRelatorio: string | null;
   urlPublica: string | null;
+  modoPainelPadrao: string;
 }): Promise<ApiEnvelope<ConfigAprovacoes>> {
   const response = await fetch("/api/admin/aprovacoes/config", {
     method: "PUT",

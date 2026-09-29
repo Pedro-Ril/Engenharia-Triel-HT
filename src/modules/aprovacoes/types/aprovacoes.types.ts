@@ -40,6 +40,8 @@ export interface ItemAumentoSalarial {
   decididoEm: string | null;
   comentarioDecisao: string | null;
   resumoTitulo: string;
+  /* Último envio do relatório da SOLICITAÇÃO (repetido em cada item dela). */
+  relatorioEnviado: { em: string; por: string; para: string } | null;
 }
 
 export interface AprovacaoLote {

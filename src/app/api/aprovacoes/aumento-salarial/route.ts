@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
@@ -100,7 +100,12 @@ async function handlePOST(request: Request) {
     });
 
     const origem = await origemPublicaEfetivaAprovacoes(request);
-    await notificarDirecaoNovaSolicitacao(lote, origem);
+    /*
+     * O aviso sai DEPOIS da resposta (after do Next): e-mail aqui já é
+     * "melhor esforço" -- falha vira log e nunca derruba a ação --
+     * então não faz sentido segurar a tela esperando o SMTP.
+     */
+    after(() => notificarDirecaoNovaSolicitacao(lote, origem));
 
     return NextResponse.json(
       { ok: true, message: "Solicitação enviada para aprovação.", data: lote },

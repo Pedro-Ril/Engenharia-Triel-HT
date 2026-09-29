@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail } from "lucide-react";
+import { Save } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
+import { RadioGroup } from "@/components/ui/RadioGroup";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
@@ -37,6 +38,7 @@ export function AprovacoesConfigPainel({ onFeedback }: AprovacoesConfigPainelPro
   const [carregando, setCarregando] = useState(true);
   const [email, setEmail] = useState("");
   const [urlPublica, setUrlPublica] = useState("");
+  const [modoPainelPadrao, setModoPainelPadrao] = useState("colaborador");
   const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null);
   const [atualizadoPor, setAtualizadoPor] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -47,6 +49,7 @@ export function AprovacoesConfigPainel({ onFeedback }: AprovacoesConfigPainelPro
       if (resultado.ok && resultado.data) {
         setEmail(resultado.data.emailRelatorio ?? "");
         setUrlPublica(resultado.data.urlPublica ?? "");
+        setModoPainelPadrao(resultado.data.modoPainelPadrao ?? "colaborador");
         setAtualizadoEm(resultado.data.atualizadoEm);
         setAtualizadoPor(resultado.data.atualizadoPor);
       }
@@ -62,6 +65,7 @@ export function AprovacoesConfigPainel({ onFeedback }: AprovacoesConfigPainelPro
       const resultado = await salvarConfigAprovacoes({
         emailRelatorio: email.trim() || null,
         urlPublica: urlPublica.trim() || null,
+        modoPainelPadrao,
       });
 
       if (resultado.ok && resultado.data) {
@@ -87,11 +91,37 @@ export function AprovacoesConfigPainel({ onFeedback }: AprovacoesConfigPainelPro
   }
 
   return (
-    <Card
-      title="Relatório por e-mail"
-      description="Para onde vai o relatório que o solicitante envia quando a solicitação termina de ser decidida."
-    >
-      <Stack gap={16}>
+    <Stack gap={20}>
+      <Card
+        title="Painel de Aprovações"
+        description="Com o que a tela abre para quem aprova. Cada pessoa pode trocar a visão na própria tela; isto define só o padrão."
+      >
+        <RadioGroup
+          name="modoPainelPadrao"
+          orientation="horizontal"
+          value={modoPainelPadrao}
+          disabled={salvando}
+          options={[
+            {
+              value: "colaborador",
+              label: "Por colaborador",
+              description: "Uma linha por colaborador — fila de decisões, com seleção em lote.",
+            },
+            {
+              value: "solicitacao",
+              label: "Por solicitação",
+              description: "Uma linha por solicitação; os colaboradores são decididos dentro do modal.",
+            },
+          ]}
+          onValueChange={setModoPainelPadrao}
+        />
+      </Card>
+
+      <Card
+        title="Relatório por e-mail"
+        description="Para onde vai o relatório que o solicitante envia quando a solicitação termina de ser decidida."
+      >
+        <Stack gap={16}>
         <Alert variant="warning" title="Este e-mail recebe dado sensível">
           É o único e-mail do módulo que leva nome do colaborador, salário e valores no corpo da
           mensagem. Todos os outros avisos do centro de aprovações são genéricos de propósito. Use um
@@ -136,13 +166,15 @@ export function AprovacoesConfigPainel({ onFeedback }: AprovacoesConfigPainelPro
           </span>
         )}
 
-        <Stack direction="row" justify="end">
-          <Button onClick={handleSalvar} loading={salvando}>
-            <Mail size={16} />
-            Salvar
-          </Button>
         </Stack>
+      </Card>
+
+      <Stack direction="row" justify="end">
+        <Button onClick={handleSalvar} loading={salvando}>
+          <Save size={16} />
+          Salvar configurações
+        </Button>
       </Stack>
-    </Card>
+    </Stack>
   );
 }

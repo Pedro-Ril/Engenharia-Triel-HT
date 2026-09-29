@@ -15,6 +15,8 @@ export interface DefinicaoTipoAprovacao {
   valor: TipoAprovacao;
   label: string;
   descricao: string;
+  /* Nome do ícone no catálogo do portal (src/lib/icons/icon-registry.ts) -- o mesmo do módulo. */
+  icone: string;
 }
 
 export const TIPOS_APROVACAO: DefinicaoTipoAprovacao[] = [
@@ -22,6 +24,7 @@ export const TIPOS_APROVACAO: DefinicaoTipoAprovacao[] = [
     valor: "aumento_salarial",
     label: "Reajuste Salarial",
     descricao: "Reajustes de salário enviados pelas lideranças para a direção decidir.",
+    icone: "TrendingUp",
   },
 ];
 
@@ -31,4 +34,8 @@ export function ehTipoAprovacao(valor: unknown): valor is TipoAprovacao {
 
 export function rotuloTipoAprovacao(valor: TipoAprovacao): string {
   return TIPOS_APROVACAO.find((tipo) => tipo.valor === valor)?.label ?? valor;
+}
+
+export function iconeTipoAprovacao(valor: TipoAprovacao): string {
+  return TIPOS_APROVACAO.find((tipo) => tipo.valor === valor)?.icone ?? "Folder";
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
@@ -96,7 +96,13 @@ async function handlePOST(request: Request) {
         ipOrigem: extrairIpOrigem(request),
       });
 
-      await avisarSolicitantes(resultado.decididos, await origemPublicaEfetivaAprovacoes(request));
+      const origem = await origemPublicaEfetivaAprovacoes(request);
+    /*
+     * O aviso sai DEPOIS da resposta (after do Next): e-mail aqui já é
+     * "melhor esforço" -- falha vira log e nunca derruba a ação --
+     * então não faz sentido segurar a tela esperando o SMTP.
+     */
+      after(() => avisarSolicitantes(resultado.decididos, origem));
     }
 
     const mensagem =
