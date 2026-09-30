@@ -241,6 +241,15 @@ export interface ConfigIntegraLantek {
   atualizadoPor: string | null;
 }
 
+export interface ConfigIntegraTubest {
+  foccoApiBaseUrl: string | null;
+  foccoApiChave: string | null;
+  tokenConfigurado: boolean;
+  pastaStep: string | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
 export type CriptografiaSmtp = "nenhuma" | "ssl" | "tls";
 
 export interface ConfiguracaoSmtp {

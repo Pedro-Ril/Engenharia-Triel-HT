@@ -1,0 +1,253 @@
+/*
+ * Tabela de conferência do modal. CSS próprio (e não o do Lantek) porque
+ * lá as colunas são fixas/sticky e reaproveitar aquilo sem o colgroup
+ * correspondente deixava cabeçalho com fundo solto e as últimas colunas
+ * cortadas.
+ *
+ * A altura da linha é FIXA de propósito: a virtualização calcula o
+ * deslocamento por multiplicação, então qualquer célula que quebre em
+ * duas linhas desalinha o scroll inteiro. Por isso todo td é nowrap
+ * com reticências.
+ */
+
+.resumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+
+  padding: 4px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--bg-surface-soft);
+
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.chipValor {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chipSucesso .chipValor {
+  color: var(--success-text);
+}
+
+.chipPerigo .chipValor {
+  color: var(--danger-text);
+}
+
+.chipAviso .chipValor {
+  color: var(--warning-text);
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.busca {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.contagemFiltro {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.barraSelecao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 8px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-surface-soft);
+
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.barraSelecaoAtiva {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+/* Área rolável: o cabeçalho gruda no topo enquanto as linhas passam. */
+.rolagem {
+  max-height: 52vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+.tabela {
+  width: 100%;
+  min-width: 1380px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.tabela th,
+.tabela td {
+  padding: 0 12px;
+  text-align: left;
+
+  /* Nada quebra linha: a virtualização depende de altura previsível. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabela thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface-muted);
+
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ordenavel {
+  cursor: pointer;
+  user-select: none;
+}
+
+.ordenavel:hover {
+  color: var(--primary);
+}
+
+.seta {
+  margin-left: 6px;
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.setaAtiva {
+  color: var(--primary);
+}
+
+.tabela tbody td {
+  height: 38px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.tabela tbody tr:hover td {
+  background: var(--bg-hover-neutral);
+}
+
+.selecionada td {
+  background: var(--primary-soft);
+}
+
+.selecionada:hover td {
+  background: var(--primary-soft-strong);
+}
+
+.centro {
+  text-align: center !important;
+}
+
+.direita {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.codigo {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.marcador {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.marcadorRepetido {
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.situacao {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.situacaoOk {
+  border: 1px solid var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.situacaoFalta {
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+/* Peça que só tem .igs: funciona, mas é exceção -- destaque diferente do "OK". */
+.situacaoIgs {
+  border: 1px solid var(--info-border);
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.situacaoDuplicado {
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+/* A linha inteira alterna a seleção -- ver o onClick no tbody. */
+.linha {
+  cursor: pointer;
+}
+
+
+.vazio {
+  padding: 32px 12px !important;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.espacador td {
+  height: auto;
+  padding: 0;
+  border: none;
+}

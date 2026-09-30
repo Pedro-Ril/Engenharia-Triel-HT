@@ -20,6 +20,7 @@ import type {
   ConfigErpEstoqueUsados,
   ConfigEstruturaSubstituicao,
   ConfigIntegraLantek,
+  ConfigIntegraTubest,
   ConfigMateriaPrima,
   ConfiguracaoAd,
   ConfiguracaoDb,
@@ -805,6 +806,26 @@ export async function salvarConfigIntegraLantek(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigIntegraLantek>(response);
+}
+
+export async function buscarConfigIntegraTubest(): Promise<ConfigIntegraTubest | null> {
+  const response = await fetch("/api/admin/integra-tubest/config");
+  const body = await parseResponse<ConfigIntegraTubest>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigIntegraTubest(dados: {
+  foccoApiBaseUrl: string | null;
+  foccoApiChave: string | null;
+  foccoApiToken: string | null;
+  pastaStep: string | null;
+}): Promise<ApiEnvelope<ConfigIntegraTubest>> {
+  const response = await fetch("/api/admin/integra-tubest/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigIntegraTubest>(response);
 }
 
 export async function buscarConfiguracaoSmtp(): Promise<ConfiguracaoSmtp | null> {
