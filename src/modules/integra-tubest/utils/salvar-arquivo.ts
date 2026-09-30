@@ -4,6 +4,12 @@
  * e nome -- inclusive numa unidade de rede. Em navegador sem suporte,
  * cai no download comum.
  *
+ * ATENÇÃO: showSaveFilePicker também exige contexto seguro. Servido em
+ * HTTP puro (o caso do portal hoje), ele não existe e TODA exportação
+ * cai no download -- o diálogo só volta a aparecer quando o portal for
+ * servido por HTTPS. Mesma limitação de crypto.randomUUID e
+ * navigator.clipboard.
+ *
  * O destino é escolhido ANTES de gerar o arquivo, de propósito:
  * showSaveFilePicker só funciona enquanto o clique ainda conta como
  * "ativação transitória" (poucos segundos no Chrome). Gerar a planilha

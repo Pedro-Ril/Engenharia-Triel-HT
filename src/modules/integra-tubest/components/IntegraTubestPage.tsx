@@ -51,6 +51,7 @@ import type {
   TipoBusca,
 } from "../types/integraTubest.types";
 import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
+import { gerarId } from "@/lib/utils/gerar-id";
 
 import { escolherDestino } from "../utils/salvar-arquivo";
 
@@ -357,7 +358,8 @@ export function IntegraTubestPage() {
       const info = stepMap[codigo];
 
       return {
-        id: crypto.randomUUID(),
+        /* gerarId e não crypto.randomUUID: em HTTP o método não existe. */
+        id: gerarId(),
         lote: String(item.num_lote_pro ?? "").trim(),
         ordem: String(item.num_ordem ?? "").trim(),
         caminho: info?.caminho ?? "",
