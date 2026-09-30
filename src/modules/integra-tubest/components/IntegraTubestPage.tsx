@@ -5,6 +5,7 @@ import {
   Boxes,
   Check,
   ClipboardList,
+  Info,
   FileArchive,
   FileSpreadsheet,
   Home,
@@ -40,6 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
+import InfoIntegracaoModal from "./InfoIntegracaoModal";
 import ValidationModal from "./ValidationModal";
 import styles from "./IntegraTubestPage.module.css";
 import { buscarOrdens, gerarPlanilha, validarStep } from "../services/integraTubest.service";
@@ -157,6 +159,7 @@ export function IntegraTubestPage() {
   const [pagina, setPagina] = useState(1);
   const [exportacaoAberta, setExportacaoAberta] = useState(false);
   const [resumoAberto, setResumoAberto] = useState(false);
+  const [infoAberto, setInfoAberto] = useState(false);
   const [resumoTitulo, setResumoTitulo] = useState("");
   const [grupoCopiado, setGrupoCopiado] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
@@ -496,7 +499,16 @@ export function IntegraTubestPage() {
         ]}
       />
 
-      <Card title="Consulta" description="Informe uma ou mais ordens ou lotes, separados por vírgula.">
+      <Card
+        title="Consulta"
+        description="Informe uma ou mais ordens ou lotes, separados por vírgula."
+        actions={
+          <Button variant="secondary" onClick={() => setInfoAberto(true)}>
+            <Info size={15} />
+            Integração ativa
+          </Button>
+        }
+      >
         <Stack gap={16}>
           <Stack direction="row" gap={12} align="end" wrap>
             <Field label="Tipo de busca">
@@ -771,6 +783,8 @@ export function IntegraTubestPage() {
           )}
         </Stack>
       </Card>
+
+      <InfoIntegracaoModal open={infoAberto} onClose={() => setInfoAberto(false)} />
 
       <ValidationModal
         open={modalAberto}
