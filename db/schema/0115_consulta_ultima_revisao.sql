@@ -1,4 +1,4 @@
-SET XACT_ABORT ON;
+﻿SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
 -- "Consulta Última Revisão": explode a estrutura do 3DX (mesmo endpoint
@@ -10,7 +10,7 @@ BEGIN
   INSERT INTO dbo.portal_modulos
     ([chave], [nome], [path], [icone], [em_desenvolvimento], [ordem])
   VALUES
-    ('consulta-ultima-revisao', N'Consulta Última Revisão', '/consulta-ultima-revisao', 'git-compare', 1, 0);
+    ('consulta-ultima-revisao', N'Consulta Última Revisão', '/consulta-ultima-revisao', 'GitCompare', 1, 0);
 END;
 
 IF NOT EXISTS (
