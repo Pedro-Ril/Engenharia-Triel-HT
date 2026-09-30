@@ -4,7 +4,7 @@ BEGIN TRANSACTION;
 -- "Integração TuBest": mesma busca por ordem/lote da integração Lantek,
 -- mas contra um endpoint próprio do Focco, conferindo a existência do
 -- arquivo STEP de cada peça e gerando o XLSX de importação em lote do
--- TuBest (#ImportaçãoEmLoteParteNinho).
+-- TuBest (#BatchImportNestPart).
 --
 -- Config em tabela própria (e não em integra_lantek_config) porque o
 -- endpoint, o token e a pasta são outros -- juntar as duas faria a

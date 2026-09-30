@@ -20,7 +20,7 @@ const ORIGEM_LOG = "integra-tubest/exportar";
  * Por isso a planilha é montada linha a linha, e não com um
  * aoa_to_sheet de cabeçalho + corpo como na exportação do Lantek.
  */
-const MARCADOR = "#ImportaçãoEmLoteParteNinho";
+const MARCADOR = "#BatchImportNestPart";
 const CABECALHO = ["Nome do arquivo", "Nome da peça", "Quantidade"];
 const NOME_ABA = "Planilha1";
 
