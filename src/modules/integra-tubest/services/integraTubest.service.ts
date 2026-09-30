@@ -50,7 +50,7 @@ export async function validarStep(codigos: string[]): Promise<ValidacaoStepRespo
  */
 export async function gerarPlanilha(
   linhas: LinhaExportacao[],
-  opcoes: { separarPorMp: boolean; nomeBase: string }
+  opcoes: { separarPorMp: boolean; nomeBase: string; numeroCarro: string }
 ): Promise<Blob> {
   const response = await fetch("/api/integra-tubest/exportar", {
     method: "POST",

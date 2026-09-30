@@ -462,10 +462,11 @@ export function IntegraTubestPage() {
         linhas.map((linha) => ({
           caminho: linha.caminho,
           codigo: linha.codigo,
+          ordem: linha.ordem,
           quantidade: linha.quantidade,
           codigoMp: linha.codigoMp,
         })),
-        { separarPorMp, nomeBase }
+        { separarPorMp, nomeBase, numeroCarro: numeroCarro.trim() }
       );
 
       const resultado = await destino.gravar(arquivo);
@@ -568,7 +569,7 @@ export function IntegraTubestPage() {
 
       <Card
         title="Peças da planilha"
-        description="Do arquivo saem três colunas: o caminho do STEP, o código da peça e a quantidade. A matéria-prima fica aqui só para conferência."
+        description="Do arquivo saem três colunas: o caminho do STEP, o nome da peça (código_ordem_carro) e a quantidade. A matéria-prima fica aqui só para conferência."
       >
         <Stack gap={16}>
           {linhas.length === 0 ? (

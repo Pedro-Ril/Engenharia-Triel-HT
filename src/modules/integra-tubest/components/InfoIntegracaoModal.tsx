@@ -97,16 +97,18 @@ export default function InfoIntegracaoModal({ open, onClose }: Props) {
               <div className={styles.card}>
                 <h4>Nº do carro</h4>
                 <p>
-                  Campo opcional, ao lado do lote. Ele não filtra nem busca nada: entra apenas no
-                  nome dos arquivos gerados, no formato CARRO_LOTE.
+                  Campo opcional, ao lado do lote. Ele não filtra nem busca nada: entra no nome dos
+                  arquivos (CARRO_LOTE) e no nome de cada peça dentro da planilha.
                 </p>
               </div>
 
               <div className={styles.card}>
                 <h4>Exportação do arquivo</h4>
                 <p>
-                  A planilha leva três colunas: caminho do arquivo, código da peça e quantidade.
-                  Pode sair como arquivo único ou um arquivo por matéria-prima, dentro de um .zip.
+                  A planilha leva três colunas: caminho do arquivo, nome da peça e quantidade. O
+                  nome da peça sai como CODITEM_ORDEM_CARRO — a ordem entra porque a mesma peça
+                  pode vir em mais de uma ordem do lote. Pode sair como arquivo único ou um arquivo
+                  por matéria-prima, dentro de um .zip.
                 </p>
               </div>
 

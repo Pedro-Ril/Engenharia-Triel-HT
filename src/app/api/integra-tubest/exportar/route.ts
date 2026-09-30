@@ -29,8 +29,21 @@ const SEM_MP = "SEM-MP";
 interface LinhaExportacao {
   caminho?: unknown;
   codigo?: unknown;
+  ordem?: unknown;
   quantidade?: unknown;
   codigoMp?: unknown;
+}
+
+/*
+ * Coluna B: CODITEM_ORDEM_CARRO. A ordem entra porque a mesma peça pode
+ * vir em mais de uma ordem do lote -- sem ela, duas linhas ficariam com
+ * o mesmo nome dentro do TuBest. O carro é opcional e some quando vazio,
+ * em vez de deixar um "_" sobrando na ponta.
+ */
+function montarNomePeca(linha: LinhaExportacao, numeroCarro: string): string {
+  return [String(linha.codigo ?? "").trim(), String(linha.ordem ?? "").trim(), numeroCarro]
+    .filter(Boolean)
+    .join("_");
 }
 
 function normalizarQuantidade(valor: unknown): number | string {
@@ -51,13 +64,13 @@ function sanitizarNome(valor: string, padrao: string): string {
   return limpo || padrao;
 }
 
-function montarPlanilha(linhas: LinhaExportacao[]): Buffer {
+function montarPlanilha(linhas: LinhaExportacao[], numeroCarro: string): Buffer {
   const dados: (string | number)[][] = [
     [MARCADOR],
     CABECALHO,
     ...linhas.map((linha) => [
       String(linha.caminho ?? "").trim(),
-      String(linha.codigo ?? "").trim(),
+      montarNomePeca(linha, numeroCarro),
       normalizarQuantidade(linha.quantidade),
     ]),
   ];
@@ -95,6 +108,7 @@ async function handlePOST(request: Request) {
     const linhas = Array.isArray(body?.linhas) ? (body.linhas as LinhaExportacao[]) : [];
     const separarPorMp = body?.separarPorMp === true;
     const nomeBase = sanitizarNome(String(body?.nomeBase ?? "").trim(), "importacao-tubest");
+    const numeroCarro = sanitizarNome(String(body?.numeroCarro ?? "").trim(), "");
 
     if (!linhas.length) {
       return NextResponse.json(
@@ -106,7 +120,7 @@ async function handlePOST(request: Request) {
     const semCaminho = linhas.filter((linha) => !String(linha.caminho ?? "").trim()).length;
 
     if (!separarPorMp) {
-      const buffer = montarPlanilha(linhas);
+      const buffer = montarPlanilha(linhas, numeroCarro);
 
       await registrarLog({
         nivel: semCaminho > 0 ? "aviso" : "info",
@@ -146,7 +160,7 @@ async function handlePOST(request: Request) {
     archive.pipe(saida);
 
     for (const [codigoMp, linhasDoGrupo] of grupos) {
-      archive.append(montarPlanilha(linhasDoGrupo), {
+      archive.append(montarPlanilha(linhasDoGrupo, numeroCarro), {
         name: `${nomeBase}__${codigoMp}.xlsx`,
       });
     }

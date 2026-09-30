@@ -66,6 +66,8 @@ export interface StepInfo {
 export interface LinhaExportacao {
   caminho: string;
   codigo: string;
+  /* Compõe o nome da peça na coluna B (CODITEM_ORDEM_CARRO). */
+  ordem: string;
   quantidade: number | "";
   codigoMp: string;
 }
