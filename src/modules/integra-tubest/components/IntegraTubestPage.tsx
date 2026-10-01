@@ -68,6 +68,7 @@ interface LinhaTela {
   quantidade: number | "";
   arquivo: string;
   formato: string;
+  pasta: string;
   descricao: string;
   codigoMp: string;
   descricaoMp: string;
@@ -327,12 +328,20 @@ export function IntegraTubestPage() {
         return;
       }
 
-      const codigos = itens.map((item) => String(item.cod_item ?? "").trim()).filter(Boolean);
-      const validacao = await validarStep(codigos);
+      /* O desenho vai junto: é por ele que a peça da Ciber é encontrada. */
+      const validacao = await validarStep(
+        itens.map((item) => ({
+          codigo: String(item.cod_item ?? "").trim(),
+          codDesenho: String(item.cod_desenho ?? "").trim(),
+        }))
+      );
 
       const mapa: Record<string, StepInfo> = {};
       validacao.resultados.forEach((resultado) => {
         mapa[resultado.codigo] = {
+          codigoUsado: resultado.codigoUsado,
+          origem: resultado.origem,
+          pasta: resultado.pasta,
           existe: resultado.existe,
           duplicado: resultado.duplicado,
           caminho: resultado.caminho,
@@ -367,6 +376,7 @@ export function IntegraTubestPage() {
         quantidade: item.qtde ?? "",
         arquivo: info?.arquivo ?? "",
         formato: info?.formato ?? "",
+        pasta: info?.pasta ?? "",
         descricao: item.desc_tecnica ?? "",
         codigoMp: item.cod_item_mp ?? "",
         descricaoMp: item.desc_tecnica_mp ?? "",
@@ -720,6 +730,9 @@ export function IntegraTubestPage() {
                             {linha.arquivo}
                             {linha.formato === "igs" && (
                               <span className={styles.marcadorIgs}>IGS</span>
+                            )}
+                            {linha.pasta === "ciber" && (
+                              <span className={styles.marcadorCiber}>CIBER</span>
                             )}
                           </span>
                         ) : (

@@ -246,6 +246,7 @@ export interface ConfigIntegraTubest {
   foccoApiChave: string | null;
   tokenConfigurado: boolean;
   pastaStep: string | null;
+  pastaStepCiber: string | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }

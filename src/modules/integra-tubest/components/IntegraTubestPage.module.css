@@ -243,3 +243,16 @@
   padding: 5px 10px;
   font-size: 11px;
 }
+
+/* Arquivo que veio da pasta da Ciber (pelo código do desenho). */
+.marcadorCiber {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--tag-purple-border);
+  border-radius: 999px;
+
+  background: var(--tag-purple-bg);
+  color: var(--tag-purple-text);
+  font-size: 10px;
+  font-weight: 700;
+}

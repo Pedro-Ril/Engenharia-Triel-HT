@@ -47,6 +47,8 @@ type LinhaModal = {
   existe: boolean | null;
   duplicado: boolean;
   formato: string;
+  pasta: string;
+  codigoUsado: string;
   arquivo: string;
   caminhos: string[];
   repetido: boolean;
@@ -160,6 +162,8 @@ export default function ValidationModal({ open, items, stepMap, onClose, onConfi
         existe: info ? info.existe : null,
         duplicado: info?.duplicado ?? false,
         formato: info?.formato ?? "",
+        pasta: info?.pasta ?? "",
+        codigoUsado: info?.codigoUsado ?? "",
         arquivo: info?.arquivo ?? "",
         caminhos: info?.caminhos ?? [],
         repetido: !!codigo && !!ordem && (contagem.get(`${ordem}__${codigo}`) ?? 0) > 1,
@@ -495,6 +499,16 @@ export default function ValidationModal({ open, items, stepMap, onClose, onConfi
                           : linha.formato === "igs"
                             ? "IGS"
                             : "OK"}
+                      </span>
+                    )}
+
+                    {/* Achado na pasta da Ciber, quase sempre pelo código do desenho. */}
+                    {linha.pasta === "ciber" && (
+                      <span
+                        className={`${styles.marcador} ${styles.marcadorCiber}`}
+                        title={`Arquivo da Ciber, encontrado pelo código ${linha.codigoUsado}`}
+                      >
+                        Ciber
                       </span>
                     )}
                   </td>

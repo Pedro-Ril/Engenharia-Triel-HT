@@ -15,6 +15,7 @@ export interface ConfigIntegraTubest {
   foccoApiChave: string | null;
   tokenConfigurado: boolean;
   pastaStep: string | null;
+  pastaStepCiber: string | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }
@@ -32,6 +33,7 @@ export async function buscarConfigIntegraTubest(): Promise<ConfigIntegraTubest> 
     focco_api_chave: string | null;
     focco_api_token: string | null;
     pasta_step: string | null;
+    pasta_step_ciber: string | null;
     atualizado_em: string | null;
     atualizado_por: string | null;
   }>(`
@@ -40,6 +42,7 @@ export async function buscarConfigIntegraTubest(): Promise<ConfigIntegraTubest> 
       [focco_api_chave],
       [focco_api_token],
       [pasta_step],
+      [pasta_step_ciber],
       CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em],
       [atualizado_por]
     FROM dbo.integra_tubest_config
@@ -53,6 +56,7 @@ export async function buscarConfigIntegraTubest(): Promise<ConfigIntegraTubest> 
     foccoApiChave: row?.focco_api_chave ?? null,
     tokenConfigurado: Boolean(row?.focco_api_token),
     pastaStep: row?.pasta_step ?? null,
+    pastaStepCiber: row?.pasta_step_ciber ?? null,
     atualizadoEm: row?.atualizado_em ?? null,
     atualizadoPor: row?.atualizado_por ?? null,
   };
@@ -64,6 +68,7 @@ export async function salvarConfigIntegraTubest(params: {
   /* undefined/vazio = mantém o token já salvo — só troca quando vier um valor novo. */
   foccoApiToken?: string | null;
   pastaStep: string | null;
+  pastaStepCiber: string | null;
   atualizadoPor: string;
 }): Promise<ConfigIntegraTubest> {
   const pool = await getSqlServerPool();
@@ -72,6 +77,7 @@ export async function salvarConfigIntegraTubest(params: {
   request.input("foccoApiBaseUrl", sql.NVarChar(300), params.foccoApiBaseUrl);
   request.input("foccoApiChave", sql.NVarChar(50), params.foccoApiChave);
   request.input("pastaStep", sql.NVarChar(300), params.pastaStep);
+  request.input("pastaStepCiber", sql.NVarChar(300), params.pastaStepCiber);
   request.input("atualizadoPor", sql.NVarChar(150), params.atualizadoPor);
 
   const trocarToken = Boolean(params.foccoApiToken);
@@ -88,11 +94,12 @@ export async function salvarConfigIntegraTubest(params: {
         [focco_api_chave] = @foccoApiChave,
         [focco_api_token] = CASE WHEN @trocarToken = 1 THEN @foccoApiToken ELSE destino.[focco_api_token] END,
         [pasta_step] = @pastaStep,
+        [pasta_step_ciber] = @pastaStepCiber,
         [atualizado_em] = SYSDATETIME(),
         [atualizado_por] = @atualizadoPor
     WHEN NOT MATCHED THEN
-      INSERT ([id], [focco_api_base_url], [focco_api_chave], [focco_api_token], [pasta_step], [atualizado_em], [atualizado_por])
-      VALUES (1, @foccoApiBaseUrl, @foccoApiChave, @foccoApiToken, @pastaStep, SYSDATETIME(), @atualizadoPor);
+      INSERT ([id], [focco_api_base_url], [focco_api_chave], [focco_api_token], [pasta_step], [pasta_step_ciber], [atualizado_em], [atualizado_por])
+      VALUES (1, @foccoApiBaseUrl, @foccoApiChave, @foccoApiToken, @pastaStep, @pastaStepCiber, SYSDATETIME(), @atualizadoPor);
   `);
 
   return buscarConfigIntegraTubest();
@@ -103,22 +110,31 @@ export async function salvarConfigIntegraTubest(params: {
  * aqui deixaria a tela inútil enquanto o endpoint não existe, sendo que
  * conferir arquivo não fala com o Focco.
  */
-export async function obterPastaStep(): Promise<string> {
+export interface PastasStep {
+  principal: string;
+  /* Opcional: sem ela, peça da Ciber simplesmente não é encontrada. */
+  ciber: string | null;
+}
+
+export async function obterPastasStep(): Promise<PastasStep> {
   const pool = await getSqlServerPool();
 
-  const result = await pool.request().query<{ pasta_step: string | null }>(`
-    SELECT [pasta_step] FROM dbo.integra_tubest_config WHERE [id] = 1;
+  const result = await pool.request().query<{
+    pasta_step: string | null;
+    pasta_step_ciber: string | null;
+  }>(`
+    SELECT [pasta_step], [pasta_step_ciber] FROM dbo.integra_tubest_config WHERE [id] = 1;
   `);
 
-  const pasta = result.recordset[0]?.pasta_step;
+  const row = result.recordset[0];
 
-  if (!pasta) {
+  if (!row?.pasta_step) {
     throw new ValidationError(
       "Configure a pasta de STEP da Integração TuBest em Administração → Configurações."
     );
   }
 
-  return pasta;
+  return { principal: row.pasta_step, ciber: row.pasta_step_ciber ?? null };
 }
 
 export interface ConfigParaRotasIntegraTubest {

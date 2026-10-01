@@ -819,6 +819,7 @@ export async function salvarConfigIntegraTubest(dados: {
   foccoApiChave: string | null;
   foccoApiToken: string | null;
   pastaStep: string | null;
+  pastaStepCiber: string | null;
 }): Promise<ApiEnvelope<ConfigIntegraTubest>> {
   const response = await fetch("/api/admin/integra-tubest/config", {
     method: "PATCH",

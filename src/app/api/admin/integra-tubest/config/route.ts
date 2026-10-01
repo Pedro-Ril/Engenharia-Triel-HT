@@ -45,6 +45,7 @@ interface ConfigBody {
   foccoApiChave?: unknown;
   foccoApiToken?: unknown;
   pastaStep?: unknown;
+  pastaStepCiber?: unknown;
 }
 
 async function handlePATCH(request: Request) {
@@ -77,12 +78,14 @@ async function handlePATCH(request: Request) {
     const foccoApiChave = optionalText(body.foccoApiChave, "Chave da integração", 50);
     const foccoApiToken = optionalText(body.foccoApiToken, "Token da API", 1000);
     const pastaStep = optionalText(body.pastaStep, "Pasta de STEP", 300);
+    const pastaStepCiber = optionalText(body.pastaStepCiber, "Pasta de STEP (Ciber)", 300);
 
     const config = await salvarConfigIntegraTubest({
       foccoApiBaseUrl,
       foccoApiChave,
       foccoApiToken,
       pastaStep,
+      pastaStepCiber,
       atualizadoPor: acesso.usuario.samAccountName,
     });
 

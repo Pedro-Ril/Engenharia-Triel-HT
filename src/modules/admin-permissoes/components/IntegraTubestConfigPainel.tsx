@@ -34,6 +34,7 @@ export function IntegraTubestConfigPainel({ onFeedback }: IntegraTubestConfigPai
   const [foccoApiChave, setFoccoApiChave] = useState("");
   const [foccoApiToken, setFoccoApiToken] = useState("");
   const [pastaStep, setPastaStep] = useState("");
+  const [pastaStepCiber, setPastaStepCiber] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function IntegraTubestConfigPainel({ onFeedback }: IntegraTubestConfigPai
       setFoccoApiBaseUrl(dados?.foccoApiBaseUrl ?? "");
       setFoccoApiChave(dados?.foccoApiChave ?? "");
       setPastaStep(dados?.pastaStep ?? "");
+      setPastaStepCiber(dados?.pastaStepCiber ?? "");
       setCarregando(false);
     }
 
@@ -59,6 +61,7 @@ export function IntegraTubestConfigPainel({ onFeedback }: IntegraTubestConfigPai
         foccoApiChave: foccoApiChave.trim() || null,
         foccoApiToken: foccoApiToken.trim() || null,
         pastaStep: pastaStep.trim() || null,
+        pastaStepCiber: pastaStepCiber.trim() || null,
       });
 
       if (resultado.ok && resultado.data) {
@@ -142,6 +145,20 @@ export function IntegraTubestConfigPainel({ onFeedback }: IntegraTubestConfigPai
               id="pastaStep"
               value={pastaStep}
               onChange={(event) => setPastaStep(event.target.value)}
+              disabled={salvando}
+            />
+          </Field>
+
+          <Field
+            label="Pasta de STEP (Ciber)"
+            htmlFor="pastaStepCiber"
+            hint="Peça da Ciber é procurada pelo código do DESENHO, nesta pasta. Em branco, a Ciber não é consultada."
+          >
+            <Input
+              id="pastaStepCiber"
+              value={pastaStepCiber}
+              placeholder="\\servidorgeral\Derivados\Triel-HT\DXF\CIBER"
+              onChange={(event) => setPastaStepCiber(event.target.value)}
               disabled={salvando}
             />
           </Field>

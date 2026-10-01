@@ -33,8 +33,15 @@ export interface ApiIntegracaoResponse {
 /* O .igs é exceção: só é usado quando a peça não tem STEP. */
 export type FormatoArquivo = "step" | "igs";
 
+/* "ciber" = achado na pasta da Ciber, normalmente pelo código do desenho. */
+export type PastaOrigem = "principal" | "ciber";
+
 export interface StepValidacaoResultado {
   codigo: string;
+  codDesenho: string;
+  codigoUsado: string;
+  origem: "codigo" | "desenho" | "";
+  pasta: PastaOrigem | "";
   existe: boolean;
   duplicado: boolean;
   caminho: string;
@@ -47,11 +54,15 @@ export interface ValidacaoStepResposta {
   total: number;
   semStep: number;
   duplicados: number;
+  pelaCiber: number;
   resultados: StepValidacaoResultado[];
 }
 
 /* O que a tela sabe de cada código depois da conferência na pasta. */
 export interface StepInfo {
+  codigoUsado: string;
+  origem: "codigo" | "desenho" | "";
+  pasta: PastaOrigem | "";
   existe: boolean;
   duplicado: boolean;
   caminho: string;

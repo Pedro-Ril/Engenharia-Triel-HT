@@ -34,11 +34,13 @@ export async function buscarOrdens(
   return parseEnvelope<ApiIntegracaoResponse>(response, "Erro ao buscar dados da integração.");
 }
 
-export async function validarStep(codigos: string[]): Promise<ValidacaoStepResposta> {
+export async function validarStep(
+  itens: { codigo: string; codDesenho: string }[]
+): Promise<ValidacaoStepResposta> {
   const response = await fetch("/api/integra-tubest/validar-step", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ codigos }),
+    body: JSON.stringify({ itens }),
   });
 
   return parseEnvelope<ValidacaoStepResposta>(response, "Erro ao conferir os arquivos STEP.");

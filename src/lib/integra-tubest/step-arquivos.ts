@@ -46,8 +46,16 @@ export interface ArquivoStepEncontrado {
   formato: FormatoArquivo;
 }
 
+export type PastaOrigem = "principal" | "ciber";
+
 export interface ResultadoValidacaoStep {
   codigo: string;
+  /* Código do desenho -- é por ele que a peça da Ciber é encontrada. */
+  codDesenho: string;
+  /* Qual dos dois achou o arquivo, e em que pasta. */
+  codigoUsado: string;
+  origem: "codigo" | "desenho" | "";
+  pasta: PastaOrigem | "";
   existe: boolean;
   duplicado: boolean;
   caminho: string;
@@ -133,10 +141,19 @@ export async function indexarPastaStep(
   return indice;
 }
 
+interface AchadoNoIndice {
+  existe: boolean;
+  duplicado: boolean;
+  caminho: string;
+  arquivo: string;
+  caminhos: string[];
+  formato: FormatoArquivo | "";
+}
+
 export function validarCodigoNoIndice(
   indice: Map<string, ArquivoStepEncontrado[]>,
   codigo: string
-): ResultadoValidacaoStep {
+): AchadoNoIndice {
   const chave = chaveIndice(codigo);
   const encontrados = chave ? (indice.get(chave) ?? []) : [];
 
@@ -169,12 +186,73 @@ export function validarCodigoNoIndice(
   const principal = candidatos[0];
 
   return {
-    codigo,
     existe: candidatos.length > 0,
     duplicado: candidatos.length > 1,
     caminho: principal?.caminho ?? "",
     arquivo: principal?.arquivo ?? "",
     caminhos: candidatos.map((item) => item.caminho),
     formato: principal?.formato ?? "",
+  };
+}
+
+export interface FonteIndice {
+  pasta: PastaOrigem;
+  indice: Map<string, ArquivoStepEncontrado[]>;
+}
+
+/*
+ * Ordem de tentativa para achar o arquivo de uma peça:
+ *
+ *   1. código do item na pasta principal   (o caso comum)
+ *   2. código do desenho na pasta principal
+ *   3. código do item na pasta da Ciber
+ *   4. código do desenho na pasta da Ciber (o caso que motivou isto)
+ *
+ * Peça da Ciber tem numeração própria: o arquivo existe com o número do
+ * DESENHO, na pasta da Ciber -- procurar pelo código do item ali não
+ * acha nada. A primeira tentativa que encontrar algo vence; dentro de
+ * cada pasta valem as regras de formato, nome exato e duplicidade.
+ */
+export function resolverArquivoDaPeca(
+  fontes: FonteIndice[],
+  codigo: string,
+  codDesenho: string
+): ResultadoValidacaoStep {
+  const tentativas = (
+    [
+      { chave: codigo, origem: "codigo" },
+      { chave: codDesenho, origem: "desenho" },
+    ] as const
+  ).filter((tentativa) => Boolean(tentativa.chave.trim()));
+
+  for (const fonte of fontes) {
+    for (const tentativa of tentativas) {
+      const achado = validarCodigoNoIndice(fonte.indice, tentativa.chave);
+
+      if (achado.existe) {
+        return {
+          codigo,
+          codDesenho,
+          codigoUsado: tentativa.chave,
+          origem: tentativa.origem,
+          pasta: fonte.pasta,
+          ...achado,
+        };
+      }
+    }
+  }
+
+  return {
+    codigo,
+    codDesenho,
+    codigoUsado: "",
+    origem: "",
+    pasta: "",
+    existe: false,
+    duplicado: false,
+    caminho: "",
+    arquivo: "",
+    caminhos: [],
+    formato: "",
   };
 }

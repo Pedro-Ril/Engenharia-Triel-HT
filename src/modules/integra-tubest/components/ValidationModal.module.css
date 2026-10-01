@@ -195,6 +195,13 @@
   vertical-align: middle;
 }
 
+/* Peça da Ciber: o arquivo veio da pasta dela, pelo código do desenho. */
+.marcadorCiber {
+  border: 1px solid var(--tag-purple-border);
+  background: var(--tag-purple-bg);
+  color: var(--tag-purple-text);
+}
+
 .marcadorRepetido {
   border: 1px solid var(--warning-border);
   background: var(--warning-bg);
