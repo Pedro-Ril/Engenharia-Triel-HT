@@ -25,14 +25,11 @@
   white-space: nowrap;
 }
 
-.arquivo {
-  display: block;
-  max-width: 260px;
-  overflow: hidden;
-
-  color: var(--text-soft);
-  font-size: 12px;
-  text-overflow: ellipsis;
+/* Selo do arquivo: o caminho inteiro fica no title da célula. */
+.selos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   white-space: nowrap;
 }
 
@@ -101,18 +98,6 @@
   font-size: 12px;
 }
 
-/* Peça atendida por .igs em vez de STEP -- exceção, vale ficar visível. */
-.marcadorIgs {
-  margin-left: 8px;
-  padding: 1px 6px;
-  border: 1px solid var(--info-border);
-  border-radius: 999px;
-
-  background: var(--info-bg);
-  color: var(--info-text);
-  font-size: 10px;
-  font-weight: 700;
-}
 
 /* As duas formas de exportar, lado a lado -- cada uma já mostra o nome
    do arquivo que vai sair. */
@@ -246,7 +231,6 @@
 
 /* Arquivo que veio da pasta da Ciber (pelo código do desenho). */
 .marcadorCiber {
-  margin-left: 6px;
   padding: 1px 6px;
   border: 1px solid var(--tag-purple-border);
   border-radius: 999px;
@@ -255,4 +239,22 @@
   color: var(--tag-purple-text);
   font-size: 10px;
   font-weight: 700;
+}
+
+/*
+ * Tabela rolando dentro do card, em vez de alargar a página.
+ *
+ * O Card é item de um flex (PageContainer) e, sem min-width: 0, não
+ * encolhe: ele cresce até caber a tabela inteira e quem rola de lado
+ * passa a ser a PÁGINA. Com muitas colunas isso ficava evidente. As duas
+ * regras trabalham juntas -- o card pode encolher, e aí o wrapper da
+ * tabela (que já tem overflow-x: auto) finalmente rola.
+ */
+.cartaoLista {
+  min-width: 0;
+}
+
+.tabelaRolagem {
+  min-width: 0;
+  max-width: 100%;
 }

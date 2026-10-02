@@ -477,16 +477,22 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
             })} ${linha.unidadeMp}`.trim();
 
       case "arquivo":
-        return linha.caminho ? (
-          /* O nome basta na tela; o caminho inteiro vai para o arquivo e
-             aparece ao parar o mouse. */
-          <span className={styles.arquivo} title={linha.caminho}>
-            {linha.arquivo}
-            {linha.formato === "igs" && <span className={styles.marcadorIgs}>IGS</span>}
+        if (!linha.caminho) return <Badge variant="warning">sem arquivo</Badge>;
+
+        /*
+         * Na lista o que importa é "tem ou não tem" -- o caminho inteiro
+         * ocupava meia tela e só é consultado de vez em quando, então
+         * fica no tooltip. O formato aparece no próprio selo, porque um
+         * .igs no lugar do STEP é exceção que vale enxergar.
+         */
+        return (
+          <span className={styles.selos} title={linha.caminho}>
+            <Badge variant={linha.formato === "igs" ? "info" : "success"}>
+              {linha.formato === "igs" ? "IGS" : "STEP"}
+            </Badge>
+
             {linha.pasta === "ciber" && <span className={styles.marcadorCiber}>CIBER</span>}
           </span>
-        ) : (
-          <Badge variant="warning">sem arquivo STEP</Badge>
         );
 
       case "acoes":
@@ -707,6 +713,7 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
       </Card>
 
       <Card
+        className={styles.cartaoLista}
         title="Peças da planilha"
         description="Do arquivo saem três colunas: o caminho do STEP, o nome da peça (código_ordem_carro) e a quantidade. A matéria-prima fica aqui só para conferência."
       >
@@ -843,6 +850,13 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
                 )}
               </Stack>
 
+              {/*
+                O wrapper do Table rola sozinho, mas como filho de um flex
+                ele herda min-width: auto e estica em vez de rolar -- com
+                muitas colunas isso jogava rolagem horizontal na PÁGINA
+                inteira. Esta div segura a largura no card.
+              */}
+              <div className={styles.tabelaRolagem}>
               <Table minWidth={Math.max(900, colunasVisiveis.length * 150)}>
                 <TableHead>
                   <TableRow>
@@ -866,6 +880,7 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               <div className={styles.totais}>
                 <div className={styles.totalItem}>
