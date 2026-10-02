@@ -31,7 +31,6 @@ import {
   colunasDoMiolo,
   definicaoDaColuna,
   type ChaveColuna,
-  type GrupoColuna,
 } from "../constants/colunas";
 
 /*
@@ -68,7 +67,7 @@ function LinhaFixa({ chave }: { chave: ChaveColuna }) {
 
       <span className={styles.rotulo}>
         {definicao.label}
-        <span className={styles.grupo}>posição fixa</span>
+        <span className={styles.grupo}>{definicao.grupo}</span>
       </span>
     </li>
   );
@@ -135,18 +134,12 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
 
   const miolo = useMemo(() => colunasDoMiolo(selecao), [selecao]);
 
-  const disponiveis = useMemo(() => {
-    const fora = COLUNAS.filter((coluna) => !selecao.includes(coluna.chave));
-    const mapa = new Map<GrupoColuna, typeof COLUNAS>();
-
-    for (const coluna of fora) {
-      const atual = mapa.get(coluna.grupo) ?? [];
-      atual.push(coluna);
-      mapa.set(coluna.grupo, atual);
-    }
-
-    return [...mapa.entries()];
-  }, [selecao]);
+  /* Lista plana, na ordem do catálogo: o grupo aparece em cada linha,
+     igual ao painel da esquerda -- dois painéis com a mesma cara. */
+  const disponiveis = useMemo(
+    () => COLUNAS.filter((coluna) => !selecao.includes(coluna.chave)),
+    [selecao]
+  );
 
   function handleDragEnd(evento: DragEndEvent) {
     const { active, over } = evento;
@@ -198,6 +191,7 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
         <section className={styles.painel}>
           <h3 className={styles.titulo}>Na tabela — arraste para ordenar</h3>
 
+          <div className={styles.rolagem}>
           <ul className={styles.lista}>
             <LinhaFixa chave="peca" />
             <LinhaFixa chave="descricao" />
@@ -216,6 +210,7 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
           <ul className={styles.lista}>
             <LinhaFixa chave="acoes" />
           </ul>
+          </div>
         </section>
 
         <section className={styles.painel}>
@@ -224,29 +219,24 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
           {disponiveis.length === 0 ? (
             <p className={styles.vazio}>Todas as colunas já estão na tabela.</p>
           ) : (
-            <div className={styles.grupos}>
-              {disponiveis.map(([grupo, colunasDoGrupo]) => (
-                <div key={grupo}>
-                  <h4 className={styles.subtitulo}>{grupo}</h4>
+            <ul className={`${styles.lista} ${styles.rolagem}`}>
+              {disponiveis.map((coluna) => (
+                <li key={coluna.chave} className={styles.linha}>
+                  <IconButton
+                    icon={<Plus size={14} />}
+                    label={`Adicionar ${coluna.label}`}
+                    size="small"
+                    variant="primary"
+                    onClick={() => adicionar(coluna.chave)}
+                  />
 
-                  <ul className={styles.lista}>
-                    {colunasDoGrupo.map((coluna) => (
-                      <li key={coluna.chave} className={styles.linha}>
-                        <span className={styles.rotulo}>{coluna.label}</span>
-
-                        <IconButton
-                          icon={<Plus size={14} />}
-                          label={`Adicionar ${coluna.label}`}
-                          size="small"
-                          variant="primary"
-                          onClick={() => adicionar(coluna.chave)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  <span className={styles.rotulo}>
+                    {coluna.label}
+                    <span className={styles.grupo}>{coluna.grupo}</span>
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </section>
       </div>

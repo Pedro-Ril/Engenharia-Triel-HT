@@ -43,7 +43,7 @@ export type ChaveColuna =
   | "arquivo"
   | "acoes";
 
-export type GrupoColuna = "Peça" | "Ordem" | "Matéria-prima" | "Roteiro" | "Ordem de produção" | "Arquivo";
+export type GrupoColuna = "Peça" | "Ordem" | "Matéria-prima" | "Roteiro" | "Arquivo";
 
 export interface DefinicaoColuna {
   chave: ChaveColuna;
@@ -184,21 +184,21 @@ export const COLUNAS: DefinicaoColuna[] = [
   {
     chave: "operacaoOrdem",
     label: "Operação (OP)",
-    grupo: "Ordem de produção",
+    grupo: "Ordem",
     filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_operacao_ordem, item.descricao_operacao_ordem),
   },
   {
     chave: "centroTrabalhoOrdem",
     label: "Centro de trabalho (OP)",
-    grupo: "Ordem de produção",
+    grupo: "Ordem",
     filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_centrotrab_ordem, item.descricao_centrotrab_ordem),
   },
   {
     chave: "maquinaOrdem",
     label: "Máquina (OP)",
-    grupo: "Ordem de produção",
+    grupo: "Ordem",
     filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_maquina_ordem, item.descricao_maquina_ordem),
   },
