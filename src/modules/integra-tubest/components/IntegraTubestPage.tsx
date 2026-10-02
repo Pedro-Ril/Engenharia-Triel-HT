@@ -174,7 +174,8 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
   const [linhas, setLinhas] = useState<LinhaTela[]>([]);
   const [filtro, setFiltro] = useState("");
   const [filtroStep, setFiltroStep] = useState<FiltroStep>("todos");
-  const [filtroMp, setFiltroMp] = useState("todas");
+  /* Um filtro por coluna habilitada -- a chave é a da coluna. */
+  const [filtrosColuna, setFiltrosColuna] = useState<Partial<Record<ChaveColuna, string>>>({});
   /* Padrão: o que está faltando aparece primeiro, que é o que trava a importação. */
   const [ordem, setOrdem] = useState<Ordenacao>("sem-step");
   const [pagina, setPagina] = useState(1);
@@ -196,24 +197,43 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
   /* Global: é o que a exportação vai levar, independente do filtro. */
   const semStep = useMemo(() => linhas.filter((linha) => !linha.caminho).length, [linhas]);
 
-  /* O dropdown de MP mostra só o que existe na lista atual. */
-  const opcoesMp = useMemo<AutocompleteOption[]>(() => {
-    const mapa = new Map<string, string>();
+  /* A ordem da preferência É a ordem na tela -- a pessoa arrasta no seletor. */
+  const colunasVisiveis = useMemo(
+    () =>
+      colunas
+        .map((chave) => definicaoDaColuna(chave))
+        .filter((coluna): coluna is DefinicaoColuna => Boolean(coluna)),
+    [colunas]
+  );
 
-    for (const linha of linhas) {
-      if (!linha.codigoMp) continue;
-      if (!mapa.has(linha.codigoMp)) {
-        mapa.set(linha.codigoMp, linha.descricaoMp || linha.codigoMp);
-      }
-    }
+  /*
+   * Os filtros seguem as colunas habilitadas: cada coluna filtrável que
+   * está na tabela vira um filtro, com as opções saídas dos próprios
+   * dados carregados -- não adianta oferecer um valor que não existe na
+   * lista.
+   */
+  const filtrosDisponiveis = useMemo(() => {
+    return colunasVisiveis
+      .filter((coluna) => coluna.filtravel && coluna.valor)
+      .map((coluna) => {
+        const mapa = new Map<string, string>();
 
-    return [...mapa.entries()]
-      .sort((a, b) => compararTexto(a[0], b[0]))
-      .map(([codigo, descricao]) => ({
-        value: codigo,
-        label: `${codigo} — ${descricao}`,
-      }));
-  }, [linhas]);
+        for (const linha of linhas) {
+          const valor = coluna.valor?.(linha.item) ?? "";
+          if (!valor) continue;
+          if (!mapa.has(valor)) {
+            mapa.set(valor, coluna.rotuloOpcao?.(linha.item) || valor);
+          }
+        }
+
+        const opcoes: AutocompleteOption[] = [...mapa.entries()]
+          .sort((a, b) => compararTexto(a[0], b[0]))
+          .map(([valor, rotulo]) => ({ value: valor, label: rotulo }));
+
+        return { coluna, opcoes };
+      })
+      .filter((filtro) => filtro.opcoes.length > 1);
+  }, [colunasVisiveis, linhas]);
 
   const filtradas = useMemo(() => {
     const termo = normalizar(filtro);
@@ -221,7 +241,14 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
     const lista = linhas.filter((linha) => {
       if (filtroStep === "com" && !linha.caminho) return false;
       if (filtroStep === "sem" && linha.caminho) return false;
-      if (filtroMp !== "todas" && linha.codigoMp !== filtroMp) return false;
+
+      for (const [chave, escolhido] of Object.entries(filtrosColuna)) {
+        if (!escolhido) continue;
+
+        const definicao = definicaoDaColuna(chave as ChaveColuna);
+        if (definicao?.valor?.(linha.item) !== escolhido) return false;
+      }
+
       if (!termo) return true;
 
       return [linha.codigo, linha.descricao, linha.codigoMp, linha.descricaoMp, linha.arquivo].some(
@@ -246,7 +273,7 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
       const faltaB = b.caminho ? 1 : 0;
       return faltaA !== faltaB ? faltaA - faltaB : compararTexto(a.codigo, b.codigo);
     });
-  }, [linhas, filtro, filtroStep, filtroMp, ordem]);
+  }, [linhas, filtro, filtroStep, filtrosColuna, ordem]);
 
   /*
    * Todo total da tela (cards do topo e rodapé) sai da lista FILTRADA --
@@ -315,15 +342,6 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
   const totalArquivosPorMp = useMemo(
     () => new Set(linhas.map((linha) => linha.codigoMp || "SEM-MP")).size,
     [linhas]
-  );
-
-  /* A ordem da preferência É a ordem na tela -- a pessoa arrasta no seletor. */
-  const colunasVisiveis = useMemo(
-    () =>
-      colunas
-        .map((chave) => definicaoDaColuna(chave))
-        .filter((coluna): coluna is DefinicaoColuna => Boolean(coluna)),
-    [colunas]
   );
 
   const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
@@ -519,7 +537,7 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
     setLinhas([]);
     setFiltro("");
     setFiltroStep("todos");
-    setFiltroMp("todas");
+    setFiltrosColuna({});
     setOrdem("sem-step");
     setPagina(1);
     setItensEncontrados([]);
@@ -729,35 +747,58 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
                   />
                 </Field>
 
-                <Field label="Arquivo STEP">
-                  <Dropdown
-                    value={filtroStep}
-                    options={[
-                      { value: "todos", label: "Todas as peças" },
-                      { value: "com", label: "Com STEP" },
-                      { value: "sem", label: "Sem STEP" },
-                    ]}
-                    onValueChange={(valor) => {
-                      setFiltroStep(valor as FiltroStep);
-                      setPagina(1);
-                    }}
-                  />
-                </Field>
+                {/* Só faz sentido filtrar pelo arquivo se a coluna dele estiver na tabela. */}
+                {colunas.includes("arquivo") && (
+                  <Field label="Arquivo STEP">
+                    <Dropdown
+                      value={filtroStep}
+                      options={[
+                        { value: "todos", label: "Todas as peças" },
+                        { value: "com", label: "Com STEP" },
+                        { value: "sem", label: "Sem STEP" },
+                      ]}
+                      onValueChange={(valor) => {
+                        setFiltroStep(valor as FiltroStep);
+                        setPagina(1);
+                      }}
+                    />
+                  </Field>
+                )}
 
-                <Field label="Matéria-prima">
-                  {/* Autocomplete em vez de Dropdown: são dezenas de MPs, e
-                      digitar o código é mais rápido do que rolar a lista. */}
-                  <Autocomplete
-                    options={opcoesMp}
-                    selectedOption={opcoesMp.find((opcao) => opcao.value === filtroMp) ?? null}
-                    placeholder="Todas as matérias-primas"
-                    emptyMessage="Nenhuma matéria-prima encontrada"
-                    onSelect={(opcao) => {
-                      setFiltroMp(opcao?.value ?? "todas");
-                      setPagina(1);
-                    }}
-                  />
-                </Field>
+                {filtrosDisponiveis.map(({ coluna, opcoes }) => (
+                  <Field key={coluna.chave} label={coluna.label}>
+                    {/* Autocomplete quando a lista é longa (dezenas de MPs,
+                        por exemplo): digitar é mais rápido do que rolar. */}
+                    {opcoes.length > 8 ? (
+                      <Autocomplete
+                        options={opcoes}
+                        selectedOption={
+                          opcoes.find((opcao) => opcao.value === filtrosColuna[coluna.chave]) ?? null
+                        }
+                        placeholder={`Todos — ${coluna.label}`}
+                        emptyMessage="Nenhuma opção encontrada"
+                        onSelect={(opcao) => {
+                          setFiltrosColuna((anterior) => ({
+                            ...anterior,
+                            [coluna.chave]: opcao?.value ?? "",
+                          }));
+                          setPagina(1);
+                        }}
+                      />
+                    ) : (
+                      <Dropdown
+                        value={filtrosColuna[coluna.chave] ?? ""}
+                        options={[{ value: "", label: `Todos — ${coluna.label}` }, ...opcoes.map(
+                          (opcao) => ({ value: opcao.value, label: opcao.label })
+                        )]}
+                        onValueChange={(valor) => {
+                          setFiltrosColuna((anterior) => ({ ...anterior, [coluna.chave]: valor }));
+                          setPagina(1);
+                        }}
+                      />
+                    )}
+                  </Field>
+                ))}
 
                 <Field label="Ordenar por">
                   <Dropdown
@@ -783,13 +824,16 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
                     : `${filtradas.length} de ${linhas.length} peça(s)`}
                 </span>
 
-                {(filtro || filtroStep !== "todos" || filtroMp !== "todas" || ordem !== "sem-step") && (
+                {(filtro ||
+                  filtroStep !== "todos" ||
+                  Object.values(filtrosColuna).some(Boolean) ||
+                  ordem !== "sem-step") && (
                   <Button
                     variant="secondary"
                     onClick={() => {
                       setFiltro("");
                       setFiltroStep("todos");
-                      setFiltroMp("todas");
+                      setFiltrosColuna({});
                       setOrdem("sem-step");
                       setPagina(1);
                     }}

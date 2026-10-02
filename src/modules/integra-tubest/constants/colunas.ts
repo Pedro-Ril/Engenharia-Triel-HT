@@ -43,7 +43,7 @@ export type ChaveColuna =
   | "arquivo"
   | "acoes";
 
-export type GrupoColuna = "Peça" | "Ordem" | "Matéria-prima" | "Roteiro" | "Ordem de fabricação" | "Arquivo";
+export type GrupoColuna = "Peça" | "Ordem" | "Matéria-prima" | "Roteiro" | "Ordem de produção" | "Arquivo";
 
 export interface DefinicaoColuna {
   chave: ChaveColuna;
@@ -56,6 +56,15 @@ export interface DefinicaoColuna {
   padrao?: boolean;
   /* Como o valor sai do item do endpoint. "" quando não se aplica. */
   valor?: (item: ApiIntegracaoItem) => string;
+  /*
+   * Coluna que também vira filtro na tela enquanto estiver habilitada.
+   * As opções saem dos dados carregados -- o filtro só oferece o que
+   * existe na lista. Ficam de fora os campos numéricos (quantidades) e
+   * os que a busca livre já cobre (peça e descrição).
+   */
+  filtravel?: boolean;
+  /* Rótulo da opção quando o valor cru não basta (ex: código da MP). */
+  rotuloOpcao?: (item: ApiIntegracaoItem) => string;
 }
 
 function texto(valor: unknown): string {
@@ -84,17 +93,43 @@ export const COLUNAS: DefinicaoColuna[] = [
     chave: "desenho",
     label: "Cód. desenho",
     grupo: "Peça",
+    filtravel: true,
     valor: (item) => texto(item.cod_desenho),
   },
 
-  { chave: "lote", label: "Lote", grupo: "Ordem", valor: (item) => texto(item.num_lote_pro) },
-  { chave: "ordem", label: "Ordem", grupo: "Ordem", valor: (item) => texto(item.num_ordem) },
-  { chave: "rancho", label: "Rancho", grupo: "Ordem", valor: (item) => texto(item.num_rancho) },
-  { chave: "pedido", label: "Pedido", grupo: "Ordem", valor: (item) => texto(item.num_pedido) },
+  {
+    chave: "lote",
+    label: "Lote",
+    grupo: "Ordem",
+    filtravel: true,
+    valor: (item) => texto(item.num_lote_pro),
+  },
+  {
+    chave: "ordem",
+    label: "Ordem",
+    grupo: "Ordem",
+    filtravel: true,
+    valor: (item) => texto(item.num_ordem),
+  },
+  {
+    chave: "rancho",
+    label: "Rancho",
+    grupo: "Ordem",
+    filtravel: true,
+    valor: (item) => texto(item.num_rancho),
+  },
+  {
+    chave: "pedido",
+    label: "Pedido",
+    grupo: "Ordem",
+    filtravel: true,
+    valor: (item) => texto(item.num_pedido),
+  },
   {
     chave: "cliente",
     label: "Cliente",
     grupo: "Ordem",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_cli, item.descricao_cli),
   },
 
@@ -103,7 +138,10 @@ export const COLUNAS: DefinicaoColuna[] = [
     label: "Cód. MP",
     grupo: "Matéria-prima",
     padrao: true,
+    filtravel: true,
     valor: (item) => texto(item.cod_item_mp),
+    /* No filtro o código sozinho não diz nada: vai com a descrição. */
+    rotuloOpcao: (item) => codigoComDescricao(item.cod_item_mp, item.desc_tecnica_mp),
   },
   {
     chave: "descricaoMp",
@@ -117,6 +155,7 @@ export const COLUNAS: DefinicaoColuna[] = [
     chave: "unidadeMp",
     label: "Unidade MP",
     grupo: "Matéria-prima",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_unid_med_mp, item.descricao_unid_med_m),
   },
 
@@ -124,43 +163,50 @@ export const COLUNAS: DefinicaoColuna[] = [
     chave: "operacao",
     label: "Operação",
     grupo: "Roteiro",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_operacao, item.descricao_operacao),
   },
   {
     chave: "centroTrabalho",
     label: "Centro de trabalho",
     grupo: "Roteiro",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_centrotrab, item.descricao_centrotrab),
   },
   {
     chave: "maquina",
     label: "Máquina",
     grupo: "Roteiro",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_maquina, item.descricao_maquina),
   },
 
   {
     chave: "operacaoOrdem",
-    label: "Operação (OF)",
-    grupo: "Ordem de fabricação",
+    label: "Operação (OP)",
+    grupo: "Ordem de produção",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_operacao_ordem, item.descricao_operacao_ordem),
   },
   {
     chave: "centroTrabalhoOrdem",
-    label: "Centro de trabalho (OF)",
-    grupo: "Ordem de fabricação",
+    label: "Centro de trabalho (OP)",
+    grupo: "Ordem de produção",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_centrotrab_ordem, item.descricao_centrotrab_ordem),
   },
   {
     chave: "maquinaOrdem",
-    label: "Máquina (OF)",
-    grupo: "Ordem de fabricação",
+    label: "Máquina (OP)",
+    grupo: "Ordem de produção",
+    filtravel: true,
     valor: (item) => codigoComDescricao(item.cod_maquina_ordem, item.descricao_maquina_ordem),
   },
 
   { chave: "arquivo", label: "Arquivo STEP", grupo: "Arquivo", padrao: true },
   { chave: "acoes", label: "Ações", grupo: "Arquivo", alinhamento: "center", fixa: true, padrao: true },
 ];
+
 
 export const COLUNAS_PADRAO: ChaveColuna[] = COLUNAS.filter((coluna) => coluna.padrao).map(
   (coluna) => coluna.chave
@@ -176,12 +222,12 @@ export function definicaoDaColuna(chave: ChaveColuna): DefinicaoColuna | undefin
 
 /*
  * Normaliza o que veio da preferência salva: descarta chave que não
- * existe mais, tira repetição e garante as fixas.
+ * existe mais, tira repetição e crava as três posições fixas.
  *
- * A ORDEM da lista é a ordem das colunas na tela -- a pessoa arrasta
- * para mudar --, então ela é preservada como veio. As fixas que
- * faltarem entram onde fazem sentido: peça e descrição abrindo a
- * tabela, ações fechando.
+ * Peça SEMPRE primeira, descrição SEMPRE segunda, ações SEMPRE última --
+ * isso não é escolha do usuário, e é garantido aqui (e não só na tela)
+ * para que nem uma preferência antiga nem um PUT fora de ordem consigam
+ * furar a regra. A ordem do miolo é a que a pessoa arrastou.
  */
 export function normalizarColunas(escolhidas: unknown): ChaveColuna[] {
   const lista = Array.isArray(escolhidas) ? escolhidas.map(String) : [];
@@ -196,11 +242,12 @@ export function normalizarColunas(escolhidas: unknown): ChaveColuna[] {
   const temAlgoAlemDasFixas = semRepetir.some((chave) => !COLUNAS_FIXAS.includes(chave));
   if (!temAlgoAlemDasFixas) return COLUNAS_PADRAO;
 
-  const resultado = [...semRepetir];
+  const miolo = semRepetir.filter((chave) => !COLUNAS_FIXAS.includes(chave));
 
-  if (!resultado.includes("descricao")) resultado.unshift("descricao");
-  if (!resultado.includes("peca")) resultado.unshift("peca");
-  if (!resultado.includes("acoes")) resultado.push("acoes");
+  return ["peca", "descricao", ...miolo, "acoes"];
+}
 
-  return resultado;
+/* O miolo é o que o usuário pode arrastar e remover. */
+export function colunasDoMiolo(colunas: ChaveColuna[]): ChaveColuna[] {
+  return colunas.filter((chave) => !COLUNAS_FIXAS.includes(chave));
 }

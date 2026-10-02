@@ -28,6 +28,7 @@ import styles from "./ColunasModal.module.css";
 import {
   COLUNAS,
   COLUNAS_PADRAO,
+  colunasDoMiolo,
   definicaoDaColuna,
   type ChaveColuna,
   type GrupoColuna,
@@ -37,9 +38,9 @@ import {
  * Escolha e ORDEM das colunas. A lista da esquerda é a tabela: a ordem
  * nela é a ordem na tela, e arrastar muda as duas.
  *
- * Peça, descrição e ações não podem ser removidas (a tabela deixaria de
- * fazer sentido), mas podem ser arrastadas como as outras -- travar a
- * posição delas seria uma restrição que ninguém pediu.
+ * Peça, descrição e ações ficam fora do arrasto: a primeira, a segunda e
+ * a última posição são fixas. Aparecem na lista mesmo assim, travadas,
+ * para a ordem mostrada ser a ordem real da tabela.
  */
 
 interface ColunasModalProps {
@@ -52,6 +53,25 @@ interface ColunasModalProps {
 interface LinhaProps {
   chave: ChaveColuna;
   onRemover: (chave: ChaveColuna) => void;
+}
+
+/* Posição cravada: sem alça e sem botão de remover. */
+function LinhaFixa({ chave }: { chave: ChaveColuna }) {
+  const definicao = definicaoDaColuna(chave);
+  if (!definicao) return null;
+
+  return (
+    <li className={`${styles.linha} ${styles.linhaFixa}`}>
+      <span className={styles.travada} title="Posição fixa">
+        <Lock size={13} />
+      </span>
+
+      <span className={styles.rotulo}>
+        {definicao.label}
+        <span className={styles.grupo}>posição fixa</span>
+      </span>
+    </li>
+  );
 }
 
 function LinhaColuna({ chave, onRemover }: LinhaProps) {
@@ -113,6 +133,8 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const miolo = useMemo(() => colunasDoMiolo(selecao), [selecao]);
+
   const disponiveis = useMemo(() => {
     const fora = COLUNAS.filter((coluna) => !selecao.includes(coluna.chave));
     const mapa = new Map<GrupoColuna, typeof COLUNAS>();
@@ -131,25 +153,19 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
     if (!over || active.id === over.id) return;
 
     setSelecao((anterior) => {
-      const de = anterior.indexOf(active.id as ChaveColuna);
-      const para = anterior.indexOf(over.id as ChaveColuna);
+      const atual = colunasDoMiolo(anterior);
+      const de = atual.indexOf(active.id as ChaveColuna);
+      const para = atual.indexOf(over.id as ChaveColuna);
       if (de < 0 || para < 0) return anterior;
 
-      return arrayMove(anterior, de, para);
+      /* Reordena só o miolo; as fixas voltam às posições delas. */
+      return ["peca", "descricao", ...arrayMove(atual, de, para), "acoes"];
     });
   }
 
   function adicionar(chave: ChaveColuna) {
-    setSelecao((anterior) => {
-      /* Entra antes de "Ações" quando ela fecha a tabela -- ninguém quer
-         uma coluna nova depois dos botões. */
-      const ultima = anterior[anterior.length - 1];
-      if (ultima === "acoes") {
-        return [...anterior.slice(0, -1), chave, "acoes"];
-      }
-
-      return [...anterior, chave];
-    });
+    /* Entra no fim do miolo: depois das demais e antes de "Ações". */
+    setSelecao((anterior) => ["peca", "descricao", ...colunasDoMiolo(anterior), chave, "acoes"]);
   }
 
   function remover(chave: ChaveColuna) {
@@ -182,15 +198,24 @@ export function ColunasModal({ open, colunas, onAplicar, onClose }: ColunasModal
         <section className={styles.painel}>
           <h3 className={styles.titulo}>Na tabela — arraste para ordenar</h3>
 
+          <ul className={styles.lista}>
+            <LinhaFixa chave="peca" />
+            <LinhaFixa chave="descricao" />
+          </ul>
+
           <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={selecao} strategy={verticalListSortingStrategy}>
+            <SortableContext items={miolo} strategy={verticalListSortingStrategy}>
               <ul className={styles.lista}>
-                {selecao.map((chave) => (
+                {miolo.map((chave) => (
                   <LinhaColuna key={chave} chave={chave} onRemover={remover} />
                 ))}
               </ul>
             </SortableContext>
           </DndContext>
+
+          <ul className={styles.lista}>
+            <LinhaFixa chave="acoes" />
+          </ul>
         </section>
 
         <section className={styles.painel}>
