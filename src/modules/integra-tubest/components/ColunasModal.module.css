@@ -1,11 +1,17 @@
-.grupos {
+.colunas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
   gap: 16px;
 }
 
-.grupo {
+@media (max-width: 800px) {
+  .colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.painel {
   padding: 14px;
   border: 1px solid var(--border-soft);
   border-radius: 10px;
@@ -20,4 +26,79 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.subtitulo {
+  margin: 12px 0 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.subtitulo:first-child {
+  margin-top: 0;
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+
+.rotulo {
+  flex: 1;
+  min-width: 0;
+
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+
+  color: var(--text);
+  font-size: 13px;
+}
+
+.grupo {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+/* A alça precisa parecer arrastável antes de alguém tentar. */
+.alca {
+  cursor: grab;
+}
+
+.alca:active {
+  cursor: grabbing;
+}
+
+.travada {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.grupos {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.vazio {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }

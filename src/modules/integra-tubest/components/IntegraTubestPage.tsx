@@ -61,9 +61,9 @@ import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-tran
 import { gerarId } from "@/lib/utils/gerar-id";
 
 import {
-  COLUNAS,
   definicaoDaColuna,
   type ChaveColuna,
+  type DefinicaoColuna,
 } from "../constants/colunas";
 import { escolherDestino } from "../utils/salvar-arquivo";
 
@@ -317,9 +317,12 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
     [linhas]
   );
 
-  /* Catálogo filtrado pela preferência, na ordem fixa do catálogo. */
+  /* A ordem da preferência É a ordem na tela -- a pessoa arrasta no seletor. */
   const colunasVisiveis = useMemo(
-    () => COLUNAS.filter((coluna) => coluna.fixa || colunas.includes(coluna.chave)),
+    () =>
+      colunas
+        .map((chave) => definicaoDaColuna(chave))
+        .filter((coluna): coluna is DefinicaoColuna => Boolean(coluna)),
     [colunas]
   );
 

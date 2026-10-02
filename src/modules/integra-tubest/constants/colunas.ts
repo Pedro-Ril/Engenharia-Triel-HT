@@ -176,19 +176,31 @@ export function definicaoDaColuna(chave: ChaveColuna): DefinicaoColuna | undefin
 
 /*
  * Normaliza o que veio da preferência salva: descarta chave que não
- * existe mais, garante as fixas e mantém a ordem do catálogo -- assim a
- * tabela nunca sai embaralhada nem perde a coluna de ações.
+ * existe mais, tira repetição e garante as fixas.
+ *
+ * A ORDEM da lista é a ordem das colunas na tela -- a pessoa arrasta
+ * para mudar --, então ela é preservada como veio. As fixas que
+ * faltarem entram onde fazem sentido: peça e descrição abrindo a
+ * tabela, ações fechando.
  */
 export function normalizarColunas(escolhidas: unknown): ChaveColuna[] {
   const lista = Array.isArray(escolhidas) ? escolhidas.map(String) : [];
-  const conhecidas = new Set(lista);
 
-  const visiveis = COLUNAS.filter(
-    (coluna) => coluna.fixa || conhecidas.has(coluna.chave)
-  ).map((coluna) => coluna.chave);
+  const validas = lista.filter((chave): chave is ChaveColuna =>
+    COLUNAS.some((coluna) => coluna.chave === chave)
+  );
+
+  const semRepetir = [...new Set(validas)];
 
   /* Preferência vazia (ou só com chaves mortas) volta para o padrão. */
-  const temAlgoAlemDasFixas = visiveis.some((chave) => !COLUNAS_FIXAS.includes(chave));
+  const temAlgoAlemDasFixas = semRepetir.some((chave) => !COLUNAS_FIXAS.includes(chave));
+  if (!temAlgoAlemDasFixas) return COLUNAS_PADRAO;
 
-  return temAlgoAlemDasFixas ? visiveis : COLUNAS_PADRAO;
+  const resultado = [...semRepetir];
+
+  if (!resultado.includes("descricao")) resultado.unshift("descricao");
+  if (!resultado.includes("peca")) resultado.unshift("peca");
+  if (!resultado.includes("acoes")) resultado.push("acoes");
+
+  return resultado;
 }
