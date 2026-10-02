@@ -5,6 +5,7 @@ import {
   Boxes,
   Check,
   ClipboardList,
+  Columns3,
   Info,
   FileArchive,
   FileSpreadsheet,
@@ -41,10 +42,16 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
+import { ColunasModal } from "./ColunasModal";
 import InfoIntegracaoModal from "./InfoIntegracaoModal";
 import ValidationModal from "./ValidationModal";
 import styles from "./IntegraTubestPage.module.css";
-import { buscarOrdens, gerarPlanilha, validarStep } from "../services/integraTubest.service";
+import {
+  buscarOrdens,
+  gerarPlanilha,
+  salvarColunas,
+  validarStep,
+} from "../services/integraTubest.service";
 import type {
   ApiIntegracaoItem,
   StepInfo,
@@ -53,6 +60,11 @@ import type {
 import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
 import { gerarId } from "@/lib/utils/gerar-id";
 
+import {
+  COLUNAS,
+  definicaoDaColuna,
+  type ChaveColuna,
+} from "../constants/colunas";
 import { escolherDestino } from "../utils/salvar-arquivo";
 
 const POR_PAGINA = 15;
@@ -61,6 +73,8 @@ const POR_PAGINA = 15;
    arquivo; o resto é conferência (e é o que o TuBest não lê). */
 interface LinhaTela {
   id: string;
+  /* O item como veio do endpoint: as colunas opcionais leem daqui. */
+  item: ApiIntegracaoItem;
   lote: string;
   ordem: string;
   caminho: string;
@@ -139,7 +153,12 @@ function totaisPorUnidade(linhas: LinhaTela[]): string {
     .join(" · ");
 }
 
-export function IntegraTubestPage() {
+interface IntegraTubestPageProps {
+  /* Resolvida no servidor para a tabela não piscar com o padrão antes. */
+  colunasIniciais: ChaveColuna[];
+}
+
+export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
   const [tipoBusca, setTipoBusca] = useState<TipoBusca>("ordem");
   const [valorBusca, setValorBusca] = useState("");
   /* Só entra no nome do arquivo -- não filtra nem busca nada. */
@@ -162,6 +181,8 @@ export function IntegraTubestPage() {
   const [exportacaoAberta, setExportacaoAberta] = useState(false);
   const [resumoAberto, setResumoAberto] = useState(false);
   const [infoAberto, setInfoAberto] = useState(false);
+  const [colunasAberto, setColunasAberto] = useState(false);
+  const [colunas, setColunas] = useState<ChaveColuna[]>(colunasIniciais);
   const [resumoTitulo, setResumoTitulo] = useState("");
   const [grupoCopiado, setGrupoCopiado] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
@@ -296,6 +317,12 @@ export function IntegraTubestPage() {
     [linhas]
   );
 
+  /* Catálogo filtrado pela preferência, na ordem fixa do catálogo. */
+  const colunasVisiveis = useMemo(
+    () => COLUNAS.filter((coluna) => coluna.fixa || colunas.includes(coluna.chave)),
+    [colunas]
+  );
+
   const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
   const visiveis = filtradas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
@@ -369,6 +396,7 @@ export function IntegraTubestPage() {
       return {
         /* gerarId e não crypto.randomUUID: em HTTP o método não existe. */
         id: gerarId(),
+        item,
         lote: String(item.num_lote_pro ?? "").trim(),
         ordem: String(item.num_ordem ?? "").trim(),
         caminho: info?.caminho ?? "",
@@ -394,6 +422,86 @@ export function IntegraTubestPage() {
         ? `${faltando} peça(s) entraram sem arquivo STEP — a coluna do caminho vai vazia na planilha.`
         : ""
     );
+  }
+
+  /*
+   * As colunas com apresentação própria (peça, descrição, MP, arquivo,
+   * ações) são tratadas aqui; o resto sai direto do item, pelo `valor`
+   * declarado no catálogo.
+   */
+  function celulaDaColuna(linha: LinhaTela, chave: ChaveColuna) {
+    switch (chave) {
+      case "peca":
+        return <strong className={styles.codigo}>{linha.codigo}</strong>;
+
+      case "descricao":
+        return (
+          <span className={styles.truncado} title={linha.descricao}>
+            {linha.descricao || "—"}
+          </span>
+        );
+
+      case "descricaoMp":
+        return (
+          <span className={styles.truncado} title={linha.descricaoMp}>
+            {linha.descricaoMp || "—"}
+          </span>
+        );
+
+      case "qtdeMp":
+        return linha.qtdeMp === ""
+          ? "—"
+          : `${Number(linha.qtdeMp).toLocaleString("pt-BR", {
+              maximumFractionDigits: 4,
+            })} ${linha.unidadeMp}`.trim();
+
+      case "arquivo":
+        return linha.caminho ? (
+          /* O nome basta na tela; o caminho inteiro vai para o arquivo e
+             aparece ao parar o mouse. */
+          <span className={styles.arquivo} title={linha.caminho}>
+            {linha.arquivo}
+            {linha.formato === "igs" && <span className={styles.marcadorIgs}>IGS</span>}
+            {linha.pasta === "ciber" && <span className={styles.marcadorCiber}>CIBER</span>}
+          </span>
+        ) : (
+          <Badge variant="warning">sem arquivo STEP</Badge>
+        );
+
+      case "acoes":
+        return (
+          <IconButton
+            icon={<Trash2 size={16} />}
+            label={`Remover ${linha.codigo}`}
+            variant="neutral"
+            size="small"
+            onClick={() => handleRemoverLinha(linha.id)}
+          />
+        );
+
+      default: {
+        const texto = definicaoDaColuna(chave)?.valor?.(linha.item) ?? "";
+
+        return texto ? (
+          <span className={styles.truncado} title={texto}>
+            {texto}
+          </span>
+        ) : (
+          "—"
+        );
+      }
+    }
+  }
+
+  async function handleAplicarColunas(novas: ChaveColuna[]) {
+    setColunas(novas);
+    setColunasAberto(false);
+
+    /* Falha ao salvar não desfaz a escolha na tela -- só avisa. */
+    const salvou = await salvarColunas(novas);
+    if (!salvou) {
+      setAviso("As colunas foram aplicadas, mas não deu para salvar sua preferência.");
+    }
   }
 
   function handleRemoverLinha(id: string) {
@@ -661,6 +769,11 @@ export function IntegraTubestPage() {
               </FormGrid>
 
               <Stack direction="row" gap={12} align="center" justify="between" wrap>
+                <Button variant="secondary" onClick={() => setColunasAberto(true)}>
+                  <Columns3 size={15} />
+                  Colunas
+                </Button>
+
                 <span className={styles.contagem}>
                   {filtradas.length === linhas.length
                     ? `${linhas.length} peça(s)`
@@ -683,71 +796,25 @@ export function IntegraTubestPage() {
                 )}
               </Stack>
 
-              <Table minWidth={1100}>
+              <Table minWidth={Math.max(900, colunasVisiveis.length * 150)}>
                 <TableHead>
                   <TableRow>
-                    <TableHeaderCell>Peça</TableHeaderCell>
-                    <TableHeaderCell>Descrição</TableHeaderCell>
-                    <TableHeaderCell align="right">Qtde</TableHeaderCell>
-                    <TableHeaderCell>Cód. MP</TableHeaderCell>
-                    <TableHeaderCell>Descrição MP</TableHeaderCell>
-                    <TableHeaderCell align="right">Qtde MP</TableHeaderCell>
-                    <TableHeaderCell>Arquivo STEP</TableHeaderCell>
-                    <TableHeaderCell align="center">Ações</TableHeaderCell>
+                    {colunasVisiveis.map((coluna) => (
+                      <TableHeaderCell key={coluna.chave} align={coluna.alinhamento}>
+                        {coluna.label}
+                      </TableHeaderCell>
+                    ))}
                   </TableRow>
                 </TableHead>
 
                 <TableBody>
                   {visiveis.map((linha) => (
                     <TableRow key={linha.id}>
-                      <TableCell>
-                        <strong className={styles.codigo}>{linha.codigo}</strong>
-                      </TableCell>
-                      <TableCell>
-                        <span className={styles.truncado} title={linha.descricao}>
-                          {linha.descricao || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell align="right">{linha.quantidade}</TableCell>
-                      <TableCell>{linha.codigoMp || "—"}</TableCell>
-                      <TableCell>
-                        <span className={styles.truncado} title={linha.descricaoMp}>
-                          {linha.descricaoMp || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell align="right">
-                        {linha.qtdeMp === ""
-                          ? "—"
-                          : `${Number(linha.qtdeMp).toLocaleString("pt-BR", {
-                              maximumFractionDigits: 4,
-                            })} ${linha.unidadeMp}`.trim()}
-                      </TableCell>
-                      <TableCell>
-                        {linha.caminho ? (
-                          /* O nome basta na tela; o caminho inteiro vai para o
-                             arquivo e aparece ao parar o mouse. */
-                          <span className={styles.arquivo} title={linha.caminho}>
-                            {linha.arquivo}
-                            {linha.formato === "igs" && (
-                              <span className={styles.marcadorIgs}>IGS</span>
-                            )}
-                            {linha.pasta === "ciber" && (
-                              <span className={styles.marcadorCiber}>CIBER</span>
-                            )}
-                          </span>
-                        ) : (
-                          <Badge variant="warning">sem arquivo STEP</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton
-                          icon={<Trash2 size={16} />}
-                          label={`Remover ${linha.codigo}`}
-                          variant="neutral"
-                          size="small"
-                          onClick={() => handleRemoverLinha(linha.id)}
-                        />
-                      </TableCell>
+                      {colunasVisiveis.map((coluna) => (
+                        <TableCell key={coluna.chave} align={coluna.alinhamento}>
+                          {celulaDaColuna(linha, coluna.chave)}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -799,6 +866,15 @@ export function IntegraTubestPage() {
           )}
         </Stack>
       </Card>
+
+      {colunasAberto && (
+        <ColunasModal
+          open
+          colunas={colunas}
+          onAplicar={handleAplicarColunas}
+          onClose={() => setColunasAberto(false)}
+        />
+      )}
 
       <InfoIntegracaoModal open={infoAberto} onClose={() => setInfoAberto(false)} />
 

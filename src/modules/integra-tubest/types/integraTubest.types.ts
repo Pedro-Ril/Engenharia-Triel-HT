@@ -8,6 +8,7 @@ export type TipoBusca = "lote" | "ordem";
  */
 export interface ApiIntegracaoItem {
   num_lote_pro: number | null;
+  num_rancho: number | null;
   num_ordem: number | null;
 
   cod_item: string | null;
@@ -22,8 +23,27 @@ export interface ApiIntegracaoItem {
   qtde_mp: number | null;
   cod_unid_med_mp: string | null;
 
+  descricao_unid_med_m: string | null;
+
   num_pedido: number | null;
+  cod_cli: string | null;
   descricao_cli: string | null;
+
+  /* Roteiro do item: a operação que esta consulta filtra. */
+  cod_operacao: number | null;
+  descricao_operacao: string | null;
+  cod_centrotrab: string | null;
+  descricao_centrotrab: string | null;
+  cod_maquina: string | null;
+  descricao_maquina: string | null;
+
+  /* O que a ordem de fabricação aponta -- pode divergir do roteiro. */
+  cod_operacao_ordem: number | null;
+  descricao_operacao_ordem: string | null;
+  cod_centrotrab_ordem: string | null;
+  descricao_centrotrab_ordem: string | null;
+  cod_maquina_ordem: string | null;
+  descricao_maquina_ordem: string | null;
 }
 
 export interface ApiIntegracaoResponse {

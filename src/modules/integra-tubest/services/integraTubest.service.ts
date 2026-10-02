@@ -67,3 +67,22 @@ export async function gerarPlanilha(
 
   return response.blob();
 }
+
+/*
+ * Salva as colunas escolhidas. Devolve só sucesso/fracasso: a tela já
+ * aplicou a escolha, e falhar aqui significa apenas que ela não vai
+ * sobreviver ao próximo acesso.
+ */
+export async function salvarColunas(colunas: string[]): Promise<boolean> {
+  try {
+    const response = await fetch("/api/integra-tubest/preferencias", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ colunas }),
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
