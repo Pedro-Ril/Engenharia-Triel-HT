@@ -151,7 +151,8 @@ export type EventoNotificacaoChamado =
   | "reaberto"
   | "fechado"
   | "nova_mensagem_solicitante"
-  | "adicionado_copia";
+  | "adicionado_copia"
+  | "aberto_atendente";
 
 export interface NotificacaoEmailChamado {
   id: string;

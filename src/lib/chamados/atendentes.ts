@@ -79,6 +79,65 @@ export async function listarAtendentesDisponiveisParaSetor(
   return result.recordset;
 }
 
+export interface AtendenteNotificavel {
+  usuarioId: string;
+  nome: string;
+  email: string;
+}
+
+/*
+ * Quem avisar quando um chamado NOVO cai num setor.
+ *
+ * Diferente de listarAtendentesDisponiveisParaSetor, que inclui todo
+ * administrador (eles atendem qualquer setor): avisar todo admin de
+ * todo chamado seria spam. Aqui valem os cadastrados em
+ * portal_chamados_atendentes para o setor.
+ *
+ * A exceção é o setor que ainda não tem ninguém cadastrado -- hoje a
+ * tabela está vazia e quem atende de fato são os administradores. Sem
+ * essa reserva, o chamado nasceria sem avisar ninguém, que é
+ * exatamente o buraco que esta notificação veio tapar.
+ */
+export async function listarAtendentesParaNotificacao(
+  setorId: string
+): Promise<AtendenteNotificavel[]> {
+  const pool = await getSqlServerPool();
+
+  const cadastrados = await pool
+    .request()
+    .input("setorId", sql.UniqueIdentifier, setorId)
+    .query<AtendenteNotificavel>(`
+      SELECT
+        CONVERT(VARCHAR(36), u.[id]) AS [usuarioId],
+        u.[nome_exibicao] AS [nome],
+        u.[email] AS [email]
+      FROM dbo.portal_chamados_atendentes AS a
+      INNER JOIN dbo.portal_usuarios AS u ON u.[id] = a.[usuario_id]
+      WHERE a.[setor_id] = @setorId
+        AND u.[ativo] = 1
+        AND u.[email] IS NOT NULL
+        AND LTRIM(RTRIM(u.[email])) <> ''
+      ORDER BY u.[nome_exibicao];
+    `);
+
+  if (cadastrados.recordset.length > 0) return cadastrados.recordset;
+
+  const administradores = await pool.request().query<AtendenteNotificavel>(`
+    SELECT
+      CONVERT(VARCHAR(36), [id]) AS [usuarioId],
+      [nome_exibicao] AS [nome],
+      [email] AS [email]
+    FROM dbo.portal_usuarios
+    WHERE [eh_administrador] = 1
+      AND [ativo] = 1
+      AND [email] IS NOT NULL
+      AND LTRIM(RTRIM([email])) <> ''
+    ORDER BY [nome_exibicao];
+  `);
+
+  return administradores.recordset;
+}
+
 export async function concederAtendente(params: {
   usuarioId: string;
   setorId: string;

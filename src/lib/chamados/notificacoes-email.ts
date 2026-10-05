@@ -13,6 +13,7 @@ import {
   montarLinkEmailHtml,
 } from "@/lib/smtp/template-email";
 
+import { listarAtendentesParaNotificacao } from "./atendentes";
 import { listarCopiaDoChamado } from "./chamados";
 
 export type EventoNotificacaoChamado =
@@ -26,7 +27,9 @@ export type EventoNotificacaoChamado =
   /* Endereçado ao ATENDENTE (não ao solicitante) -- disparado quando quem escreve não é atendente (solicitante ou usuário em cópia). Ver notificarAtendenteChamado. */
   | "nova_mensagem_solicitante"
   /* Endereçado a UMA pessoa específica, no momento em que ela é colocada em cópia (na abertura ou depois). Ver notificarPessoaAdicionadaEmCopia. */
-  | "adicionado_copia";
+  | "adicionado_copia"
+  /* Endereçado aos ATENDENTES do setor, na abertura do chamado. Ver notificarAtendentesDoSetor. */
+  | "aberto_atendente";
 
 export interface NotificacaoEmailChamado {
   id: string;
@@ -147,10 +150,10 @@ interface ConteudoEmail {
   corpoTexto: string;
 }
 
-/* Só os 6 eventos endereçados ao solicitante -- "nova_mensagem_solicitante" (endereçado ao atendente) e "adicionado_copia" (endereçado a uma pessoa específica) têm sua própria montagem de conteúdo. */
+/* Só os eventos endereçados ao solicitante -- "nova_mensagem_solicitante" (ao atendente do chamado), "adicionado_copia" (a uma pessoa específica) e "aberto_atendente" (aos atendentes do setor) têm sua própria montagem de conteúdo. */
 type EventoParaSolicitante = Exclude<
   EventoNotificacaoChamado,
-  "nova_mensagem_solicitante" | "adicionado_copia"
+  "nova_mensagem_solicitante" | "adicionado_copia" | "aberto_atendente"
 >;
 
 function montarConteudo(
@@ -581,6 +584,108 @@ export async function notificarAtendenteChamado(params: NotificarAtendenteParams
     corpoTexto,
     origem,
   });
+}
+
+export interface NotificarAtendentesParams {
+  chamado: {
+    numero: number;
+    titulo: string;
+    prioridade: string;
+    solicitanteNome: string | null;
+    solicitanteDepartamento?: string | null;
+  };
+  setorId: string;
+  origem: string;
+  /* Quem abriu não precisa ser avisado do próprio chamado. */
+  excluirUsuarioId?: string | null;
+}
+
+/* Os quatro valores aceitos em requiredPrioridade (ver validacao.ts). */
+const PRIORIDADE_TEXTO: Record<string, string> = {
+  baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
+  urgente: "Urgente",
+};
+
+/*
+ * Avisa os atendentes do setor que um chamado NOVO chegou.
+ *
+ * Era o buraco do módulo: até aqui, abrir um chamado só mandava e-mail
+ * para quem abriu -- do lado de quem atende, ninguém ficava sabendo até
+ * alguém olhar a fila por conta própria. Vale só na abertura; o resto
+ * do ciclo (resposta, resolução) já tem notificação própria e é
+ * endereçado a quem aceitou o chamado.
+ */
+export async function notificarAtendentesDoSetor(
+  params: NotificarAtendentesParams
+): Promise<void> {
+  const { chamado, setorId, origem, excluirUsuarioId } = params;
+
+  const atendentes = (await listarAtendentesParaNotificacao(setorId)).filter(
+    (atendente) => atendente.usuarioId !== excluirUsuarioId
+  );
+
+  if (atendentes.length === 0) return;
+
+  const pool = await getSqlServerPool();
+  const setor = await pool
+    .request()
+    .input("setorId", sql.UniqueIdentifier, setorId)
+    .query<{ nome: string }>(`SELECT [nome] FROM dbo.portal_setores WHERE [id] = @setorId;`);
+
+  const setorNome = setor.recordset[0]?.nome ?? "sem setor";
+
+  const link = `${origem}/chamados/${chamado.numero}`;
+  const referencia = `#${chamado.numero} — ${chamado.titulo}`;
+  const assunto = `Novo chamado ${referencia} — ${setorNome} — Portal Triel-HT`;
+  const prioridade = PRIORIDADE_TEXTO[chamado.prioridade] ?? chamado.prioridade;
+
+  const solicitante = [chamado.solicitanteNome, chamado.solicitanteDepartamento]
+    .filter(Boolean)
+    .join(" — ");
+
+  for (const atendente of atendentes) {
+    if (!EMAIL_REGEX.test(atendente.email)) continue;
+
+    const corpoHtml = `
+      <p style="margin: 0 0 18px; font-size: 16px;">Olá, <strong>${atendente.nome}</strong>!</p>
+      <p style="margin: 0 0 18px;">
+        Um chamado novo entrou na fila de <strong>${setorNome}</strong>:
+        <strong>${referencia}</strong>.
+      </p>
+      <p style="margin: 0 0 18px;">
+        Solicitante: <strong>${solicitante || "não informado"}</strong><br />
+        Prioridade: <strong>${prioridade}</strong>
+      </p>
+      ${montarBotaoEmailHtml("Ver chamado", link)}
+      ${montarLinkEmailHtml(link)}
+    `;
+
+    const corpoTexto =
+      `Olá, ${atendente.nome}!
+
+` +
+      `Um chamado novo entrou na fila de ${setorNome}: ${referencia}.
+` +
+      `Solicitante: ${solicitante || "não informado"}
+` +
+      `Prioridade: ${prioridade}
+
+${link}`;
+
+    await enviarNotificacaoUnica({
+      chamadoNumero: chamado.numero,
+      chamadoTitulo: chamado.titulo,
+      evento: "aberto_atendente",
+      destinatarioEmail: atendente.email,
+      destinatarioNome: atendente.nome,
+      assunto,
+      corpoHtml,
+      corpoTexto,
+      origem,
+    });
+  }
 }
 
 interface NotificacaoEmailRow {

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
@@ -8,7 +8,10 @@ import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { getSetoresQueAtende } from "@/lib/chamados/autorizacao-chamados";
 import { criarChamado } from "@/lib/chamados/chamados";
 import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
-import { notificarSolicitanteChamado } from "@/lib/chamados/notificacoes-email";
+import {
+  notificarAtendentesDoSetor,
+  notificarSolicitanteChamado,
+} from "@/lib/chamados/notificacoes-email";
 import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -97,6 +100,8 @@ async function handlePOST(request: Request) {
       criadoPorUsuarioId,
     });
 
+    const origem = await origemPublicaEfetivaChamados(request);
+
     await notificarSolicitanteChamado({
       chamado: {
         id,
@@ -107,8 +112,29 @@ async function handlePOST(request: Request) {
         solicitanteUsuarioId: solicitante?.id ?? null,
       },
       evento: "aberto",
-      origem: await origemPublicaEfetivaChamados(request),
+      origem,
     });
+
+    /*
+     * Os atendentes do setor saem DEPOIS da resposta (after do Next):
+     * são N e-mails, e quem abriu o chamado não precisa esperar por
+     * eles. Falha de envio nunca derruba a abertura -- cada tentativa
+     * fica registrada em portal_chamados_notificacoes_email.
+     */
+    after(() =>
+      notificarAtendentesDoSetor({
+        chamado: {
+          numero,
+          titulo,
+          prioridade,
+          solicitanteNome,
+          solicitanteDepartamento: solicitante?.departamento ?? null,
+        },
+        setorId,
+        origem,
+        excluirUsuarioId: solicitante?.id ?? null,
+      })
+    );
 
     return NextResponse.json(
       {
