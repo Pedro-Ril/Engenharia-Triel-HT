@@ -411,13 +411,19 @@ function ExcelGridComponent({ rows, setRows, onVisibleRowsChange }: Props) {
       }
 
       if (field === "codItem" || field === "codDesenho") {
+        /*
+         * O `row` que chega aqui JÁ É o índice físico -- o Handsontable
+         * documenta "A physical row index" para o `cells`. Converter de
+         * novo com toPhysicalRow pintava a linha errada assim que a
+         * grade estava ordenada ou filtrada: item com DXF ficava
+         * vermelho e item sem DXF ficava verde, cada um herdando a cor
+         * de outra linha. Indexar a source data direto é o certo.
+         */
         const hot = hotRef.current?.hotInstance;
-        const physicalRow = hot ? hot.toPhysicalRow(row) : row;
-
-        const linha =
-          hot && physicalRow !== null && physicalRow !== undefined
-            ? (hot.getSourceData() as TabelaProcessamentoRow[])[physicalRow]
-            : undefined;
+        const linhas =
+          (hot?.getSourceData() as TabelaProcessamentoRow[] | undefined) ??
+          dataRef.current;
+        const linha = linhas[row];
 
         if (linha?.dxfExiste === true) {
           cellProperties.className = "dxfCellFound";
