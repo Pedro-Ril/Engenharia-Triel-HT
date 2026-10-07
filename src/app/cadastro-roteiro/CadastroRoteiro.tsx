@@ -124,6 +124,47 @@ function roteiroComAtencao(node: RoteiroTreeNode): boolean {
     });
 }
 
+/*
+ * Observação herdada do pai: quando o item de cima já tem uma
+ * observação no roteiro dele, o filho nasce com o mesmo texto no
+ * campo -- quase sempre a observação vale para a peça inteira, e
+ * redigitar item a item é onde o pessoal errava.
+ *
+ * O pai é o IMEDIATO na estrutura (não a raiz pesquisada), então a
+ * observação desce nível a nível. É só um valor inicial: quem está
+ * cadastrando continua livre para apagar ou trocar.
+ */
+function encontrarPaiNaArvore(
+    raiz: RoteiroTreeNode | null,
+    filhoId: string
+): RoteiroTreeNode | null {
+    if (!raiz) return null;
+
+    for (const filho of raiz.children) {
+        if (filho.id === filhoId) return raiz;
+
+        const achado = encontrarPaiNaArvore(filho, filhoId);
+        if (achado) return achado;
+    }
+
+    return null;
+}
+
+/*
+ * A primeira observação preenchida do roteiro, na ordem de sequência
+ * das operações -- um item pode ter várias operações, e nem todas têm
+ * texto.
+ */
+function primeiraObservacaoDoRoteiro(node: RoteiroTreeNode | null): string {
+    if (!node) return "";
+
+    const comObservacao = [...node.roteiros]
+        .sort((a, b) => Number(a.SEQ ?? 0) - Number(b.SEQ ?? 0))
+        .find((roteiro) => (roteiro.OBSERVACAO ?? "").trim());
+
+    return (comObservacao?.OBSERVACAO ?? "").trim();
+}
+
 function contarOperacoesPadrao(roteiros: RoteiroItem[]): number {
     return roteiros.filter((roteiro) => obterTipoRoteiro(roteiro) === "Padrão")
         .length;
@@ -870,6 +911,10 @@ export default function CadastroRoteiro() {
     const [itemCadastroOperacao, setItemCadastroOperacao] =
         useState<RoteiroTreeNode | null>(null);
 
+    /* Observação que o pai imediato já tem no roteiro dele, usada como
+       valor inicial ao cadastrar o filho (ver primeiraObservacaoDoRoteiro). */
+    const [observacaoHerdada, setObservacaoHerdada] = useState("");
+
     const { toasts, exibirToast, removerToast } = useToast();
     const [retornoErpModal, setRetornoErpModal] = useState<any>(null);
 
@@ -1417,9 +1462,21 @@ export default function CadastroRoteiro() {
                             initialExpanded={mostrarSemRoteiro || mostrarComAtencao}
                             onCreateRoteiro={(item) => {
                                 setRoteiroEdicao(null);
+                                /*
+                                 * Procura na árvore COMPLETA, não na filtrada:
+                                 * um filtro ativo pode esconder o pai, e a
+                                 * herança tem que seguir a estrutura real.
+                                 */
+                                const pai = encontrarPaiNaArvore(
+                                    resultado?.tree ?? null,
+                                    item.id
+                                );
+                                setObservacaoHerdada(primeiraObservacaoDoRoteiro(pai));
                                 setItemCadastroOperacao(item);
                             }}
                             onEditRoteiro={(item, roteiro) => {
+                                /* Em edição o texto vem do próprio roteiro. */
+                                setObservacaoHerdada("");
                                 setItemCadastroOperacao(item);
                                 setRoteiroEdicao(roteiro);
                             }}
@@ -1790,10 +1847,12 @@ export default function CadastroRoteiro() {
                 open={!!itemCadastroOperacao}
                 item={itemCadastroOperacao}
                 roteiroEdicao={roteiroEdicao}
+                observacaoHerdada={observacaoHerdada}
                 onRoteiroSalvo={atualizarRoteirosDoItem}
                 onClose={() => {
                     setItemCadastroOperacao(null);
                     setRoteiroEdicao(null);
+                    setObservacaoHerdada("");
                 }}
             />
         </div>

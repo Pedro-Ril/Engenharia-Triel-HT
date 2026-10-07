@@ -6,6 +6,8 @@ import {
     RoteiroItem,
     RoteiroTreeNode,
 } from "../types/cadastroRoteiro.types";
+import AbrirPdfItemButton from "./AbrirPdfItemButton";
+import Abrir3DPlayButton from "./Abrir3DPlayButton";
 
 type SelectOption = {
     codigo: string;
@@ -27,6 +29,12 @@ type Props = {
     open: boolean;
     item: RoteiroTreeNode | null;
     roteiroEdicao?: RoteiroItem | null;
+    /*
+     * Observação que o item pai já tem no roteiro dele -- entra como
+     * valor inicial do campo ao CRIAR (ver CadastroRoteiro.tsx). Em
+     * edição não se aplica: ali o texto vem do próprio roteiro.
+     */
+    observacaoHerdada?: string;
     onClose: () => void;
     onRoteiroSalvo?: (codItem: string) => Promise<void>;
 };
@@ -532,6 +540,7 @@ export default function CadastroOperacaoModal({
     open,
     item,
     roteiroEdicao,
+    observacaoHerdada = "",
     onClose,
     onRoteiroSalvo,
 }: Props) {
@@ -710,7 +719,15 @@ export default function CadastroOperacaoModal({
         setSeq(seqInicial);
         setOperacoesAdicionadas([]);
         limparCamposFormulario(false);
-    }, [open, item, seqInicial, roteiroEdicao]);
+
+        /*
+         * Depois de limpar, porque limparCamposFormulario zera a
+         * observação. Só na abertura: se a pessoa apagar o texto e
+         * mandar "salvar e adicionar próxima", a herdada não volta
+         * sozinha.
+         */
+        setObservacao(observacaoHerdada);
+    }, [open, item, seqInicial, roteiroEdicao, observacaoHerdada]);
 
     useEffect(() => {
         if (apontamento === "Não") {
@@ -1032,6 +1049,23 @@ export default function CadastroOperacaoModal({
                                     Item {item.codigoNormalizado} | {item.revisao || "-"} —{" "}
                                     {item.descricaoNormalizada || "Sem descrição"}
                                 </p>
+
+                                {/*
+                                    Os mesmos botões da árvore: conferir o desenho
+                                    sem precisar fechar o modal e procurar o item
+                                    de novo. São os componentes já existentes,
+                                    nada novo.
+                                */}
+                                <div className={styles.operacaoModalAcoesItem}>
+                                    <AbrirPdfItemButton
+                                        codigo={item.codigoNormalizado}
+                                        onErro={(mensagem) => setErroValidacao(mensagem)}
+                                    />
+                                    <Abrir3DPlayButton
+                                        item={item}
+                                        onErro={(mensagem) => setErroValidacao(mensagem)}
+                                    />
+                                </div>
                             </div>
 
                             <button
@@ -1336,6 +1370,13 @@ export default function CadastroOperacaoModal({
                                     value={observacao}
                                     onChange={(e) => setObservacao(e.target.value)}
                                 />
+                                {!modoEdicao &&
+                                    observacaoHerdada &&
+                                    observacao === observacaoHerdada && (
+                                        <span className={styles.formHint}>
+                                            Veio do roteiro do item pai — pode alterar ou apagar.
+                                        </span>
+                                    )}
                             </div>
                         </div>
 

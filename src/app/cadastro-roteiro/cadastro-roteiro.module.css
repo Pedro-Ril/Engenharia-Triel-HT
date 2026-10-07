@@ -1427,3 +1427,31 @@
     background: var(--info-bg-strong);
     border-color: var(--info-text);
 }
+
+/* Botões de 2D e 3D no cabeçalho do modal de operação. */
+.operacaoModalAcoesItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/*
+ * Na linha da árvore esses botões usam margin-left: auto para irem
+ * parar na ponta direita. Aqui eles começam junto do título, então a
+ * margem automática tem de sair -- senão o par inteiro é empurrado
+ * para o meio do cabeçalho.
+ */
+.operacaoModalAcoesItem > * {
+  margin-left: 0;
+}
+
+/* Dica abaixo de um campo (ex.: observação herdada do item pai). */
+.formHint {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
