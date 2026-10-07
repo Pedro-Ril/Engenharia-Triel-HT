@@ -74,6 +74,29 @@ export interface ResumoBuscasTerminalFabrica {
   naoEncontrados: number;
 }
 
+/* Espelha src/lib/terminal-fabrica/impressao.ts. */
+export interface PermissaoImpressaoTerminal {
+  usuarioId: string;
+  usuarioNome: string;
+  concedidoEm: string;
+  concedidoPor: string | null;
+}
+
+export interface ImpressaoTerminal {
+  id: string;
+  usuarioNome: string;
+  codigoItem: string;
+  totalPaginas: number | null;
+  impressoEm: string;
+  ipOrigem: string | null;
+}
+
+export interface ResumoImpressoesTerminal {
+  totalImpressoes: number;
+  impressoesHoje: number;
+  usuariosLiberados: number;
+}
+
 export interface ConfiguracaoAd {
   url: string;
   baseDn: string;

@@ -462,7 +462,9 @@ export function AdminPermissoesPage() {
             />
           )}
 
-          {secao === "terminal-fabrica" && <TerminalFabricaPainel />}
+          {secao === "terminal-fabrica" && (
+            <TerminalFabricaPainel usuarios={usuarios} onFeedback={mostrarFeedback} />
+          )}
 
           {secao === "atualizacoes" && (
             <AtualizacoesPainel onFeedback={mostrarFeedback} />

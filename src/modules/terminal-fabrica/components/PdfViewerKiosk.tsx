@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Printer, X, ZoomIn, ZoomOut } from "lucide-react";
 /*
  * Build "legacy" (não a raiz "pdfjs-dist") -- a raiz assume DOMMatrix
  * disponível já na avaliação do módulo, o que não existe em Node.js.
@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, Loader2, X, ZoomIn, ZoomOut } from "lucide-r
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
+import { registrarImpressaoTerminal } from "../services/registrarImpressao.service";
 import styles from "./PdfViewerKiosk.module.css";
 
 /*
@@ -26,6 +27,10 @@ import styles from "./PdfViewerKiosk.module.css";
  * componente já é a barra + área do overlay inteiro (não só a
  * área de conteúdo) pra poder colocar os controles de zoom/página
  * na mesma barra do botão "Fechar".
+ *
+ * A exceção é imprimir, liberado por usuário (ver
+ * src/lib/terminal-fabrica/impressao.ts): quem tem a permissão ganha
+ * um botão a mais, e cada clique fica registrado.
  */
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
@@ -35,6 +40,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 interface PdfViewerKioskProps {
   data: ArrayBuffer;
   itemCodigo?: string;
+  /* Resolvido no servidor (ver src/app/terminal-fabrica/page.tsx) — sem a
+     permissão o botão não existe, nem a rota de registro aceita. */
+  podeImprimir?: boolean;
   onFechar: () => void;
 }
 
@@ -58,6 +66,14 @@ const ZOOM_SENSIBILIDADE_SCROLL = 0.0015;
  */
 const DEBOUNCE_ZOOM_MS = 160;
 
+/*
+ * O diálogo de impressão depende do `load` do iframe com o PDF, e esse
+ * evento não vem em navegador sem visualizador de PDF embutido (um
+ * Chromium "puro", por exemplo). Sem este limite o botão ficaria
+ * girando para sempre, sem dizer nada a quem clicou.
+ */
+const TIMEOUT_IMPRESSAO_MS = 20000;
+
 interface FocoZoom {
   ratioX: number;
   ratioY: number;
@@ -67,9 +83,17 @@ interface FocoZoom {
   clientY: number;
 }
 
-export function PdfViewerKiosk({ data, itemCodigo, onFechar }: PdfViewerKioskProps) {
+export function PdfViewerKiosk({
+  data,
+  itemCodigo,
+  podeImprimir = false,
+  onFechar,
+}: PdfViewerKioskProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const iframeImpressaoRef = useRef<HTMLIFrameElement>(null);
+  const urlImpressaoRef = useRef<string | null>(null);
+  const timeoutImpressaoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focoZoomRef = useRef<FocoZoom | null>(null);
   const arrastoRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(
     null
@@ -88,6 +112,8 @@ export function PdfViewerKiosk({ data, itemCodigo, onFechar }: PdfViewerKioskPro
     altura: number;
   } | null>(null);
   const [arrastando, setArrastando] = useState(false);
+  const [preparandoImpressao, setPreparandoImpressao] = useState(false);
+  const [erroImpressao, setErroImpressao] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -263,7 +289,82 @@ export function PdfViewerKiosk({ data, itemCodigo, onFechar }: PdfViewerKioskPro
     return () => container.removeEventListener("wheel", aoWheel);
   }, []);
 
+  /* O blob da impressão vive enquanto o visualizador estiver aberto. */
+  useEffect(() => {
+    return () => {
+      if (urlImpressaoRef.current) {
+        URL.revokeObjectURL(urlImpressaoRef.current);
+        urlImpressaoRef.current = null;
+      }
+
+      if (timeoutImpressaoRef.current) {
+        clearTimeout(timeoutImpressaoRef.current);
+        timeoutImpressaoRef.current = null;
+      }
+    };
+  }, []);
+
   const totalPaginas = documento?.numPages ?? 1;
+
+  /*
+   * Imprime o PDF ORIGINAL, não os canvas desenhados na tela: o
+   * arquivo é vetorial, sai nítido em qualquer escala e já traz todas
+   * as folhas. Rasterizar o canvas sairia na resolução do zoom atual e
+   * só da página aberta.
+   *
+   * Reusa os bytes que já estão em memória (o `data` desta prop) —
+   * nenhuma requisição nova. O iframe fica no DOM, invisível mas não
+   * display:none, porque o Chrome não imprime iframe sem caixa.
+   *
+   * Registra no clique, não na saída do papel: o diálogo do navegador
+   * é do sistema, não dá para saber se a pessoa confirmou ou cancelou.
+   * O histórico, portanto, é de impressões PEDIDAS -- e o painel do
+   * admin diz isso com essas palavras.
+   */
+  function imprimir() {
+    const iframe = iframeImpressaoRef.current;
+    if (!iframe || preparandoImpressao) return;
+
+    setPreparandoImpressao(true);
+    setErroImpressao(null);
+
+    if (urlImpressaoRef.current) {
+      URL.revokeObjectURL(urlImpressaoRef.current);
+    }
+
+    const url = URL.createObjectURL(new Blob([data], { type: "application/pdf" }));
+    urlImpressaoRef.current = url;
+
+    timeoutImpressaoRef.current = setTimeout(() => {
+      timeoutImpressaoRef.current = null;
+      setPreparandoImpressao(false);
+      setErroImpressao("Não foi possível abrir a impressão. Tente novamente.");
+    }, TIMEOUT_IMPRESSAO_MS);
+
+    iframe.onload = () => {
+      if (timeoutImpressaoRef.current) {
+        clearTimeout(timeoutImpressaoRef.current);
+        timeoutImpressaoRef.current = null;
+      }
+
+      setPreparandoImpressao(false);
+
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (erro) {
+        console.error("Erro ao abrir o diálogo de impressão:", erro);
+        setErroImpressao("Não foi possível abrir a impressão. Tente novamente.");
+        return;
+      }
+
+      if (itemCodigo) {
+        registrarImpressaoTerminal(itemCodigo, documento?.numPages ?? 0);
+      }
+    };
+
+    iframe.src = url;
+  }
 
   /* Só mostra o spinner quando está trocando de folha de verdade — o zoom já tem sua própria prévia instantânea (ver estiloCanvas), não precisa de loading. */
   const carregandoNovaPagina = documento !== null && paginaRenderizada !== pagina;
@@ -338,6 +439,31 @@ export function PdfViewerKiosk({ data, itemCodigo, onFechar }: PdfViewerKioskPro
               <ZoomIn size={18} />
             </button>
           </div>
+
+          {podeImprimir && (
+            <div className={styles.grupo}>
+              <button
+                type="button"
+                className={styles.botaoImprimir}
+                onClick={imprimir}
+                disabled={carregando || !!erro || preparandoImpressao}
+                title="Imprimir o desenho"
+              >
+                {preparandoImpressao ? (
+                  <Loader2 className={styles.spin} size={18} />
+                ) : (
+                  <Printer size={18} />
+                )}
+                Imprimir
+              </button>
+
+              {erroImpressao && (
+                <span className={styles.avisoImpressao} role="status">
+                  {erroImpressao}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <button type="button" className={styles.overlayFecharBotao} onClick={onFechar}>
@@ -370,6 +496,16 @@ export function PdfViewerKiosk({ data, itemCodigo, onFechar }: PdfViewerKioskPro
           </div>
         )}
       </div>
+
+      {podeImprimir && (
+        <iframe
+          ref={iframeImpressaoRef}
+          className={styles.iframeImpressao}
+          title="Impressão do desenho"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+      )}
     </div>
   );
 }

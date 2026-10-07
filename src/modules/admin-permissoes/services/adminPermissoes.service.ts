@@ -29,8 +29,10 @@ import type {
   CriptografiaSmtp,
   Empresa,
   EmpresaComCatalogo,
+  ImpressaoTerminal,
   ItensMateriaPrimaCachePaginados,
   LogSincronizacaoMateriaPrima,
+  PermissaoImpressaoTerminal,
   PortalModulo,
   PortalPermissao,
   PortalSetor,
@@ -40,6 +42,7 @@ import type {
   ResultadoTesteConexaoDb,
   ResultadoTesteConexaoFirebird,
   ResumoBuscasTerminalFabrica,
+  ResumoImpressoesTerminal,
   TipoRegraEscopo,
   StatusManutencao,
   TemaPadrao,
@@ -488,6 +491,62 @@ export async function buscarBuscasTerminalFabrica(params: {
       buscas: [],
       total: 0,
       resumo: { totalBuscas: 0, buscasHoje: 0, naoEncontrados: 0 },
+    }
+  );
+}
+
+/*
+ * Impressão de desenho na Consulta 2D / 3D: quem pode (permissão por
+ * usuário) e o que já foi pedido para imprimir.
+ */
+export async function listarPermissoesImpressaoTerminal(): Promise<
+  ApiEnvelope<PermissaoImpressaoTerminal[]>
+> {
+  const response = await fetch("/api/admin/terminal-fabrica/impressao-permissoes");
+  return parseResponse<PermissaoImpressaoTerminal[]>(response);
+}
+
+export async function liberarImpressaoTerminal(
+  usuarioId: string
+): Promise<ApiEnvelope<PermissaoImpressaoTerminal>> {
+  const response = await fetch("/api/admin/terminal-fabrica/impressao-permissoes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuarioId }),
+  });
+  return parseResponse<PermissaoImpressaoTerminal>(response);
+}
+
+export async function revogarImpressaoTerminal(usuarioId: string): Promise<ApiEnvelope<null>> {
+  const query = new URLSearchParams({ usuarioId });
+  const response = await fetch(
+    `/api/admin/terminal-fabrica/impressao-permissoes?${query.toString()}`,
+    { method: "DELETE" }
+  );
+  return parseResponse<null>(response);
+}
+
+export interface ImpressoesTerminalFabricaData {
+  impressoes: ImpressaoTerminal[];
+  total: number;
+  resumo: ResumoImpressoesTerminal;
+}
+
+export async function buscarImpressoesTerminalFabrica(params: {
+  pagina: number;
+  porPagina: number;
+}): Promise<ImpressoesTerminalFabricaData> {
+  const query = new URLSearchParams({
+    pagina: String(params.pagina),
+    porPagina: String(params.porPagina),
+  });
+  const response = await fetch(`/api/admin/terminal-fabrica/impressoes?${query.toString()}`);
+  const body = await parseResponse<ImpressoesTerminalFabricaData>(response);
+  return (
+    body.data ?? {
+      impressoes: [],
+      total: 0,
+      resumo: { totalImpressoes: 0, impressoesHoje: 0, usuariosLiberados: 0 },
     }
   );
 }

@@ -48,7 +48,12 @@ function itemParaBusca3D(item: ItemInfoTerminal): RoteiroTreeNode {
   };
 }
 
-export default function TerminalFabrica() {
+interface TerminalFabricaProps {
+  /* Vem resolvido do servidor em page.tsx — ver podeImprimirDesenho. */
+  podeImprimir?: boolean;
+}
+
+export default function TerminalFabrica({ podeImprimir = false }: TerminalFabricaProps) {
   const searchParams = useSearchParams();
   const emTelaCheia = searchParams.get("fullscreen") === "1";
 
@@ -526,7 +531,12 @@ export default function TerminalFabrica() {
       )}
 
       {overlay && (
-        <PdfViewerKiosk data={overlay.data} itemCodigo={item?.codigo} onFechar={fecharOverlay} />
+        <PdfViewerKiosk
+          data={overlay.data}
+          itemCodigo={item?.codigo}
+          podeImprimir={podeImprimir}
+          onFechar={fecharOverlay}
+        />
       )}
     </div>
   );

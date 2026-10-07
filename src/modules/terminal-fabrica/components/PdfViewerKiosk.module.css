@@ -180,3 +180,64 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
   background: #fff;
 }
+
+/*
+ * Imprimir: só existe para quem tem a permissão. Fica no tom
+ * translúcido dos controles (como .botao) em vez do vermelho do
+ * "Fechar" -- é uma ação a mais na barra, não a principal.
+ */
+.botaoImprimir {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  height: 38px;
+  padding: 0 16px;
+
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.botaoImprimir:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.botaoImprimir:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/*
+ * O iframe que leva o PDF ao diálogo de impressão. Não pode ser
+ * display:none nem ter tamanho zero -- o Chrome não imprime iframe sem
+ * caixa renderizada. Então fica com 1px, fora da área visível.
+ */
+.iframeImpressao {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+
+  width: 1px;
+  height: 1px;
+  border: 0;
+
+  visibility: hidden;
+}
+
+/* Recado curto ao lado do botão quando a impressão não abre. */
+.avisoImpressao {
+  max-width: 230px;
+  color: #fca5a5;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
