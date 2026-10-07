@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start -p 80",
     "lint": "eslint",
-    "tv-signaling": "node --env-file=.env tv-signaling/server.mjs"
+    "tv-signaling": "node --env-file=.env tv-signaling/server.mjs",
+    "copiar-occt": "node scripts/copiar-occt.mjs",
+    "predev": "node scripts/copiar-occt.mjs",
+    "prebuild": "node scripts/copiar-occt.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -34,6 +37,7 @@
     "next": "16.1.6",
     "node-firebird": "^2.18.2",
     "nodemailer": "^10.0.0",
+    "occt-import-js": "^0.0.23",
     "officecrypto-tool": "^0.0.19",
     "onvif": "^0.8.3",
     "pdf-lib": "^1.17.1",

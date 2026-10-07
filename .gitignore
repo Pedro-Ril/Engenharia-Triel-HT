@@ -49,3 +49,6 @@ mediamtx/auto.crt
 mediamtx/auto.key
 
 Gerador_Assinaturas
+
+# leitor de STEP/IGES copiado de node_modules (ver scripts/copiar-occt.mjs)
+/public/occt/

@@ -1,0 +1,293 @@
+/*
+ * O palco é escuro nos dois temas, de propósito: peça clara sobre fundo
+ * escuro é como todo CAD mostra, e trocar o fundo com o tema mudaria o
+ * contraste do modelo. Mesma exceção deliberada do overlay do terminal
+ * de fábrica. O resto da página segue os tokens normalmente.
+ */
+.palco {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+
+  background: #10151f;
+}
+
+.areaWrapper {
+  position: relative;
+  min-height: 0;
+  /* Altura de trabalho: sobra tela para a peça sem empurrar o rodapé. */
+  height: calc(100vh - 320px);
+  min-height: 420px;
+}
+
+.area {
+  width: 100%;
+  height: 100%;
+}
+
+.area canvas {
+  display: block;
+  /* O reset global limita canvas a 100% de largura; aqui o canvas é
+     dimensionado pelo renderer e precisa ocupar a caixa inteira. */
+  max-width: none;
+}
+
+/* ---------- barra de ferramentas ---------- */
+
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.grupo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.nomeArquivo {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tamanho {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 32px;
+  height: 32px;
+
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.botao:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.botaoAtivo {
+  background: var(--primary);
+}
+
+.botaoAtivo:hover {
+  background: var(--primary-hover);
+}
+
+.botaoVista {
+  padding: 6px 10px;
+
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.botaoVista:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+/* ---------- estados sobre a cena ---------- */
+
+.convite,
+.carregando,
+.erro {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  padding: 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.conviteIcone {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.conviteTitulo {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.conviteTexto {
+  margin: 0;
+  font-size: 14px;
+}
+
+.formatos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+
+  margin-top: 18px;
+  max-width: 560px;
+
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.formatos strong {
+  color: rgba(255, 255, 255, 0.7);
+  margin-right: 6px;
+}
+
+.link {
+  border: none;
+  background: none;
+  padding: 0;
+
+  color: var(--primary);
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+
+  cursor: pointer;
+}
+
+.carregando small {
+  max-width: 340px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.erro p {
+  margin: 0;
+  max-width: 440px;
+  color: #fca5a5;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.girando {
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- informação sobre a peça ---------- */
+
+.info {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.info strong {
+  color: #fff;
+}
+
+.gestos {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* ---------- alvo de arrastar ---------- */
+
+.alvoArraste {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+
+  background: rgba(16, 21, 31, 0.88);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+
+  border: 3px dashed var(--primary);
+  pointer-events: none;
+}
+
+.inputEscondido {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .areaWrapper {
+    height: calc(100vh - 380px);
+  }
+
+  .nomeArquivo {
+    max-width: 180px;
+  }
+}
+
+/* O DXF desenha em fundo branco; o lembrete de gestos precisa inverter. */
+.gestosClaro {
+  color: rgba(0, 0, 0, 0.4);
+}
