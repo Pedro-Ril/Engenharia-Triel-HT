@@ -1,4 +1,5 @@
 import { requireModuloAccess } from "@/lib/auth/autorizacao";
+import { buscarModoGestos } from "@/lib/visualizador-cad/preferencias";
 import { VisualizadorCadPage } from "@/modules/visualizador-cad/components/VisualizadorCadPage";
 
 export const metadata = {
@@ -11,7 +12,11 @@ export const metadata = {
  * registrarAcessoModuloSemFalhar aqui -- seria contado duas vezes.
  */
 export default async function Page() {
-  await requireModuloAccess("visualizador-cad");
+  const usuario = await requireModuloAccess("visualizador-cad");
 
-  return <VisualizadorCadPage />;
+  /* Resolvido no servidor para a cena já nascer com os gestos certos --
+     sem um instante no modo errado enquanto o cliente pergunta. */
+  const modoGestos = await buscarModoGestos(usuario.id);
+
+  return <VisualizadorCadPage modoGestos={modoGestos} />;
 }

@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { ViewHelper } from "three/examples/jsm/helpers/ViewHelper.js";
+
+import { MODO_GESTOS_PADRAO, type ModoGestos } from "../constants/gestos";
 
 import type { MalhaOcct } from "./carregar-occt";
 
@@ -28,6 +31,12 @@ export type VistaPadrao = "iso" | "frente" | "tras" | "topo" | "base" | "direita
 const COR_FUNDO = 0x10151f;
 const COR_PECA = 0xb0b8c4;
 const COR_ARESTA = 0x2b3340;
+const COR_COTA = 0xffd98a;
+
+/* Medida com unidade, do jeito que se lê num desenho. */
+function formatarMm(valor: number): string {
+  return `${valor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mm`;
+}
 
 export class CenaCad {
   private readonly container: HTMLElement;
@@ -38,10 +47,20 @@ export class CenaCad {
   private readonly grupoModelo = new THREE.Group();
   private readonly grupoArestas = new THREE.Group();
   private readonly grade: THREE.GridHelper;
-  private readonly eixos: THREE.AxesHelper;
+  private readonly grupoCotas = new THREE.Group();
+  private readonly viewHelper: ViewHelper;
+  private readonly relogio = new THREE.Clock();
   private readonly observador: ResizeObserver;
+  private gizmoVisivel = true;
+  private modoGestos: ModoGestos = MODO_GESTOS_PADRAO;
+  /* Gesto de "roll" (Alt + roda) em andamento. */
+  private rolando: { x: number } | null = null;
+  private ultimoCliqueRoda = 0;
 
   private raioModelo = 1;
+  /* Com as cotas ligadas o conjunto é maior que a peça -- enquadrar
+     pelo raio da peça deixaria as cotas fora da tela. */
+  private raioComCotas = 1;
   private centroModelo = new THREE.Vector3();
   private animacao = 0;
 
@@ -56,17 +75,23 @@ export class CenaCad {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(this.renderer.domElement);
 
     /*
-     * Os gestos: arrastar gira, scroll aproxima, botão do meio (ou
-     * ctrl/shift + arrastar) desloca. É o esquema que todo mundo já
-     * conhece de CAD, então não inventamos nada aqui.
+     * autoClear desligado porque o indicador de eixos desenha num
+     * segundo render, no canto do mesmo canvas. Com autoClear ligado,
+     * esse segundo render limpa a tela inteira antes -- a peça some e
+     * sobra só o gizmo. Quem limpa agora é o loop, uma vez por quadro.
      */
+    this.renderer.autoClear = false;
+    container.appendChild(this.renderer.domElement);
+
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.screenSpacePanning = true;
+    this.aplicarModoGestos();
+
+    this.configurarGestosSolidWorks();
 
     /* Luz presa à câmera: a peça nunca fica num ângulo sem iluminação. */
     const luzCamera = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -85,9 +110,19 @@ export class CenaCad {
     this.grade.visible = false;
     this.scene.add(this.grade);
 
-    this.eixos = new THREE.AxesHelper(1);
-    this.eixos.visible = false;
-    this.scene.add(this.eixos);
+    this.scene.add(this.grupoCotas);
+
+    /*
+     * Indicador de orientação no canto inferior direito, com as letras
+     * X/Y/Z -- é onde todo CAD coloca. Vem pronto no three, inclusive
+     * clicável: clicar num eixo vira a câmera para aquela vista.
+     */
+    this.viewHelper = new ViewHelper(this.camera, this.renderer.domElement);
+
+    this.renderer.domElement.addEventListener("pointerup", (evento) => {
+      if (!this.gizmoVisivel) return;
+      this.viewHelper.handleClick(evento);
+    });
 
     this.observador = new ResizeObserver(() => this.ajustarTamanho());
     this.observador.observe(container);
@@ -95,8 +130,17 @@ export class CenaCad {
 
     const desenhar = () => {
       this.animacao = requestAnimationFrame(desenhar);
+
+      const intervalo = this.relogio.getDelta();
+      if (this.viewHelper.animating) this.viewHelper.update(intervalo);
+
       this.controls.update();
+
+      this.renderer.clear();
       this.renderer.render(this.scene, this.camera);
+
+      /* O gizmo desenha por cima, num canto do mesmo canvas. */
+      if (this.gizmoVisivel) this.viewHelper.render(this.renderer);
     };
     desenhar();
   }
@@ -105,7 +149,16 @@ export class CenaCad {
     const largura = this.container.clientWidth || 1;
     const altura = this.container.clientHeight || 1;
 
-    this.renderer.setSize(largura, altura, false);
+    /*
+     * O terceiro argumento (updateStyle) fica no padrão, true: sem
+     * ele o canvas recebe o tamanho do BUFFER como tamanho CSS, que
+     * em tela com escala acima de 100% (DPR 1,25 ou 1,5, comum no
+     * Windows) sai maior que o container. A cena aparecia ampliada e
+     * deslocada, a peça escorregava para fora da área visível e o
+     * indicador de eixos, que se posiciona por offsetWidth, caía
+     * depois da borda direita -- dava "tela preta".
+     */
+    this.renderer.setSize(largura, altura);
     this.camera.aspect = largura / altura;
     this.camera.updateProjectionMatrix();
   }
@@ -128,6 +181,7 @@ export class CenaCad {
   limpar() {
     this.limparGrupo(this.grupoModelo);
     this.limparGrupo(this.grupoArestas);
+    this.limparGrupo(this.grupoCotas);
   }
 
   /* Monta as malhas que o OpenCascade devolveu (STEP/IGES/BREP). */
@@ -236,11 +290,19 @@ export class CenaCad {
     this.grade.scale.setScalar(lado);
     this.grade.position.set(this.centroModelo.x, caixa.min.y, this.centroModelo.z);
 
-    this.eixos.scale.setScalar(this.raioModelo * 0.6);
-    this.eixos.position.copy(caixa.min);
+    this.montarCotas(caixa, tamanho);
+
+    /* Agora que as cotas existem, mede o conjunto todo. */
+    const caixaComCotas = new THREE.Box3()
+      .setFromObject(this.grupoModelo)
+      .union(new THREE.Box3().setFromObject(this.grupoCotas));
+    this.raioComCotas = Math.max(
+      caixaComCotas.getSize(new THREE.Vector3()).length() / 2,
+      this.raioModelo
+    );
 
     this.camera.near = this.raioModelo / 100;
-    this.camera.far = this.raioModelo * 100;
+    this.camera.far = this.raioComCotas * 100;
     this.camera.updateProjectionMatrix();
 
     this.enquadrar();
@@ -254,6 +316,130 @@ export class CenaCad {
     };
   }
 
+  /*
+   * Cotas do envelope da peça, desenhadas ao lado dela: largura (X),
+   * altura (Y) e profundidade (Z). São as mesmas medidas do rodapé,
+   * só que presas ao desenho -- quem olha entende de cara qual número
+   * é qual direção, sem precisar deduzir.
+   *
+   * É a cota do envelope, não de cada face: serve para "cabe na
+   * máquina?", não para conferir desenho.
+   */
+  private montarCotas(caixa: THREE.Box3, tamanho: THREE.Vector3) {
+    this.limparGrupo(this.grupoCotas);
+
+    /* Afastamento das cotas: longe o bastante para o rótulo não
+       encostar na peça nem em outra cota. */
+    const folga = this.raioModelo * 0.22;
+    const material = new THREE.LineBasicMaterial({ color: COR_COTA });
+
+    const desenharCota = (
+      inicio: THREE.Vector3,
+      fim: THREE.Vector3,
+      valor: number,
+      eixo: "X" | "Y" | "Z"
+    ) => {
+      if (valor <= 0) return;
+
+      const linha = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([inicio, fim]),
+        material
+      );
+      this.grupoCotas.add(linha);
+
+      /* Tracinhos nas pontas, como numa cota de desenho técnico. */
+      const direcao = new THREE.Vector3().subVectors(fim, inicio).normalize();
+      const perpendicular = new THREE.Vector3(direcao.y, direcao.z, direcao.x)
+        .cross(direcao)
+        .normalize()
+        .multiplyScalar(folga * 0.25);
+
+      for (const ponta of [inicio, fim]) {
+        this.grupoCotas.add(
+          new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([
+              ponta.clone().add(perpendicular),
+              ponta.clone().sub(perpendicular),
+            ]),
+            material
+          )
+        );
+      }
+
+      const meio = new THREE.Vector3().addVectors(inicio, fim).multiplyScalar(0.5);
+      this.grupoCotas.add(this.criarRotulo(`${eixo}  ${formatarMm(valor)}`, meio));
+    };
+
+    const { min, max } = caixa;
+
+    /* Largura, embaixo e à frente. */
+    desenharCota(
+      new THREE.Vector3(min.x, min.y - folga, max.z + folga),
+      new THREE.Vector3(max.x, min.y - folga, max.z + folga),
+      tamanho.x,
+      "X"
+    );
+
+    /* Altura, na lateral direita da frente. */
+    desenharCota(
+      new THREE.Vector3(max.x + folga, min.y, max.z + folga),
+      new THREE.Vector3(max.x + folga, max.y, max.z + folga),
+      tamanho.y,
+      "Y"
+    );
+
+    /* Profundidade, embaixo e à direita. */
+    desenharCota(
+      new THREE.Vector3(max.x + folga, min.y - folga, min.z),
+      new THREE.Vector3(max.x + folga, min.y - folga, max.z),
+      tamanho.z,
+      "Z"
+    );
+  }
+
+  /*
+   * Rótulo como sprite: sempre de frente para a câmera, gire-se a peça
+   * como for. O texto vai numa textura de canvas -- é o jeito de ter
+   * texto no three sem carregar fonte nem um segundo renderer de HTML.
+   */
+  private criarRotulo(texto: string, posicao: THREE.Vector3): THREE.Sprite {
+    const escala = 4;
+    const canvas = document.createElement("canvas");
+    const contexto = canvas.getContext("2d")!;
+
+    contexto.font = `bold ${16 * escala}px system-ui, sans-serif`;
+    const largura = contexto.measureText(texto).width;
+
+    canvas.width = largura + 20 * escala;
+    canvas.height = 26 * escala;
+
+    /* Medir zerou o contexto; configura de novo depois de dimensionar. */
+    const ctx = canvas.getContext("2d")!;
+    ctx.font = `bold ${16 * escala}px system-ui, sans-serif`;
+    ctx.fillStyle = "rgba(16, 21, 31, 0.85)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffd98a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(texto, canvas.width / 2, canvas.height / 2);
+
+    const textura = new THREE.CanvasTexture(canvas);
+    textura.minFilter = THREE.LinearFilter;
+
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: textura, depthTest: false })
+    );
+
+    /* Tamanho proporcional à peça, para servir tanto a um parafuso
+       quanto a um chassi inteiro. */
+    const alturaMundo = this.raioModelo * 0.09;
+    sprite.scale.set((alturaMundo * canvas.width) / canvas.height, alturaMundo, 1);
+    sprite.position.copy(posicao);
+    sprite.renderOrder = 999;
+
+    return sprite;
+  }
+
   /* Volta a peça inteira para dentro da tela, mantendo o ângulo atual. */
   enquadrar() {
     const direcao = this.camera.position
@@ -263,12 +449,17 @@ export class CenaCad {
 
     if (direcao.lengthSq() === 0) direcao.set(1, 1, 1).normalize();
 
-    const distancia =
-      (this.raioModelo / Math.sin((this.camera.fov * Math.PI) / 360)) * 1.15;
-
     this.controls.target.copy(this.centroModelo);
-    this.camera.position.copy(this.centroModelo).addScaledVector(direcao, distancia);
+    this.camera.position
+      .copy(this.centroModelo)
+      .addScaledVector(direcao, this.distanciaDeEnquadramento());
     this.controls.update();
+  }
+
+  /* O quanto a câmera precisa recuar para caber o que está à mostra. */
+  private distanciaDeEnquadramento(): number {
+    const raio = this.grupoCotas.visible ? this.raioComCotas : this.raioModelo;
+    return (raio / Math.sin((this.camera.fov * Math.PI) / 360)) * 1.15;
   }
 
   verDe(vista: VistaPadrao) {
@@ -283,8 +474,7 @@ export class CenaCad {
     };
 
     const [x, y, z] = direcoes[vista];
-    const distancia =
-      (this.raioModelo / Math.sin((this.camera.fov * Math.PI) / 360)) * 1.15;
+    const distancia = this.distanciaDeEnquadramento();
 
     this.controls.target.copy(this.centroModelo);
     this.camera.position
@@ -319,8 +509,155 @@ export class CenaCad {
     this.grade.visible = visivel;
   }
 
-  definirEixos(visivel: boolean) {
-    this.eixos.visible = visivel;
+  /*
+   * Os gestos do SolidWorks que o OrbitControls não tem de fábrica.
+   * Todos os listeners ficam presos o tempo todo e conferem o modo por
+   * dentro -- é mais simples do que montar e desmontar a cada troca, e
+   * no modo padrão eles saem na primeira linha.
+   *
+   * O que o SolidWorks faz, e aqui também:
+   *   roda pressionada          gira
+   *   Ctrl + roda pressionada   desloca
+   *   Shift + roda pressionada  aproxima
+   *   Alt + roda pressionada    gira no plano da tela (roll)
+   *   duplo clique na roda      enquadra
+   *   girar a roda              aproxima/afasta, na direção DELE:
+   *                             girar para frente AFASTA
+   *   botão esquerdo/direito    não mexem a câmera (lá são seleção e
+   *                             menu de contexto)
+   */
+  private configurarGestosSolidWorks() {
+    const tela = this.renderer.domElement;
+
+    /*
+     * Em fase de captura: o OrbitControls lê `mouseButtons` quando o
+     * botão desce, então a escolha precisa estar feita antes dele.
+     */
+    tela.addEventListener(
+      "pointerdown",
+      (evento) => {
+        if (this.modoGestos !== "solidworks" || evento.button !== 1) return;
+
+        /* Sem isto o navegador entra no rolamento automático. */
+        evento.preventDefault();
+
+        const agora = performance.now();
+        const ehDuploClique = agora - this.ultimoCliqueRoda < 400;
+        this.ultimoCliqueRoda = agora;
+
+        if (ehDuploClique) {
+          this.enquadrar();
+          return;
+        }
+
+        if (evento.altKey) {
+          /* O roll é nosso: o OrbitControls sai de cena enquanto dura. */
+          this.rolando = { x: evento.clientX };
+          this.controls.enabled = false;
+          return;
+        }
+
+        this.controls.mouseButtons.MIDDLE = evento.ctrlKey
+          ? THREE.MOUSE.PAN
+          : evento.shiftKey
+            ? THREE.MOUSE.DOLLY
+            : THREE.MOUSE.ROTATE;
+      },
+      true
+    );
+
+    window.addEventListener("pointermove", (evento) => {
+      if (!this.rolando) return;
+
+      const deslocamento = evento.clientX - this.rolando.x;
+      this.rolando.x = evento.clientX;
+
+      /* Gira o "para cima" da câmera em torno da linha de visão. */
+      const linhaDeVisao = new THREE.Vector3()
+        .subVectors(this.camera.position, this.controls.target)
+        .normalize();
+
+      this.camera.up.applyAxisAngle(linhaDeVisao, deslocamento * 0.01);
+      this.camera.lookAt(this.controls.target);
+    });
+
+    window.addEventListener("pointerup", () => {
+      if (!this.rolando) return;
+      this.rolando = null;
+      this.controls.enabled = true;
+    });
+
+    /*
+     * Zoom da roda por conta própria (enableZoom fica desligado no modo
+     * SolidWorks): é o único jeito de inverter a direção, que o
+     * OrbitControls não oferece.
+     */
+    tela.addEventListener(
+      "wheel",
+      (evento) => {
+        if (this.modoGestos !== "solidworks") return;
+
+        evento.preventDefault();
+
+        /* deltaY < 0 é girar para frente, que no SolidWorks AFASTA. */
+        this.aproximar(evento.deltaY < 0 ? 1.1 : 1 / 1.1);
+      },
+      { passive: false }
+    );
+  }
+
+  /* Aproxima ou afasta a câmera do alvo, com limite nos dois extremos. */
+  private aproximar(fator: number) {
+    const deslocamento = this.camera.position
+      .clone()
+      .sub(this.controls.target)
+      .multiplyScalar(fator);
+
+    const distancia = deslocamento.length();
+    if (distancia < this.raioModelo * 0.05 || distancia > this.raioModelo * 60) return;
+
+    this.camera.position.copy(this.controls.target).add(deslocamento);
+  }
+
+  /*
+   * Padrão: esquerdo gira, meio aproxima, direito desloca (OrbitControls
+   * de fábrica). SolidWorks: o esquerdo não mexe a câmera -- lá ele é
+   * seleção, e mover a peça sem querer ao clicar é justamente o que
+   * incomoda quem vem de lá.
+   */
+  private aplicarModoGestos() {
+    if (this.modoGestos === "solidworks") {
+      this.controls.mouseButtons = {
+        LEFT: null,
+        MIDDLE: THREE.MOUSE.ROTATE,
+        /* No SolidWorks o direito abre menu; aqui ele só não mexe a
+           câmera -- quem desloca é Ctrl + roda. */
+        RIGHT: null,
+      };
+      /* O zoom da roda passa a ser nosso, para poder inverter. */
+      this.controls.enableZoom = false;
+      return;
+    }
+
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+    this.controls.enableZoom = true;
+  }
+
+  definirModoGestos(modo: ModoGestos) {
+    this.modoGestos = modo;
+    this.aplicarModoGestos();
+  }
+
+  definirGizmo(visivel: boolean) {
+    this.gizmoVisivel = visivel;
+  }
+
+  definirCotas(visivel: boolean) {
+    this.grupoCotas.visible = visivel;
   }
 
   /* Gira sozinho, para deixar a peça em exibição. */
@@ -330,6 +667,7 @@ export class CenaCad {
   }
 
   capturarImagem(): string {
+    this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     return this.renderer.domElement.toDataURL("image/png");
   }
@@ -338,6 +676,7 @@ export class CenaCad {
     cancelAnimationFrame(this.animacao);
     this.observador.disconnect();
     this.controls.dispose();
+    this.viewHelper.dispose();
     this.limpar();
     this.renderer.dispose();
     this.renderer.domElement.remove();

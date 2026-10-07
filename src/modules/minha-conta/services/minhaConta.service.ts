@@ -1,3 +1,5 @@
+import type { ModoGestos } from "@/modules/visualizador-cad/constants/gestos";
+
 import type { MinhaContaData, TemaPreferencia } from "../types/minhaConta.types";
 
 export type ResultadoMinhaConta =
@@ -28,6 +30,22 @@ export async function atualizarTemaUsuario(
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tema }),
+    });
+
+    return await response.json();
+  } catch {
+    return { ok: false, message: "Não foi possível salvar a preferência." };
+  }
+}
+
+export async function atualizarGestosCadUsuario(
+  gestosCad: ModoGestos
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const response = await fetch("/api/minha-conta", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gestosCad }),
     });
 
     return await response.json();

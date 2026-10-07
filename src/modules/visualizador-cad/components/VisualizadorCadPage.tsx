@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Axis3d,
   Box,
+  Ruler,
   Camera,
   Grid3x3,
   Loader2,
@@ -19,6 +20,11 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 
+import {
+  dicaDeGestos,
+  MODO_GESTOS_PADRAO,
+  type ModoGestos,
+} from "../constants/gestos";
 import { carregarArquivo } from "../utils/carregar-modelo";
 import { CenaCad, type InfoModelo, type VistaPadrao } from "../utils/cena";
 import { EXTENSOES_ACEITAS, formatoDoArquivo, rotulosPorMotor } from "../utils/formatos";
@@ -44,7 +50,14 @@ function formatarTamanhoArquivo(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function VisualizadorCadPage() {
+interface VisualizadorCadPageProps {
+  /* Preferência do usuário, lida no servidor (ver page.tsx). */
+  modoGestos?: ModoGestos;
+}
+
+export function VisualizadorCadPage({
+  modoGestos = MODO_GESTOS_PADRAO,
+}: VisualizadorCadPageProps) {
   const areaRef = useRef<HTMLDivElement>(null);
   const cenaRef = useRef<CenaCad | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,8 +72,11 @@ export function VisualizadorCadPage() {
 
   const [arestas, setArestas] = useState(true);
   const [wireframe, setWireframe] = useState(false);
-  const [grade, setGrade] = useState(false);
-  const [eixos, setEixos] = useState(false);
+  /* Grade, indicador de eixos e cotas vêm ligados: é o estado em que a
+     peça diz mais sobre si mesma logo que abre. */
+  const [grade, setGrade] = useState(true);
+  const [eixos, setEixos] = useState(true);
+  const [cotas, setCotas] = useState(true);
   const [girando, setGirando] = useState(false);
 
   /* A cena nasce junto com a área de desenho e morre com ela. */
@@ -68,13 +84,14 @@ export function VisualizadorCadPage() {
     if (!areaRef.current || arquivoDxf) return;
 
     const cena = new CenaCad(areaRef.current);
+    cena.definirModoGestos(modoGestos);
     cenaRef.current = cena;
 
     return () => {
       cena.destruir();
       cenaRef.current = null;
     };
-  }, [arquivoDxf]);
+  }, [arquivoDxf, modoGestos]);
 
   const abrirArquivo = useCallback(async (novoArquivo: File) => {
     const formato = formatoDoArquivo(novoArquivo.name);
@@ -124,7 +141,8 @@ export function VisualizadorCadPage() {
       cena.definirArestas(arestas);
       cena.definirWireframe(wireframe);
       cena.definirGrade(grade);
-      cena.definirEixos(eixos);
+      cena.definirGizmo(eixos);
+      cena.definirCotas(cotas);
 
       setInfo(resultado);
     } catch (erroCarga) {
@@ -138,7 +156,7 @@ export function VisualizadorCadPage() {
       setCarregando(false);
       setEtapa("");
     }
-  }, [arestas, wireframe, grade, eixos]);
+  }, [arestas, wireframe, grade, eixos, cotas]);
 
   /* Soltar o arquivo em qualquer lugar da página. */
   useEffect(() => {
@@ -214,7 +232,7 @@ export function VisualizadorCadPage() {
     <PageContainer>
       <PageHeader
         title="Visualizador CAD"
-        description="Arraste um arquivo para a tela e gire a peça. Nada é enviado ao servidor — o arquivo é aberto aqui mesmo, no seu navegador."
+        description="Arraste o arquivo da peça para a tela. Abre desenho 2D e modelo 3D para girar, aproximar e ver as dimensões — sem precisar de outro programa."
       />
 
       <Breadcrumb items={[{ label: "Início", href: "/" }, { label: "Visualizador CAD" }]} />
@@ -285,10 +303,19 @@ export function VisualizadorCadPage() {
               <button
                 type="button"
                 className={`${styles.botao} ${eixos ? styles.botaoAtivo : ""}`}
-                onClick={() => alternar(eixos, setEixos, (c, v) => c.definirEixos(v))}
-                title="Eixos"
+                onClick={() => alternar(eixos, setEixos, (c, v) => c.definirGizmo(v))}
+                title="Indicador de eixos (canto inferior direito)"
               >
                 <Axis3d size={16} />
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.botao} ${cotas ? styles.botaoAtivo : ""}`}
+                onClick={() => alternar(cotas, setCotas, (c, v) => c.definirCotas(v))}
+                title="Cotas na peça"
+              >
+                <Ruler size={16} />
               </button>
 
               <button
@@ -371,6 +398,11 @@ export function VisualizadorCadPage() {
                     <strong>2D</strong> {rotulosPorMotor("2d").join(" · ")}
                   </span>
                 </div>
+
+                <p className={styles.nota}>
+                  O arquivo não sai do seu computador: ele é aberto aqui mesmo,
+                  pelo navegador.
+                </p>
               </div>
             )}
 
@@ -394,7 +426,9 @@ export function VisualizadorCadPage() {
               </div>
             )}
 
-            {/* Medidas e contagem: o que a pessoa quer saber da peça. */}
+            {/* Medidas, contagem e os gestos: tudo num canto só, longe
+                das cotas (que ficam sobre a peça) e do indicador de
+                eixos (canto oposto). */}
             {info && temModelo && (
               <div className={styles.info}>
                 <span>
@@ -407,13 +441,8 @@ export function VisualizadorCadPage() {
                   {info.pecas === 1 ? "sólido" : "sólidos"} ·{" "}
                   {info.triangulos.toLocaleString("pt-BR")} triângulos
                 </span>
-              </div>
-            )}
 
-            {/* Lembrete dos gestos, discreto. */}
-            {temModelo && (
-              <div className={styles.gestos}>
-                Arrastar gira · Scroll aproxima · Botão do meio (ou Shift) desloca
+                <span className={styles.gestos}>{dicaDeGestos(modoGestos)}</span>
               </div>
             )}
           </div>

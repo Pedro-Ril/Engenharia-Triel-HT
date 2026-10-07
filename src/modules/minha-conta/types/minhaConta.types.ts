@@ -1,3 +1,5 @@
+import type { ModoGestos } from "@/modules/visualizador-cad/constants/gestos";
+
 export type TemaPreferencia = "claro" | "escuro" | "sistema";
 
 export interface PerfilUsuario {
@@ -8,6 +10,10 @@ export interface PerfilUsuario {
   ehAdministrador: boolean;
   ultimoLoginEm: string | null;
   tema: TemaPreferencia;
+  /* Modo de gestos do mouse no Visualizador CAD. */
+  gestosCad: ModoGestos;
+  /* Falso esconde o cartão de gestos: a pessoa não abre esse módulo. */
+  podeVisualizadorCad: boolean;
 }
 
 export interface TentativaLoginHistorico {

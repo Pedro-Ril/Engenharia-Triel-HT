@@ -52,8 +52,17 @@ import { Toast } from "@/components/ui/Toast";
 import { resolverIcone } from "@/lib/icons/icon-registry";
 import { aplicarTemaComTransicao } from "@/lib/tema/aplicar-tema";
 import { OPCOES_TEMA } from "@/lib/tema/opcoes-tema";
+import {
+  MODO_GESTOS_PADRAO,
+  OPCOES_MODO_GESTOS,
+  type ModoGestos,
+} from "@/modules/visualizador-cad/constants/gestos";
 
-import { atualizarTemaUsuario, buscarMinhaConta } from "../services/minhaConta.service";
+import {
+  atualizarGestosCadUsuario,
+  atualizarTemaUsuario,
+  buscarMinhaConta,
+} from "../services/minhaConta.service";
 import type { MinhaContaData, TemaPreferencia } from "../types/minhaConta.types";
 import styles from "./MinhaConta.module.css";
 
@@ -83,6 +92,8 @@ export function MinhaContaPage() {
   const [aba, setAba] = useState("geral");
   const [tema, setTema] = useState<TemaPreferencia>("sistema");
   const [salvandoTema, setSalvandoTema] = useState(false);
+  const [gestosCad, setGestosCad] = useState<ModoGestos>(MODO_GESTOS_PADRAO);
+  const [salvandoGestos, setSalvandoGestos] = useState(false);
   const ultimoCliqueTemaRef = useRef({ x: 0, y: 0 });
   const [toast, setToast] = useState({
     open: false,
@@ -100,6 +111,7 @@ export function MinhaContaPage() {
       if (resultado.ok) {
         setDados(resultado.data);
         setTema(resultado.data.perfil.tema);
+        setGestosCad(resultado.data.perfil.gestosCad);
         setErro(null);
       } else {
         setErro(resultado.motivo);
@@ -144,6 +156,36 @@ export function MinhaContaPage() {
       variant: "success",
       title: "Aparência atualizada",
       description: "Sua preferência foi salva.",
+    });
+  }
+
+  async function handleAlterarGestos(novoModo: ModoGestos) {
+    const anterior = gestosCad;
+
+    /* Troca na hora e desfaz se o servidor recusar -- mesmo padrão do tema. */
+    setGestosCad(novoModo);
+    setSalvandoGestos(true);
+
+    const resultado = await atualizarGestosCadUsuario(novoModo);
+
+    setSalvandoGestos(false);
+
+    if (!resultado.ok) {
+      setGestosCad(anterior);
+      setToast({
+        open: true,
+        variant: "danger",
+        title: "Não foi possível salvar",
+        description: resultado.message ?? "Tente novamente em instantes.",
+      });
+      return;
+    }
+
+    setToast({
+      open: true,
+      variant: "success",
+      title: "Gestos do mouse atualizados",
+      description: "Vale no Visualizador CAD, da próxima vez que você abrir.",
     });
   }
 
@@ -426,27 +468,46 @@ export function MinhaContaPage() {
               </Stack>
             ),
             content: (
-              <Card
-                title="Aparência"
-                description="Escolha como o portal deve aparecer para você. A preferência é salva na sua conta e vale em qualquer dispositivo."
-              >
-                <div
-                  onClickCapture={(event) => {
-                    ultimoCliqueTemaRef.current = { x: event.clientX, y: event.clientY };
-                  }}
+              <Stack gap={20}>
+                <Card
+                  title="Aparência"
+                  description="Escolha como o portal deve aparecer para você. A preferência é salva na sua conta e vale em qualquer dispositivo."
                 >
-                  <RadioGroup
-                    name="tema"
-                    orientation="horizontal"
-                    options={OPCOES_TEMA}
-                    value={tema}
-                    disabled={salvandoTema}
-                    onValueChange={(valor) =>
-                      handleAlterarTema(valor as TemaPreferencia, ultimoCliqueTemaRef.current)
-                    }
-                  />
-                </div>
-              </Card>
+                  <div
+                    onClickCapture={(event) => {
+                      ultimoCliqueTemaRef.current = { x: event.clientX, y: event.clientY };
+                    }}
+                  >
+                    <RadioGroup
+                      name="tema"
+                      orientation="horizontal"
+                      options={OPCOES_TEMA}
+                      value={tema}
+                      disabled={salvandoTema}
+                      onValueChange={(valor) =>
+                        handleAlterarTema(valor as TemaPreferencia, ultimoCliqueTemaRef.current)
+                      }
+                    />
+                  </div>
+                </Card>
+
+                {/* Só para quem abre o módulo: ajustar uma tela que a
+                    pessoa não acessa seria ruído. */}
+                {perfil.podeVisualizadorCad && (
+                  <Card
+                    title="Gestos do mouse no Visualizador CAD"
+                    description="Como o mouse move a peça na tela do Visualizador CAD. Escolha SolidWorks se você estiver acostumado com os gestos de lá."
+                  >
+                    <RadioGroup
+                      name="gestosCad"
+                      options={OPCOES_MODO_GESTOS}
+                      value={gestosCad}
+                      disabled={salvandoGestos}
+                      onValueChange={(valor) => handleAlterarGestos(valor as ModoGestos)}
+                    />
+                  </Card>
+                )}
+              </Stack>
             ),
           },
         ]}

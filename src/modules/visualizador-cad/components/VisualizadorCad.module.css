@@ -241,14 +241,15 @@
   color: #fff;
 }
 
+/* Terceira linha do bloco de medidas: o rodapé ficou para as cotas
+   (sobre a peça) e para o indicador de eixos (canto direito). */
 .gestos {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 11px;
-  pointer-events: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
 }
 
 /* ---------- alvo de arrastar ---------- */
@@ -290,4 +291,14 @@
 /* O DXF desenha em fundo branco; o lembrete de gestos precisa inverter. */
 .gestosClaro {
   color: rgba(0, 0, 0, 0.4);
+}
+
+/* Nota de rodapé do convite: informação útil, peso visual baixo. */
+.nota {
+  margin: 14px 0 0;
+  max-width: 420px;
+
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  line-height: 1.5;
 }
