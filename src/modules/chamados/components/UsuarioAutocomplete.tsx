@@ -9,13 +9,26 @@ import styles from "./UsuarioAutocomplete.module.css";
 interface UsuarioAutocompleteProps {
   placeholder?: string;
   disabled?: boolean;
+  /*
+   * Liga a regra de "pessoas em cópia": a busca passa a devolver só
+   * gente do setor de quem está pesquisando, a menos que seja
+   * administrador, atendente ou da gerência. Fora da cópia (o "abrir
+   * em nome de"), continua enxergando todo mundo.
+   */
+  paraCopia?: boolean;
   onSelecionar: (usuario: UsuarioParaSelecao) => void;
 }
 
 /* Busca no servidor com debounce de 400ms (não fetch-once-filtra-local, ao contrário de ClienteAutocomplete) -- a lista de usuários do portal é grande demais pra trazer inteira de uma vez. */
-export function UsuarioAutocomplete({ placeholder, disabled, onSelecionar }: UsuarioAutocompleteProps) {
+export function UsuarioAutocomplete({
+  placeholder,
+  disabled,
+  paraCopia = false,
+  onSelecionar,
+}: UsuarioAutocompleteProps) {
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState<UsuarioParaSelecao[]>([]);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [mostrarLista, setMostrarLista] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
@@ -30,8 +43,10 @@ export function UsuarioAutocomplete({ placeholder, disabled, onSelecionar }: Usu
      * não tinha nenhum resultado pra mostrar (parecia "não abrir").
      */
     if (!termo.trim()) {
-      buscarUsuariosParaSelecao("").then((dados) => {
-        if (!cancelado) setResultados(dados);
+      buscarUsuariosParaSelecao("", paraCopia).then((resultado) => {
+        if (cancelado) return;
+        setResultados(resultado.usuarios);
+        setAviso(resultado.aviso);
       });
       return () => {
         cancelado = true;
@@ -39,8 +54,10 @@ export function UsuarioAutocomplete({ placeholder, disabled, onSelecionar }: Usu
     }
 
     const temporizador = setTimeout(() => {
-      buscarUsuariosParaSelecao(termo).then((dados) => {
-        if (!cancelado) setResultados(dados);
+      buscarUsuariosParaSelecao(termo, paraCopia).then((resultado) => {
+        if (cancelado) return;
+        setResultados(resultado.usuarios);
+        setAviso(resultado.aviso);
       });
     }, 400);
 
@@ -48,7 +65,7 @@ export function UsuarioAutocomplete({ placeholder, disabled, onSelecionar }: Usu
       cancelado = true;
       clearTimeout(temporizador);
     };
-  }, [termo]);
+  }, [termo, paraCopia]);
 
   useEffect(() => {
     function handleClickFora(event: MouseEvent) {
@@ -82,6 +99,12 @@ export function UsuarioAutocomplete({ placeholder, disabled, onSelecionar }: Usu
         }}
         onFocus={() => setMostrarLista(true)}
       />
+
+      {mostrarLista && resultados.length === 0 && aviso && (
+        <div className={styles.lista}>
+          <p className={styles.aviso}>{aviso}</p>
+        </div>
+      )}
 
       {mostrarLista && resultados.length > 0 && (
         <div className={styles.lista}>

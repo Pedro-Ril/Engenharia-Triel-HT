@@ -328,11 +328,22 @@ export interface UsuarioParaSelecao {
  * requireAdminApi. Alimenta os seletores de "usuário em cópia" e
  * "abrir em nome de" em Chamados, onde quem usa nem sempre é admin.
  */
-export async function buscarUsuariosParaSelecao(termo: string): Promise<UsuarioParaSelecao[]> {
+export async function buscarUsuariosParaSelecao(
+  termo: string,
+  /*
+   * Quando vem preenchido, a busca só devolve gente deste departamento
+   * -- é o que prende o seletor de "pessoas em cópia" ao setor de quem
+   * abriu o chamado (ver src/lib/chamados/copia-escopo.ts). Comparado
+   * sem caixa e sem espaço nas pontas, igual ao mesmoDepartamento() de
+   * lá, para um "TI " do AD não virar outro setor.
+   */
+  departamento?: string | null
+): Promise<UsuarioParaSelecao[]> {
   const pool = await getSqlServerPool();
   const request = pool.request();
 
   request.input("termo", sql.NVarChar(200), `%${termo.trim()}%`);
+  request.input("departamento", sql.NVarChar(200), (departamento ?? "").trim() || null);
 
   const result = await request.query<{ id: string; nome_exibicao: string; email: string | null }>(`
     SELECT TOP 20
@@ -342,6 +353,7 @@ export async function buscarUsuariosParaSelecao(termo: string): Promise<UsuarioP
     FROM dbo.portal_usuarios
     WHERE [ativo] = 1
       AND ([nome_exibicao] LIKE @termo OR [email] LIKE @termo)
+      AND (@departamento IS NULL OR LOWER(LTRIM(RTRIM([departamento]))) = LOWER(@departamento))
     ORDER BY [nome_exibicao];
   `);
 

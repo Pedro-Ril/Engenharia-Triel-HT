@@ -292,6 +292,7 @@ export function AbrirChamadoPage({
                     )}
 
                     <UsuarioAutocomplete
+                      paraCopia
                       placeholder="Buscar usuário por nome ou e-mail"
                       onSelecionar={(usuario) =>
                         setCopiaSelecionada((atual) =>

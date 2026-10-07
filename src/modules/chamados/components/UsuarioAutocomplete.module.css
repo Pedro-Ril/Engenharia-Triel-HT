@@ -87,3 +87,12 @@
   font-weight: 400;
   color: var(--text-muted);
 }
+
+/* Explica uma lista vazia que não é "ninguém com esse nome". */
+.aviso {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}

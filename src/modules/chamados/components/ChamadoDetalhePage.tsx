@@ -525,6 +525,7 @@ export function ChamadoDetalhePage({
             )}
 
             <UsuarioAutocomplete
+              paraCopia
               placeholder="Adicionar pessoa em cópia"
               disabled={salvandoCopia}
               onSelecionar={(usuario) => handleAdicionarCopia(usuario)}

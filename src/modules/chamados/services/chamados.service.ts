@@ -60,10 +60,32 @@ export async function enviarMensagemChamado(
   return parseResponse(response);
 }
 
-export async function buscarUsuariosParaSelecao(termo: string): Promise<UsuarioParaSelecao[]> {
-  const response = await fetch(`/api/chamados/usuarios-busca?q=${encodeURIComponent(termo)}`);
+export interface ResultadoBuscaUsuarios {
+  usuarios: UsuarioParaSelecao[];
+  /* Explica uma lista vazia que não é "ninguém com esse nome" -- por
+     exemplo, usuário sem setor cadastrado no AD. */
+  aviso: string | null;
+}
+
+/*
+ * `paraCopia` prende a busca ao setor de quem está pesquisando, a
+ * menos que a pessoa seja administradora, atendente ou da gerência
+ * (ver src/lib/chamados/copia-escopo.ts).
+ */
+export async function buscarUsuariosParaSelecao(
+  termo: string,
+  paraCopia = false
+): Promise<ResultadoBuscaUsuarios> {
+  const query = new URLSearchParams({ q: termo });
+  if (paraCopia) query.set("escopo", "copia");
+
+  const response = await fetch(`/api/chamados/usuarios-busca?${query.toString()}`);
   const body = await parseResponse<UsuarioParaSelecao[]>(response);
-  return body.ok && body.data ? body.data : [];
+
+  return {
+    usuarios: body.ok && body.data ? body.data : [],
+    aviso: body.ok ? body.message ?? null : null,
+  };
 }
 
 export async function adicionarUsuarioCopiaChamado(
