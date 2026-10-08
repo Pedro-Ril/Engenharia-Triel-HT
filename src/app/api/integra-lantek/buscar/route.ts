@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ValidationError } from "@/lib/auth/errors";
 import { verificarAcessoIntegraLantekApi } from "@/lib/integra-lantek/autorizacao-integra-lantek";
 import { obterConfigParaRotas } from "@/lib/integra-lantek/integra-lantek-config";
+import { fetchMonitorado } from "@/lib/monitoramento/integracao-externa";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,14 +52,18 @@ export async function POST(request: NextRequest) {
       url.searchParams.set("num_ordem", valor);
     }
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${config.foccoApiToken}`,
-        Accept: "application/json",
+    const response = await fetchMonitorado(
+      url.toString(),
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${config.foccoApiToken}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+      { servico: "erp_integra_lantek", moduloChave: "integra-lantek" }
+    );
 
     const contentType = response.headers.get("content-type") || "";
     const isJson = contentType.includes("application/json");

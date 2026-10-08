@@ -9,6 +9,50 @@ export interface ModuloComLog {
 }
 
 /*
+ * De que módulo é cada linha de portal_logs.
+ *
+ * Quem chama registrarLog() passa uma `origem` no formato
+ * "modulo/acao" (ex: "integra-tubest/exportar", "aprovacoes") -- é o
+ * prefixo antes da barra que diz o módulo. Sem este mapa, todo log
+ * gravado por módulo nenhum caía como "Sistema" e sumia do filtro:
+ * era o caso de 783 linhas da Integração TuBest e 32 das Aprovações.
+ *
+ * Para um módulo novo aparecer no filtro basta acrescentar uma linha
+ * aqui, com o prefixo que ele usa em registrarLog.
+ */
+const ORIGENS_POR_MODULO: { prefixo: string; chave: string; nome: string }[] = [
+  { prefixo: "integra-tubest", chave: "integra-tubest", nome: "Integração TuBest" },
+  { prefixo: "aprovacoes", chave: "aprovacoes", nome: "Aprovações" },
+  { prefixo: "chamados", chave: "chamados", nome: "Chamados" },
+  { prefixo: "desenho-aprovacao", chave: "desenho-aprovacao", nome: "Desenho de Aprovação" },
+  {
+    prefixo: "substituicao-estrutura",
+    chave: "substituicao-estrutura",
+    nome: "Substituição de Estrutura",
+  },
+  {
+    prefixo: "depara-materia-prima",
+    chave: "depara-materia-prima",
+    nome: "De-Para Matéria-Prima",
+  },
+  {
+    prefixo: "estoque-equipamentos-usados",
+    chave: "estoque-equipamentos-usados",
+    nome: "Estoque de Equipamentos Usados",
+  },
+  {
+    prefixo: "transferencia-arquivos",
+    chave: "transferencia-arquivos",
+    nome: "Transferência de Arquivos",
+  },
+  { prefixo: "terminal-fabrica", chave: "terminal-fabrica", nome: "Terminal de Fábrica" },
+  /* Sem log próprio em portal_logs ainda, mas já aparecem pelas
+     chamadas externas que registram (ver fetchMonitorado). */
+  { prefixo: "integra-lantek", chave: "integra-lantek", nome: "Integração Lantek" },
+  { prefixo: "semaforo", chave: "semaforo", nome: "Semáforo da Balança" },
+];
+
+/*
  * Só os módulos que hoje realmente geram alguma linha nas fontes
  * unificadas abaixo — não é a lista completa de portal_modulos (a
  * maioria das telas do portal não grava nenhum log/auditoria próprio,
@@ -17,17 +61,34 @@ export interface ModuloComLog {
  * bruto de toda API, já tem a aba "APIs") e portal_acesso_modulo_historico
  * (já tem a aba "Acessos") — ambas são volume alto demais pra virar
  * "log" legível junto com o resto.
+ *
+ * Sai de ORIGENS_POR_MODULO para a lista do filtro e a classificação
+ * nunca discordarem: um módulo que aparece numa, aparece na outra.
  */
 export const MODULOS_COM_LOG: ModuloComLog[] = [
   { chave: "sistema", nome: "Sistema" },
-  { chave: "chamados", nome: "Chamados" },
-  { chave: "desenho-aprovacao", nome: "Desenho de Aprovação" },
-  { chave: "substituicao-estrutura", nome: "Substituição de Estrutura" },
-  { chave: "depara-materia-prima", nome: "De-Para Matéria-Prima" },
-  { chave: "estoque-equipamentos-usados", nome: "Estoque de Equipamentos Usados" },
-  { chave: "transferencia-arquivos", nome: "Transferência de Arquivos" },
-  { chave: "terminal-fabrica", nome: "Terminal de Fábrica" },
-];
+  ...ORIGENS_POR_MODULO.map(({ chave, nome }) => ({ chave, nome })),
+].sort((a, b) =>
+  a.chave === "sistema" ? -1 : b.chave === "sistema" ? 1 : a.nome.localeCompare(b.nome, "pt-BR")
+);
+
+/* Valores vêm da constante acima, não de entrada de usuário; o escape
+   está aqui por disciplina, não porque haja texto externo em jogo. */
+function textoSql(valor: string): string {
+  return `N'${valor.replace(/'/g, "''")}'`;
+}
+
+/* Monta o CASE que traduz o prefixo da origem em chave ou nome. */
+function caseDoModulo(campo: "chave" | "nome"): string {
+  const quando = ORIGENS_POR_MODULO.map(
+    (modulo) => `WHEN '${modulo.prefixo}' THEN ${textoSql(modulo[campo])}`
+  ).join("\n        ");
+
+  return `CASE [prefixo_origem]
+        ${quando}
+        ELSE ${textoSql(campo === "chave" ? "sistema" : "Sistema")}
+      END`;
+}
 
 export interface LogUnificado {
   id: string;
@@ -88,14 +149,27 @@ function mapearLogUnificado(row: LogUnificadoRow): LogUnificado {
 const TODAS_AS_FONTES_SQL = `
   SELECT
     'portal_logs:' + CONVERT(VARCHAR(36), [id]) AS [id],
-    'sistema' AS [modulo_chave],
-    N'Sistema' AS [modulo_nome],
-    N'Erro de sistema' AS [fonte],
+    ${caseDoModulo("chave")} AS [modulo_chave],
+    ${caseDoModulo("nome")} AS [modulo_nome],
+    /* A origem completa ("integra-tubest/exportar") diz mais do que um
+       rótulo fixo: nem todo log daqui é erro -- há muito registro de
+       ação, em nível info. */
+    CAST([origem] AS NVARCHAR(200)) AS [fonte],
     [nivel] AS [nivel],
     CAST([mensagem] AS NVARCHAR(1000)) AS [mensagem],
     [detalhes] AS [detalhes],
     [criado_em] AS [criado_em]
   FROM dbo.portal_logs
+  /* O módulo é o pedaço antes da primeira barra da origem. */
+  CROSS APPLY (
+    SELECT LOWER(LTRIM(RTRIM(
+      LEFT([origem],
+        CASE
+          WHEN CHARINDEX('/', [origem]) > 0 THEN CHARINDEX('/', [origem]) - 1
+          ELSE LEN([origem])
+        END)
+    ))) AS [prefixo_origem]
+  ) AS [origem_partida]
 
   UNION ALL
 
@@ -119,29 +193,44 @@ const TODAS_AS_FONTES_SQL = `
 
   SELECT
     'chamada_externa:' + CONVERT(VARCHAR(36), [id]),
-    CASE
-      WHEN [servico] LIKE 'erp_estoque_usados%' THEN 'estoque-equipamentos-usados'
-      WHEN [servico] = 'erp_materia_prima' THEN 'depara-materia-prima'
-      WHEN [servico] = 'erp_estrutura' THEN 'substituicao-estrutura'
-      ELSE 'sistema'
-    END,
-    CASE
-      WHEN [servico] LIKE 'erp_estoque_usados%' THEN N'Estoque de Equipamentos Usados'
-      WHEN [servico] = 'erp_materia_prima' THEN N'De-Para Matéria-Prima'
-      WHEN [servico] = 'erp_estrutura' THEN N'Substituição de Estrutura'
-      ELSE N'Sistema'
-    END,
+    [chave_resolvida],
+    ${caseDoModulo("nome").replace("[prefixo_origem]", "[chave_resolvida]")},
     N'Chamada externa (' + ISNULL([servico], N'-') + N')',
     CASE WHEN [sucesso] = 1 THEN 'info' ELSE 'erro' END,
     CAST(
-      N'Chamada ao serviço "' + ISNULL([servico], N'-') + N'" '
+      ISNULL(N'[' + [metodo] + N'] ', N'')
+      + N'Chamada ao serviço "' + ISNULL([servico], N'-') + N'" '
       + CASE WHEN [sucesso] = 1 THEN N'concluída com sucesso' ELSE N'falhou' END
+      + ISNULL(N' (HTTP ' + CONVERT(NVARCHAR(10), [status_http]) + N')', N'')
       + ISNULL(N': ' + [mensagem_erro], N'')
       + N' (' + CONVERT(NVARCHAR(20), ISNULL([duracao_ms], 0)) + N' ms).'
     AS NVARCHAR(1000)),
-    NULL,
+    /* O detalhe guarda o que foi pedido e o que voltou -- é para isso
+       que serve abrir a linha do log. */
+    CASE
+      WHEN [url] IS NULL THEN NULL
+      ELSE N'URL: ' + [url]
+        + ISNULL(NCHAR(13) + NCHAR(10) + N'--- requisição ---' + NCHAR(13) + NCHAR(10) + [requisicao], N'')
+        + ISNULL(NCHAR(13) + NCHAR(10) + N'--- resposta ---' + NCHAR(13) + NCHAR(10) + [resposta], N'')
+    END,
     [criado_em]
   FROM dbo.portal_monitoramento_chamadas_externas
+  /*
+   * modulo_chave vem preenchido desde que a chamada passou a usar o
+   * fetchMonitorado; linha antiga (ou serviço sem módulo próprio) cai
+   * no CASE por serviço.
+   */
+  CROSS APPLY (
+    SELECT ISNULL([modulo_chave], CASE
+      WHEN [servico] LIKE 'erp_estoque_usados%' THEN 'estoque-equipamentos-usados'
+      WHEN [servico] = 'erp_materia_prima' THEN 'depara-materia-prima'
+      WHEN [servico] = 'erp_estrutura' THEN 'substituicao-estrutura'
+      WHEN [servico] = 'erp_integra_tubest' THEN 'integra-tubest'
+      WHEN [servico] = 'erp_integra_lantek' THEN 'integra-lantek'
+      WHEN [servico] = 'semaforo' THEN 'semaforo'
+      ELSE 'sistema'
+    END) AS [chave_resolvida]
+  ) AS [modulo_da_chamada]
 
   UNION ALL
 
@@ -192,6 +281,27 @@ const TODAS_AS_FONTES_SQL = `
     N'IP: ' + ISNULL([ip_origem], N'-'),
     [buscado_em]
   FROM dbo.portal_terminal_fabrica_buscas
+
+  UNION ALL
+
+  SELECT
+    'terminal_impressao:' + CONVERT(VARCHAR(36), i.[id]),
+    'terminal-fabrica',
+    N'Terminal de Fábrica',
+    N'Impressão de desenho',
+    'info',
+    CAST(
+      N'Desenho do item "' + ISNULL(i.[codigo_item], N'-') + N'" enviado para impressão por '
+      + ISNULL(u.[nome_exibicao], N'-')
+      + CASE WHEN i.[total_paginas] IS NOT NULL
+          THEN N' (' + CONVERT(NVARCHAR(20), i.[total_paginas]) + N' página(s))'
+          ELSE N'' END
+      + N'.'
+    AS NVARCHAR(1000)),
+    N'IP: ' + ISNULL(i.[ip_origem], N'-'),
+    i.[impresso_em]
+  FROM dbo.portal_terminal_fabrica_impressoes AS i
+  LEFT JOIN dbo.portal_usuarios AS u ON u.[id] = i.[usuario_id]
 
   UNION ALL
 

@@ -731,9 +731,15 @@ function AbaLogs({ onFeedback }: { onFeedback: FeedbackHandler }) {
         message={
           <Stack gap={12}>
             <span>
-              Remove permanentemente os erros de sistema mais antigos que o período informado — as
-              demais fontes exibidas aqui (tentativas de integração, auditoria de módulos, etc.)
-              não são afetadas, cada uma mantém sua própria política de retenção.
+              Remove permanentemente, acima do período informado, as duas fontes que o portal
+              escreve a cada evento: <strong>erros e eventos dos módulos</strong> (incluindo busca
+              e exportação da Integração TuBest, Aprovações e Chamados) e o{" "}
+              <strong>registro das chamadas a serviços externos</strong>, com a requisição e a
+              resposta guardadas em cada uma.
+            </span>
+            <span>
+              A auditoria dos módulos (notificações, histórico de desenhos, buscas do terminal) é
+              histórico de negócio e <strong>não</strong> é afetada.
             </span>
             <Field label="Manter os últimos (dias)">
               <NumberInput

@@ -12,7 +12,10 @@ export type ServicoExterno =
   | "erp_estoque_usados_nf_entrada"
   | "erp_estoque_usados_nf_saida"
   | "erp_rh_firebird"
-  | "erp_3dx_estrutura";
+  | "erp_3dx_estrutura"
+  | "erp_integra_tubest"
+  | "erp_integra_lantek"
+  | "semaforo";
 export type OrigemChamadaExterna = "health_check" | "uso_real";
 
 export interface StatusServicoExterno {
@@ -296,4 +299,32 @@ export async function obterResumoChamadasExternas(): Promise<StatusServicoExtern
       ultimaFalhaErp3dxEstrutura
     ),
   ];
+}
+
+/*
+ * Mesma ideia de limparLogsAntigos em logs.ts: sem isto a tabela
+ * cresce para sempre -- e ela cresceu de uma vez quando passou a
+ * guardar o corpo da requisição e da resposta (ver
+ * integracao-externa.ts), na ordem de 10 MB por dia.
+ *
+ * Sob demanda, pelo botão "Limpar antigos" da aba Logs, junto com
+ * portal_logs: são as duas fontes que o portal escreve a cada
+ * chamada, e faz sentido envelhecerem pelo mesmo critério.
+ *
+ * O status dos serviços olha as últimas 24h, então uma limpeza por
+ * idade não o afeta; o que se perde é a "última falha" quando ela for
+ * mais velha que o corte.
+ */
+export async function limparChamadasExternasAntigas(diasParaManter: number): Promise<number> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("dias", sql.Int, diasParaManter);
+
+  const result = await request.query(`
+    DELETE FROM dbo.portal_monitoramento_chamadas_externas
+    WHERE [criado_em] < DATEADD(DAY, -@dias, SYSDATETIME());
+  `);
+
+  return result.rowsAffected[0] ?? 0;
 }

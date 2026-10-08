@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
+import { fetchMonitorado } from "@/lib/monitoramento/integracao-externa";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,13 +13,15 @@ export async function POST() {
   if (acesso.negado) return acesso.negado;
 
   try {
-    const response = await fetch(`${BASE_URL}/semaforo/toggle`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetchMonitorado(
+      `${BASE_URL}/semaforo/toggle`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+      { servico: "semaforo", moduloChave: "semaforo" }
+    );
 
     const data = await response.json();
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchMonitorado } from "@/lib/monitoramento/integracao-externa";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
@@ -73,7 +74,11 @@ async function buscarPaginaErp(
   pagina: number
 ): Promise<RespostaItemErp> {
   const url = `${apiBaseUrl}/api/item?cod_emp=${encodeURIComponent(codEmpresa)}&cod_grp_invent=110&page=${pagina}`;
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetchMonitorado(
+    url,
+    { cache: "no-store" },
+    { servico: "erp_materia_prima", moduloChave: "depara-materia-prima" }
+  );
 
   if (!response.ok) {
     throw new Error(`Erro HTTP ${response.status} ao consultar itens no ERP.`);

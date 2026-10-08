@@ -5,6 +5,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { obterConfigParaRotasTubest } from "@/lib/integra-tubest/integra-tubest-config";
 import { registrarLog } from "@/lib/monitoramento/logs";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
+import { fetchMonitorado } from "@/lib/monitoramento/integracao-externa";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,14 +49,18 @@ async function handlePOST(request: Request) {
     url.searchParams.set("chave", config.foccoApiChave);
     url.searchParams.set(tipo === "lote" ? "num_lote_pro" : "num_ordem", valor);
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${config.foccoApiToken}`,
-        Accept: "application/json",
+    const response = await fetchMonitorado(
+      url.toString(),
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${config.foccoApiToken}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+      { servico: "erp_integra_tubest", moduloChave: "integra-tubest" }
+    );
 
     const contentType = response.headers.get("content-type") || "";
     const data = contentType.includes("application/json")

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalInteger } from "@/lib/auth/validation";
+import { limparChamadasExternasAntigas } from "@/lib/monitoramento/chamadas-externas";
 import { limparLogsAntigos } from "@/lib/monitoramento/logs";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -23,12 +24,26 @@ async function handlePOST(request: Request) {
       throw new ValidationError("Informe pelo menos 1 dia para manter.");
     }
 
-    const removidos = await limparLogsAntigos(dias);
+    /*
+     * As duas fontes que o portal escreve a cada evento envelhecem
+     * pelo mesmo corte. As demais tabelas da tela (auditoria dos
+     * módulos, notificações) são histórico de negócio e não entram
+     * numa limpeza genérica de monitoramento.
+     */
+    const [removidosLogs, removidasChamadas] = await Promise.all([
+      limparLogsAntigos(dias),
+      limparChamadasExternasAntigas(dias),
+    ]);
+
+    const removidos = removidosLogs + removidasChamadas;
 
     return NextResponse.json({
       ok: true,
-      message: `${removidos} registro(s) removido(s).`,
-      data: { removidos },
+      message:
+        `${removidos} registro(s) removido(s): ` +
+        `${removidosLogs} de erros e eventos, ` +
+        `${removidasChamadas} de chamadas externas.`,
+      data: { removidos, removidosLogs, removidasChamadas },
     });
   } catch (error) {
     if (error instanceof ValidationError) {
