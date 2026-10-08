@@ -272,6 +272,18 @@ export function normalizarCnpj(valor: unknown): string | null {
 }
 
 /*
+ * Os 8 primeiros dígitos do CNPJ: é a raiz, que identifica a pessoa
+ * jurídica. Filiais da mesma empresa compartilham essa parte e diferem
+ * só no sufixo -- a TRIEL-HT está cadastrada como 89422042/0001-24 e
+ * emite NF pela 89422042/0006-39. Empresas diferentes nunca têm a mesma
+ * raiz, então comparar por ela é seguro para "é a mesma empresa".
+ */
+export function raizCnpj(valor: unknown): string | null {
+  const digitos = normalizarCnpj(valor);
+  return digitos && digitos.length >= 8 ? digitos.slice(0, 8) : null;
+}
+
+/*
  * O endpoint antigo devolvia um array puro com chaves minúsculas
  * (cod_cli/descricao); o novo devolve { success, data } com chaves
  * MAIÚSCULAS e CNPJ. Aceita os dois pra que trocar a URL na tela de
@@ -437,33 +449,8 @@ export function selecionarNfEntrada(
 ): ResultadoSelecaoNf {
   if (candidatos.length === 0) return { tipo: "nenhum" };
 
-  /*
-   * Numa entrada de equipamento usado, quem entrega é um terceiro: a
-   * própria empresa não pode ser a fornecedora de si mesma. NF com o
-   * CNPJ da casa que aparecia na lista era a principal causa de
-   * ambiguidade -- em dois dos três casos reais, descartá-la deixava
-   * uma candidata só.
-   *
-   * Quando TODAS as candidatas são da própria empresa, o caso continua
-   * como "precisa de conferência", com a lista inteira à mostra: é sinal
-   * de que a NF do fornecedor de verdade ainda não apareceu, e esconder
-   * isso só atrasaria quem for conferir.
-   */
-  const deTerceiros = criterios.cnpjProprio
-    ? candidatos.filter((candidato) => candidato.fornecedorCnpj !== criterios.cnpjProprio)
-    : candidatos;
-
-  if (deTerceiros.length === 0) {
-    return {
-      tipo: "ambiguo",
-      candidatos,
-      motivo:
-        "Todas as NFs candidatas têm a própria empresa como fornecedora — numa entrada o fornecedor é quem entregou o equipamento.",
-    };
-  }
-
   const chave = criterios.chaveMascara.trim();
-  const porSegmento = deTerceiros.filter((candidato) =>
+  const porSegmento = candidatos.filter((candidato) =>
     segmentosMascara(candidato.mascara).includes(chave)
   );
 
@@ -472,7 +459,40 @@ export function selecionarNfEntrada(
    * equipamento cuja máscara não isola o número num campo próprio. Aí o
    * CNPJ e a trava de ambiguidade seguram.
    */
-  const base = porSegmento.length > 0 ? porSegmento : deTerceiros;
+  const comMascara = porSegmento.length > 0 ? porSegmento : candidatos;
+
+  /*
+   * Numa entrada de equipamento usado quem entrega é um terceiro: a
+   * própria empresa não pode ser fornecedora de si mesma. NF da casa
+   * aparecendo na lista era a principal causa de ambiguidade.
+   *
+   * Vem DEPOIS do filtro de máscara, de propósito: descartar antes
+   * esvaziava o conjunto com máscara exata e fazia a busca cair no
+   * conjunto inteiro, trocando 2 candidatas certas por 13 sem relação.
+   *
+   * Compara a RAIZ do CNPJ, não o número inteiro: a NF pode vir de uma
+   * filial e o cadastro guardar a matriz -- a TRIEL-HT está cadastrada
+   * como 89422042/0001-24 e emite pela 89422042/0006-39.
+   */
+  const raizPropria = raizCnpj(criterios.cnpjProprio);
+
+  const base = raizPropria
+    ? comMascara.filter((candidato) => raizCnpj(candidato.fornecedorCnpj) !== raizPropria)
+    : comMascara;
+
+  /*
+   * Todas da própria empresa: segue como "precisa de conferência", com
+   * as candidatas da máscara à mostra. É sinal de que a NF do
+   * fornecedor de verdade ainda não chegou ao ERP.
+   */
+  if (base.length === 0) {
+    return {
+      tipo: "ambiguo",
+      candidatos: comMascara,
+      motivo:
+        "Todas as NFs candidatas têm a própria empresa como fornecedora — numa entrada o fornecedor é quem entregou o equipamento.",
+    };
+  }
 
   if (criterios.cnpjCliente) {
     const porCnpj = base.filter((candidato) => candidato.fornecedorCnpj === criterios.cnpjCliente);
