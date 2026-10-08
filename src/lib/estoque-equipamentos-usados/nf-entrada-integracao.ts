@@ -14,6 +14,7 @@ import {
   buscarConfigErpEstoqueUsados,
   consultarNfEntradaNoErp,
   listarClientesErp,
+  normalizarCnpj,
   selecionarNfEntrada,
   type DetalhesChamadaNfErp,
 } from "./erp-integracao";
@@ -188,6 +189,30 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
   };
 }
 
+/*
+ * CNPJ da empresa dona do equipamento, de portal_empresas (cadastro de
+ * Administração > Empresas). Serve para descartar NF em que a própria
+ * empresa aparece como fornecedora -- ver selecionarNfEntrada.
+ *
+ * Hoje só a TRIEL-HT tem CNPJ preenchido ali; equipamento de empresa
+ * sem CNPJ cadastrado simplesmente não ganha esse filtro, e o
+ * comportamento segue o de antes.
+ */
+async function buscarCnpjDaEmpresa(codigoEmpresa: string | null): Promise<string | null> {
+  if (!codigoEmpresa) return null;
+
+  const pool = await getSqlServerPool();
+
+  const resultado = await pool
+    .request()
+    .input("codigo", sql.NVarChar(20), codigoEmpresa)
+    .query<{ cnpj: string | null }>(`
+      SELECT [cnpj] FROM dbo.portal_empresas WHERE [codigo] = @codigo;
+    `);
+
+  return normalizarCnpj(resultado.recordset[0]?.cnpj);
+}
+
 async function registrarTentativaNf(params: {
   equipamentoId: string;
   status: "sucesso" | "nao_encontrado" | "erro" | "ambiguo";
@@ -353,9 +378,12 @@ export async function tentarBuscarNfEntrada(
     }
 
     const cnpjCliente = await buscarCnpjClienteErp(equipamento.codigoCliente);
+    const cnpjProprio = await buscarCnpjDaEmpresa(equipamento.codigoEmpresa);
+
     const selecao = selecionarNfEntrada(resultado.candidatos, {
       chaveMascara: equipamento.valorMascara,
       cnpjCliente,
+      cnpjProprio,
     });
 
     if (selecao.tipo === "nenhum") {

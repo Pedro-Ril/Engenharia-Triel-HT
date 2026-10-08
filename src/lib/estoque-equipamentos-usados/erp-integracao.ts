@@ -428,12 +428,42 @@ function segmentosMascara(mascara: string): string[] {
  */
 export function selecionarNfEntrada(
   candidatos: CandidatoNfEntrada[],
-  criterios: { chaveMascara: string; cnpjCliente: string | null }
+  criterios: {
+    chaveMascara: string;
+    cnpjCliente: string | null;
+    /* CNPJ da própria empresa do equipamento -- ver o filtro abaixo. */
+    cnpjProprio?: string | null;
+  }
 ): ResultadoSelecaoNf {
   if (candidatos.length === 0) return { tipo: "nenhum" };
 
+  /*
+   * Numa entrada de equipamento usado, quem entrega é um terceiro: a
+   * própria empresa não pode ser a fornecedora de si mesma. NF com o
+   * CNPJ da casa que aparecia na lista era a principal causa de
+   * ambiguidade -- em dois dos três casos reais, descartá-la deixava
+   * uma candidata só.
+   *
+   * Quando TODAS as candidatas são da própria empresa, o caso continua
+   * como "precisa de conferência", com a lista inteira à mostra: é sinal
+   * de que a NF do fornecedor de verdade ainda não apareceu, e esconder
+   * isso só atrasaria quem for conferir.
+   */
+  const deTerceiros = criterios.cnpjProprio
+    ? candidatos.filter((candidato) => candidato.fornecedorCnpj !== criterios.cnpjProprio)
+    : candidatos;
+
+  if (deTerceiros.length === 0) {
+    return {
+      tipo: "ambiguo",
+      candidatos,
+      motivo:
+        "Todas as NFs candidatas têm a própria empresa como fornecedora — numa entrada o fornecedor é quem entregou o equipamento.",
+    };
+  }
+
   const chave = criterios.chaveMascara.trim();
-  const porSegmento = candidatos.filter((candidato) =>
+  const porSegmento = deTerceiros.filter((candidato) =>
     segmentosMascara(candidato.mascara).includes(chave)
   );
 
@@ -442,7 +472,7 @@ export function selecionarNfEntrada(
    * equipamento cuja máscara não isola o número num campo próprio. Aí o
    * CNPJ e a trava de ambiguidade seguram.
    */
-  const base = porSegmento.length > 0 ? porSegmento : candidatos;
+  const base = porSegmento.length > 0 ? porSegmento : deTerceiros;
 
   if (criterios.cnpjCliente) {
     const porCnpj = base.filter((candidato) => candidato.fornecedorCnpj === criterios.cnpjCliente);
