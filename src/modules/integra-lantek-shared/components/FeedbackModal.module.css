@@ -196,6 +196,45 @@
   white-space: nowrap;
 }
 
+/* O contador e o botao de exportar andam juntos na ponta direita. */
+.resumoAcoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mesma altura do badge ao lado, com peso de acao secundaria. */
+.exportarButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+
+  border: 1px solid var(--modal-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--modal-text);
+
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.exportarButton:hover:not(:disabled) {
+  background: var(--modal-red-soft);
+  border-color: var(--modal-red);
+  color: var(--modal-red);
+}
+
+.exportarButton:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* ── Grid de cards ── */
 .resumoGrid {
   display: grid;

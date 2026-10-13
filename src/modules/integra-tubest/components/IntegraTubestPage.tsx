@@ -58,6 +58,7 @@ import type {
   TipoBusca,
 } from "../types/integraTubest.types";
 import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
+import { exportarPlanilha } from "@/lib/utils/exportar-planilha";
 import { gerarId } from "@/lib/utils/gerar-id";
 
 import {
@@ -181,6 +182,7 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
   const [pagina, setPagina] = useState(1);
   const [exportacaoAberta, setExportacaoAberta] = useState(false);
   const [resumoAberto, setResumoAberto] = useState(false);
+  const [exportandoResumo, setExportandoResumo] = useState(false);
   const [infoAberto, setInfoAberto] = useState(false);
   const [colunasAberto, setColunasAberto] = useState(false);
   const [colunas, setColunas] = useState<ChaveColuna[]>(colunasIniciais);
@@ -337,6 +339,35 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
       }))
       .sort((a, b) => compararTexto(a.codigoMp, b.codigoMp));
   }, [linhas]);
+
+  /*
+   * Uma linha por matéria-prima, com as ordens numa célula só,
+   * separadas por vírgula -- é o mesmo conteúdo do botão "Copiar
+   * ordens" da tela, pronto para colar na impressão das OFs.
+   */
+  async function exportarResumoDeOrdens() {
+    setExportandoResumo(true);
+
+    try {
+      const linhasPlanilha = ordensPorMp.map((grupo) => [
+        grupo.codigoMp || "SEM MP",
+        grupo.descricaoMp || "",
+        grupo.ordens.length,
+        grupo.ordens.join(", "),
+      ]);
+
+      await exportarPlanilha({
+        nomeArquivo: `${nomeBase || "resumo-ordens"}_ordens-por-mp.xlsx`,
+        nomeAba: "Ordens",
+        cabecalho: ["Código MP", "Descrição MP", "Qtd. de ordens", "Ordens"],
+        linhas: linhasPlanilha,
+      });
+    } catch {
+      /* Fechar o diálogo sem escolher não é erro. */
+    } finally {
+      setExportandoResumo(false);
+    }
+  }
 
   /* Quantos arquivos sairiam se a pessoa escolher separar por MP. */
   const totalArquivosPorMp = useMemo(
@@ -1010,9 +1041,21 @@ export function IntegraTubestPage({ colunasIniciais }: IntegraTubestPageProps) {
         description={resumoTitulo}
       >
         <Stack gap={16}>
-          <p className={styles.resumoIntro}>
-            Ordens por matéria-prima, para imprimir as ordens de fabricação:
-          </p>
+          <div className={styles.resumoTopo}>
+            <p className={styles.resumoIntro}>
+              Ordens por matéria-prima, para imprimir as ordens de fabricação:
+            </p>
+
+            <Button
+              variant="secondary"
+              onClick={exportarResumoDeOrdens}
+              disabled={exportandoResumo}
+              loading={exportandoResumo}
+            >
+              <FileSpreadsheet size={15} />
+              Exportar Excel
+            </Button>
+          </div>
 
           <div className={styles.grupos}>
             {ordensPorMp.map((grupo) => {

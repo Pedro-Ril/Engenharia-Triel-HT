@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-transferencia";
+import { exportarPlanilha, nomeComData } from "@/lib/utils/exportar-planilha";
 import styles from "@/modules/integra-lantek-shared/components/FeedbackModal.module.css";
 
 type ResumoOrdensAgrupado = {
@@ -63,6 +64,27 @@ function CloseIcon() {
   );
 }
 
+/*
+ * Uma linha por combinacao de material e espessura, com as ordens numa
+ * celula so, separadas por virgula -- o mesmo conteudo do botao de
+ * copiar da tela, pronto para colar na impressao das OFs.
+ */
+async function exportarResumo(grupos: ResumoOrdensAgrupado[]) {
+  const linhas = grupos.map((grupo) => [
+    grupo.material,
+    grupo.espessura,
+    grupo.ordens.length,
+    grupo.ordens.join(", "),
+  ]);
+
+  await exportarPlanilha({
+    nomeArquivo: nomeComData("ordens-por-material"),
+    nomeAba: "Ordens",
+    cabecalho: ["Material", "Espessura", "Qtd. de ordens", "Ordens"],
+    linhas,
+  });
+}
+
 export default function FeedbackModal({
   open,
   title,
@@ -70,6 +92,7 @@ export default function FeedbackModal({
   resumoOrdensAgrupado = [],
   onClose,
 }: Props) {
+  const [exportando, setExportando] = useState(false);
   const [copiadoGrupo, setCopiadoGrupo] = useState<string | null>(null);
 
   useEffect(() => {
@@ -168,9 +191,29 @@ export default function FeedbackModal({
                   </p>
                 </div>
 
-                <span className={styles.badgeTotal}>
-                  {resumoOrdensAgrupado.length} grupo(s)
-                </span>
+                <div className={styles.resumoAcoes}>
+                  <span className={styles.badgeTotal}>
+                    {resumoOrdensAgrupado.length} grupo(s)
+                  </span>
+
+                  <button
+                    type="button"
+                    className={styles.exportarButton}
+                    disabled={exportando}
+                    onClick={async () => {
+                      setExportando(true);
+                      try {
+                        await exportarResumo(resumoOrdensAgrupado);
+                      } catch {
+                        /* Fechar o dialogo sem escolher nao e erro. */
+                      } finally {
+                        setExportando(false);
+                      }
+                    }}
+                  >
+                    {exportando ? "Gerando..." : "Exportar Excel"}
+                  </button>
+                </div>
               </div>
 
               <div className={styles.resumoGrid}>

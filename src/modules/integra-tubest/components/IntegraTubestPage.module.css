@@ -258,3 +258,12 @@
   min-width: 0;
   max-width: 100%;
 }
+
+/* A intro do resumo e o botao de exportar na mesma linha. */
+.resumoTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
