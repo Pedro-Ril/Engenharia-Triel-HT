@@ -15,7 +15,13 @@ import {
 } from "@/modules/cadastro-roteiro/types/cadastroRoteiro.types";
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
+import { Alert } from "@/components/ui/Alert";
 import { Checkbox } from "@/components/ui/Checkbox";
+import {
+    validarEstruturaNoErp,
+    type ResultadoValidacaoEstrutura,
+    type TipoDivergencia,
+} from "@/modules/cadastro-roteiro/services/validacaoEstrutura.service";
 import { ModoAberturaProvider } from "@/modules/cadastro-roteiro/components/ModoAberturaArquivos";
 import type { ModoAberturaArquivos } from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
 
@@ -614,6 +620,101 @@ function RoteirosDoItem({
     );
 }
 
+/*
+ * Conferência da estrutura do 3DX contra a do ERP. Roda DEPOIS que a
+ * árvore e os roteiros já estão na tela, para não atrasar quem só veio
+ * cadastrar roteiro.
+ */
+type EstadoValidacaoErp =
+    | { estado: "inativo" }
+    | { estado: "validando" }
+    | { estado: "pronto"; resultado: ResultadoValidacaoEstrutura }
+    | { estado: "erro"; mensagem: string };
+
+const SEM_DIVERGENCIAS: ReadonlyMap<string, TipoDivergencia> = new Map();
+
+/* Acima disso o banner resume -- a lista completa vira parede de texto. */
+const LIMITE_DIVERGENCIAS_NO_BANNER = 8;
+
+function BannerValidacaoErp({ validacao }: { validacao: EstadoValidacaoErp }) {
+    if (validacao.estado === "inativo") return null;
+
+    if (validacao.estado === "validando") {
+        return (
+            <Alert variant="info" title="Conferindo a estrutura com o ERP…" className={styles.bannerErp}>
+                A árvore já pode ser usada. Os itens que não estiverem no ERP serão marcados quando a
+                conferência terminar.
+            </Alert>
+        );
+    }
+
+    if (validacao.estado === "erro") {
+        /* Falhar em silêncio pareceria "tudo certo" -- e não é isso. */
+        return (
+            <Alert
+                variant="warning"
+                title="Não foi possível conferir a estrutura com o ERP"
+                className={styles.bannerErp}
+            >
+                {validacao.mensagem} Sem a conferência nenhum item é marcado, o que não quer dizer que a
+                estrutura esteja igual à do ERP.
+            </Alert>
+        );
+    }
+
+    const { divergencias, ligacoesConferidas } = validacao.resultado;
+
+    if (ligacoesConferidas === 0) {
+        return (
+            <Alert variant="info" title="Nada a conferir no ERP" className={styles.bannerErp}>
+                Este item não tem filhos debaixo de itens fabricados.
+            </Alert>
+        );
+    }
+
+    if (divergencias.length === 0) {
+        return (
+            <Alert variant="success" title="Estrutura igual à do ERP" className={styles.bannerErp}>
+                As {ligacoesConferidas} ligações de itens fabricados batem com a estrutura do ERP.
+            </Alert>
+        );
+    }
+
+    const visiveis = divergencias.slice(0, LIMITE_DIVERGENCIAS_NO_BANNER);
+    const restantes = divergencias.length - visiveis.length;
+
+    return (
+        <Alert
+            variant="danger"
+            title={
+                divergencias.length === 1
+                    ? "1 item do 3DX não está na estrutura do ERP"
+                    : `${divergencias.length} itens do 3DX não estão na estrutura do ERP`
+            }
+            className={styles.bannerErp}
+        >
+            <ul className={styles.bannerErpLista}>
+                {visiveis.map((d) => (
+                    <li key={`${d.codigoPai}>${d.codigoFilho}`}>
+                        <strong>
+                            {d.codigoPai} › {d.codigoFilho}
+                        </strong>{" "}
+                        {d.descricaoFilho}
+                        {d.tipo === "vencida" && " (vencido no ERP)"}
+                        {d.instancias > 1 && ` · ${d.instancias} vezes na árvore`}
+                    </li>
+                ))}
+            </ul>
+
+            {restantes > 0 && <p className={styles.bannerErpNota}>E mais {restantes}.</p>}
+
+            <p className={styles.bannerErpNota}>
+                Só são conferidos os filhos de itens fabricados: item comprado não tem estrutura no ERP.
+            </p>
+        </Alert>
+    );
+}
+
 function TreeNode({
     node,
     initialExpanded = false,
@@ -622,9 +723,12 @@ function TreeNode({
     onDeleteRoteiro,
     onDeleteRoteiroCompleto,
     onOpenAtencao,
+    divergenciasErp,
 }: {
     node: RoteiroTreeNode;
     initialExpanded?: boolean;
+    /* id do nó -> divergência com o ERP. Vazio enquanto não conferiu. */
+    divergenciasErp: ReadonlyMap<string, TipoDivergencia>;
     onCreateRoteiro: (item: RoteiroTreeNode) => void;
     onEditRoteiro: (item: RoteiroTreeNode, roteiro: RoteiroItem) => void;
     onDeleteRoteiro: (item: RoteiroTreeNode, roteiro: RoteiroItem) => void;
@@ -643,6 +747,7 @@ function TreeNode({
     const comAtencao =
         tipoItem === "fabricado" && !semRoteiro && roteiroComAtencao(node);
     const qtdOperacoesPadrao = contarOperacoesPadrao(node.roteiros);
+    const divergenciaErp = divergenciasErp.get(node.id);
 
     return (
         <div className={styles.treeNode}>
@@ -690,6 +795,19 @@ function TreeNode({
                         ) : (
                             <span className={styles.badgeSuccess}>
                                 {formatarQtdOperacoes(qtdOperacoesPadrao)}
+                            </span>
+                        )}
+
+                        {divergenciaErp && (
+                            <span
+                                className={styles.badgeErp}
+                                title={
+                                    divergenciaErp === "vencida"
+                                        ? "A ligação com o item pai existe no ERP, mas está fora da validade."
+                                        : "A ligação com o item pai não existe na estrutura do ERP."
+                                }
+                            >
+                                {divergenciaErp === "vencida" ? "Vencido no ERP" : "Não tem no ERP"}
                             </span>
                         )}
 
@@ -799,6 +917,7 @@ function TreeNode({
                             onDeleteRoteiro={onDeleteRoteiro}
                             onDeleteRoteiroCompleto={onDeleteRoteiroCompleto}
                             onOpenAtencao={onOpenAtencao}
+                            divergenciasErp={divergenciasErp}
                         />
                     ))}
                 </div>
@@ -977,6 +1096,9 @@ export default function CadastroRoteiro({
        valor inicial ao cadastrar o filho (ver primeiraObservacaoDoRoteiro). */
     const [observacaoHerdada, setObservacaoHerdada] = useState("");
     /* O pai do item aberto no modal, so para o cabecalho se situar. */
+    const [validacaoErp, setValidacaoErp] = useState<EstadoValidacaoErp>({ estado: "inativo" });
+    /* Consulta mais recente: resposta de uma consulta velha é descartada. */
+    const consultaAtualRef = useRef(0);
     const [paiCadastroOperacao, setPaiCadastroOperacao] =
         useState<RoteiroTreeNode | null>(null);
 
@@ -1047,10 +1169,13 @@ export default function CadastroRoteiro({
             return;
         }
 
+        const consulta = ++consultaAtualRef.current;
+
         try {
             setLoading(true);
             setErro("");
             setResultado(null);
+            setValidacaoErp({ estado: "inativo" });
             /* Volta no padrao, nao em branco: cada consulta nova comeca
                filtrada em Fabricado, igual a primeira. */
             setTiposSelecionados([TIPO_FILTRO_PADRAO]);
@@ -1068,6 +1193,26 @@ export default function CadastroRoteiro({
 
             const dados = await buscarEstruturaComRoteiros(codigo);
             setResultado(dados);
+
+            /* Sem await: a árvore aparece já, a conferência chega depois. */
+            setValidacaoErp({ estado: "validando" });
+
+            validarEstruturaNoErp(dados.tree)
+                .then((resultadoErp) => {
+                    if (consultaAtualRef.current !== consulta) return;
+                    setValidacaoErp({ estado: "pronto", resultado: resultadoErp });
+                })
+                .catch((erroErp) => {
+                    if (consultaAtualRef.current !== consulta) return;
+                    console.error(erroErp);
+                    setValidacaoErp({
+                        estado: "erro",
+                        mensagem:
+                            erroErp instanceof Error
+                                ? erroErp.message
+                                : "Erro de comunicação com o ERP.",
+                    });
+                });
         } catch (error) {
             console.error(error);
             setErro(
@@ -1518,6 +1663,8 @@ export default function CadastroRoteiro({
                     <h2>Estrutura com Roteiros</h2>
                 </div>
 
+                {arvoreExibida && <BannerValidacaoErp validacao={validacaoErp} />}
+
                 {!arvoreExibida ? (
                     <div className={styles.emptyState}>
                         Informe um código do item pai para carregar a estrutura.
@@ -1528,6 +1675,11 @@ export default function CadastroRoteiro({
                             key={`${arvoreExibida.id}-${mostrarSemRoteiro ? "sem-roteiro" : "todos"}-${mostrarComAtencao ? "atencao" : "normal"}`}
                             node={arvoreExibida}
                             initialExpanded={mostrarSemRoteiro || mostrarComAtencao}
+                            divergenciasErp={
+                                validacaoErp.estado === "pronto"
+                                    ? validacaoErp.resultado.porNo
+                                    : SEM_DIVERGENCIAS
+                            }
                             onCreateRoteiro={(item) => {
                                 setRoteiroEdicao(null);
                                 /*

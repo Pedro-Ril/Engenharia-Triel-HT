@@ -252,6 +252,45 @@
   text-transform: uppercase;
 }
 
+/*
+ * Ligacao do 3DX que nao esta na estrutura do ERP. Preenchida (fundo
+ * forte), para nao se confundir com o "Sem roteiro", que tambem e
+ * vermelho mas claro: os dois podem aparecer na mesma linha.
+ */
+.badgeErp {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--danger-bg-strong);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-text);
+  white-space: nowrap;
+}
+
+/* Banner da conferencia com o ERP, acima da arvore. */
+.bannerErp {
+  margin-bottom: 14px;
+}
+
+.bannerErpLista {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.bannerErpNota {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 .badgeSuccess {
   background: var(--success-bg);
   color: var(--success-text);
