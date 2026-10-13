@@ -8,6 +8,8 @@ import {
     buscarModelos3DPlay,
     Modelo3DPlay,
 } from "../services/threeDPlay.service";
+import { MENSAGEM_POPUP_BLOQUEADO } from "../utils/abrir-arquivo";
+import { useModoAbertura } from "./ModoAberturaArquivos";
 
 type Props = {
     item: RoteiroTreeNode;
@@ -30,6 +32,7 @@ function CubeIcon() {
 }
 
 export default function Abrir3DPlayButton({ item, onErro }: Props) {
+    const modoAbertura = useModoAbertura();
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [modelos, setModelos] = useState<Modelo3DPlay[]>([]);
@@ -48,7 +51,9 @@ export default function Abrir3DPlayButton({ item, onErro }: Props) {
             }
 
             if (resultados.length === 1) {
-                abrirModeloNo3DPlay(resultados[0]);
+                if (!abrirModeloNo3DPlay(resultados[0], modoAbertura)) {
+                    onErro(MENSAGEM_POPUP_BLOQUEADO);
+                }
                 return;
             }
 
@@ -129,8 +134,11 @@ export default function Abrir3DPlayButton({ item, onErro }: Props) {
                                         type="button"
                                         className={styles.modelo3DOpenButton}
                                         onClick={() => {
-                                            abrirModeloNo3DPlay(modelo);
                                             setModalOpen(false);
+
+                                            if (!abrirModeloNo3DPlay(modelo, modoAbertura)) {
+                                                onErro(MENSAGEM_POPUP_BLOQUEADO);
+                                            }
                                         }}
                                     >
                                         Abrir

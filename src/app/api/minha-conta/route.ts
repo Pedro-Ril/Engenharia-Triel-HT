@@ -16,11 +16,17 @@ import {
   definirModoGestos,
 } from "@/lib/visualizador-cad/preferencias";
 import { ehModoGestos } from "@/modules/visualizador-cad/constants/gestos";
+import {
+  buscarModoAberturaArquivos,
+  definirModoAberturaArquivos,
+} from "@/lib/cadastro-roteiro/preferencias";
+import { ehModoAberturaArquivos } from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MODULO_VISUALIZADOR = "visualizador-cad";
+const MODULO_ROTEIRO = "cadastro-roteiro";
 
 /*
  * A preferência de gestos só faz sentido para quem abre o Visualizador
@@ -37,6 +43,15 @@ async function temVisualizadorCad(usuario: {
   return podeAcessarModulo(usuario.id, MODULO_VISUALIZADOR);
 }
 
+/* Mesma regra, para a abertura de PDF/3D do Roteiro de Fabricação. */
+async function temCadastroRoteiro(usuario: {
+  id: string;
+  ehAdministrador: boolean;
+}): Promise<boolean> {
+  if (usuario.ehAdministrador) return true;
+  return podeAcessarModulo(usuario.id, MODULO_ROTEIRO);
+}
+
 async function handleGET() {
   const usuario = await getUsuarioAutenticado();
 
@@ -48,15 +63,25 @@ async function handleGET() {
   }
 
   try {
-    const [historico, setores, resumoAcessos, tema, gestosCad, podeVisualizadorCad] =
-      await Promise.all([
-        listarHistoricoDoUsuario(usuario.id, usuario.samAccountName),
-        getSetoresComModulosPermitidos(usuario),
-        getResumoAcessosModulos(usuario.id),
-        buscarTemaUsuario(usuario.id),
-        buscarModoGestos(usuario.id),
-        temVisualizadorCad(usuario),
-      ]);
+    const [
+      historico,
+      setores,
+      resumoAcessos,
+      tema,
+      gestosCad,
+      podeVisualizadorCad,
+      aberturaArquivosRoteiro,
+      podeCadastroRoteiro,
+    ] = await Promise.all([
+      listarHistoricoDoUsuario(usuario.id, usuario.samAccountName),
+      getSetoresComModulosPermitidos(usuario),
+      getResumoAcessosModulos(usuario.id),
+      buscarTemaUsuario(usuario.id),
+      buscarModoGestos(usuario.id),
+      temVisualizadorCad(usuario),
+      buscarModoAberturaArquivos(usuario.id),
+      temCadastroRoteiro(usuario),
+    ]);
 
     const resumoPorModuloId = new Map(
       resumoAcessos.map((item) => [item.moduloId, item])
@@ -87,6 +112,9 @@ async function handleGET() {
           gestosCad,
           /* Governa a exibição do cartão de gestos em Minha conta. */
           podeVisualizadorCad,
+          aberturaArquivosRoteiro,
+          /* Governa a exibição do cartão de abertura de PDF/3D. */
+          podeCadastroRoteiro,
         },
         historico,
         acessosModulos,
@@ -151,6 +179,25 @@ async function handlePATCH(request: Request) {
       }
 
       await definirModoGestos(usuario.id, gestos);
+      alterou = true;
+    }
+
+    if (body.aberturaArquivosRoteiro !== undefined) {
+      const modo = requiredText(body.aberturaArquivosRoteiro, "modo de abertura", 10);
+
+      if (!ehModoAberturaArquivos(modo)) {
+        throw new ValidationError("Modo de abertura inválido.");
+      }
+
+      /* A API não aceita o que a tela não oferece. */
+      if (!(await temCadastroRoteiro(usuario))) {
+        return NextResponse.json(
+          { ok: false, message: "Você não tem acesso ao Roteiro de Fabricação." },
+          { status: 403 }
+        );
+      }
+
+      await definirModoAberturaArquivos(usuario.id, modo);
       alterou = true;
     }
 

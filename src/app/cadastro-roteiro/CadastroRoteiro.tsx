@@ -16,6 +16,8 @@ import {
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { ModoAberturaProvider } from "@/modules/cadastro-roteiro/components/ModoAberturaArquivos";
+import type { ModoAberturaArquivos } from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
 
 function normalizarTipo(valor?: string | null): string {
     const texto = String(valor ?? "").trim().toLowerCase();
@@ -948,7 +950,12 @@ function montarRetornoErro(mensagem: string, error: unknown) {
     };
 }
 
-export default function CadastroRoteiro() {
+export default function CadastroRoteiro({
+    modoAbertura,
+}: {
+    /* Onde o PDF e o 3D abrem -- preferência da pessoa em Minha conta. */
+    modoAbertura: ModoAberturaArquivos;
+}) {
     const [codigoPai, setCodigoPai] = useState("");
     const [loading, setLoading] = useState(false);
     const [erro, setErro] = useState("");
@@ -1271,6 +1278,7 @@ export default function CadastroRoteiro() {
         mostrarSemRoteiro || mostrarComAtencao || tiposSelecionados.length > 0;
 
     return (
+        <ModoAberturaProvider modo={modoAbertura}>
         <div className={styles.page}>
             <ToastContainer
                 toasts={toasts}
@@ -1923,5 +1931,6 @@ export default function CadastroRoteiro() {
                 }}
             />
         </div>
+        </ModoAberturaProvider>
     );
 }

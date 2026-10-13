@@ -1,3 +1,4 @@
+import type { ModoAberturaArquivos } from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
 import type { ModoGestos } from "@/modules/visualizador-cad/constants/gestos";
 
 export type TemaPreferencia = "claro" | "escuro" | "sistema";
@@ -14,6 +15,10 @@ export interface PerfilUsuario {
   gestosCad: ModoGestos;
   /* Falso esconde o cartão de gestos: a pessoa não abre esse módulo. */
   podeVisualizadorCad: boolean;
+  /* Onde o PDF e o 3D do Roteiro de Fabricação abrem. */
+  aberturaArquivosRoteiro: ModoAberturaArquivos;
+  /* Falso esconde o cartão de abertura: a pessoa não abre o Roteiro. */
+  podeCadastroRoteiro: boolean;
 }
 
 export interface TentativaLoginHistorico {

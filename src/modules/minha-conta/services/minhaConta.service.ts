@@ -1,3 +1,4 @@
+import type { ModoAberturaArquivos } from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
 import type { ModoGestos } from "@/modules/visualizador-cad/constants/gestos";
 
 import type { MinhaContaData, TemaPreferencia } from "../types/minhaConta.types";
@@ -46,6 +47,22 @@ export async function atualizarGestosCadUsuario(
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gestosCad }),
+    });
+
+    return await response.json();
+  } catch {
+    return { ok: false, message: "Não foi possível salvar a preferência." };
+  }
+}
+
+export async function atualizarAberturaArquivosRoteiro(
+  aberturaArquivosRoteiro: ModoAberturaArquivos
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const response = await fetch("/api/minha-conta", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aberturaArquivosRoteiro }),
     });
 
     return await response.json();

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import styles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
 import { buscarPdfDetalhamentoItem } from "../services/itemPdf.service";
+import { abrirArquivo, MENSAGEM_POPUP_BLOQUEADO } from "../utils/abrir-arquivo";
+import { useModoAbertura } from "./ModoAberturaArquivos";
 
 type Props = {
     codigo: string;
@@ -25,6 +27,7 @@ function DocumentIcon() {
 }
 
 export default function AbrirPdfItemButton({ codigo, onErro }: Props) {
+    const modoAbertura = useModoAbertura();
     const [loading, setLoading] = useState(false);
     const [progresso, setProgresso] = useState(0);
 
@@ -47,7 +50,11 @@ export default function AbrirPdfItemButton({ codigo, onErro }: Props) {
             window.clearInterval(timer);
             setProgresso(100);
 
-            window.open(pdfUrl, "_blank");
+            if (!abrirArquivo(pdfUrl, "pdf", modoAbertura)) {
+                /* Ninguem vai mostrar este PDF: libera ja. */
+                URL.revokeObjectURL(pdfUrl);
+                onErro(MENSAGEM_POPUP_BLOQUEADO);
+            }
         } catch (error) {
             onErro(
                 error instanceof Error

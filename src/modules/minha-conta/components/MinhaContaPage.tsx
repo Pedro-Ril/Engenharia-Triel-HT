@@ -53,12 +53,18 @@ import { resolverIcone } from "@/lib/icons/icon-registry";
 import { aplicarTemaComTransicao } from "@/lib/tema/aplicar-tema";
 import { OPCOES_TEMA } from "@/lib/tema/opcoes-tema";
 import {
+  MODO_ABERTURA_PADRAO,
+  OPCOES_MODO_ABERTURA,
+  type ModoAberturaArquivos,
+} from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
+import {
   MODO_GESTOS_PADRAO,
   OPCOES_MODO_GESTOS,
   type ModoGestos,
 } from "@/modules/visualizador-cad/constants/gestos";
 
 import {
+  atualizarAberturaArquivosRoteiro,
   atualizarGestosCadUsuario,
   atualizarTemaUsuario,
   buscarMinhaConta,
@@ -94,6 +100,9 @@ export function MinhaContaPage() {
   const [salvandoTema, setSalvandoTema] = useState(false);
   const [gestosCad, setGestosCad] = useState<ModoGestos>(MODO_GESTOS_PADRAO);
   const [salvandoGestos, setSalvandoGestos] = useState(false);
+  const [aberturaRoteiro, setAberturaRoteiro] =
+    useState<ModoAberturaArquivos>(MODO_ABERTURA_PADRAO);
+  const [salvandoAbertura, setSalvandoAbertura] = useState(false);
   const ultimoCliqueTemaRef = useRef({ x: 0, y: 0 });
   const [toast, setToast] = useState({
     open: false,
@@ -112,6 +121,7 @@ export function MinhaContaPage() {
         setDados(resultado.data);
         setTema(resultado.data.perfil.tema);
         setGestosCad(resultado.data.perfil.gestosCad);
+        setAberturaRoteiro(resultado.data.perfil.aberturaArquivosRoteiro);
         setErro(null);
       } else {
         setErro(resultado.motivo);
@@ -186,6 +196,36 @@ export function MinhaContaPage() {
       variant: "success",
       title: "Gestos do mouse atualizados",
       description: "Vale no Visualizador CAD, da próxima vez que você abrir.",
+    });
+  }
+
+  async function handleAlterarAbertura(novoModo: ModoAberturaArquivos) {
+    const anterior = aberturaRoteiro;
+
+    /* Troca na hora e desfaz se o servidor recusar -- mesmo padrão do tema. */
+    setAberturaRoteiro(novoModo);
+    setSalvandoAbertura(true);
+
+    const resultado = await atualizarAberturaArquivosRoteiro(novoModo);
+
+    setSalvandoAbertura(false);
+
+    if (!resultado.ok) {
+      setAberturaRoteiro(anterior);
+      setToast({
+        open: true,
+        variant: "danger",
+        title: "Não foi possível salvar",
+        description: resultado.message ?? "Tente novamente em instantes.",
+      });
+      return;
+    }
+
+    setToast({
+      open: true,
+      variant: "success",
+      title: "Abertura de PDF e 3D atualizada",
+      description: "Vale no Roteiro de Fabricação, da próxima vez que você abrir a tela.",
     });
   }
 
@@ -504,6 +544,24 @@ export function MinhaContaPage() {
                       value={gestosCad}
                       disabled={salvandoGestos}
                       onValueChange={(valor) => handleAlterarGestos(valor as ModoGestos)}
+                    />
+                  </Card>
+                )}
+
+                {/* Mesma regra: só para quem abre o Roteiro de Fabricação. */}
+                {perfil.podeCadastroRoteiro && (
+                  <Card
+                    title="Abertura de PDF e 3D no Roteiro de Fabricação"
+                    description="Onde o desenho e o modelo 3D abrem quando você clica nos botões de PDF e 3D do Roteiro de Fabricação."
+                  >
+                    <RadioGroup
+                      name="aberturaArquivosRoteiro"
+                      options={OPCOES_MODO_ABERTURA}
+                      value={aberturaRoteiro}
+                      disabled={salvandoAbertura}
+                      onValueChange={(valor) =>
+                        handleAlterarAbertura(valor as ModoAberturaArquivos)
+                      }
                     />
                   </Card>
                 )}

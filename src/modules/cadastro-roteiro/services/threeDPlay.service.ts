@@ -1,3 +1,5 @@
+import type { ModoAberturaArquivos } from "../constants/abertura-arquivos";
+import { abrirArquivo } from "../utils/abrir-arquivo";
 import { RoteiroTreeNode } from "../types/cadastroRoteiro.types";
 
 export type Modelo3DPlay = {
@@ -98,7 +100,10 @@ export function montarUrl3DPlay(modelo: Modelo3DPlay) {
     )}`;
 }
 
-export function abrirModeloNo3DPlay(modelo: Modelo3DPlay) {
-    const url = montarUrl3DPlay(modelo);
-    window.open(url, "_blank");
+/* Devolve false se o navegador bloqueou a abertura. */
+export function abrirModeloNo3DPlay(
+    modelo: Modelo3DPlay,
+    modo: ModoAberturaArquivos
+): boolean {
+    return abrirArquivo(montarUrl3DPlay(modelo), "3d", modo);
 }
