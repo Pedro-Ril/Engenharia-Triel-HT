@@ -45,6 +45,12 @@ function formatarTipo(valor?: string | null): string {
         .join(" ");
 }
 
+/*
+ * O modulo existe para cadastrar roteiro de fabricacao, entao a
+ * estrutura ja abre filtrada no que interessa. Continua desmarcavel.
+ */
+const TIPO_FILTRO_PADRAO = "fabricado";
+
 function obterTipoItem(node: RoteiroTreeNode): string {
     return normalizarTipo(node.tipoint);
 }
@@ -663,11 +669,26 @@ function TreeNode({
                             {node.revisao ? `| ${node.revisao}` : ""}
                         </strong>
 
-                        <span className={semRoteiro ? styles.badgeWarning : styles.badgeSuccess}>
-                            {semRoteiro
-                                ? "Sem roteiro"
-                                : formatarQtdOperacoes(qtdOperacoesPadrao)}
-                        </span>
+                        {semRoteiro ? (
+                            /* A propria badge e o atalho: quem esta varrendo a
+                               estrutura clica no que falta, no lugar de
+                               procurar o botao do lado. */
+                            <button
+                                type="button"
+                                className={styles.badgeWarningButton}
+                                title="Cadastrar o roteiro deste item"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCreateRoteiro(node);
+                                }}
+                            >
+                                Sem roteiro
+                            </button>
+                        ) : (
+                            <span className={styles.badgeSuccess}>
+                                {formatarQtdOperacoes(qtdOperacoesPadrao)}
+                            </span>
+                        )}
 
                         {comAtencao && (
                             <button
@@ -933,7 +954,9 @@ export default function CadastroRoteiro() {
     const [mostrarSemRoteiro, setMostrarSemRoteiro] = useState(false);
     const [mostrarComAtencao, setMostrarComAtencao] = useState(false);
     const [filtrosAbertos, setFiltrosAbertos] = useState(false);
-    const [tiposSelecionados, setTiposSelecionados] = useState<string[]>([]);
+    const [tiposSelecionados, setTiposSelecionados] = useState<string[]>([
+        TIPO_FILTRO_PADRAO,
+    ]);
     const [modalSemRoteiroOpen, setModalSemRoteiroOpen] = useState(false);
     const [modalComAtencaoOpen, setModalComAtencaoOpen] = useState(false);
     const [atencaoModalItem, setAtencaoModalItem] =
@@ -1017,7 +1040,9 @@ export default function CadastroRoteiro() {
             setLoading(true);
             setErro("");
             setResultado(null);
-            setTiposSelecionados([]);
+            /* Volta no padrao, nao em branco: cada consulta nova comeca
+               filtrada em Fabricado, igual a primeira. */
+            setTiposSelecionados([TIPO_FILTRO_PADRAO]);
             setMostrarSemRoteiro(false);
             setMostrarComAtencao(false);
             setFiltrosAbertos(false);
@@ -1175,10 +1200,21 @@ export default function CadastroRoteiro() {
     }
 
     const tiposDisponiveis = useMemo(() => {
-        return Array.from(coletarTiposItens(resultado?.tree ?? null).entries()).sort(
-            (a, b) => a[1].localeCompare(b[1], "pt-BR")
+        const tipos = coletarTiposItens(resultado?.tree ?? null);
+
+        /*
+         * Tipo marcado continua na lista mesmo que a estrutura consultada
+         * nao tenha nenhum item dele -- do contrario o filtro ficaria
+         * ligado sem checkbox para desligar, escondendo a arvore inteira.
+         */
+        for (const tipo of tiposSelecionados) {
+            if (!tipos.has(tipo)) tipos.set(tipo, formatarTipo(tipo));
+        }
+
+        return Array.from(tipos.entries()).sort((a, b) =>
+            a[1].localeCompare(b[1], "pt-BR")
         );
-    }, [resultado]);
+    }, [resultado, tiposSelecionados]);
 
     const arvoreExibida = useMemo(() => {
         if (!resultado?.tree) return null;

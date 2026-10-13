@@ -1376,6 +1376,30 @@
 .badgeAttentionButton:hover {
   background: var(--warning-border);
 }
+
+/* Mesma badge de "Sem roteiro", so que clicavel: abre o cadastro de
+   operacao do item. Espelha .badgeWarning -- o que muda e so o que
+   indica que da para clicar. */
+.badgeWarningButton {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.badgeWarningButton:hover {
+  background: var(--danger-bg-strong);
+  border-color: var(--danger-text);
+}
 .pdfItemButton {
     margin-left: auto;
     height: 30px;
