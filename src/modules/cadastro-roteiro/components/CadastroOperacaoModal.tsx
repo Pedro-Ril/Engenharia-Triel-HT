@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as EventoTeclado } from "react";
 import styles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
 import {
     RoteiroItem,
@@ -327,6 +328,97 @@ function useToast() {
 }
 
 // =========================================
+// TECLADO DOS CAMPOS DE BUSCA
+// =========================================
+
+/*
+ * Setas andam pela lista, Enter escolhe, Esc desiste e Tab segue para o
+ * proximo campo. Os dois campos de busca do modal usam este mesmo hook
+ * para nao divergirem no comportamento.
+ *
+ * As opcoes continuam sendo <button>, mas saem da ordem de tabulacao
+ * (tabIndex -1): antes o Tab entrava na lista aberta em vez de ir para o
+ * campo seguinte, que era a maior queixa de quem preenche so no teclado.
+ */
+function useTecladoBusca<T>({
+    opcoes,
+    aberto,
+    abrir,
+    fechar,
+    escolher,
+}: {
+    opcoes: T[];
+    aberto: boolean;
+    abrir: () => void;
+    fechar: () => void;
+    escolher: (opcao: T) => void;
+}) {
+    const [indiceAtivo, setIndiceAtivo] = useState(0);
+    const listaRef = useRef<HTMLDivElement | null>(null);
+
+    /*
+     * A lista encolhe conforme a pessoa digita, entao o indice guardado
+     * pode acabar fora dela -- o destaque e sempre lido preso ao tamanho
+     * atual, em vez de corrigido num efeito.
+     */
+    const ativo = opcoes.length > 0 ? Math.min(indiceAtivo, opcoes.length - 1) : -1;
+
+    function destacar(indice: number, rolar = true) {
+        setIndiceAtivo(indice);
+
+        if (!rolar) return;
+
+        const item = listaRef.current?.children[indice] as HTMLElement | undefined;
+
+        item?.scrollIntoView({ block: "nearest" });
+    }
+
+    function aoTeclar(evento: EventoTeclado<HTMLInputElement>) {
+        if (evento.key === "ArrowDown" || evento.key === "ArrowUp") {
+            evento.preventDefault();
+
+            if (!aberto) {
+                abrir();
+                destacar(0);
+                return;
+            }
+
+            if (opcoes.length === 0) return;
+
+            const passo = evento.key === "ArrowDown" ? 1 : -1;
+
+            /* Da a volta: do fim pro comeco e vice-versa. */
+            destacar((ativo + passo + opcoes.length) % opcoes.length);
+            return;
+        }
+
+        if (evento.key === "Enter") {
+            if (!aberto || ativo < 0) return;
+
+            /* Sem isto o Enter vazaria para o botao de salvar. */
+            evento.preventDefault();
+            escolher(opcoes[ativo]);
+            return;
+        }
+
+        if (evento.key === "Escape") {
+            if (!aberto) return;
+
+            /* Fecha so a lista -- o modal continua aberto. */
+            evento.preventDefault();
+            evento.stopPropagation();
+            fechar();
+            return;
+        }
+
+        /* Tab nao e bloqueado: a lista some e o foco segue sozinho. */
+        if (evento.key === "Tab") fechar();
+    }
+
+    return { ativo, listaRef, aoTeclar, destacar };
+}
+
+// =========================================
 // SEARCH SELECT
 // =========================================
 function SearchSelect({
@@ -347,6 +439,8 @@ function SearchSelect({
     const [search, setSearch] = useState("");
     const [opened, setOpened] = useState(false);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    /* Liga o campo a lista para o leitor de tela (aria-controls). */
+    const idLista = useId();
 
     const filteredOptions = useMemo(() => {
         const termo = search.trim().toLowerCase();
@@ -380,6 +474,27 @@ function SearchSelect({
         };
     }, []);
 
+    const listaVisivel = (opened || !!search) && filteredOptions.length > 0;
+
+    function fecharLista() {
+        setOpened(false);
+        setSearch("");
+    }
+
+    function escolher(option: SelectOption) {
+        onChange(formatarOption(option));
+        setSearch("");
+        setOpened(false);
+    }
+
+    const { ativo, listaRef, aoTeclar, destacar } = useTecladoBusca({
+        opcoes: filteredOptions,
+        aberto: listaVisivel,
+        abrir: () => setOpened(true),
+        fechar: fecharLista,
+        escolher,
+    });
+
     return (
         <div className={styles.formField} ref={wrapperRef}>
             <label className={styles.formLabel}>
@@ -392,7 +507,13 @@ function SearchSelect({
                 className={styles.formInput}
                 placeholder={placeholder || "Pesquisar..."}
                 value={search || value}
+                role="combobox"
+                aria-expanded={listaVisivel}
+                aria-controls={idLista}
+                aria-autocomplete="list"
                 onFocus={() => setOpened(true)}
+                onBlur={fecharLista}
+                onKeyDown={aoTeclar}
                 onClick={() => {
                     setSearch("");
                     setOpened(true);
@@ -400,23 +521,41 @@ function SearchSelect({
                 onChange={(e) => {
                     setSearch(e.target.value);
                     setOpened(true);
-                    onChange(e.target.value);
+                    destacar(0, false);
+
+                    /*
+                     * Digitar so filtra: o valor do campo so muda quando uma
+                     * opcao e de fato escolhida. Antes o texto solto virava o
+                     * valor, entao "cor" passava pela validacao como se fosse
+                     * uma operacao do ERP. Apagar tudo continua limpando.
+                     */
+                    if (!e.target.value) onChange("");
                 }}
             />
 
-            {(opened || search) && filteredOptions.length > 0 && (
-                <div className={styles.searchDropdown}>
-                    {filteredOptions.map((option) => (
+            {listaVisivel && (
+                <div
+                    className={styles.searchDropdown}
+                    ref={listaRef}
+                    id={idLista}
+                    role="listbox"
+                >
+                    {filteredOptions.map((option, indice) => (
                         <button
                             key={option.codigo}
                             type="button"
-                            className={styles.searchOption}
-                            onClick={() => {
-                                const selected = formatarOption(option);
-                                onChange(selected);
-                                setSearch("");
-                                setOpened(false);
-                            }}
+                            tabIndex={-1}
+                            role="option"
+                            aria-selected={indice === ativo}
+                            className={
+                                indice === ativo
+                                    ? `${styles.searchOption} ${styles.searchOptionAtivo}`
+                                    : styles.searchOption
+                            }
+                            /* Sem isto o input perde o foco antes do clique. */
+                            onMouseDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => destacar(indice, false)}
+                            onClick={() => escolher(option)}
                         >
                             <strong>{option.codigo}</strong>
                             <span>{option.descricao}</span>
@@ -447,6 +586,8 @@ function OperacaoSearchSelect({
     const [search, setSearch] = useState("");
     const [opened, setOpened] = useState(false);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    /* Liga o campo a lista para o leitor de tela (aria-controls). */
+    const idLista = useId();
 
     const filteredOptions = useMemo(() => {
         const termo = search.trim().toLowerCase();
@@ -484,6 +625,28 @@ function OperacaoSearchSelect({
         };
     }, []);
 
+    const listaVisivel = (opened || !!search) && filteredOptions.length > 0;
+
+    function fecharLista() {
+        setOpened(false);
+        setSearch("");
+    }
+
+    function escolher(option: OperacaoOption) {
+        onChange(`${option.COD_OPERACAO} - ${option.DESC_OPERACAO}`);
+        onSelect(option);
+        setSearch("");
+        setOpened(false);
+    }
+
+    const { ativo, listaRef, aoTeclar, destacar } = useTecladoBusca({
+        opcoes: filteredOptions,
+        aberto: listaVisivel,
+        abrir: () => setOpened(true),
+        fechar: fecharLista,
+        escolher,
+    });
+
     return (
         <div className={styles.formField} ref={wrapperRef}>
             <label className={styles.formLabel}>
@@ -498,7 +661,13 @@ function OperacaoSearchSelect({
                 }
                 value={search || value}
                 disabled={loading}
+                role="combobox"
+                aria-expanded={listaVisivel}
+                aria-controls={idLista}
+                aria-autocomplete="list"
                 onFocus={() => setOpened(true)}
+                onBlur={fecharLista}
+                onKeyDown={aoTeclar}
                 onClick={() => {
                     setSearch("");
                     setOpened(true);
@@ -506,25 +675,35 @@ function OperacaoSearchSelect({
                 onChange={(e) => {
                     setSearch(e.target.value);
                     setOpened(true);
-                    onChange(e.target.value);
+                    destacar(0, false);
+
+                    /* Igual ao SearchSelect: digitar filtra, escolher decide. */
+                    if (!e.target.value) onChange("");
                 }}
             />
 
-            {(opened || search) && filteredOptions.length > 0 && (
-                <div className={styles.searchDropdown}>
-                    {filteredOptions.map((option) => (
+            {listaVisivel && (
+                <div
+                    className={styles.searchDropdown}
+                    ref={listaRef}
+                    id={idLista}
+                    role="listbox"
+                >
+                    {filteredOptions.map((option, indice) => (
                         <button
                             key={option.ID_OPERACAO}
                             type="button"
-                            className={styles.searchOption}
-                            onClick={() => {
-                                const selected = `${option.COD_OPERACAO} - ${option.DESC_OPERACAO}`;
-
-                                onChange(selected);
-                                onSelect(option);
-                                setSearch("");
-                                setOpened(false);
-                            }}
+                            tabIndex={-1}
+                            role="option"
+                            aria-selected={indice === ativo}
+                            className={
+                                indice === ativo
+                                    ? `${styles.searchOption} ${styles.searchOptionAtivo}`
+                                    : styles.searchOption
+                            }
+                            onMouseDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => destacar(indice, false)}
+                            onClick={() => escolher(option)}
                         >
                             <strong>
                                 {option.COD_OPERACAO} - {option.DESC_OPERACAO}

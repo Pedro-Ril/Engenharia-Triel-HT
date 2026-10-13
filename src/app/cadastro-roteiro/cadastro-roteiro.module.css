@@ -908,8 +908,18 @@
   cursor: pointer;
 }
 
-.searchOption:hover {
+.searchOption:hover,
+.searchOptionAtivo {
   background: var(--bg-hover-brand);
+}
+
+/*
+ * No teclado o destaque e a unica pista de onde o Enter vai cair -- no
+ * mouse o cursor ja diz. Por isso a opcao ativa leva tambem a barra na
+ * lateral, que o :hover nao tem.
+ */
+.searchOptionAtivo {
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .searchOption strong {
