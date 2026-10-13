@@ -29,6 +29,11 @@ type OperacaoOption = {
 type Props = {
     open: boolean;
     item: RoteiroTreeNode | null;
+    /*
+     * De quem o item faz parte na estrutura consultada -- so para o
+     * cabecalho se situar. Null quando o item e a raiz da consulta.
+     */
+    pai?: RoteiroTreeNode | null;
     roteiroEdicao?: RoteiroItem | null;
     /*
      * Observação que o item pai já tem no roteiro dele -- entra como
@@ -725,6 +730,7 @@ function OperacaoSearchSelect({
 export default function CadastroOperacaoModal({
     open,
     item,
+    pai,
     roteiroEdicao,
     observacaoHerdada = "",
     onClose,
@@ -1269,14 +1275,59 @@ export default function CadastroOperacaoModal({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className={styles.operacaoModalHeader}>
-                            <div>
+                            <div className={styles.operacaoModalHeaderInfo}>
                                 <h3 className={styles.operacaoModalTitle}>
                                     {modoEdicao ? "Editar Operação" : "Cadastro de Operação"}
                                 </h3>
-                                <p className={styles.operacaoModalSubtitle}>
-                                    Item {item.codigoNormalizado} | {item.revisao || "-"} —{" "}
-                                    {item.descricaoNormalizada || "Sem descrição"}
-                                </p>
+                                {/*
+                                    De quem o item faz parte e quem esta sendo
+                                    roteirizado. O codigo sozinho nao dizia onde
+                                    o item entra na estrutura, que era a duvida
+                                    mais comum de quem abre este modal.
+                                */}
+                                <div className={styles.hierarquiaItem}>
+                                    <div className={styles.hierarquiaLinha}>
+                                        <span className={styles.hierarquiaEtiqueta}>
+                                            {pai ? "Pertence a" : "Topo da estrutura"}
+                                        </span>
+
+                                        {pai ? (
+                                            <>
+                                                <strong className={styles.hierarquiaCodigo}>
+                                                    {pai.codigoNormalizado} | {pai.revisao || "-"}
+                                                </strong>
+                                                <span
+                                                    className={styles.hierarquiaDescricao}
+                                                    title={pai.descricaoNormalizada || ""}
+                                                >
+                                                    {pai.descricaoNormalizada || "Sem descrição"}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className={styles.hierarquiaDescricao}>
+                                                Este item é a raiz da consulta — não tem pai acima.
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        className={`${styles.hierarquiaLinha} ${styles.hierarquiaFilho}`}
+                                    >
+                                        <span className={styles.hierarquiaEtiqueta}>
+                                            Roteirizando
+                                        </span>
+
+                                        <strong className={styles.hierarquiaCodigo}>
+                                            {item.codigoNormalizado} | {item.revisao || "-"}
+                                        </strong>
+                                        <span
+                                            className={styles.hierarquiaDescricao}
+                                            title={item.descricaoNormalizada || ""}
+                                        >
+                                            {item.descricaoNormalizada || "Sem descrição"}
+                                        </span>
+                                    </div>
+                                </div>
 
                                 {/*
                                     Os mesmos botões da árvore: conferir o desenho

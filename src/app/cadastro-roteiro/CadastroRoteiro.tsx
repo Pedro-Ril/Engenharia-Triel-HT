@@ -969,6 +969,9 @@ export default function CadastroRoteiro() {
     /* Observação que o pai imediato já tem no roteiro dele, usada como
        valor inicial ao cadastrar o filho (ver primeiraObservacaoDoRoteiro). */
     const [observacaoHerdada, setObservacaoHerdada] = useState("");
+    /* O pai do item aberto no modal, so para o cabecalho se situar. */
+    const [paiCadastroOperacao, setPaiCadastroOperacao] =
+        useState<RoteiroTreeNode | null>(null);
 
     const { toasts, exibirToast, removerToast } = useToast();
     const [retornoErpModal, setRetornoErpModal] = useState<any>(null);
@@ -1529,11 +1532,16 @@ export default function CadastroRoteiro() {
                                     item.id
                                 );
                                 setObservacaoHerdada(primeiraObservacaoDoRoteiro(pai));
+                                setPaiCadastroOperacao(pai);
                                 setItemCadastroOperacao(item);
                             }}
                             onEditRoteiro={(item, roteiro) => {
                                 /* Em edição o texto vem do próprio roteiro. */
                                 setObservacaoHerdada("");
+                                /* O cabeçalho mostra a hierarquia nos dois modos. */
+                                setPaiCadastroOperacao(
+                                    encontrarPaiNaArvore(resultado?.tree ?? null, item.id)
+                                );
                                 setItemCadastroOperacao(item);
                                 setRoteiroEdicao(roteiro);
                             }}
@@ -1903,6 +1911,7 @@ export default function CadastroRoteiro() {
             <CadastroOperacaoModal
                 open={!!itemCadastroOperacao}
                 item={itemCadastroOperacao}
+                pai={paiCadastroOperacao}
                 roteiroEdicao={roteiroEdicao}
                 observacaoHerdada={observacaoHerdada}
                 onRoteiroSalvo={atualizarRoteirosDoItem}
@@ -1910,6 +1919,7 @@ export default function CadastroRoteiro() {
                     setItemCadastroOperacao(null);
                     setRoteiroEdicao(null);
                     setObservacaoHerdada("");
+                    setPaiCadastroOperacao(null);
                 }}
             />
         </div>

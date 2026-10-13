@@ -809,6 +809,7 @@
     padding: 14px 20px 10px;
   }
 
+
   .operacaoModalTitle {
     font-size: 19px;
   }
@@ -932,6 +933,128 @@
   font-size: 12px;
 }
 
+/*
+ * Hierarquia no cabecalho do modal: de quem o item faz parte e qual
+ * esta sendo roteirizado. Compacto de proposito -- o cabecalho divide
+ * altura com o formulario, que ja e justo em tela de notebook.
+ */
+.hierarquiaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.hierarquiaLinha {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface-soft);
+}
+
+/* O item entra recuado, com a haste ligando no pai. */
+.hierarquiaFilho {
+  position: relative;
+  margin-left: 20px;
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+}
+
+.hierarquiaFilho::before {
+  content: "";
+  position: absolute;
+  left: -13px;
+  top: -7px;
+  bottom: 50%;
+  width: 10px;
+  border-left: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  border-bottom-left-radius: 6px;
+}
+
+.hierarquiaEtiqueta {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/*
+ * Texto cheio, nao --primary: o vermelho escuro desta empresa
+ * (#921c1c) da 1.81:1 sobre a propria caixa no tema escuro. A enfase
+ * ja vem do fundo tingido e da borda; aqui basta destacar da etiqueta
+ * do pai, que e --text-muted.
+ */
+.hierarquiaFilho .hierarquiaEtiqueta {
+  color: var(--text);
+}
+
+.hierarquiaCodigo {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Descricao longa corta na linha em vez de empurrar o cabecalho. */
+.hierarquiaDescricao {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+/*
+ * Tela baixa: o cabecalho cede altura para o formulario.
+ *
+ * Precisa vir DEPOIS das regras acima -- mesma especificidade, entao
+ * quem aparece por ultimo no arquivo e que vale (foi assim que a
+ * primeira tentativa, escrita no @media la de cima, nao pegou).
+ *
+ * A hierarquia deixa de ser empilhada e vira uma faixa com as duas
+ * caixas lado a lado; titulo e botoes de 2D/3D passam a dividir a mesma
+ * linha. Juntos, e o que faz a Observacao caber sem rolar no notebook.
+ */
+@media (max-height: 820px) {
+  .operacaoModalHeaderInfo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  .operacaoModalHeaderInfo .hierarquiaItem {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .hierarquiaLinha {
+    padding: 3px 8px;
+  }
+
+  .hierarquiaFilho {
+    margin-left: 0;
+  }
+
+  .hierarquiaFilho::before {
+    display: none;
+  }
+
+  .operacaoModalAcoesItem {
+    margin-top: 0;
+  }
+}
 .operacaoModalFooter {
   display: flex;
   justify-content: flex-end;
