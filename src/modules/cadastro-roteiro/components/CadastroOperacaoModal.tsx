@@ -87,6 +87,13 @@ const situacaoOptions: SelectOption[] = [
     { codigo: "Inativa", descricao: "Inativa" },
 ];
 
+/*
+ * Quase toda operacao e apontada em minuto -- deixar pronto poupa um
+ * campo por cadastro. Casado pelo CODIGO da unidade, nao pela
+ * descricao, que varia ("MINUTO", "MINUTOS").
+ */
+const CODIGO_UNIDADE_PADRAO = "MIN";
+
 const simNaoOptions: SelectOption[] = [
     { codigo: "Sim", descricao: "Sim" },
     { codigo: "Não", descricao: "Não" },
@@ -643,7 +650,7 @@ export default function CadastroOperacaoModal({
                         : []
                 );
 
-                setUnidadesMedida(
+                const unidades: SelectOption[] =
                     responseUnidades.ok &&
                         jsonUnidades?.success &&
                         Array.isArray(jsonUnidades.data)
@@ -651,8 +658,28 @@ export default function CadastroOperacaoModal({
                             codigo: String(unidade.COD_UNID_MED ?? "").trim(),
                             descricao: String(unidade.DESC_UNID_MED ?? "").trim(),
                         }))
-                        : []
+                        : [];
+
+                setUnidadesMedida(unidades);
+
+                /*
+                 * A lista chega depois do formulario montar, entao o padrao
+                 * so pode ser aplicado aqui.
+                 *
+                 * So preenche campo VAZIO: em edicao o efeito que carrega o
+                 * roteiro ja rodou e colocou a unidade de la, entao nada e
+                 * sobrescrito. Decidir pelo valor atual, em vez de perguntar
+                 * se e edicao, mantem este efeito dependendo so de `open`
+                 * -- do contrario ele refaria as tres consultas ao ERP a
+                 * cada troca de roteiro em edicao.
+                 */
+                const padrao = unidades.find(
+                    (unidade) => unidade.codigo.toUpperCase() === CODIGO_UNIDADE_PADRAO
                 );
+
+                if (padrao) {
+                    setUnidadeMedida((atual) => (atual ? atual : formatarOption(padrao)));
+                }
             } catch (error) {
                 console.error("Erro ao carregar dados:", error);
 
@@ -747,6 +774,16 @@ export default function CadastroOperacaoModal({
         setSeq(proximaSeq);
     }, [roteiroPadrao, operacoesAdicionadas, item, open, modoEdicao]);
 
+    /* Texto da unidade padrao ("MIN - MINUTO"), ou vazio se a lista
+       ainda nao chegou ou o ERP nao tiver esse codigo. */
+    function unidadePadraoFormatada(): string {
+        const padrao = unidadesMedida.find(
+            (unidade) => unidade.codigo.toUpperCase() === CODIGO_UNIDADE_PADRAO
+        );
+
+        return padrao ? formatarOption(padrao) : "";
+    }
+
     function limparCamposFormulario(limparSeq = true) {
         if (limparSeq) setSeq("10");
 
@@ -768,12 +805,24 @@ export default function CadastroOperacaoModal({
         setNumeroDiasExecucao("");
         setObservacao("");
         setObrigatorio("Não");
-        setApontamento("Não");
+        /* Apontamento e "Sim" na pratica quase sempre; abrir ja marcado
+           evita o clique repetido a cada operacao. */
+        setApontamento("Sim");
         setErroValidacao("");
     }
 
     function limparCamposParaProximaOperacao(proximaSeq: string) {
         limparCamposFormulario(false);
+
+        /*
+         * Volta na unidade padrao em vez de em branco. So aqui, e nao
+         * dentro de limparCamposFormulario: aquela funcao tambem roda no
+         * efeito de abertura do modal, e ler `unidadesMedida` ali a
+         * tornaria dependencia reativa daquele efeito. Na abertura a
+         * lista do ERP nem chegou ainda -- quem aplica o padrao la e o
+         * proprio carregamento. Aqui ela ja esta em maos.
+         */
+        setUnidadeMedida(unidadePadraoFormatada());
         setSeq(proximaSeq);
     }
 
@@ -1174,11 +1223,6 @@ export default function CadastroOperacaoModal({
                                                 disabled
                                                 readOnly
                                                 title="O tipo do roteiro não pode ser alterado durante a edição."
-                                                style={{
-                                                    background: "#f3f4f6",
-                                                    cursor: "not-allowed",
-                                                    color: "#6b7280",
-                                                }}
                                             />
                                         </div>
                                     ) : (
@@ -1317,10 +1361,16 @@ export default function CadastroOperacaoModal({
                                 </div>
                             </fieldset>
 
+                            {/*
+                                Planejamento e Observação dividem a última
+                                faixa: empilhados, a observação caía fora da
+                                tela e obrigava a rolar o modal inteiro.
+                            */}
+                            <div className={styles.formFaixaFinal}>
                             <fieldset className={styles.formFieldset}>
                                 <legend>Planejamento</legend>
 
-                                <div className={styles.formGrid}>
+                                <div className={styles.formGridDuplo}>
                                     <div className={styles.formField}>
                                         <label className={styles.formLabel}>Folga Mínima</label>
                                         <input
@@ -1363,20 +1413,24 @@ export default function CadastroOperacaoModal({
                                 </div>
                             </fieldset>
 
-                            <div className={styles.formFieldFull}>
-                                <label className={styles.formLabel}>Observação</label>
-                                <textarea
-                                    className={styles.formTextarea}
-                                    value={observacao}
-                                    onChange={(e) => setObservacao(e.target.value)}
-                                />
-                                {!modoEdicao &&
-                                    observacaoHerdada &&
-                                    observacao === observacaoHerdada && (
-                                        <span className={styles.formHint}>
-                                            Veio do roteiro do item pai — pode alterar ou apagar.
-                                        </span>
-                                    )}
+                            <fieldset className={styles.formFieldset}>
+                                <legend>Observação</legend>
+
+                                <div className={styles.formFieldObservacao}>
+                                    <textarea
+                                        className={styles.formTextarea}
+                                        value={observacao}
+                                        onChange={(e) => setObservacao(e.target.value)}
+                                    />
+                                    {!modoEdicao &&
+                                        observacaoHerdada &&
+                                        observacao === observacaoHerdada && (
+                                            <span className={styles.formHint}>
+                                                Veio do roteiro do item pai — pode alterar ou apagar.
+                                            </span>
+                                        )}
+                                </div>
+                            </fieldset>
                             </div>
                         </div>
 

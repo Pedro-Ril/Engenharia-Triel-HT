@@ -701,6 +701,37 @@ function TreeNode({
                                 alert(mensagem);
                             }}
                         />
+
+                        {/*
+                            Atalho para quem esta varrendo a estrutura atras do
+                            que falta: sem isto, cadastrar o roteiro de um item
+                            exige abrir os detalhes dele antes. So aparece quando
+                            nao ha roteiro -- o item que ja tem um continua com o
+                            botao de dentro dos detalhes.
+                        */}
+                        {semRoteiro && (
+                            <button
+                                type="button"
+                                className={styles.addRoteiroButton}
+                                title="Cadastrar roteiro deste item"
+                                aria-label="Cadastrar roteiro deste item"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCreateRoteiro(node);
+                                }}
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path
+                                        d="M12 5v14M5 12h14"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.4"
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
+                                Roteiro
+                            </button>
+                        )}
                     </div>
 
                     <span className={styles.nodeDescription}>

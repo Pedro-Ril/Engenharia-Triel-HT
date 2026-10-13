@@ -692,8 +692,8 @@
 }
 
 .operacaoModalContent {
-  width: min(980px, 96vw);
-  max-height: 92vh;
+  width: min(1240px, 96vw);
+  max-height: 94vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -724,11 +724,11 @@
 }
 
 .operacaoModalBody {
-  padding: 18px 24px;
+  padding: 14px 20px;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .formSection {
@@ -741,7 +741,7 @@
 .formFieldset {
   border: 1px solid var(--border-strong);
   border-radius: 14px;
-  padding: 16px 14px 14px;
+  padding: 12px 12px 10px;
   background: var(--bg-surface);
 }
 
@@ -752,10 +752,104 @@
   color: var(--text-soft);
 }
 
+/*
+ * Quatro colunas em vez de tres: com tres, o formulario inteiro pedia
+ * 938px de altura e a observacao ficava fora da tela em qualquer
+ * monitor comum, obrigando a rolar o modal a cada cadastro.
+ */
 .formGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px 12px;
+}
+
+/*
+ * Planejamento e Observacao lado a lado, fechando o formulario. O
+ * Planejamento tem quatro campos curtos em duas colunas e nao precisa
+ * de largura; a observacao e texto corrido e aproveita o que sobra.
+ */
+.formFaixaFinal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
   gap: 12px;
+  align-items: stretch;
+}
+
+/* Dentro do Planejamento, que agora ocupa meia largura. */
+.formGridDuplo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+/* A observacao acompanha a altura do bloco ao lado. */
+.formFieldObservacao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+
+.formFieldObservacao .formTextarea {
+  flex: 1;
+  min-height: 84px;
+}
+
+@media (max-width: 900px) {
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .formFaixaFinal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+ * Notebook de tela baixa: aperta o espacamento (nunca a fonte dos
+ * campos) para a observacao continuar cabendo sem rolagem. Em monitor
+ * normal nada disto se aplica.
+ */
+@media (max-height: 820px) {
+  .operacaoModalBody {
+    gap: 10px;
+    padding: 12px 18px;
+  }
+
+  .formGrid,
+  .formGridDuplo {
+    gap: 8px 10px;
+  }
+
+  .formFieldset {
+    padding: 10px 10px 8px;
+  }
+
+  .formInput,
+  .formTextarea {
+    padding: 6px 9px;
+  }
+
+  .formFieldObservacao .formTextarea {
+    min-height: 62px;
+  }
+
+  /* Cabeçalho e rodapé também cedem altura para o formulário. */
+  .operacaoModalHeader {
+    padding: 14px 20px 10px;
+  }
+
+  .operacaoModalTitle {
+    font-size: 19px;
+  }
+
+  .operacaoModalAcoesItem {
+    margin-top: 6px;
+  }
+
+  .operacaoModalFooter {
+    padding: 10px 20px 14px;
+  }
 }
 
 .formField,
@@ -786,7 +880,7 @@
   border: 1px solid var(--border-input);
   border-radius: 10px;
   background: var(--bg-surface);
-  padding: 9px 10px;
+  padding: 8px 10px;
   font-size: 13px;
   outline: none;
 }
@@ -795,6 +889,22 @@
 .formTextarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+/*
+ * Campo bloqueado, igual ao Input do portal
+ * (src/components/ui/Input/Input.module.css). Estes tokens têm par
+ * claro/escuro -- antes a cor vinha fixa num style inline e o campo
+ * ficava branco no meio do modal escuro.
+ */
+.formInput:disabled,
+.formInput[readonly],
+.formTextarea:disabled,
+.formTextarea[readonly] {
+  cursor: not-allowed;
+  background: var(--bg-surface-muted);
+  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 .formTextarea {
@@ -1454,4 +1564,42 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+/*
+ * Atalho "Roteiro" na linha da arvore, ao lado do 2D e do 3D, para item
+ * sem roteiro. Mesma altura e raio dos vizinhos; verde para separar do
+ * vermelho (abrir arquivo) e do azul (3D) -- aqui a acao e criar.
+ */
+.addRoteiroButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  /* Mesma caixa dos botoes de 2D/3D ao lado (.play3DButton), para os
+     tres alinharem na linha da arvore. */
+  height: 38px;
+  padding: 0 12px;
+
+  border: 1px solid var(--success-border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--success-text);
+
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.addRoteiroButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.addRoteiroButton:hover {
+  background: var(--success-bg);
+  border-color: var(--success-text);
 }
