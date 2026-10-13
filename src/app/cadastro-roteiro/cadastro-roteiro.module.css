@@ -142,22 +142,6 @@
   flex-wrap: wrap;
 }
 
-.filterToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-  font-weight: 600;
-  color: var(--text-soft);
-}
-
-.filterToggle input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary);
-}
-
 .filterHint {
   font-size: 12px;
   color: var(--text-muted);
@@ -368,26 +352,9 @@
 .tipoCheckboxList {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px 24px;
 }
 
-.tipoCheckboxItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-surface);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-soft);
-  cursor: pointer;
-}
-
-.tipoCheckboxItem input {
-  accent-color: var(--primary);
-}
 .treeRow {
   cursor: pointer;
 }
@@ -676,6 +643,9 @@
 }
 .createRouteButton {
   margin-top: 8px;
+  /* Encostado a direita, alinhado com a lixeira do bloco de roteiros
+     logo acima -- as acoes do item ficam todas no mesmo canto. */
+  margin-left: auto;
   width: fit-content;
   border: none;
   border-radius: 10px;

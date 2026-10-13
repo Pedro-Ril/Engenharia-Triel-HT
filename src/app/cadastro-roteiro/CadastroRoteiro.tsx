@@ -15,6 +15,7 @@ import {
 } from "@/modules/cadastro-roteiro/types/cadastroRoteiro.types";
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 function normalizarTipo(valor?: string | null): string {
     const texto = String(valor ?? "").trim().toLowerCase();
@@ -1450,23 +1451,17 @@ export default function CadastroRoteiro() {
 
                             {filtrosAbertos && (
                                 <div className={styles.filtersBody}>
-                                    <label className={styles.filterToggle}>
-                                        <input
-                                            type="checkbox"
-                                            checked={mostrarSemRoteiro}
-                                            onChange={(e) => setMostrarSemRoteiro(e.target.checked)}
-                                        />
-                                        <span>Mostrar apenas itens sem roteiro</span>
-                                    </label>
+                                    <Checkbox
+                                        label="Mostrar apenas itens sem roteiro"
+                                        checked={mostrarSemRoteiro}
+                                        onChange={(e) => setMostrarSemRoteiro(e.target.checked)}
+                                    />
 
-                                    <label className={styles.filterToggle}>
-                                        <input
-                                            type="checkbox"
-                                            checked={mostrarComAtencao}
-                                            onChange={(e) => setMostrarComAtencao(e.target.checked)}
-                                        />
-                                        <span>Mostrar apenas itens com atenção</span>
-                                    </label>
+                                    <Checkbox
+                                        label="Mostrar apenas itens com atenção"
+                                        checked={mostrarComAtencao}
+                                        onChange={(e) => setMostrarComAtencao(e.target.checked)}
+                                    />
 
                                     <div className={styles.filterSelectGroup}>
                                         <label className={styles.filterSelectLabel}>
@@ -1475,19 +1470,14 @@ export default function CadastroRoteiro() {
 
                                         <div className={styles.tipoCheckboxList}>
                                             {tiposDisponiveis.map(([tipoKey, tipoLabel]) => (
-                                                <label
+                                                <Checkbox
                                                     key={tipoKey}
-                                                    className={styles.tipoCheckboxItem}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={tiposSelecionados.includes(tipoKey)}
-                                                        onChange={(e) =>
-                                                            toggleTipo(tipoKey, e.target.checked)
-                                                        }
-                                                    />
-                                                    <span>{tipoLabel}</span>
-                                                </label>
+                                                    label={tipoLabel}
+                                                    checked={tiposSelecionados.includes(tipoKey)}
+                                                    onChange={(e) =>
+                                                        toggleTipo(tipoKey, e.target.checked)
+                                                    }
+                                                />
                                             ))}
                                         </div>
 
