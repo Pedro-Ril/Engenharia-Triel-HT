@@ -274,6 +274,14 @@ export interface ConfigIntegraTubest {
   atualizadoPor: string | null;
 }
 
+export interface ConfigConferenciaDerivados {
+  pastaPdf: string | null;
+  pastaDxf: string | null;
+  pastaStep: string | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
 export type CriptografiaSmtp = "nenhuma" | "ssl" | "tls";
 
 export interface ConfiguracaoSmtp {

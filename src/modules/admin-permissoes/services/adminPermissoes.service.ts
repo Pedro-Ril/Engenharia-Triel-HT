@@ -20,6 +20,7 @@ import type {
   ConfigErpEstoqueUsados,
   ConfigEstruturaSubstituicao,
   ConfigIntegraLantek,
+  ConfigConferenciaDerivados,
   ConfigIntegraTubest,
   ConfigMateriaPrima,
   ConfiguracaoAd,
@@ -886,6 +887,25 @@ export async function salvarConfigIntegraTubest(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigIntegraTubest>(response);
+}
+
+export async function buscarConfigConferenciaDerivados(): Promise<ConfigConferenciaDerivados | null> {
+  const response = await fetch("/api/admin/conferencia-derivados/config");
+  const body = await parseResponse<ConfigConferenciaDerivados>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigConferenciaDerivados(dados: {
+  pastaPdf: string | null;
+  pastaDxf: string | null;
+  pastaStep: string | null;
+}): Promise<ApiEnvelope<ConfigConferenciaDerivados>> {
+  const response = await fetch("/api/admin/conferencia-derivados/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigConferenciaDerivados>(response);
 }
 
 export async function buscarConfiguracaoSmtp(): Promise<ConfiguracaoSmtp | null> {

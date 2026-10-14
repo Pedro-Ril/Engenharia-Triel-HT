@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Boxes,
   Database,
+  FileSearch,
   FileSpreadsheet,
   KeyRound,
   Mail,
@@ -27,6 +28,7 @@ import { ConfiguracaoAdPainel } from "./ConfiguracaoAdPainel";
 import { ConfiguracaoDbPainel } from "./ConfiguracaoDbPainel";
 import { ConfiguracaoFirebirdPainel } from "./ConfiguracaoFirebirdPainel";
 import { ConfiguracaoSmtpPainel } from "./ConfiguracaoSmtpPainel";
+import { ConferenciaDerivadosConfigPainel } from "./ConferenciaDerivadosConfigPainel";
 import { EstruturaSubstituicaoConfigPainel } from "./EstruturaSubstituicaoConfigPainel";
 import { IntegraLantekConfigPainel } from "./IntegraLantekConfigPainel";
 import { IntegraTubestConfigPainel } from "./IntegraTubestConfigPainel";
@@ -56,6 +58,7 @@ type AbaConfiguracao =
   | "estrutura"
   | "lantek"
   | "tubest"
+  | "derivados"
   | "transferencia"
   | "manutencao";
 
@@ -69,6 +72,7 @@ const ABAS: { valor: AbaConfiguracao; label: string; icon: typeof KeyRound }[] =
   { valor: "estrutura", label: "Estrutura", icon: Shuffle },
   { valor: "lantek", label: "Integração Lantek", icon: FileSpreadsheet },
   { valor: "tubest", label: "Integração TuBest", icon: Boxes },
+  { valor: "derivados", label: "Arquivos Derivados", icon: FileSearch },
   { valor: "transferencia", label: "Transferência de Arquivos", icon: Send },
 ];
 
@@ -139,6 +143,8 @@ export function ConfiguracoesPainel({
         {aba === "lantek" && <IntegraLantekConfigPainel onFeedback={onFeedback} />}
 
         {aba === "tubest" && <IntegraTubestConfigPainel onFeedback={onFeedback} />}
+
+        {aba === "derivados" && <ConferenciaDerivadosConfigPainel onFeedback={onFeedback} />}
 
         {aba === "transferencia" && <TransferenciaConfigPainel onFeedback={onFeedback} />}
 
