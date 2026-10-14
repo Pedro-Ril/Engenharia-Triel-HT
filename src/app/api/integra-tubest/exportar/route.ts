@@ -35,15 +35,24 @@ interface LinhaExportacao {
 }
 
 /*
- * Coluna B: CODITEM_ORDEM_CARRO. A ordem entra porque a mesma peça pode
- * vir em mais de uma ordem do lote -- sem ela, duas linhas ficariam com
- * o mesmo nome dentro do TuBest. O carro é opcional e some quando vazio,
- * em vez de deixar um "_" sobrando na ponta.
+ * Coluna B: CODITEM_ORDEM_CARRO(COD_MP). A ordem entra porque a mesma
+ * peça pode vir em mais de uma ordem do lote -- sem ela, duas linhas
+ * ficariam com o mesmo nome dentro do TuBest. A matéria-prima vai entre
+ * parênteses no fim, para quem está no TuBest saber de que tubo é a
+ * peça sem voltar ao portal. Vale igual no arquivo único e no separado
+ * por MP.
+ *
+ * Carro e MP são opcionais e somem quando vazios, em vez de deixar um
+ * "_" sobrando na ponta ou um "()" vazio.
  */
 function montarNomePeca(linha: LinhaExportacao, numeroCarro: string): string {
-  return [String(linha.codigo ?? "").trim(), String(linha.ordem ?? "").trim(), numeroCarro]
+  const base = [String(linha.codigo ?? "").trim(), String(linha.ordem ?? "").trim(), numeroCarro]
     .filter(Boolean)
     .join("_");
+
+  const codigoMp = String(linha.codigoMp ?? "").trim();
+
+  return codigoMp ? `${base}(${codigoMp})` : base;
 }
 
 function normalizarQuantidade(valor: unknown): number | string {
