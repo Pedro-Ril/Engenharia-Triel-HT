@@ -62,11 +62,20 @@ direto via `setAttribute` fora dali.
 - Toda rota em `src/app/api/**/route.ts` começa com
   `export const runtime = "nodejs";` e `export const dynamic = "force-dynamic";`.
 - Resposta sempre no formato `{ ok: boolean; message?: string; data?: T }`.
-- Autenticação/autorização via helpers em `src/lib/auth/autorizacao.ts`:
-  `requireAdminApi()`, `requireModuloAccess()`/`requireModuloAccessApi()`,
-  ou o equivalente específico do módulo (ex:
-  `requireAtendenteChamadosApi()` em `src/lib/chamados/`). Padrão:
-  `const acesso = await requireAdminApi(); if (acesso.negado) return acesso.negado;`.
+- Autenticação/autorização via helpers em `src/lib/auth/autorizacao.ts`.
+  São dois pares, um para página e outro para rota de API — não troque:
+  - **Página (Server Component):** `requireModuloAccess("<chave>")` /
+    `requireAdmin()`. Redirecionam quando negado e `requireModuloAccess`
+    já registra o acesso ao módulo.
+  - **Rota de API:** `verificarAcessoModuloApi("<chave>")` /
+    `requireAdminApi()`. Não redirecionam (rota não pode usar
+    `redirect()`); devolvem `{ usuario, negado }` e a rota devolve o
+    `negado` pronto (401/403). Padrão:
+    `const acesso = await verificarAcessoModuloApi("<chave>"); if (acesso.negado) return acesso.negado;`.
+  - Ou o equivalente específico do módulo (ex:
+    `requireAtendenteChamadosApi()` em `src/lib/chamados/`).
+  Não existe `requireModuloAccessApi()` — o nome já apareceu aqui por
+  engano; o de API é `verificarAcessoModuloApi`.
 - Erros de validação lançam `ValidationError` (`src/lib/auth/errors.ts`)
   e a rota captura e devolve `{ ok:false, message }` com status 400.
   Nunca deixe uma validação de negócio virar um 500.
