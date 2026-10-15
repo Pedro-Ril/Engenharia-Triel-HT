@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { NumberInput } from "@/components/ui/NumberInput";
@@ -20,7 +20,7 @@ type StatusType = "idle" | "success" | "error";
 type ModalStep = "confirmar-consulta" | "confirmar-envio";
 
 /*
- * Campos elegíveis pro "campo que muda" nos múltiplos envios — só os
+ * Campos elegíveis pros "campos que mudam" nos múltiplos envios — só os
  * de texto livre (Nome/Cliente usam widgets de seleção, não fazem
  * sentido como "uma lista de valores alternativos").
  */
@@ -36,6 +36,14 @@ const CAMPOS_MULTIPLOS: { value: CampoMultiplo; label: string }[] = [
 ];
 
 const QUANTIDADE_MAX_MULTIPLO = 20;
+
+/* Valores de um envio adicional, por campo. Guarda também o que foi
+   digitado em campos depois desmarcados -- remarcar devolve o valor. */
+type ValoresEnvio = Partial<Record<CampoMultiplo, string>>;
+
+function rotuloDoCampo(campo: CampoMultiplo): string {
+  return CAMPOS_MULTIPLOS.find((c) => c.value === campo)?.label ?? campo;
+}
 
 function mensagemDeErro(error: unknown): string {
   return error instanceof Error
@@ -70,8 +78,10 @@ export default function LiberacaoProjetoPage() {
   const [modalErro, setModalErro] = useState("");
 
   const [multiploAtivo, setMultiploAtivo] = useState(false);
-  const [multiploCampo, setMultiploCampo] = useState<CampoMultiplo | "">("");
-  const [multiploValores, setMultiploValores] = useState<string[]>([""]);
+  /* Mais de um campo pode mudar entre os envios; a ordem segue a do
+     formulário, não a dos cliques. */
+  const [multiploCampos, setMultiploCampos] = useState<CampoMultiplo[]>([]);
+  const [multiploEnvios, setMultiploEnvios] = useState<ValoresEnvio[]>([{}]);
 
   const clienteWrapperRef = useRef<HTMLDivElement | null>(null);
 
@@ -204,8 +214,8 @@ export default function LiberacaoProjetoPage() {
     setModalStep("confirmar-consulta");
     setModalErro("");
     setMultiploAtivo(false);
-    setMultiploCampo("");
-    setMultiploValores([""]);
+    setMultiploCampos([]);
+    setMultiploEnvios([{}]);
   };
 
   const handleQuantidadeMultiploChange = (quantidadeTexto: string) => {
@@ -214,52 +224,101 @@ export default function LiberacaoProjetoPage() {
       Math.min(QUANTIDADE_MAX_MULTIPLO, Number(quantidadeTexto) || 1)
     );
 
-    setMultiploValores((atual) => {
+    setMultiploEnvios((atual) => {
       const novo = atual.slice(0, quantidade);
-      while (novo.length < quantidade) novo.push("");
+      while (novo.length < quantidade) novo.push({});
       return novo;
     });
   };
 
+  const alternarCampoMultiplo = (campo: CampoMultiplo, marcado: boolean) => {
+    setMultiploCampos((atuais) =>
+      CAMPOS_MULTIPLOS.map((c) => c.value).filter((c) =>
+        c === campo ? marcado : atuais.includes(c)
+      )
+    );
+    setModalErro("");
+  };
+
+  const atualizarValorEnvio = (indice: number, campo: CampoMultiplo, valor: string) => {
+    setMultiploEnvios((atual) =>
+      atual.map((envio, i) => (i === indice ? { ...envio, [campo]: valor } : envio))
+    );
+    setModalErro("");
+  };
+
   /*
    * Não muda nada no backend: reaproveita enviarEmail() chamando-a
-   * várias vezes em sequência — um envio primário com os dados como
-   * o usuário digitou, e mais um por valor alternativo informado,
-   * trocando só o campo escolhido.
+   * várias vezes em sequência — o Envio 1 com os dados como o usuário
+   * digitou, e mais um por linha preenchida, trocando só os campos
+   * marcados (um ou vários) pelos valores daquela linha.
+   *
+   * Linha toda em branco é pulada. Linha preenchida pela metade barra o
+   * envio inteiro, antes de mandar qualquer coisa: é e-mail, não tem
+   * volta, e um campo esquecido sairia com o valor do formulário sem
+   * ninguém perceber.
    */
   const executarEnvioMultiplo = async (payloadBase: EmailPayload) => {
-    if (!multiploCampo) {
-      setModalErro("Selecione o campo que muda entre os envios.");
+    if (multiploCampos.length === 0) {
+      setModalErro("Marque ao menos um campo que muda entre os envios.");
       return;
     }
 
-    const valoresValidos = multiploValores.map((v) => v.trim()).filter(Boolean);
-    if (valoresValidos.length === 0) {
-      setModalErro("Informe ao menos um valor adicional para o campo escolhido.");
+    const campos = multiploCampos;
+    const variantes: { numero: number; valores: ValoresEnvio }[] = [];
+
+    for (const [indice, envio] of multiploEnvios.entries()) {
+      const numero = indice + 2;
+      const preenchidos = campos.filter((c) => (envio[c] ?? "").trim());
+
+      if (preenchidos.length === 0) continue;
+
+      const faltando = campos.filter((c) => !(envio[c] ?? "").trim());
+
+      if (faltando.length > 0) {
+        setModalErro(
+          `Envio ${numero}: preencha ${faltando.map(rotuloDoCampo).join(", ")} — ou deixe a linha toda em branco para pular.`
+        );
+        return;
+      }
+
+      variantes.push({
+        numero,
+        valores: Object.fromEntries(campos.map((c) => [c, (envio[c] ?? "").trim()])),
+      });
+    }
+
+    if (variantes.length === 0) {
+      setModalErro("Preencha ao menos um envio adicional.");
       return;
     }
 
     setModalErro("");
     setEnviando(true);
 
-    const campo = multiploCampo;
-    const resultados: { valor: string; ok: boolean; erro?: string }[] = [];
+    const descrever = (valores: ValoresEnvio) =>
+      campos.map((c) => `${rotuloDoCampo(c)} ${valores[c] ?? ""}`).join(", ");
 
-    try {
-      await enviarEmail(payloadBase);
-      resultados.push({ valor: payloadBase[campo], ok: true });
-    } catch (error) {
-      resultados.push({ valor: payloadBase[campo], ok: false, erro: mensagemDeErro(error) });
-    }
+    const tentativas = [
+      { descricao: `Envio 1 (${descrever(payloadBase)})`, payload: payloadBase },
+      ...variantes.map((v) => ({
+        descricao: `Envio ${v.numero} (${descrever(v.valores)})`,
+        payload: { ...payloadBase, ...v.valores },
+      })),
+    ];
 
-    for (const valor of valoresValidos) {
-      const payloadVariante: EmailPayload = { ...payloadBase, [campo]: valor };
+    const resultados: { descricao: string; ok: boolean; erro?: string }[] = [];
 
+    for (const tentativa of tentativas) {
       try {
-        await enviarEmail(payloadVariante);
-        resultados.push({ valor, ok: true });
+        await enviarEmail(tentativa.payload);
+        resultados.push({ descricao: tentativa.descricao, ok: true });
       } catch (error) {
-        resultados.push({ valor, ok: false, erro: mensagemDeErro(error) });
+        resultados.push({
+          descricao: tentativa.descricao,
+          ok: false,
+          erro: mensagemDeErro(error),
+        });
       }
     }
 
@@ -267,20 +326,20 @@ export default function LiberacaoProjetoPage() {
 
     const sucessos = resultados.filter((r) => r.ok).length;
     const falhas = resultados.filter((r) => !r.ok);
-    const rotuloCampo = CAMPOS_MULTIPLOS.find((c) => c.value === campo)?.label ?? campo;
+    const rotulos = campos.map(rotuloDoCampo).join(", ");
 
     if (falhas.length === 0) {
       setStatusType("success");
       setStatusMessage(
-        `${sucessos} e-mails enviados com sucesso (${rotuloCampo} variando entre eles).`
+        `${sucessos} e-mails enviados com sucesso (${rotulos} variando entre eles).`
       );
       limparFormulario();
     } else {
       setStatusType("error");
       setStatusMessage(
-        `${sucessos} de ${resultados.length} e-mails enviados. Falha para ${rotuloCampo} = ${falhas
-          .map((f) => `"${f.valor}" (${f.erro})`)
-          .join(", ")}.`
+        `${sucessos} de ${resultados.length} e-mails enviados. Falha em ${falhas
+          .map((f) => `${f.descricao}: ${f.erro}`)
+          .join("; ")}.`
       );
     }
 
@@ -350,15 +409,22 @@ export default function LiberacaoProjetoPage() {
     setModalStep("confirmar-envio");
   };
 
-  const rotuloCampoSelecionado = CAMPOS_MULTIPLOS.find(
-    (c) => c.value === multiploCampo
-  )?.label;
+  /* O Envio 1 é o próprio formulário -- mostrado na grade como
+     referência de onde os outros envios partem. */
+  const valoresFormulario: Record<CampoMultiplo, string> = {
+    ordem,
+    numOf,
+    codFocco,
+    idMasc,
+    numPed,
+    codCjGeral,
+  };
 
   const blocoMultiplosEnvios = (
     <div className={styles.multiploBox}>
       <Checkbox
-        label="Múltiplos envios (mesma informação, um campo diferente)"
-        hint="Envia o e-mail com os dados preenchidos e mais um e-mail para cada valor adicional informado abaixo, trocando só o campo escolhido."
+        label="Múltiplos envios (mesmos dados, mudando um ou mais campos)"
+        hint="Envia o e-mail com os dados preenchidos e mais um e-mail para cada linha abaixo, trocando só os campos marcados."
         checked={multiploAtivo}
         onChange={(e) => {
           setMultiploAtivo(e.target.checked);
@@ -370,20 +436,18 @@ export default function LiberacaoProjetoPage() {
       {multiploAtivo && (
         <div className={styles.multiploConfig}>
           <div className={styles.fieldGroup}>
-            <label className={styles.label}>Campo que muda entre os envios</label>
-            <Dropdown
-              value={multiploCampo}
-              onValueChange={(valor) => {
-                setMultiploCampo(valor as CampoMultiplo);
-                setModalErro("");
-              }}
-              options={CAMPOS_MULTIPLOS.map((c) => ({
-                value: c.value,
-                label: c.label,
-              }))}
-              placeholder="Selecione o campo"
-              disabled={enviando}
-            />
+            <span className={styles.label}>Campos que mudam entre os envios</span>
+            <div className={styles.multiploCampos}>
+              {CAMPOS_MULTIPLOS.map((c) => (
+                <Checkbox
+                  key={c.value}
+                  label={c.label}
+                  checked={multiploCampos.includes(c.value)}
+                  onChange={(e) => alternarCampoMultiplo(c.value, e.target.checked)}
+                  disabled={enviando}
+                />
+              ))}
+            </div>
           </div>
 
           <div className={styles.fieldGroup}>
@@ -391,33 +455,59 @@ export default function LiberacaoProjetoPage() {
             <NumberInput
               min={1}
               max={QUANTIDADE_MAX_MULTIPLO}
-              value={multiploValores.length}
+              value={multiploEnvios.length}
               onChange={(e) => handleQuantidadeMultiploChange(e.target.value)}
               disabled={enviando}
             />
           </div>
 
-          <div className={styles.multiploValores}>
-            {multiploValores.map((valor, indice) => (
-              <div className={styles.fieldGroup} key={indice}>
-                <label className={styles.label}>
-                  Valor {indice + 1}
-                  {rotuloCampoSelecionado ? ` (${rotuloCampoSelecionado})` : ""}
-                </label>
-                <input
-                  type="text"
-                  className={styles.input}
-                  value={valor}
-                  onChange={(e) => {
-                    const novo = [...multiploValores];
-                    novo[indice] = e.target.value;
-                    setMultiploValores(novo);
-                  }}
-                  disabled={enviando}
-                />
+          {multiploCampos.length > 0 && (
+            <div className={styles.multiploGradeRolavel}>
+              <div
+                className={styles.multiploGrade}
+                style={{
+                  gridTemplateColumns: `auto repeat(${multiploCampos.length}, minmax(130px, 1fr))`,
+                }}
+              >
+                <span />
+                {multiploCampos.map((c) => (
+                  <span key={c} className={styles.multiploCabecalho}>
+                    {rotuloDoCampo(c)}
+                  </span>
+                ))}
+
+                <span className={styles.multiploRotuloLinha}>
+                  Envio 1<small>formulário</small>
+                </span>
+                {multiploCampos.map((c) => (
+                  <span
+                    key={c}
+                    className={styles.multiploValorBase}
+                    title={valoresFormulario[c] || "vazio no formulário"}
+                  >
+                    {valoresFormulario[c] || "—"}
+                  </span>
+                ))}
+
+                {multiploEnvios.map((envio, indice) => (
+                  <Fragment key={indice}>
+                    <span className={styles.multiploRotuloLinha}>Envio {indice + 2}</span>
+                    {multiploCampos.map((c) => (
+                      <input
+                        key={c}
+                        type="text"
+                        className={`${styles.input} ${styles.inputCompacto}`}
+                        aria-label={`Envio ${indice + 2} — ${rotuloDoCampo(c)}`}
+                        value={envio[c] ?? ""}
+                        onChange={(e) => atualizarValorEnvio(indice, c, e.target.value)}
+                        disabled={enviando}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
 
           {modalErro && (
             <div className={`${styles.statusMessage} ${styles.statusError}`}>
@@ -678,7 +768,7 @@ export default function LiberacaoProjetoPage() {
       {modalAberto && (
         <div className={styles.modalOverlay} onClick={fecharModal}>
           <div
-            className={styles.modalContent}
+            className={`${styles.modalContent} ${multiploAtivo ? styles.modalContentLargo : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
             {modalStep === "confirmar-consulta" ? (
