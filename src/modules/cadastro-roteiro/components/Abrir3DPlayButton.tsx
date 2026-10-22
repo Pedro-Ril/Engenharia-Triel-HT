@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/ui/Modal";
 import styles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
-import { RoteiroTreeNode } from "../types/cadastroRoteiro.types";
 import {
     abrirModeloNo3DPlay,
     buscarModelos3DPlay,
     Modelo3DPlay,
+    type ItemModelo3D,
 } from "../services/threeDPlay.service";
 import { MENSAGEM_POPUP_BLOQUEADO } from "../utils/abrir-arquivo";
 import { useModoAbertura } from "./ModoAberturaArquivos";
 
 type Props = {
-    item: RoteiroTreeNode;
+    item: ItemModelo3D;
     onErro: (mensagem: string) => void;
 };
 
@@ -83,72 +84,63 @@ export default function Abrir3DPlayButton({ item, onErro }: Props) {
                 {loading ? "..." : <CubeIcon />}
             </button>
 
-            {modalOpen && (
-                <div
-                    className={styles.modalOverlay}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setModalOpen(false);
-                    }}
+            {/*
+                Modal da biblioteca (portal, z-index acima do modal de
+                operação). O overlay antigo era inline: o Esc dele subia até
+                o onKeyDown do modal de operação e pedia para fechá-lo.
+
+                O portal tira o seletor do DOM do pai, mas NÃO da árvore do
+                React: clique, mousedown e tecla continuam subindo até quem
+                renderizou o botão (linha da árvore, modal de operação). O
+                span segura tudo aqui. Não atrapalha o Esc do Modal, que
+                escuta no document -- a mesma raiz onde o React escuta.
+            */}
+            <span
+                className={styles.seletor3DContencao}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+            >
+                <Modal
+                    open={modalOpen}
+                    title="Selecionar modelo 3D"
+                    description={`Foram encontrados ${modelos.length} modelos para este item.`}
+                    onClose={() => setModalOpen(false)}
                 >
-                    <div
-                        className={styles.modalContent}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className={styles.modalHeader}>
-                            <div>
-                                <h3 className={styles.modalTitle}>
-                                    Selecionar modelo 3D
-                                </h3>
-                                <p className={styles.modalSubtitle}>
-                                    Foram encontrados {modelos.length} modelos para este item.
-                                </p>
-                            </div>
-
-                            <button
-                                type="button"
-                                className={styles.modalCloseButton}
-                                onClick={() => setModalOpen(false)}
+                    <div className={styles.seletor3DLista}>
+                        {modelos.map((modelo) => (
+                            <div
+                                key={modelo.physicalId}
+                                className={styles.modelo3DCard}
                             >
-                                ×
-                            </button>
-                        </div>
+                                <div className={styles.modelo3DInfo}>
+                                    <strong>
+                                        {modelo.titulo || modelo.codigo}
+                                    </strong>
 
-                        <div className={styles.modalTableWrapper}>
-                            {modelos.map((modelo) => (
-                                <div
-                                    key={modelo.physicalId}
-                                    className={styles.modelo3DCard}
-                                >
-                                    <div className={styles.modelo3DInfo}>
-                                        <strong>
-                                            {modelo.titulo || modelo.codigo}
-                                        </strong>
-
-                                        <span>
-                                            Revisão: {modelo.revisao || "-"}
-                                        </span>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        className={styles.modelo3DOpenButton}
-                                        onClick={() => {
-                                            setModalOpen(false);
-
-                                            if (!abrirModeloNo3DPlay(modelo, modoAbertura)) {
-                                                onErro(MENSAGEM_POPUP_BLOQUEADO);
-                                            }
-                                        }}
-                                    >
-                                        Abrir
-                                    </button>
+                                    <span>
+                                        Revisão: {modelo.revisao || "-"}
+                                    </span>
                                 </div>
-                            ))}
-                        </div>
+
+                                <button
+                                    type="button"
+                                    className={styles.modelo3DOpenButton}
+                                    onClick={() => {
+                                        setModalOpen(false);
+
+                                        if (!abrirModeloNo3DPlay(modelo, modoAbertura)) {
+                                            onErro(MENSAGEM_POPUP_BLOQUEADO);
+                                        }
+                                    }}
+                                >
+                                    Abrir
+                                </button>
+                            </div>
+                        ))}
                     </div>
-                </div>
-            )}
+                </Modal>
+            </span>
         </>
     );
 }

@@ -125,8 +125,10 @@
   text-transform: uppercase;
 }
 
+/* --danger-text, não --primary-hover: o vermelho da empresa no tema
+   escuro some sobre o card (o "65" de Sem roteiro ficava ilegível). */
 .warningText {
-  color: var(--primary-hover);
+  color: var(--danger-text);
   font-weight: 700;
 }
 
@@ -147,12 +149,24 @@
   color: var(--text-muted);
 }
 
+/*
+ * overflow visível: o painel flutuante da conferência com o ERP sai do
+ * cabeçalho por cima da árvore e era cortado quando a árvore é curta.
+ * A rolagem da árvore é do .treeWrapper; o min-width: 0 mantém o que o
+ * overflow: hidden fazia de graça no grid (não alargar a coluna).
+ */
 .leftPanel {
   padding: 16px;
-  overflow: hidden;
+  overflow: visible;
+  min-width: 0;
 }
 
 .panelHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-soft);
   margin-bottom: 16px;
@@ -269,26 +283,6 @@
   color: var(--danger-text);
   border: 1px solid var(--danger-text);
   white-space: nowrap;
-}
-
-/* Banner da conferencia com o ERP, acima da arvore. */
-.bannerErp {
-  margin-bottom: 14px;
-}
-
-.bannerErpLista {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-}
-
-.bannerErpNota {
-  margin: 6px 0 0;
-  font-size: 12px;
-  opacity: 0.85;
 }
 
 .badgeSuccess {
@@ -642,13 +636,43 @@
   font-size: 14px;
 }
 
+/* Mesmo botão de fechar do Modal da biblioteca (ui/Modal). */
 .modalCloseButton {
-  border: none;
-  background: transparent;
-  color: var(--text-soft);
-  font-size: 28px;
-  line-height: 1;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
   cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.modalCloseButton:hover:not(:disabled) {
+  background: var(--primary-soft-strong);
+}
+
+.modalCloseButton:focus-visible {
+  outline: 3px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.modalCloseButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.modalCloseButton svg {
+  width: 19px;
+  height: 19px;
+  stroke-width: 2.4;
 }
 
 .modalTableWrapper {
@@ -701,7 +725,9 @@
 }
 
 .operacaoModalContent {
-  width: min(1240px, 96vw);
+  /* Largo de propósito: recursos e consumos ficam ao lado do formulário,
+     não embaixo, para caber sem rolar. */
+  width: min(1600px, 96vw);
   max-height: 94vh;
   overflow: hidden;
   display: flex;
@@ -772,26 +798,104 @@
   gap: 10px 12px;
 }
 
-/*
- * Planejamento e Observacao lado a lado, fechando o formulario. O
- * Planejamento tem quatro campos curtos em duas colunas e nao precisa
- * de largura; a observacao e texto corrido e aproveita o que sobra.
- */
-.formFaixaFinal {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+.formColunaPrincipal {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: stretch;
+  min-width: 0;
 }
 
-/* Dentro do Planejamento, que agora ocupa meia largura. */
-.formGridDuplo {
+/*
+ * Embaixo da observação: máquinas e consumos lado a lado. Lista longa
+ * rola por dentro (cerca de 3 linhas à vista), para o modal não crescer
+ * a cada item e continuar sem rolar.
+ */
+.formFaixaRecursos {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
 }
 
-/* A observacao acompanha a altura do bloco ao lado. */
+.formFaixaRecursos .recursoLista {
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .formFaixaRecursos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.recursoAviso,
+.recursoErro {
+  margin: 0;
+  font-size: 13px;
+}
+
+.recursoAviso {
+  color: var(--text-muted);
+}
+
+.recursoErro {
+  color: var(--danger-text);
+}
+
+.recursoLista {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recursoLinha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface-soft);
+}
+
+.recursoNome {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.recursoNome strong {
+  color: var(--text);
+}
+
+.recursoDica {
+  font-size: 11px;
+  color: var(--warning-text);
+}
+
+.consumoPercentual {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.consumoPercentual input {
+  width: 72px;
+  padding: 4px 8px;
+  text-align: right;
+}
+
+/* A observação ocupa a largura toda do formulário. */
 .formFieldObservacao {
   display: flex;
   flex-direction: column;
@@ -808,10 +912,6 @@
   .formGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .formFaixaFinal {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /*
@@ -820,13 +920,18 @@
  * normal nada disto se aplica.
  */
 @media (max-height: 820px) {
+  /* Notebook de 768: o modal usa quase a tela toda para o formulário
+     caber sem rolar. */
+  .operacaoModalContent {
+    max-height: 98vh;
+  }
+
   .operacaoModalBody {
     gap: 10px;
     padding: 12px 18px;
   }
 
-  .formGrid,
-  .formGridDuplo {
+  .formGrid {
     gap: 8px 10px;
   }
 
@@ -839,6 +944,22 @@
     padding: 6px 9px;
   }
 
+  /*
+   * Rótulo mais perto do campo e campo um pouco mais baixo: são 6 linhas
+   * de campos na coluna, e é isso que fecha os últimos pixels no
+   * notebook de 768. Com o prefixo do corpo do modal de propósito: as
+   * regras base de .formField/.formInput vêm DEPOIS deste @media no
+   * arquivo e, com a mesma especificidade, venceriam.
+   */
+  .operacaoModalBody .formField {
+    gap: 4px;
+  }
+
+  .operacaoModalBody .formInput {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
   .formFieldObservacao .formTextarea {
     min-height: 62px;
   }
@@ -848,13 +969,8 @@
     padding: 14px 20px 10px;
   }
 
-
   .operacaoModalTitle {
     font-size: 19px;
-  }
-
-  .operacaoModalAcoesItem {
-    margin-top: 6px;
   }
 
   .operacaoModalFooter {
@@ -1089,10 +1205,6 @@
   .hierarquiaFilho::before {
     display: none;
   }
-
-  .operacaoModalAcoesItem {
-    margin-top: 0;
-  }
 }
 .operacaoModalFooter {
   display: flex;
@@ -1179,43 +1291,6 @@
 .searchOption span {
   line-height: 1.35;
 }
-.operacoesAdicionadasBox {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--bg-surface-soft);
-  padding: 14px;
-}
-
-.operacoesAdicionadasBox h4 {
-  margin: 0 0 10px;
-  font-size: 14px;
-  color: var(--primary);
-}
-
-.operacoesAdicionadasList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.operacaoAdicionadaCard {
-  display: grid;
-  grid-template-columns: 100px 1fr 1fr;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  background: var(--bg-surface);
-  font-size: 13px;
-}
-
-.operacaoAdicionadaCard strong {
-  color: var(--text);
-}
-
-.operacaoAdicionadaCard span {
-  color: var(--text-muted);
-}
 .modalSecondaryButton {
   font-family: inherit;
   border: 1px solid var(--border);
@@ -1248,30 +1323,6 @@
 .modalSecondaryButton {
   min-height: 42px;
   white-space: nowrap;
-}
-.operacaoAdicionadaCard {
-  display: grid;
-  grid-template-columns: 90px 1.4fr 1.4fr 160px 160px;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  background: var(--bg-surface);
-  font-size: 13px;
-  align-items: center;
-}
-
-.operacaoAdicionadaCard strong {
-  color: var(--text);
-}
-
-.operacaoAdicionadaCard span {
-  color: var(--text-muted);
-}
-
-.operacaoAdicionadaCard b {
-  color: var(--text-soft);
-  font-weight: 700;
 }
 .editRouteButton {
   width: fit-content;
@@ -1704,26 +1755,102 @@
     border-color: var(--info-text);
 }
 
-/* Botões de 2D e 3D no cabeçalho do modal de operação. */
-.operacaoModalAcoesItem {
+/* Dica abaixo de um campo (ex.: observação herdada do item pai). */
+/* Implosão: a lista flutua por cima do formulário, sem empurrá-lo. */
+.paisErp {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.paisErpPainel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: min(460px, 80vw);
+  /* Busca e filtro ocupam o topo: sobra lista para uns 5 pais. */
+  max-height: min(460px, 60vh);
+  overflow: auto;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.paisErpTitulo {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.paisErpTitulo span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.paisErpFiltros {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paisErpLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paisErpDetalhe {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Legenda com um botão ao lado do título (Observação). */
+.legendaComAcao {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /*
- * Na linha da árvore esses botões usam margin-left: auto para irem
- * parar na ponta direita. Aqui eles começam junto do título, então a
- * margem automática tem de sair -- senão o par inteiro é empurrado
- * para o meio do cabeçalho.
+ * Botão compacto do cabeçalho e das legendas ("Importar OBS Pai", "Ver
+ * pais no ERP"). Pequeno de propósito -- o Button da biblioteca tem 44px
+ * e empurraria o formulário; as cores são as do secundário dela.
  */
-.operacaoModalAcoesItem > * {
-  margin-left: 0;
+.botaoCompacto {
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
-/* Dica abaixo de um campo (ex.: observação herdada do item pai). */
+.botaoCompacto:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+
+.botaoCompacto:disabled {
+  border-color: var(--success-border);
+  color: var(--success-text);
+  cursor: default;
+}
+
 .formHint {
   display: block;
   margin-top: 6px;
@@ -1768,4 +1895,942 @@
 .addRoteiroButton:hover {
   background: var(--success-bg);
   border-color: var(--success-text);
+}
+
+/* ===================== Modal de operação: otimização ===================== */
+
+/* Campo com erro de validação: borda e anel no tom de perigo. */
+.formInput.formInputInvalido,
+.formInput.formInputInvalido:focus {
+  border-color: var(--danger-text);
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+/*
+ * 2D/3D na própria linha "Roteirizando", na ponta direita, em versão
+ * compacta: a faixa de botões embaixo do cabeçalho deixou de existir.
+ */
+.acoesNaLinha {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  align-self: center;
+}
+
+.acoesNaLinha .pdfItemButton,
+.acoesNaLinha .play3DButton {
+  margin-left: 0;
+  width: 34px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.acoesNaLinha > button svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Fila da sessão: uma faixa de pílulas no topo do corpo. */
+.fila {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-surface-soft);
+}
+
+.filaTitulo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.filaLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+  padding: 2px 3px 2px 10px;
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 999px;
+  background: var(--primary-soft);
+  font-size: 12px;
+  color: var(--text);
+  cursor: default;
+}
+
+.filaItem strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.filaOperacao {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+
+.filaAlternativo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.filaRemover {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.filaRemover:hover:not(:disabled),
+.filaRemover:focus-visible {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  outline: none;
+}
+
+.filaRemover:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Mensagem do rodapé (andamento ou erro), à esquerda dos botões. */
+.rodapeMensagem {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: auto;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rodapeMensagemErro {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
+/* Lista do que o envio muda além do editado (confirmação de gravar). */
+.confirmacaoImpactos p {
+  margin: 0 0 6px;
+}
+
+.confirmacaoImpactos ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 40vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Botão na legenda: numa linha só. */
+.legendaComAcao .botaoCompacto {
+  white-space: nowrap;
+}
+
+/* Menu "+N pais": abre alinhado à direita do botão, que fica na ponta
+   da linha do pai. */
+.paisErpPainelDireita {
+  left: auto;
+  right: 0;
+}
+
+/* ============ Modal de operação: correções e usabilidade (fila, ERP, atalhos) ============ */
+
+/* Observação acima do limite: mesma marca de erro dos campos de texto. */
+.formTextarea.formInputInvalido,
+.formTextarea.formInputInvalido:focus {
+  border-color: var(--danger-text);
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+/*
+ * Pílula da fila clicável (devolve a operação ao formulário). O botão
+ * herda o visual da pílula; só o × continua com o fundo de perigo.
+ */
+.filaItem .filaEditar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.filaItem .filaEditar:hover:not(:disabled) .filaOperacao,
+.filaItem .filaEditar:focus-visible .filaOperacao {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.filaItem .filaEditar:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.filaItem .filaEditar:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/*
+ * Faixa "No ERP (...)": pendurada na borda de cima da seção dos dados da
+ * operação, como uma legenda de fieldset. Absoluta de propósito -- não
+ * soma altura nenhuma ao modal (metade fica no espaçamento acima da
+ * seção, metade no padding de cima dela).
+ */
+.formSection.formSectionComFaixaErp {
+  position: relative;
+}
+
+.faixaErp {
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+
+.faixaErpTitulo {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.faixaErpVazio {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.faixaErpOperacao {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 5px;
+  border-radius: 999px;
+  cursor: default;
+}
+
+.faixaErpOperacao strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* As outras operações: clicar abre a edição delas no mesmo modal. */
+.faixaErpOperacao.faixaErpOperacaoBotao {
+  border: none;
+  background: none;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.faixaErpOperacao.faixaErpOperacaoBotao:hover:not(:disabled) {
+  background: var(--bg-hover-brand);
+  color: var(--primary);
+}
+
+.faixaErpOperacao.faixaErpOperacaoBotao:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: -2px;
+}
+
+.faixaErpOperacao.faixaErpOperacaoBotao:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* A operação aberta na edição. */
+.faixaErpOperacao.faixaErpOperacaoAtual {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.faixaErpOperacao.faixaErpOperacaoAtual strong {
+  color: var(--primary);
+}
+
+.faixaErpMais {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Botão "Tentar de novo" dentro da mensagem do rodapé, como link. */
+.rodapeMensagem .rodapeAcao {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rodapeMensagem .rodapeAcao:hover {
+  color: var(--primary-hover);
+}
+
+.rodapeMensagem.rodapeMensagemAviso {
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+/*
+ * Atalho escrito no botão do rodapé. Pequeno e em currentColor, para
+ * servir no botão primário (fundo vermelho) e no secundário, nos dois
+ * temas, sem mexer na altura do botão.
+ */
+.atalhoTecla {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  vertical-align: 1px;
+  opacity: 0.7;
+}
+
+@media (max-width: 900px) {
+  .atalhoTecla {
+    display: none;
+  }
+}
+
+/* JSON do "Retorno do ERP" (agora no Modal da biblioteca). */
+.retornoErpJson {
+  margin: 0;
+  padding: 16px;
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface-muted);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/*
+ * Seletor de modelos 3D (Modal da biblioteca). O span em volta só
+ * segura os eventos que sobem pelo portal; sem caixa própria, não
+ * vira um item a mais (com gap) na fileira de botões.
+ */
+.seletor3DContencao {
+  display: contents;
+}
+
+.seletor3DLista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* O gap da lista já separa os cartões. */
+.seletor3DLista .modelo3DCard {
+  margin-bottom: 0;
+}
+
+
+/* ============ Página: árvore, filtros, pesquisa e listas (usabilidade) ============ */
+
+/* --- Filtros: quantos itens os filtros estão escondendo --- */
+.filtersHeader .filtrosOcultos {
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+/* --- Barra de ferramentas acima da árvore --- */
+.ferramentasArvore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+}
+
+.ferramentasGrupo {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.ferramentaBotao {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ferramentaBotao:hover:not(:disabled),
+.ferramentaBotao:focus-visible {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
+  outline: none;
+}
+
+.ferramentaBotao:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.ferramentaBotao svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.localizarArvore {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.localizarInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.localizarInput:hover {
+  border-color: var(--border-input-hover);
+}
+
+.localizarInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.localizarContador {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- Linha da árvore: o que é clicável e o que está aberto --- */
+
+/*
+ * Linha de cima em duas partes: código e badges à esquerda (quebram
+ * entre si quando não cabem) e as ações numa coluna fixa na ponta
+ * direita, que nunca desce para a linha de baixo.
+ */
+.nodeTopLine {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+}
+
+.nodeInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.nodeAcoes {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* O 2D (.pdfItemButton) e o "Operações" traziam margin-left: auto para
+   se empurrarem à direita; dentro do grupo quem empurra é o grupo. */
+.nodeAcoes .pdfItemButton,
+.nodeAcoes .detalhesToggle {
+  margin-left: 0;
+}
+
+/* "Operações" na mesma caixa dos vizinhos (2D/3D/Roteiro, 38px). */
+.nodeAcoes .detalhesToggle {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.treeRow.treeRowSemDetalhes {
+  cursor: default;
+}
+
+/*
+ * Linha comum (sem a cor de "Sem roteiro"/"Atenção"): borda no hover e
+ * fundo suave quando os detalhes estão abertos. As coloridas mantêm o
+ * próprio fundo -- o "Operações" preenchido já diz que estão abertas.
+ */
+.treeRow.treeRowComDetalhes:not(.treeRowWarning):not(.treeRowAttention):hover {
+  border-color: var(--border);
+}
+
+.treeRow.treeRowAberta:not(.treeRowWarning):not(.treeRowAttention) {
+  border-color: var(--border);
+  background: var(--bg-surface-soft);
+}
+
+/* Alvo da última navegação (localizar, listas, banner). */
+.treeRow.treeRowDestacada {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  animation: destaqueNoArvore 1.6s ease-out 1;
+}
+
+@keyframes destaqueNoArvore {
+  0% {
+    box-shadow: 0 0 0 6px var(--primary-ring);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Botão dos filhos: chevron que gira; folha e raiz não são botão. */
+.expandButton.expandButtonFilhos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--text-soft);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.expandButton.expandButtonFilhos:hover,
+.expandButton.expandButtonFilhos:focus-visible {
+  background: var(--bg-hover-neutral);
+  color: var(--primary);
+  outline: none;
+}
+
+.expandButton.expandButtonFilhos svg,
+.expandButton.expandButtonFolha svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.expandButton.expandButtonFolha {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  color: var(--text-faint);
+}
+
+.iconeGirado90 {
+  transform: rotate(90deg);
+}
+
+.iconeGirado180 {
+  transform: rotate(180deg);
+}
+
+/* "Operações ▾": diz que a linha abre, e é o alvo do teclado. */
+.detalhesToggle {
+  margin-left: auto;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.detalhesToggle:hover,
+.detalhesToggle:focus-visible,
+.detalhesToggle[aria-expanded="true"] {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
+  outline: none;
+}
+
+.detalhesToggle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.detalhesItem {
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+}
+
+/* Copiar o código: discreto até passar o mouse na linha. */
+.copiarCodigoBotao {
+  height: 22px;
+  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.treeRow:hover .copiarCodigoBotao {
+  color: var(--text-muted);
+}
+
+.copiarCodigoBotao:hover,
+.copiarCodigoBotao:focus-visible {
+  background: var(--bg-hover-neutral);
+  color: var(--primary);
+  outline: none;
+}
+
+.copiarCodigoBotao svg {
+  width: 13px;
+  height: 13px;
+}
+
+.copiarCodigoBotao.copiarCodigoBotaoFeito,
+.treeRow:hover .copiarCodigoBotao.copiarCodigoBotaoFeito {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+/* Item que só tem roteiro alternativo: informação, não "ok" verde. */
+.badgeSoAlternativo {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
+  white-space: nowrap;
+}
+
+/* --- Card de operação compacto (duas linhas densas) --- */
+.roteiroCard.roteiroCardCompacto {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 10px;
+}
+
+.roteiroCardLinhas {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.roteiroCardLinha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+}
+
+.roteiroCardOperacao {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.roteiroCardLinha.roteiroCardLinhaSecundaria {
+  color: var(--text-muted);
+}
+
+.roteiroCardObs {
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.roteiroCard.roteiroCardCompacto .routeIconActions {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+/* --- Conferência 3DX x ERP: botão no cabeçalho, lista flutuante --- */
+.conferenciaErpBotao {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.conferenciaErpBotao svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+
+.conferenciaErpBotao:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+/* Carregando: não é botão (não há o que abrir), só o aviso. */
+.conferenciaErpBotao.conferenciaErpCarregando {
+  border-color: var(--neutral-border);
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  cursor: default;
+}
+
+.conferenciaErpGirando {
+  animation: conferenciaErpGiro 0.9s linear infinite;
+}
+
+@keyframes conferenciaErpGiro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.conferenciaErpBotao.conferenciaErpOk {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.conferenciaErpBotao.conferenciaErpOk:hover {
+  background: var(--success-bg-strong);
+}
+
+/* Divergência: preenchido, no tom da badge "Não tem no ERP" da árvore. */
+.conferenciaErpBotao.conferenciaErpDivergente {
+  border-color: var(--danger-text);
+  background: var(--danger-bg-strong);
+  color: var(--danger-text);
+}
+
+.conferenciaErpBotao.conferenciaErpDivergente:hover {
+  background: var(--danger-bg);
+}
+
+.conferenciaErpBotao.conferenciaErpErro {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.conferenciaErpBotao.conferenciaErpErro:hover {
+  background: var(--warning-bg-strong);
+}
+
+/* Cada divergência: código, descrição e detalhe, clicável inteira. */
+.conferenciaErpItem {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.conferenciaErpItem > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.conferenciaErpItem:hover,
+.conferenciaErpItem:focus-visible {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  outline: none;
+}
+
+/* --- Modal da legenda: uma linha por marcação, badge à esquerda --- */
+.legendaLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legendaLista li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.legendaLista li > span:first-child {
+  justify-self: start;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+/* --- Listas "Sem roteiro" / "Com atenção" (Modal da biblioteca) --- */
+.modalTabelaRolavel {
+  overflow: auto;
+}
+
+.modalTable.modalTableNavegavel tbody tr {
+  cursor: pointer;
+}
+
+.linkCodigo {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.linkCodigo:hover,
+.linkCodigo:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.modalTable td.modalTableAcao {
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .roteiroCard.roteiroCardCompacto {
+    flex-direction: column;
+  }
+
+  .localizarArvore {
+    flex-basis: 100%;
+  }
 }

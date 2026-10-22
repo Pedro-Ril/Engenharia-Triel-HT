@@ -34,6 +34,9 @@ export type DivergenciaEstrutura = {
     tipo: TipoDivergencia;
     /* Quantas vezes a ligação aparece na árvore do 3DX. */
     instancias: number;
+    /* id do nó da PRIMEIRA ocorrência na árvore: é para onde o banner
+       leva quando a pessoa clica na divergência. */
+    noId: string;
 };
 
 export type ResultadoValidacaoEstrutura = {
@@ -121,6 +124,7 @@ export function compararEstrutura(
                             descricaoFilho: filho.descricaoNormalizada,
                             tipo,
                             instancias: 1,
+                            noId: filho.id,
                         });
                     }
 

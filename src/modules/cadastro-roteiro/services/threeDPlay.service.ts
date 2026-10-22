@@ -21,7 +21,44 @@ const DASHBOARD_3DPLAY_URL =
 
 const CONTEXT_ID = "VPLMProjectLeader.Company Name.Common Space";
 
-export async function buscarModelos3DPlay(item: RoteiroTreeNode) {
+/* O que a busca precisa: um nó da árvore serve, um pai do ERP também. */
+export type ItemModelo3D = Pick<RoteiroTreeNode, "codigoNormalizado"> &
+    Partial<Pick<RoteiroTreeNode, "codigo" | "revisao">>;
+
+/* Revisão "maior": mais longa primeiro (Z < AA), depois a ordem natural. */
+function compararRevisao(a: string, b: string) {
+    return a.length - b.length || a.localeCompare(b, "pt-BR", { numeric: true });
+}
+
+/*
+ * Sem revisão -- pai que veio da implosão do ERP, que não informa
+ * revisão. O /item do 3DX traz o código em todas as revisões; fica a
+ * mais recente, que é a que o pessoal quer ver.
+ */
+async function buscarModelosDaRevisaoMaisRecente(codigo: string) {
+    const response = await fetch(`${API_3DX}/item/${encodeURIComponent(codigo)}`, {
+        method: "GET",
+        cache: "no-store",
+    });
+
+    const json = await response.json().catch(() => null);
+
+    if (!response.ok || !json?.success) {
+        throw new Error(json?.message || json?.error || "Erro ao pesquisar o item no 3DX.");
+    }
+
+    const modelos = (Array.isArray(json.results) ? json.results : []) as Modelo3DPlay[];
+    const revisoes = [
+        ...new Set(modelos.map((m) => String(m.revisao ?? "").trim()).filter(Boolean)),
+    ].sort(compararRevisao);
+    const maisRecente = revisoes.at(-1);
+
+    return maisRecente
+        ? modelos.filter((m) => String(m.revisao ?? "").trim() === maisRecente)
+        : modelos;
+}
+
+export async function buscarModelos3DPlay(item: ItemModelo3D) {
     const codigo = String(item.codigoNormalizado || item.codigo || "").trim();
     const revisao = String(item.revisao || "").trim();
 
@@ -30,7 +67,7 @@ export async function buscarModelos3DPlay(item: RoteiroTreeNode) {
     }
 
     if (!revisao) {
-        throw new Error("Item sem revisão para pesquisar no 3DX.");
+        return buscarModelosDaRevisaoMaisRecente(codigo);
     }
 
     const url = `${API_3DX}/xcad-model/${encodeURIComponent(

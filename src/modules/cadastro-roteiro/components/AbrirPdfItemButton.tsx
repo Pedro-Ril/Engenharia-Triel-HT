@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
 import { buscarPdfDetalhamentoItem } from "../services/itemPdf.service";
 import { abrirArquivo, MENSAGEM_POPUP_BLOQUEADO } from "../utils/abrir-arquivo";
@@ -30,6 +30,27 @@ export default function AbrirPdfItemButton({ codigo, onErro }: Props) {
     const modoAbertura = useModoAbertura();
     const [loading, setLoading] = useState(false);
     const [progresso, setProgresso] = useState(0);
+    /*
+     * Fora do try: antes o intervalo era declarado lá dentro e, se a busca
+     * falhasse, ninguém o parava -- a barra seguia rodando para sempre.
+     * Ref para o finally e o desmontar alcançarem o mesmo timer.
+     */
+    const timerRef = useRef<number | null>(null);
+
+    function pararProgresso() {
+        if (timerRef.current !== null) {
+            window.clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    }
+
+    /* Fechou o modal (ou a linha sumiu) no meio da busca: para o timer. */
+    useEffect(() => {
+        const timers = timerRef;
+        return () => {
+            if (timers.current !== null) window.clearInterval(timers.current);
+        };
+    }, []);
 
     async function handleAbrirPdf(e: React.MouseEvent<HTMLButtonElement>) {
         e.stopPropagation();
@@ -38,7 +59,8 @@ export default function AbrirPdfItemButton({ codigo, onErro }: Props) {
             setLoading(true);
             setProgresso(15);
 
-            const timer = window.setInterval(() => {
+            pararProgresso();
+            timerRef.current = window.setInterval(() => {
                 setProgresso((prev) => {
                     if (prev >= 90) return prev;
                     return prev + 10;
@@ -47,7 +69,7 @@ export default function AbrirPdfItemButton({ codigo, onErro }: Props) {
 
             const pdfUrl = await buscarPdfDetalhamentoItem(codigo);
 
-            window.clearInterval(timer);
+            pararProgresso();
             setProgresso(100);
 
             if (!abrirArquivo(pdfUrl, "pdf", modoAbertura)) {
@@ -62,6 +84,7 @@ export default function AbrirPdfItemButton({ codigo, onErro }: Props) {
                     : "Não localizou PDFs para abrir."
             );
         } finally {
+            pararProgresso();
             setTimeout(() => {
                 setLoading(false);
                 setProgresso(0);
