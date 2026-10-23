@@ -26,16 +26,21 @@ import {
     deletarOperacaoRoteiro,
     deletarRoteiroCompleto,
     type ProgressoConsulta,
+    type OrigemEstrutura,
 } from "@/modules/cadastro-roteiro/services/cadastroRoteiro.service";
 import CadastroOperacaoModal from "@/modules/cadastro-roteiro/components/CadastroOperacaoModal";
 import {
     RoteiroItem,
     RoteiroTreeNode,
 } from "@/modules/cadastro-roteiro/types/cadastroRoteiro.types";
+import { codigoDoPdf } from "@/modules/cadastro-roteiro/utils/codigo-pdf";
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { Loader } from "@/components/ui/Loader";
@@ -659,10 +664,18 @@ function montarLinhasExportacao(
  * e o router.replace refaria o render do page.tsx a cada consulta só
  * para trocar a barra de endereço.
  */
-function gravarCodigoNaUrl(codigo: string) {
+/* Triel-HT: estrutura do 3DX (o padrão). Ciber: estrutura do ERP. */
+const OPCOES_ORIGEM = [
+    { value: "3dx", label: "Triel-HT" },
+    { value: "ciber", label: "Ciber" },
+];
+
+function gravarCodigoNaUrl(codigo: string, origem: OrigemEstrutura) {
     try {
         const params = new URLSearchParams(window.location.search);
         params.set("codigo", codigo);
+        if (origem === "ciber") params.set("origem", "ciber");
+        else params.delete("origem");
         window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
     } catch {
         /* Sem URL atualizada a consulta funciona do mesmo jeito. */
@@ -671,7 +684,9 @@ function gravarCodigoNaUrl(codigo: string) {
 
 function textoDoProgresso(progresso: ProgressoConsulta | null): string {
     if (!progresso) return "Consultando…";
-    if (progresso.etapa === "estrutura") return "Lendo estrutura no 3DX…";
+    if (progresso.etapa === "estrutura") {
+        return progresso.origem === "ciber" ? "Lendo estrutura no ERP (Ciber)…" : "Lendo estrutura no 3DX…";
+    }
     return `Lendo roteiros no ERP ${progresso.feitos}/${progresso.total}…`;
 }
 
@@ -1362,7 +1377,7 @@ function TreeNode({
                         */}
                         <div className={styles.nodeAcoes}>
                             <AbrirPdfItemButton
-                                codigo={node.codigoNormalizado}
+                                codigo={codigoDoPdf(node)}
                                 onErro={(mensagem) => {
                                     alert(mensagem);
                                 }}
@@ -1656,6 +1671,14 @@ export default function CadastroRoteiro({
     const codigoDaUrl = (searchParams.get("codigo") ?? "").trim();
 
     const [codigoPai, setCodigoPai] = useState(codigoDaUrl);
+    /*
+     * Ciber: estruturas que não existem no 3DX. Marcado, a estrutura vem
+     * do ERP -- só para item pai com item base 2316 -- e o resto da tela
+     * segue igual. Vai junto na URL (?origem=ciber).
+     */
+    const [ciber, setCiber] = useState(searchParams.get("origem") === "ciber");
+    /* A origem da consulta exibida (a do switch pode ter mudado depois). */
+    const [origemConsulta, setOrigemConsulta] = useState<OrigemEstrutura>("3dx");
     const [loading, setLoading] = useState(false);
     /* Erro do campo (código vazio), mostrado no card de pesquisa. */
     const [erroCampo, setErroCampo] = useState("");
@@ -1873,16 +1896,22 @@ export default function CadastroRoteiro({
             setRoteiroExclusao(null);
             setRoteiroCompletoExclusao(null);
             setRetornoErpModal(null);
-            gravarCodigoNaUrl(codigo);
+            const origem: OrigemEstrutura = ciber ? "ciber" : "3dx";
+            gravarCodigoNaUrl(codigo, origem);
 
-            const dados = await buscarEstruturaComRoteiros(codigo, (andamento) => {
-                if (consultaAtualRef.current === consulta) setProgresso(andamento);
-            });
+            const dados = await buscarEstruturaComRoteiros(
+                codigo,
+                (andamento) => {
+                    if (consultaAtualRef.current === consulta) setProgresso(andamento);
+                },
+                origem
+            );
 
             /* Uma consulta mais nova já assumiu a tela: esta não mexe em nada. */
             if (consultaAtualRef.current !== consulta) return;
 
             setResultado(dados);
+            setOrigemConsulta(origem);
 
             /*
              * Item sem descrição ou sem tipo no 3DX: completa com o
@@ -1914,8 +1943,9 @@ export default function CadastroRoteiro({
                 });
             }
 
-            /* Sem await: a árvore aparece já, a conferência chega depois. */
-            conferirNoErp(dados.tree, consulta);
+            /* Sem await: a árvore aparece já, a conferência chega depois.
+               Ciber não tem 3DX para conferir com o ERP. */
+            if (origem === "3dx") conferirNoErp(dados.tree, consulta);
         } catch (error) {
             console.error(error);
 
@@ -2415,15 +2445,23 @@ export default function CadastroRoteiro({
             </div>
 
             <div className={styles.searchCard}>
+                {/* Pesquisa com os componentes da biblioteca: origem da
+                    estrutura, código e botão, todos com a mesma altura. */}
                 <div className={styles.searchRow}>
-                    <div className={styles.inputGroup}>
-                        <label htmlFor="codigoPai" className={styles.label}>
-                            Código do item pai
-                        </label>
+                    {/* "Ciber": peças com item base 2316, sem 3DX -- a
+                        estrutura vem do ERP. */}
+                    <Field label="Origem da estrutura" className={styles.campoOrigem}>
+                        <Dropdown
+                            value={ciber ? "ciber" : "3dx"}
+                            options={OPCOES_ORIGEM}
+                            disabled={loading}
+                            onValueChange={(valor) => setCiber(valor === "ciber")}
+                        />
+                    </Field>
 
-                        <input
+                    <Field label="Código do item pai" htmlFor="codigoPai" className={styles.campoCodigo}>
+                        <Input
                             id="codigoPai"
-                            type="text"
                             value={codigoPai}
                             onChange={(e) => setCodigoPai(e.target.value)}
                             onKeyDown={(e) => {
@@ -2432,18 +2470,17 @@ export default function CadastroRoteiro({
                                 if (e.key === "Enter" && !loading) void handleBuscar();
                             }}
                             placeholder="Ex.: 20031933"
-                            className={styles.input}
                         />
-                    </div>
+                    </Field>
 
-                    <button
-                        type="button"
-                        className={styles.searchButton}
+                    <Button
+                        className={styles.botaoConsultar}
                         onClick={() => void handleBuscar()}
-                        disabled={loading}
+                        loading={loading}
+                        loadingLabel="Consultando…"
                     >
-                        {loading ? "Consultando..." : "Consultar"}
-                    </button>
+                        Consultar
+                    </Button>
                 </div>
 
                 {erroCampo && <div className={styles.errorBox}>{erroCampo}</div>}
@@ -2452,7 +2489,9 @@ export default function CadastroRoteiro({
                     <>
                         <div className={styles.summary}>
                             <div className={styles.summaryCard}>
-                                <span className={styles.summaryLabel}>Item pai</span>
+                                <span className={styles.summaryLabel}>
+                                    Item pai{origemConsulta === "ciber" && " · Ciber (estrutura do ERP)"}
+                                </span>
                                 <strong>{resultado.codigo}</strong>
                             </div>
 
@@ -2782,36 +2821,45 @@ export default function CadastroRoteiro({
                     </Button>
                 }
             >
-                {/* As badges são as mesmas da árvore, para reconhecer de olho. */}
-                <ul className={styles.legendaLista}>
-                    <li>
-                        <span className={styles.badgeWarning}>Sem roteiro</span>
-                        <span>Item fabricado sem nenhuma operação. Clique na badge para cadastrar.</span>
-                    </li>
-                    <li>
-                        <span className={styles.badgeAttention}>Atenção</span>
-                        <span>Revisão do roteiro no ERP diferente da revisão do 3DX.</span>
-                    </li>
-                    <li>
-                        <span className={styles.badgeErp}>Não tem no ERP</span>
-                        <span>A ligação com o item pai não existe na estrutura do ERP (ou está vencida).</span>
-                    </li>
-                    <li>
-                        <span className={styles.badgeSuccess}>2 operações</span>
-                        <span>Operações do roteiro padrão. &quot;+1 alt&quot;: também tem roteiro alternativo.</span>
-                    </li>
-                    <li>
-                        <span className={styles.badgeSoAlternativo}>2 op · Alt 1</span>
-                        <span>O item não tem roteiro padrão, só alternativo.</span>
-                    </li>
-                    <li>
-                        <span className={styles.nodeType}>Tipo: Fabricado</span>
-                        <span>
-                            Tipo do item no 3DX. &quot;(ERP)&quot; quando o 3DX não informa e o tipo vem do
-                            cadastro do ERP. O filtro abre em Fabricado a cada consulta.
-                        </span>
-                    </li>
-                </ul>
+                {/* As badges são as mesmas da árvore, para reconhecer de olho.
+                    Agrupadas pelo que significam, cada uma alinhada à sua explicação. */}
+                <div className={styles.legenda}>
+                    <section className={styles.legendaGrupo}>
+                        <h4 className={styles.legendaTitulo}>Roteiro do item</h4>
+                        <dl className={styles.legendaLista}>
+                            <dt><span className={styles.badgeWarning}>Sem roteiro</span></dt>
+                            <dd>Item fabricado sem nenhuma operação. Clique na etiqueta para cadastrar.</dd>
+
+                            <dt><span className={styles.badgeSuccess}>2 operações</span></dt>
+                            <dd>Quantas operações tem o roteiro padrão. Com &quot;+1 alt&quot;, também tem alternativo.</dd>
+
+                            <dt><span className={styles.badgeSoAlternativo}>2 op · Alt 1</span></dt>
+                            <dd>Só tem roteiro alternativo, sem o padrão.</dd>
+                        </dl>
+                    </section>
+
+                    <section className={styles.legendaGrupo}>
+                        <h4 className={styles.legendaTitulo}>Pontos de atenção</h4>
+                        <dl className={styles.legendaLista}>
+                            <dt><span className={styles.badgeAttention}>Atenção</span></dt>
+                            <dd>A revisão do roteiro no ERP é diferente da revisão do 3DX.</dd>
+
+                            <dt><span className={styles.badgeErp}>Não tem no ERP</span></dt>
+                            <dd>O item não está, ou está vencido, na estrutura do ERP debaixo deste pai.</dd>
+                        </dl>
+                    </section>
+
+                    <section className={styles.legendaGrupo}>
+                        <h4 className={styles.legendaTitulo}>Tipo do item</h4>
+                        <dl className={styles.legendaLista}>
+                            <dt><span className={styles.nodeType}>Tipo: Fabricado</span></dt>
+                            <dd>
+                                Tipo do item no 3DX; &quot;(ERP)&quot; quando veio do cadastro do ERP. O filtro abre
+                                mostrando só Fabricado.
+                            </dd>
+                        </dl>
+                    </section>
+                </div>
             </Modal>
 
             <Modal

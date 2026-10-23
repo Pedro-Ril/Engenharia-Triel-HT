@@ -29,6 +29,8 @@ const API_ROTEIRO_V2 = "http://proserver.trielht.com.br:1000/api/v2/roteiro";
 const API_RECURSOS_V2 = "http://proserver.trielht.com.br:1000/api/v2/recursos";
 const API_ESTRUTURA_V2 = "http://proserver.trielht.com.br:1000/api/v2/estrutura";
 const API_ITEM = "http://proserver.trielht.com.br:1000/api/item";
+/* Estrutura do ERP (a mesma da Consulta de Estrutura), usada nas peças Ciber. */
+const API_ESTRUTURA = "http://proserver.trielht.com.br:1000/api/estrutura";
 
 const EMPR_ID_FIXO = 2;
 
@@ -83,7 +85,7 @@ async function buscarRoteiroItem(codigo: string): Promise<RoteiroItem[]> {
  * barra parada sem número parece travada.
  */
 export type ProgressoConsulta =
-  | { etapa: "estrutura" }
+  | { etapa: "estrutura"; origem: OrigemEstrutura }
   | { etapa: "roteiros"; feitos: number; total: number };
 
 /* Entre um aviso e outro: cada roteiro lido vira um render da tela, e
@@ -166,9 +168,131 @@ function contarItensUnicos(
   return codigos.size;
 }
 
+/*
+ * De onde vem a estrutura. "ciber": estruturas que não existem no 3DX --
+ * a árvore sai do ERP (TCAD_EST_ITE), e só para itens Ciber, os de item
+ * base 2316. Daí em diante (roteiros, cadastro, filtros) é tudo igual.
+ */
+export type OrigemEstrutura = "3dx" | "ciber";
+
+export const ITEM_BASE_CIBER = "2316";
+
+type LinhaEstruturaErp = {
+  ID_ESTRUTURA: number;
+  ORDEM_HIERARQUICA: string;
+  NIVEL: number;
+  COD_ITEM_FILHO: string;
+  DESC_TECNICA_FILHO: string | null;
+  SEQ_ORD: number | null;
+  STATUS_VALIDADE: "VALIDO" | "INVALIDO";
+  TP_ITEM_FILHO: string | null;
+  COD_DESENHO_FILHO: string | null;
+};
+
+/* O item pai no cadastro do ERP: confere que é Ciber e dá descrição e tipo da raiz. */
+async function buscarItemCiber(codigo: string) {
+  const url = new URL(API_ITEM);
+  url.searchParams.set("cod_emp", String(EMPR_ID_FIXO));
+  url.searchParams.set("cod_item", codigo);
+
+  const response = await fetch(url.toString(), { cache: "no-store" });
+  const json = await response.json().catch(() => null);
+
+  if (!response.ok || !json?.success) {
+    throw new Error(json?.message || `Erro ao consultar o item no ERP. HTTP ${response.status}`);
+  }
+
+  const item = (Array.isArray(json.data) ? json.data : []).find(
+    (i: { COD_ITEM?: string }) => normalizarTexto(i.COD_ITEM).toUpperCase() === codigo.toUpperCase()
+  );
+
+  if (!item) {
+    throw new Error(`O item ${codigo} não foi encontrado no cadastro do ERP.`);
+  }
+
+  const itemBase = normalizarTexto(item.COD_ITEM_BASE);
+
+  if (itemBase !== ITEM_BASE_CIBER) {
+    throw new Error(
+      `O item ${codigo} não é Ciber: o item base dele é ${itemBase || "vazio"}, e não ${ITEM_BASE_CIBER}. Escolha "Triel-HT" em Origem da estrutura para buscar no 3DX.`
+    );
+  }
+
+  return {
+    descricao: normalizarTexto(item.DESC_TECNICA ?? item.DESC_RESUM),
+    tipo: normalizarTexto(item.TP_ITEM),
+    desenho: normalizarTexto(item.COD_DESENHO),
+  };
+}
+
+/*
+ * Estrutura Ciber, montada a partir do ERP no mesmo formato da do 3DX.
+ * Só ligações vigentes: uma vencida sai com tudo o que está abaixo dela
+ * (o filho de uma ligação vencida não tem pai na árvore e fica de fora).
+ * Não há revisão -- o roteiro dessas peças vai sem.
+ */
+async function buscarEstruturaCiber(codigo: string): Promise<Estrutura3DXNode> {
+  const raizErp = await buscarItemCiber(codigo);
+
+  const response = await fetch(`${API_ESTRUTURA}/${encodeURIComponent(codigo)}`, { cache: "no-store" });
+  const json = await response.json().catch(() => null);
+
+  if (!response.ok || !json?.success || !Array.isArray(json.data)) {
+    throw new Error(json?.message || `Erro ao consultar a estrutura no ERP. HTTP ${response.status}`);
+  }
+
+  const raiz: Estrutura3DXNode = {
+    origem: "erp",
+    physicalId: `erp-raiz-${codigo}`,
+    codigo,
+    codigoDesenho: raizErp.desenho,
+    descricao: raizErp.descricao,
+    tipoint: raizErp.tipo,
+    revisao: "",
+    nivel: 0,
+    instancia: null,
+    children: [],
+  };
+
+  const porCaminho = new Map<string, Estrutura3DXNode>([["", raiz]]);
+
+  for (const linha of json.data as LinhaEstruturaErp[]) {
+    if (linha.STATUS_VALIDADE !== "VALIDO") continue;
+
+    const caminho = String(linha.ORDEM_HIERARQUICA);
+    const caminhoPai = caminho.includes(".") ? caminho.slice(0, caminho.lastIndexOf(".")) : "";
+    const pai = porCaminho.get(caminhoPai);
+
+    if (!pai) continue;
+
+    const no: Estrutura3DXNode = {
+      origem: "erp",
+      physicalId: `erp-${linha.ID_ESTRUTURA}`,
+      codigo: normalizarTexto(linha.COD_ITEM_FILHO),
+      codigoDesenho: normalizarTexto(linha.COD_DESENHO_FILHO),
+      descricao: normalizarTexto(linha.DESC_TECNICA_FILHO),
+      tipoint: normalizarTexto(linha.TP_ITEM_FILHO),
+      revisao: "",
+      nivel: Number(linha.NIVEL),
+      instancia: {
+        physicalId: `erp-${linha.ID_ESTRUTURA}`,
+        nome: normalizarTexto(linha.COD_ITEM_FILHO),
+        ordem: String(linha.SEQ_ORD ?? ""),
+      },
+      children: [],
+    };
+
+    pai.children = [...(pai.children ?? []), no];
+    porCaminho.set(caminho, no);
+  }
+
+  return raiz;
+}
+
 export async function buscarEstruturaComRoteiros(
   codItemPai: string,
-  onProgresso?: (progresso: ProgressoConsulta) => void
+  onProgresso?: (progresso: ProgressoConsulta) => void,
+  origem: OrigemEstrutura = "3dx"
 ): Promise<{
   codigo: string;
   totalItens: number;
@@ -181,10 +305,30 @@ export async function buscarEstruturaComRoteiros(
     throw new Error("Informe o código do item pai.");
   }
 
+  onProgresso?.({ etapa: "estrutura", origem });
+
+  const arvore = origem === "ciber" ? await buscarEstruturaCiber(codigo) : await buscarEstrutura3dx(codigo);
+
+  const codigos = Array.from(coletarCodigos(arvore));
+  const roteirosPorCodigo = await buscarRoteirosEmLote(codigos, onProgresso);
+
+  const tree = montarArvoreComRoteiros(arvore, roteirosPorCodigo);
+
+  if (!tree) {
+    throw new Error("Nenhum item com código foi encontrado na estrutura.");
+  }
+
+  return {
+    codigo,
+    totalItens: contarItensUnicos(tree),
+    totalInstancias: contarItensEInstancias(arvore).totalInstancias,
+    tree,
+  };
+}
+
+async function buscarEstrutura3dx(codigo: string): Promise<Estrutura3DXNode> {
   const url = new URL(`${API_STRUCTURE}/${encodeURIComponent(codigo)}`);
   url.searchParams.set("empr_id", String(EMPR_ID_FIXO));
-
-  onProgresso?.({ etapa: "estrutura" });
 
   const response = await fetch(url.toString(), {
     method: "GET",
@@ -211,23 +355,7 @@ export async function buscarEstruturaComRoteiros(
   const estrutura = json as Estrutura3DXResponse;
 
   /* Item fora da lista de materiais não entra na árvore (nem é lido no ERP). */
-  const arvore3dx = removerForaDaListaDeMateriais(estrutura.data.tree);
-
-  const codigos = Array.from(coletarCodigos(arvore3dx));
-  const roteirosPorCodigo = await buscarRoteirosEmLote(codigos, onProgresso);
-
-  const tree = montarArvoreComRoteiros(arvore3dx, roteirosPorCodigo);
-
-  if (!tree) {
-    throw new Error("Nenhum item com código foi encontrado na estrutura.");
-  }
-
-  return {
-    codigo: estrutura.codigo,
-    totalItens: contarItensUnicos(tree),
-    totalInstancias: contarItensEInstancias(arvore3dx).totalInstancias,
-    tree,
-  };
+  return removerForaDaListaDeMateriais(estrutura.data.tree);
 }
 
 export type DeletarOperacaoRoteiroPayload = {

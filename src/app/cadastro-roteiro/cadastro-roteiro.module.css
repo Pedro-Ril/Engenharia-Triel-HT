@@ -47,53 +47,6 @@
   align-items: end;
 }
 
-.inputGroup {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-soft);
-}
-
-.input {
-  height: 44px;
-  border: 1px solid var(--border-input);
-  border-radius: 12px;
-  padding: 0 14px;
-  font-size: 15px;
-  outline: none;
-  transition: 0.2s ease;
-  background: var(--bg-surface);
-  color: var(--text);
-}
-
-.input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-ring);
-}
-
-.searchButton {
-  height: 44px;
-  min-width: 140px;
-  border: none;
-  border-radius: 12px;
-  background: var(--primary);
-  color: var(--text-inverse);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.searchButton:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
 .errorBox {
   padding: 12px 14px;
   border-radius: 12px;
@@ -2295,7 +2248,6 @@
   margin-bottom: 0;
 }
 
-
 /* ============ Página: árvore, filtros, pesquisa e listas (usabilidade) ============ */
 
 /* --- Filtros: quantos itens os filtros estão escondendo --- */
@@ -2770,28 +2722,63 @@
 }
 
 /* --- Modal da legenda: uma linha por marcação, badge à esquerda --- */
-.legendaLista {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.legenda {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.legendaLista li {
+.legendaGrupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legendaTitulo {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Etiqueta numa coluna fixa e a explicação ao lado, alinhadas pelo topo. */
+.legendaLista {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text-soft);
+  grid-template-columns: 128px minmax(0, 1fr);
+  margin: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-surface-soft);
 }
 
-.legendaLista li > span:first-child {
-  justify-self: start;
-  margin-top: 0;
+.legendaLista dt,
+.legendaLista dd {
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.legendaLista dt:first-of-type,
+.legendaLista dd:first-of-type {
+  border-top: none;
+}
+
+.legendaLista dt {
+  display: flex;
+  align-items: flex-start;
+}
+
+.legendaLista dt > span {
+  margin: 0;
   white-space: nowrap;
+}
+
+.legendaLista dd {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-soft);
 }
 
 /* --- Listas "Sem roteiro" / "Com atenção" (Modal da biblioteca) --- */
@@ -2832,5 +2819,36 @@
 
   .localizarArvore {
     flex-basis: 100%;
+  }
+}
+
+/* Pesquisa: origem estreita, código ocupa o resto, botão no fim. */
+.campoOrigem {
+  flex: 0 0 200px;
+  min-width: 0;
+}
+
+.campoCodigo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.botaoConsultar {
+  flex: 0 0 auto;
+  min-width: 140px;
+}
+
+@media (max-width: 760px) {
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .campoOrigem {
+    flex-basis: auto;
+  }
+
+  .botaoConsultar {
+    width: 100%;
   }
 }

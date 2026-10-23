@@ -23,7 +23,7 @@ const CONTEXT_ID = "VPLMProjectLeader.Company Name.Common Space";
 
 /* O que a busca precisa: um nó da árvore serve, um pai do ERP também. */
 export type ItemModelo3D = Pick<RoteiroTreeNode, "codigoNormalizado"> &
-    Partial<Pick<RoteiroTreeNode, "codigo" | "revisao">>;
+    Partial<Pick<RoteiroTreeNode, "codigo" | "revisao" | "origem">>;
 
 /* Revisão "maior": mais longa primeiro (Z < AA), depois a ordem natural. */
 function compararRevisao(a: string, b: string) {

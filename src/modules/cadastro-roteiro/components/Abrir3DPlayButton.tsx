@@ -71,6 +71,9 @@ export default function Abrir3DPlayButton({ item, onErro }: Props) {
         }
     }
 
+    /* Peça Ciber vem do ERP e não existe no 3DX: não há o que abrir. */
+    if (item.origem === "erp") return null;
+
     return (
         <>
             <button

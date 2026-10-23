@@ -7,6 +7,7 @@ import styles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
 import type { RoteiroTreeNode } from "../types/cadastroRoteiro.types";
 import AbrirPdfItemButton from "./AbrirPdfItemButton";
 import Abrir3DPlayButton from "./Abrir3DPlayButton";
+import { codigoDoPdf } from "../utils/codigo-pdf";
 
 /*
  * O mesmo item usado em mais de um conjunto da estrutura consultada: o
@@ -93,7 +94,7 @@ export function OutrosPaisMenu({
                                 </span>
 
                                 <div className={styles.acoesNaLinha}>
-                                    <AbrirPdfItemButton codigo={pai.codigoNormalizado} onErro={onErro} />
+                                    <AbrirPdfItemButton codigo={codigoDoPdf(pai)} onErro={onErro} />
                                     <Abrir3DPlayButton item={pai} onErro={onErro} />
                                 </div>
                             </li>

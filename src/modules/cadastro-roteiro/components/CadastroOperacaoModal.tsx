@@ -26,6 +26,7 @@ import { OutrosPaisMenu } from "./OutrosPaisMenu";
 import AbrirPdfItemButton from "./AbrirPdfItemButton";
 import Abrir3DPlayButton from "./Abrir3DPlayButton";
 import { formatarTempo, mascararTempo, tempoParaNumero } from "../utils/tempo";
+import { codigoDoPdf } from "../utils/codigo-pdf";
 
 type OperacaoOption = {
     COD_EMP: number;
@@ -1892,7 +1893,7 @@ export default function CadastroOperacaoModal({
                                                     conjuntos, o menu lista os outros. */}
                                                 <div className={styles.acoesNaLinha}>
                                                     <AbrirPdfItemButton
-                                                        codigo={pai.codigoNormalizado}
+                                                        codigo={codigoDoPdf(pai)}
                                                         onErro={mostrarErroGeral}
                                                     />
                                                     <Abrir3DPlayButton item={pai} onErro={mostrarErroGeral} />
@@ -1933,7 +1934,7 @@ export default function CadastroOperacaoModal({
                                         */}
                                         <div className={styles.acoesNaLinha}>
                                             <AbrirPdfItemButton
-                                                codigo={item.codigoNormalizado}
+                                                codigo={codigoDoPdf(item)}
                                                 onErro={mostrarErroGeral}
                                             />
                                             <Abrir3DPlayButton item={item} onErro={mostrarErroGeral} />

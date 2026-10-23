@@ -45,6 +45,10 @@ export type RoteiroApiResponse = {
 };
 
 export type Estrutura3DXNode = {
+  /* "erp": nó de estrutura Ciber, montado a partir do ERP (sem 3DX, sem revisão). */
+  origem?: "3dx" | "erp";
+  /* Código do desenho no ERP (COD_DESENHO) -- o PDF da peça Ciber é por ele. */
+  codigoDesenho?: string;
   tipo?: string;
   tipoint?: string;
   physicalId?: string;
