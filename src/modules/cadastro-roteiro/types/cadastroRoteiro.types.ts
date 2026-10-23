@@ -65,6 +65,8 @@ export type Estrutura3DXNode = {
     nome?: string;
     ordem?: string;
     matriz?: string;
+    /* "SynchroEBOMExt" = fora da lista de materiais (ver lib/estrutura-3dx). */
+    kind?: string | null;
   } | null;
   children?: Estrutura3DXNode[];
 };

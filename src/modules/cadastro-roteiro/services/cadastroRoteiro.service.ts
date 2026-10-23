@@ -8,6 +8,10 @@ import {
   RoteiroItem,
   RoteiroTreeNode,
 } from "../types/cadastroRoteiro.types";
+import {
+  contarItensEInstancias,
+  removerForaDaListaDeMateriais,
+} from "../utils/lista-materiais";
 
 const API_STRUCTURE = "http://proserver.trielht.com.br:1001/api/search/structure";
 /*
@@ -206,13 +210,13 @@ export async function buscarEstruturaComRoteiros(
 
   const estrutura = json as Estrutura3DXResponse;
 
-  const codigos = Array.from(coletarCodigos(estrutura.data.tree));
+  /* Item fora da lista de materiais não entra na árvore (nem é lido no ERP). */
+  const arvore3dx = removerForaDaListaDeMateriais(estrutura.data.tree);
+
+  const codigos = Array.from(coletarCodigos(arvore3dx));
   const roteirosPorCodigo = await buscarRoteirosEmLote(codigos, onProgresso);
 
-  const tree = montarArvoreComRoteiros(
-    estrutura.data.tree,
-    roteirosPorCodigo
-  );
+  const tree = montarArvoreComRoteiros(arvore3dx, roteirosPorCodigo);
 
   if (!tree) {
     throw new Error("Nenhum item com código foi encontrado na estrutura.");
@@ -221,7 +225,7 @@ export async function buscarEstruturaComRoteiros(
   return {
     codigo: estrutura.codigo,
     totalItens: contarItensUnicos(tree),
-    totalInstancias: estrutura.data.totalInstancias,
+    totalInstancias: contarItensEInstancias(arvore3dx).totalInstancias,
     tree,
   };
 }
