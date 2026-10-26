@@ -227,6 +227,7 @@ const TODAS_AS_FONTES_SQL = `
       WHEN [servico] = 'erp_estrutura' THEN 'substituicao-estrutura'
       WHEN [servico] = 'erp_integra_tubest' THEN 'integra-tubest'
       WHEN [servico] = 'erp_integra_lantek' THEN 'integra-lantek'
+      WHEN [servico] = 'erp_pedido_compra' THEN 'aprovacoes-painel'
       WHEN [servico] = 'semaforo' THEN 'semaforo'
       ELSE 'sistema'
     END) AS [chave_resolvida]

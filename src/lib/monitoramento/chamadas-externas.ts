@@ -15,6 +15,7 @@ export type ServicoExterno =
   | "erp_3dx_estrutura"
   | "erp_integra_tubest"
   | "erp_integra_lantek"
+  | "erp_pedido_compra"
   | "semaforo";
 export type OrigemChamadaExterna = "health_check" | "uso_real";
 

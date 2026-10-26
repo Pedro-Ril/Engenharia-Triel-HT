@@ -65,6 +65,13 @@ const PREFIXOS_PUBLICOS = [
    */
   "/estoque-equipamentos-usados/painel",
   "/api/estoque-equipamentos-usados/painel",
+  /*
+   * Integrações com sistemas externos sem login (ex: SupriConnect
+   * mandando pedidos de compra para aprovação). Público só no proxy:
+   * cada rota exige a própria chave no cabeçalho X-Api-Key (ver
+   * autenticarSistemaExterno em src/lib/aprovacoes/pedidos-compra.ts).
+   */
+  "/api/externo",
 ];
 
 export function ehRotaPublica(pathname: string): boolean {

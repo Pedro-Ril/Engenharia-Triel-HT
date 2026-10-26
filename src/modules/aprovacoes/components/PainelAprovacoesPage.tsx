@@ -54,6 +54,7 @@ import {
 } from "../services/aprovacoes.service";
 import type { AprovacaoLote, ItemAumentoSalarial, StatusAprovacao } from "../types/aprovacoes.types";
 import { AbasTipoAprovacao } from "./AbasTipoAprovacao";
+import { PainelPedidosCompra } from "./PainelPedidosCompra";
 
 type FiltroStatus = StatusAprovacao | "todos";
 
@@ -515,7 +516,7 @@ export function PainelAprovacoesPage() {
     <PageContainer>
       <PageHeader
         title="Painel de Aprovações"
-        description="Solicitações de reajuste enviadas à direção — cada colaborador é decidido separadamente."
+        description="Solicitações enviadas para aprovação — cada item é decidido separadamente."
       />
 
       <Breadcrumb
@@ -544,264 +545,274 @@ export function PainelAprovacoesPage() {
             }}
           />
 
-          <SegmentedTabs
-            itens={[
-              { valor: "colaborador", label: "Por colaborador", icon: <User size={15} /> },
-              { valor: "solicitacao", label: "Por solicitação", icon: <Layers size={15} /> },
-            ]}
-            ativo={modo}
-            onSelecionar={(valor) => {
-              setModo(valor as ModoPainel);
-              setSelecionados([]);
-            }}
-          />
+          {/*
+            * Pedidos de compra são outro módulo (tabela, colunas e escopo por
+            * empresa próprios): a aba troca o corpo inteiro da fila.
+            */}
+          {tipo === "pedido_compra" ? (
+            <PainelPedidosCompra onDecidido={carregarLista} />
+          ) : (
+            <>
+            <SegmentedTabs
+              itens={[
+                { valor: "colaborador", label: "Por colaborador", icon: <User size={15} /> },
+                { valor: "solicitacao", label: "Por solicitação", icon: <Layers size={15} /> },
+              ]}
+              ativo={modo}
+              onSelecionar={(valor) => {
+                setModo(valor as ModoPainel);
+                setSelecionados([]);
+              }}
+            />
 
-          <FormGrid columns={3}>
-            <Field label="Situação">
-              <Dropdown
-                value={status}
-                options={OPCOES_STATUS}
-                onValueChange={(valor) => setStatus(valor as FiltroStatus)}
-              />
-            </Field>
-
-            <Field label="Departamento">
-              <Dropdown
-                value={departamento}
-                options={[
-                  { value: TODOS, label: "Todos os departamentos" },
-                  ...departamentos.map((nome) => ({ value: nome, label: nome })),
-                ]}
-                onValueChange={setDepartamento}
-              />
-            </Field>
-
-            <Field label="Setor">
-              <Dropdown
-                value={setor}
-                options={[
-                  { value: TODOS, label: "Todos os setores" },
-                  ...setores.map((nome) => ({ value: nome, label: nome })),
-                ]}
-                onValueChange={setSetor}
-              />
-            </Field>
-
-            <Field label="Colaborador ou solicitante">
-              <Input
-                value={buscaDigitada}
-                placeholder="Buscar por nome..."
-                onChange={(event) => setBuscaDigitada(event.target.value)}
-              />
-            </Field>
-
-            {!agrupado && (
-              <Field label="Ordenar por">
+            <FormGrid columns={3}>
+              <Field label="Situação">
                 <Dropdown
-                  value={ordem}
-                  options={OPCOES_ORDEM}
-                  onValueChange={(valor) => setOrdem(valor as OrdemPainel)}
+                  value={status}
+                  options={OPCOES_STATUS}
+                  onValueChange={(valor) => setStatus(valor as FiltroStatus)}
                 />
               </Field>
-            )}
-          </FormGrid>
 
-          {erroLista && <Alert variant="danger">{erroLista}</Alert>}
-          {avisoLote && <Alert variant="success">{avisoLote}</Alert>}
+              <Field label="Departamento">
+                <Dropdown
+                  value={departamento}
+                  options={[
+                    { value: TODOS, label: "Todos os departamentos" },
+                    ...departamentos.map((nome) => ({ value: nome, label: nome })),
+                  ]}
+                  onValueChange={setDepartamento}
+                />
+              </Field>
 
-          {!agrupado && selecionados.length > 0 && (
-            <Stack direction="row" gap={12} align="center" justify="between" wrap>
-              <strong>{selecionados.length} colaborador(es) selecionado(s)</strong>
+              <Field label="Setor">
+                <Dropdown
+                  value={setor}
+                  options={[
+                    { value: TODOS, label: "Todos os setores" },
+                    ...setores.map((nome) => ({ value: nome, label: nome })),
+                  ]}
+                  onValueChange={setSetor}
+                />
+              </Field>
 
-              <Stack direction="row" gap={8} wrap>
-                <Button variant="secondary" onClick={() => setSelecionados([])}>
-                  Limpar seleção
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    setComentarioLote("");
-                    setErroComentarioLote(false);
-                    setAcaoLote("reprovar");
-                  }}
-                >
-                  <XCircle size={16} />
-                  Reprovar selecionados
-                </Button>
-                <Button
-                  onClick={() => {
-                    setComentarioLote("");
-                    setErroComentarioLote(false);
-                    setAcaoLote("aprovar");
-                  }}
-                >
-                  <CheckCircle2 size={16} />
-                  Aprovar selecionados
-                </Button>
+              <Field label="Colaborador ou solicitante">
+                <Input
+                  value={buscaDigitada}
+                  placeholder="Buscar por nome..."
+                  onChange={(event) => setBuscaDigitada(event.target.value)}
+                />
+              </Field>
+
+              {!agrupado && (
+                <Field label="Ordenar por">
+                  <Dropdown
+                    value={ordem}
+                    options={OPCOES_ORDEM}
+                    onValueChange={(valor) => setOrdem(valor as OrdemPainel)}
+                  />
+                </Field>
+              )}
+            </FormGrid>
+
+            {erroLista && <Alert variant="danger">{erroLista}</Alert>}
+            {avisoLote && <Alert variant="success">{avisoLote}</Alert>}
+
+            {!agrupado && selecionados.length > 0 && (
+              <Stack direction="row" gap={12} align="center" justify="between" wrap>
+                <strong>{selecionados.length} colaborador(es) selecionado(s)</strong>
+
+                <Stack direction="row" gap={8} wrap>
+                  <Button variant="secondary" onClick={() => setSelecionados([])}>
+                    Limpar seleção
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setComentarioLote("");
+                      setErroComentarioLote(false);
+                      setAcaoLote("reprovar");
+                    }}
+                  >
+                    <XCircle size={16} />
+                    Reprovar selecionados
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setComentarioLote("");
+                      setErroComentarioLote(false);
+                      setAcaoLote("aprovar");
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    Aprovar selecionados
+                  </Button>
+                </Stack>
               </Stack>
-            </Stack>
-          )}
+            )}
 
-          {carregando ? (
-            <Loader label="Carregando solicitações..." />
-          ) : naoEhAprovador ? (
-            <EmptyState
-              icon={<ShieldOff size={28} />}
-              title="Você ainda não é aprovador de nenhum tipo de solicitação"
-              description="Um administrador precisa cadastrar você em Administração → Diretoria → Aprovadores para que a fila apareça aqui."
-            />
-          ) : (agrupado ? solicitacoes.length === 0 : itens.length === 0) ? (
-            <EmptyState
-              icon={<ClipboardCheck size={28} />}
-              title={busca ? "Nenhum resultado para essa busca" : "Nenhuma solicitação nesta situação"}
-            />
-          ) : agrupado ? (
-            <Table minWidth={950}>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Nº</TableHeaderCell>
-                  <TableHeaderCell>Tipo</TableHeaderCell>
-                  <TableHeaderCell>Colaboradores</TableHeaderCell>
-                  <TableHeaderCell>Solicitante</TableHeaderCell>
-                  <TableHeaderCell>Enviada em</TableHeaderCell>
-                  <TableHeaderCell align="right">Reajuste</TableHeaderCell>
-                  <TableHeaderCell align="center">Situação</TableHeaderCell>
-                  <TableHeaderCell align="center">Ações</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {solicitacoesPagina.map((solicitacao) => {
-                  return (
-                    <TableRow
-                      key={solicitacao.numero}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => abrirSolicitacao(solicitacao.numero)}
-                    >
-                      <TableCell>#{solicitacao.numero}</TableCell>
-                      <TableCell>{rotuloTipoAprovacao(solicitacao.tipo)}</TableCell>
-                      <TableCell>
-                        {solicitacao.totalItens === 1
-                          ? "1 colaborador"
-                          : `${solicitacao.totalItens} colaboradores`}
-                      </TableCell>
-                      <TableCell>{solicitacao.criadoPorNome}</TableCell>
-                      <TableCell>{formatarData(solicitacao.criadoEm)}</TableCell>
-                      <TableCell align="right">{formatarMoeda(solicitacao.totalReajuste)}</TableCell>
+            {carregando ? (
+              <Loader label="Carregando solicitações..." />
+            ) : naoEhAprovador ? (
+              <EmptyState
+                icon={<ShieldOff size={28} />}
+                title="Você ainda não é aprovador de nenhum tipo de solicitação"
+                description="Um administrador precisa cadastrar você em Administração → Diretoria → Aprovadores para que a fila apareça aqui."
+              />
+            ) : (agrupado ? solicitacoes.length === 0 : itens.length === 0) ? (
+              <EmptyState
+                icon={<ClipboardCheck size={28} />}
+                title={busca ? "Nenhum resultado para essa busca" : "Nenhuma solicitação nesta situação"}
+              />
+            ) : agrupado ? (
+              <Table minWidth={950}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Nº</TableHeaderCell>
+                    <TableHeaderCell>Tipo</TableHeaderCell>
+                    <TableHeaderCell>Colaboradores</TableHeaderCell>
+                    <TableHeaderCell>Solicitante</TableHeaderCell>
+                    <TableHeaderCell>Enviada em</TableHeaderCell>
+                    <TableHeaderCell align="right">Reajuste</TableHeaderCell>
+                    <TableHeaderCell align="center">Situação</TableHeaderCell>
+                    <TableHeaderCell align="center">Ações</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {solicitacoesPagina.map((solicitacao) => {
+                    return (
+                      <TableRow
+                        key={solicitacao.numero}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => abrirSolicitacao(solicitacao.numero)}
+                      >
+                        <TableCell>#{solicitacao.numero}</TableCell>
+                        <TableCell>{rotuloTipoAprovacao(solicitacao.tipo)}</TableCell>
+                        <TableCell>
+                          {solicitacao.totalItens === 1
+                            ? "1 colaborador"
+                            : `${solicitacao.totalItens} colaboradores`}
+                        </TableCell>
+                        <TableCell>{solicitacao.criadoPorNome}</TableCell>
+                        <TableCell>{formatarData(solicitacao.criadoEm)}</TableCell>
+                        <TableCell align="right">{formatarMoeda(solicitacao.totalReajuste)}</TableCell>
+                        <TableCell align="center">
+                          <Badge variant={solicitacao.pendentes > 0 ? "warning" : "success"}>
+                            {solicitacao.pendentes > 0
+                              ? `${solicitacao.pendentes} de ${solicitacao.totalItens} aguardando`
+                              : "Tudo decidido"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell align="center">
+                          <div onClick={(event) => event.stopPropagation()}>
+                            <IconButton
+                              icon={<Eye size={15} />}
+                              label={`Abrir solicitação #${solicitacao.numero}`}
+                              size="small"
+                              onClick={() => abrirSolicitacao(solicitacao.numero)}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <Table minWidth={1550}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell align="center">
+                      <Checkbox
+                        label=""
+                        aria-label="Selecionar todos os pendentes"
+                        checked={todosSelecionados}
+                        disabled={pendentesVisiveis.length === 0}
+                        onChange={alternarTodos}
+                      />
+                    </TableHeaderCell>
+                    <TableHeaderCell>Nº</TableHeaderCell>
+                    <TableHeaderCell>Tipo</TableHeaderCell>
+                    <TableHeaderCell>Colaborador</TableHeaderCell>
+                    <TableHeaderCell>Departamento / Setor</TableHeaderCell>
+                    <TableHeaderCell>Admissão</TableHeaderCell>
+                    <TableHeaderCell align="right">Salário atual</TableHeaderCell>
+                    <TableHeaderCell align="right">Reajuste</TableHeaderCell>
+                    <TableHeaderCell align="right">Novo salário</TableHeaderCell>
+                    <TableHeaderCell>Solicitante</TableHeaderCell>
+                    <TableHeaderCell>Enviada em</TableHeaderCell>
+                    <TableHeaderCell align="center">Status</TableHeaderCell>
+                    <TableHeaderCell align="center">Ações</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {itensPagina.map((item) => (
+                    <TableRow key={item.id} style={{ cursor: "pointer" }} onClick={() => abrirDetalhe(item.id)}>
                       <TableCell align="center">
-                        <Badge variant={solicitacao.pendentes > 0 ? "warning" : "success"}>
-                          {solicitacao.pendentes > 0
-                            ? `${solicitacao.pendentes} de ${solicitacao.totalItens} aguardando`
-                            : "Tudo decidido"}
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <Checkbox
+                            label=""
+                            aria-label={`Selecionar ${item.funcionarioNome}`}
+                            checked={selecionados.includes(item.id)}
+                            disabled={item.status !== "pendente"}
+                            onChange={() => alternarSelecao(item.id)}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>#{item.aprovacaoNumero}</TableCell>
+                      <TableCell>{rotuloTipoAprovacao(item.tipo)}</TableCell>
+                      <TableCell>{item.funcionarioNome}</TableCell>
+                      <TableCell>
+                        {item.departamento ?? "-"}
+                        {item.setor ? ` / ${item.setor}` : ""}
+                      </TableCell>
+                      <TableCell>{formatarDataAdmissao(item.dataAdmissao)}</TableCell>
+                      <TableCell align="right">{formatarMoeda(item.salarioAtual)}</TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" gap={8} align="center" justify="end" wrap>
+                          <span>{formatarReajuste(item.valorReajuste, item.percentualReajuste)}</span>
+                          {item.valorReajusteOriginal !== null && (
+                            <Badge variant="warning">
+                              <PencilLine size={12} />
+                              Alterado pela direção
+                            </Badge>
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right">{formatarMoeda(item.novoSalario)}</TableCell>
+                      <TableCell>{item.criadoPorNome}</TableCell>
+                      <TableCell>{formatarData(item.criadoEm)}</TableCell>
+                      <TableCell align="center">
+                        <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
+                          {statusAprovacaoConfig[item.status].label}
                         </Badge>
                       </TableCell>
                       <TableCell align="center">
                         <div onClick={(event) => event.stopPropagation()}>
                           <IconButton
                             icon={<Eye size={15} />}
-                            label={`Abrir solicitação #${solicitacao.numero}`}
+                            label={
+                              item.status === "pendente"
+                                ? `Analisar ${item.funcionarioNome}`
+                                : `Ver ${item.funcionarioNome}`
+                            }
                             size="small"
-                            onClick={() => abrirSolicitacao(solicitacao.numero)}
+                            onClick={() => abrirDetalhe(item.id)}
                           />
                         </div>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <Table minWidth={1550}>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell align="center">
-                    <Checkbox
-                      label=""
-                      aria-label="Selecionar todos os pendentes"
-                      checked={todosSelecionados}
-                      disabled={pendentesVisiveis.length === 0}
-                      onChange={alternarTodos}
-                    />
-                  </TableHeaderCell>
-                  <TableHeaderCell>Nº</TableHeaderCell>
-                  <TableHeaderCell>Tipo</TableHeaderCell>
-                  <TableHeaderCell>Colaborador</TableHeaderCell>
-                  <TableHeaderCell>Departamento / Setor</TableHeaderCell>
-                  <TableHeaderCell>Admissão</TableHeaderCell>
-                  <TableHeaderCell align="right">Salário atual</TableHeaderCell>
-                  <TableHeaderCell align="right">Reajuste</TableHeaderCell>
-                  <TableHeaderCell align="right">Novo salário</TableHeaderCell>
-                  <TableHeaderCell>Solicitante</TableHeaderCell>
-                  <TableHeaderCell>Enviada em</TableHeaderCell>
-                  <TableHeaderCell align="center">Status</TableHeaderCell>
-                  <TableHeaderCell align="center">Ações</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {itensPagina.map((item) => (
-                  <TableRow key={item.id} style={{ cursor: "pointer" }} onClick={() => abrirDetalhe(item.id)}>
-                    <TableCell align="center">
-                      <div onClick={(event) => event.stopPropagation()}>
-                        <Checkbox
-                          label=""
-                          aria-label={`Selecionar ${item.funcionarioNome}`}
-                          checked={selecionados.includes(item.id)}
-                          disabled={item.status !== "pendente"}
-                          onChange={() => alternarSelecao(item.id)}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>#{item.aprovacaoNumero}</TableCell>
-                    <TableCell>{rotuloTipoAprovacao(item.tipo)}</TableCell>
-                    <TableCell>{item.funcionarioNome}</TableCell>
-                    <TableCell>
-                      {item.departamento ?? "-"}
-                      {item.setor ? ` / ${item.setor}` : ""}
-                    </TableCell>
-                    <TableCell>{formatarDataAdmissao(item.dataAdmissao)}</TableCell>
-                    <TableCell align="right">{formatarMoeda(item.salarioAtual)}</TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" gap={8} align="center" justify="end" wrap>
-                        <span>{formatarReajuste(item.valorReajuste, item.percentualReajuste)}</span>
-                        {item.valorReajusteOriginal !== null && (
-                          <Badge variant="warning">
-                            <PencilLine size={12} />
-                            Alterado pela direção
-                          </Badge>
-                        )}
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="right">{formatarMoeda(item.novoSalario)}</TableCell>
-                    <TableCell>{item.criadoPorNome}</TableCell>
-                    <TableCell>{formatarData(item.criadoEm)}</TableCell>
-                    <TableCell align="center">
-                      <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
-                        {statusAprovacaoConfig[item.status].label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell align="center">
-                      <div onClick={(event) => event.stopPropagation()}>
-                        <IconButton
-                          icon={<Eye size={15} />}
-                          label={
-                            item.status === "pendente"
-                              ? `Analisar ${item.funcionarioNome}`
-                              : `Ver ${item.funcionarioNome}`
-                          }
-                          size="small"
-                          onClick={() => abrirDetalhe(item.id)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                  ))}
+                </TableBody>
+              </Table>
+            )}
 
-          {!carregando && !naoEhAprovador && totalPaginas > 1 && (
-            <Stack direction="row" justify="center">
-              <Pagination page={paginaAtual} totalPages={totalPaginas} onPageChange={setPagina} />
-            </Stack>
+            {!carregando && !naoEhAprovador && totalPaginas > 1 && (
+              <Stack direction="row" justify="center">
+                <Pagination page={paginaAtual} totalPages={totalPaginas} onPageChange={setPagina} />
+              </Stack>
+            )}
+            </>
           )}
         </Stack>
       </Card>

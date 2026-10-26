@@ -1,0 +1,56 @@
+/* Texto de apoio dentro das células (empresa, comprador, data de envio). */
+.secundario {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.fornecedor {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Observação do comprador: uma linha só, o resto no title e no detalhe. */
+.observacao {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Rodapé da lista: total filtrado, total selecionado e paginação. */
+.totalizador {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 32px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface-soft);
+}
+
+.totalizador > :last-child:not(.totalizadorBloco) {
+  margin-left: auto;
+}
+
+.totalizadorBloco {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.totalizadorRotulo {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.totalizadorValor {
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}

@@ -316,3 +316,65 @@
     display: none;
   }
 }
+
+/* Pedidos de compra: teste da consulta no ERP. */
+.testeErp {
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--bg-surface-soft);
+}
+
+.testeErpLinha {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.testeErpEmpresa {
+  flex: 0 0 200px;
+  min-width: 0;
+}
+
+.testeErpNumero {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.testeErpBotao {
+  min-width: 120px;
+}
+
+.testeErpResposta {
+  max-height: 280px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-soft);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* A chave do SupriConnect, mostrada uma única vez ao gerar. */
+.chaveGerada {
+  display: block;
+  padding: 14px;
+  border: 1px dashed var(--primary-soft-border);
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-size: 14px;
+  word-break: break-all;
+  user-select: all;
+}
+
+@media (max-width: 760px) {
+  .testeErpEmpresa {
+    flex-basis: 100%;
+  }
+}

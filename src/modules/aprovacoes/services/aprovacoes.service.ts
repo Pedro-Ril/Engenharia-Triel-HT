@@ -3,6 +3,8 @@ import type {
   DetalheAtualFuncionario,
   FuncionarioRh,
   ItemAumentoSalarial,
+  PedidoCompraErp,
+  PedidoCompraPainel,
   StatusAprovacao,
   TipoAprovacao,
 } from "../types/aprovacoes.types";
@@ -178,5 +180,42 @@ export async function enviarRelatorioSolicitacao(numero: number): Promise<ApiEnv
 /* A solicitação inteira, com todos os colaboradores -- usada pelo modo agrupado do painel. */
 export async function buscarLoteAprovacao(numero: number): Promise<ApiEnvelope<AprovacaoLote>> {
   const response = await fetch(`/api/aprovacoes/${numero}`);
+  return parseResponse(response);
+}
+
+/* =========================================================
+   Pedidos de compra (aba do painel)
+   ========================================================= */
+
+export async function listarPedidosCompraPainel(filtros: {
+  status: StatusAprovacao | "todos";
+  empresa: string;
+  busca: string;
+}): Promise<ApiEnvelope<{ pedidos: PedidoCompraPainel[]; empresas: number[] }>> {
+  const parametros = new URLSearchParams({ status: filtros.status });
+  if (filtros.empresa) parametros.set("empresa", filtros.empresa);
+  if (filtros.busca) parametros.set("busca", filtros.busca);
+
+  const response = await fetch(`/api/aprovacoes/pedidos-compra?${parametros.toString()}`, { cache: "no-store" });
+  return parseResponse(response);
+}
+
+export async function decidirPedidosCompra(dados: {
+  ids: string[];
+  acao: "aprovar" | "reprovar";
+  comentario?: string;
+}): Promise<ApiEnvelope<{ decididos: { empresa: number; numero: number }[]; ignorados: number }>> {
+  const response = await fetch("/api/aprovacoes/pedidos-compra/decidir", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse(response);
+}
+
+export async function buscarPedidoCompraDetalhe(
+  id: string
+): Promise<ApiEnvelope<{ pedido: PedidoCompraPainel; erp: PedidoCompraErp | null; erroErp: string | null }>> {
+  const response = await fetch(`/api/aprovacoes/pedidos-compra/${id}`, { cache: "no-store" });
   return parseResponse(response);
 }

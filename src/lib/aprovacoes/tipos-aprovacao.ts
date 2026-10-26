@@ -9,7 +9,7 @@
  * cada tipo precisa de tabela de item e tela próprias de qualquer jeito.
  */
 
-export type TipoAprovacao = "aumento_salarial";
+export type TipoAprovacao = "aumento_salarial" | "pedido_compra";
 
 export interface DefinicaoTipoAprovacao {
   valor: TipoAprovacao;
@@ -25,6 +25,12 @@ export const TIPOS_APROVACAO: DefinicaoTipoAprovacao[] = [
     label: "Reajuste Salarial",
     descricao: "Reajustes de salário enviados pelas lideranças para a direção decidir.",
     icone: "TrendingUp",
+  },
+  {
+    valor: "pedido_compra",
+    label: "Pedidos de Compra",
+    descricao: "Pedidos de compra do Focco enviados pelo SupriConnect, das empresas marcadas em Pedidos de Compra.",
+    icone: "ShoppingCart",
   },
 ];
 

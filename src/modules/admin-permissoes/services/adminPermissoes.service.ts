@@ -13,6 +13,9 @@ import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 import type {
   AprovacaoAtendente,
   ConfigAprovacoes,
+  ConfigPedidosCompra,
+  EscopoEmpresasAprovador,
+  ResultadoTesteErpPedido,
   Atualizacao,
   AtualizacaoTag,
   BuscaTerminalFabrica,
@@ -1293,6 +1296,70 @@ export async function removerAtendenteAprovacao(
     method: "DELETE",
   });
   return parseResponse<null>(response);
+}
+
+/* =========================================================
+   Aprovações — pedidos de compra (escopo por empresa e integração)
+   ========================================================= */
+
+export async function buscarConfigPedidosCompra(): Promise<ApiEnvelope<ConfigPedidosCompra>> {
+  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/config");
+  return parseResponse<ConfigPedidosCompra>(response);
+}
+
+export async function salvarConfigPedidosCompra(dados: {
+  urlPedido: string | null;
+  urlPedidoTeste: string | null;
+  usarAmbienteTeste: boolean;
+  chaveApiErp: string | null;
+}): Promise<ApiEnvelope<ConfigPedidosCompra>> {
+  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigPedidosCompra>(response);
+}
+
+export async function gerarChavePedidosCompra(): Promise<
+  ApiEnvelope<{ chave: string; config: ConfigPedidosCompra }>
+> {
+  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/chave", { method: "POST" });
+  return parseResponse<{ chave: string; config: ConfigPedidosCompra }>(response);
+}
+
+export async function revogarChavePedidosCompra(): Promise<ApiEnvelope<ConfigPedidosCompra>> {
+  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/chave", { method: "DELETE" });
+  return parseResponse<ConfigPedidosCompra>(response);
+}
+
+export async function testarErpPedidosCompra(dados: {
+  empresa: number;
+  numero: number;
+}): Promise<ApiEnvelope<ResultadoTesteErpPedido>> {
+  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/testar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ResultadoTesteErpPedido>(response);
+}
+
+export async function listarEscopoEmpresasPedidosCompra(): Promise<ApiEnvelope<EscopoEmpresasAprovador[]>> {
+  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/empresas");
+  return parseResponse<EscopoEmpresasAprovador[]>(response);
+}
+
+export async function salvarEmpresasAprovadorPedidosCompra(
+  usuarioId: string,
+  empresas: number[]
+): Promise<ApiEnvelope<EscopoEmpresasAprovador>> {
+  const response = await fetch(`/api/admin/aprovacoes/pedidos-compra/empresas/${usuarioId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ empresas }),
+  });
+  return parseResponse<EscopoEmpresasAprovador>(response);
 }
 
 export async function buscarConfigAprovacoes(): Promise<ApiEnvelope<ConfigAprovacoes>> {

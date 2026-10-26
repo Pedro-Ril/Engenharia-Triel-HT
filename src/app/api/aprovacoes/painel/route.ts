@@ -11,6 +11,7 @@ import {
   type StatusItemAprovacao,
 } from "@/lib/aprovacoes/aprovacoes";
 import { buscarConfigAprovacoes } from "@/lib/aprovacoes/config";
+import { contarPedidosPendentes } from "@/lib/aprovacoes/pedidos-compra";
 import { ehTipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -39,13 +40,19 @@ async function handleGET(request: Request) {
   };
 
   try {
-    const [itens, solicitacoes, opcoes, pendentesPorTipo, config] = await Promise.all([
+    const [itens, solicitacoes, opcoes, pendentesPorTipo, config, pedidosPendentes] = await Promise.all([
       listarItensPainel(acesso.tiposAtendidos, filtros),
       listarSolicitacoesPainel(acesso.tiposAtendidos, filtros),
       listarOpcoesFiltroPainel(acesso.tiposAtendidos),
       contarPendentesPorTipo(acesso.tiposAtendidos),
       buscarConfigAprovacoes(),
+      /* Pedidos de compra têm tabela e escopo (empresa) próprios: contagem à parte. */
+      acesso.tiposAtendidos.includes("pedido_compra")
+        ? contarPedidosPendentes(acesso.usuario.id)
+        : Promise.resolve(null),
     ]);
+
+    if (pedidosPendentes !== null) pendentesPorTipo.pedido_compra = pedidosPendentes;
 
     return NextResponse.json({
       ok: true,

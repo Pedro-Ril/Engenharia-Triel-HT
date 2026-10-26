@@ -169,6 +169,34 @@ export interface AprovacaoAtendente {
   tipo: string;
 }
 
+/* Pedidos de compra: integração com o ERP e situação da chave do SupriConnect. */
+export interface ConfigPedidosCompra {
+  urlPedido: string | null;
+  urlPedidoTeste: string | null;
+  usarAmbienteTeste: boolean;
+  chaveApiErp: string | null;
+  chaveExternaConfigurada: boolean;
+  chaveExternaFinal: string | null;
+  chaveExternaGeradaEm: string | null;
+  chaveExternaGeradaPor: string | null;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
+/* Empresas do Focco (empr_id) que o diretor aprova. */
+export interface EscopoEmpresasAprovador {
+  usuarioId: string;
+  empresas: number[];
+}
+
+export interface ResultadoTesteErpPedido {
+  url: string;
+  ambiente: "producao" | "teste";
+  status: number | null;
+  duracaoMs: number;
+  corpo: string;
+}
+
 export interface ResultadoTesteConexaoFirebird {
   conectou: boolean;
   mensagemErro: string | null;
