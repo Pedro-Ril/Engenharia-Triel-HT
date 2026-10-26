@@ -30,5 +30,13 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "Integra-o-FoccoERP-x-Lantek-via-XLS", "Semaforo_Balaca", "Conversor_TXT_RH"]
+  "exclude": [
+    "node_modules",
+    "Integra-o-FoccoERP-x-Lantek-via-XLS",
+    "Semaforo_Balaca",
+    "Conversor_TXT_RH",
+    "vitest.config.ts",
+    "tests",
+    "**/*.test.ts"
+  ]
 }

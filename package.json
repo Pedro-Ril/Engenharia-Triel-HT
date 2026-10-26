@@ -11,7 +11,7 @@
     "copiar-occt": "node scripts/copiar-occt.mjs",
     "predev": "node scripts/copiar-occt.mjs",
     "prebuild": "node scripts/copiar-occt.mjs",
-    "test": "vitest run"
+    "test": "tsc -p tsconfig.test.json && vitest run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
