@@ -37,6 +37,7 @@ import { codigoDoPdf } from "@/modules/cadastro-roteiro/utils/codigo-pdf";
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
@@ -54,6 +55,12 @@ import {
 } from "@/modules/cadastro-roteiro/services/validacaoEstrutura.service";
 import { ModoAberturaProvider } from "@/modules/cadastro-roteiro/components/ModoAberturaArquivos";
 import { formatarTempo } from "@/modules/cadastro-roteiro/utils/tempo";
+import {
+    gravarAtualizacaoRevisao,
+    planejarAtualizacaoRevisao,
+    registrarValidacaoRevisao,
+    type PayloadRevisao,
+} from "@/modules/cadastro-roteiro/services/validacaoRevisao.service";
 import type { ModoAberturaArquivos } from "@/modules/cadastro-roteiro/constants/abertura-arquivos";
 
 function normalizarTipo(valor?: string | null): string {
@@ -1717,6 +1724,19 @@ export default function CadastroRoteiro({
     const [modalComAtencaoOpen, setModalComAtencaoOpen] = useState(false);
     const [atencaoModalItem, setAtencaoModalItem] =
         useState<RoteiroTreeNode | null>(null);
+    /*
+     * "Roteiro continua válido": simulando no ERP, gravando, a
+     * confirmação com o que vai mudar, e o erro (mostrado no modal).
+     */
+    const [validacaoRevisao, setValidacaoRevisao] = useState<"planejando" | "gravando" | null>(null);
+    const [confirmacaoRevisao, setConfirmacaoRevisao] = useState<{
+        item: RoteiroTreeNode;
+        payload: PayloadRevisao;
+        operacoes: number;
+        revisaoAnterior: string;
+        revisaoNova: string;
+    } | null>(null);
+    const [erroValidacaoRevisao, setErroValidacaoRevisao] = useState<string | null>(null);
 
     const [itemCadastroOperacao, setItemCadastroOperacao] =
         useState<RoteiroTreeNode | null>(null);
@@ -2245,6 +2265,87 @@ export default function CadastroRoteiro({
      * abaixo) rola até a linha. Se os filtros escondem o nó, limpa os
      * filtros -- melhor do que um clique que não leva a lugar nenhum.
      */
+    function abrirAtencao(item: RoteiroTreeNode) {
+        setErroValidacaoRevisao(null);
+        setAtencaoModalItem(item);
+    }
+
+    function fecharAtencao() {
+        if (validacaoRevisao) return;
+        setErroValidacaoRevisao(null);
+        setAtencaoModalItem(null);
+    }
+
+    /*
+     * Simula no ERP reenviar as operações como estão, só com a revisão do
+     * 3DX. Se o plano mexer em mais alguma coisa, não segue -- aí é caso de
+     * revisar as operações pelo cadastro.
+     */
+    async function iniciarValidacaoRevisao(item: RoteiroTreeNode) {
+        const revisaoNova = normalizarRevisao(item.revisao);
+        if (!revisaoNova) {
+            setErroValidacaoRevisao("O 3DX não informou a revisão deste item.");
+            return;
+        }
+
+        setErroValidacaoRevisao(null);
+        setValidacaoRevisao("planejando");
+        try {
+            const plano = await planejarAtualizacaoRevisao(item.codigoNormalizado, revisaoNova);
+            if (!plano.ok) {
+                setErroValidacaoRevisao(plano.mensagem);
+                if (plano.retornoErp) exibirToast(plano.mensagem, "erro", plano.retornoErp);
+                return;
+            }
+            setConfirmacaoRevisao({
+                item,
+                payload: plano.payload,
+                operacoes: plano.operacoes,
+                revisaoAnterior: obterRevisoesErpTexto(item.roteiros),
+                revisaoNova,
+            });
+        } finally {
+            setValidacaoRevisao(null);
+        }
+    }
+
+    async function confirmarValidacaoRevisao() {
+        if (!confirmacaoRevisao) return;
+        const { item, payload, operacoes, revisaoAnterior, revisaoNova } = confirmacaoRevisao;
+
+        setValidacaoRevisao("gravando");
+        try {
+            const gravado = await gravarAtualizacaoRevisao(payload);
+            if (!gravado.ok) {
+                setConfirmacaoRevisao(null);
+                setErroValidacaoRevisao(gravado.mensagem);
+                exibirToast(gravado.mensagem, "erro", gravado.retornoErp);
+                return;
+            }
+
+            const registrado = await registrarValidacaoRevisao({
+                codItem: item.codigoNormalizado,
+                revisaoAnterior,
+                revisaoNova,
+                comentarioRevisao: item.comentarioRevisao?.trim() || null,
+                operacoes,
+            });
+
+            setConfirmacaoRevisao(null);
+            setAtencaoModalItem(null);
+            void atualizarRoteirosDoItem(item.codigoNormalizado);
+            exibirToast(
+                registrado
+                    ? `Roteiro do item ${item.codigoNormalizado} validado: revisão atualizada para ${revisaoNova} no ERP.`
+                    : `Revisão atualizada para ${revisaoNova} no ERP, mas o Portal não conseguiu registrar quem validou.`,
+                registrado ? "sucesso" : "info",
+                gravado.retornoErp
+            );
+        } finally {
+            setValidacaoRevisao(null);
+        }
+    }
+
     function irParaNo(id: string, abrirDetalhes = false) {
         const caminho = caminhoAteNo(resultado?.tree ?? null, id);
 
@@ -2375,8 +2476,10 @@ export default function CadastroRoteiro({
             />
 
             {retornoErpModal && (
+                /* Acima das outras janelas: o aviso pode ser clicado com o "Roteiro com atenção" aberto. */
                 <div
                     className={styles.modalOverlay}
+                    style={{ zIndex: 10000 }}
                     onClick={() => setRetornoErpModal(null)}
                 >
                     <div
@@ -2795,9 +2898,7 @@ export default function CadastroRoteiro({
                                 onDeleteRoteiroCompleto={(item) => {
                                     setRoteiroCompletoExclusao(item);
                                 }}
-                                onOpenAtencao={(item) => {
-                                    setAtencaoModalItem(item);
-                                }}
+                                onOpenAtencao={abrirAtencao}
                             />
                         </div>
                     </>
@@ -2979,6 +3080,7 @@ export default function CadastroRoteiro({
                                 <th>Revisão ERP</th>
                                 <th>Tipo</th>
                                 <th>Descrição</th>
+                                <th>Comentário da revisão</th>
                                 <th aria-label="Ações" />
                             </tr>
                         </thead>
@@ -3010,17 +3112,25 @@ export default function CadastroRoteiro({
                                     <td>{revisoesErp || "Sem revisão"}</td>
                                     <td>{formatarTipo(tipoBrutoDoItem(item))}</td>
                                     <td>{item.descricaoNormalizada || "Sem descrição"}</td>
+                                    <td>
+                                        <span
+                                            className={styles.comentarioRevisaoCelula}
+                                            title={item.comentarioRevisao?.trim() || undefined}
+                                        >
+                                            {item.comentarioRevisao?.trim() || "-"}
+                                        </span>
+                                    </td>
                                     <td className={styles.modalTableAcao}>
-                                        {/* "Ver": vai até o item já com as
-                                            operações abertas, para comparar
-                                            as revisões. */}
+                                        {/* "Ver": abre o "Roteiro com atenção"
+                                            do item -- comentário da revisão,
+                                            revisar operações ou validar. */}
                                         <button
                                             type="button"
                                             className={styles.botaoCompacto}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setModalComAtencaoOpen(false);
-                                                irParaNo(item.id, true);
+                                                abrirAtencao(item);
                                             }}
                                         >
                                             Ver
@@ -3034,10 +3144,7 @@ export default function CadastroRoteiro({
             </Modal>
 
             {atencaoModalItem && (
-                <div
-                    className={styles.modalOverlay}
-                    onClick={() => setAtencaoModalItem(null)}
-                >
+                <div className={styles.modalOverlay} onClick={fecharAtencao}>
                     <div
                         className={`${styles.modalContent} ${styles.deleteModalContent}`}
                         onClick={(e) => e.stopPropagation()}
@@ -3054,7 +3161,8 @@ export default function CadastroRoteiro({
                                 type="button"
                                 className={styles.modalCloseButton}
                                 aria-label="Fechar"
-                                onClick={() => setAtencaoModalItem(null)}
+                                disabled={validacaoRevisao !== null}
+                                onClick={fecharAtencao}
                             >
                                 <X aria-hidden="true" />
                             </button>
@@ -3062,7 +3170,7 @@ export default function CadastroRoteiro({
 
                         <div className={styles.deleteModalBody}>
                             <p className={styles.deleteModalQuestion}>
-                                Revise o roteiro de fabricação deste item, pois ele pode estar desatualizado em relação à revisão atual da estrutura.
+                                Veja o que mudou na revisão. Se o roteiro precisar mudar, revise as operações; se continuar valendo, valide o roteiro e o Portal só atualiza a revisão no ERP.
                             </p>
 
                             <div className={styles.deleteModalInfoBox}>
@@ -3087,20 +3195,77 @@ export default function CadastroRoteiro({
                                     {atencaoModalItem.descricaoNormalizada || "Sem descrição"}
                                 </span>
                             </div>
+
+                            <div className={styles.comentarioRevisao}>
+                                <span className={styles.comentarioRevisaoTitulo}>
+                                    Comentário da revisão {normalizarRevisao(atencaoModalItem.revisao) || ""} (3DEXPERIENCE)
+                                </span>
+                                {atencaoModalItem.comentarioRevisao?.trim() ? (
+                                    <p className={styles.comentarioRevisaoTexto}>
+                                        &ldquo;{atencaoModalItem.comentarioRevisao.trim()}&rdquo;
+                                    </p>
+                                ) : (
+                                    <p className={styles.comentarioRevisaoVazio}>Sem comentário nesta revisão.</p>
+                                )}
+                            </div>
+
+                            {erroValidacaoRevisao && (
+                                <p className={styles.erroValidacaoRevisao} role="alert">
+                                    {erroValidacaoRevisao}
+                                </p>
+                            )}
                         </div>
 
                         <div className={styles.deleteModalFooter}>
                             <button
                                 type="button"
                                 className={styles.modalSecondaryButton}
-                                onClick={() => setAtencaoModalItem(null)}
+                                disabled={validacaoRevisao !== null}
+                                onClick={fecharAtencao}
                             >
                                 Fechar
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.modalSecondaryButton}
+                                disabled={validacaoRevisao !== null}
+                                onClick={() => {
+                                    const id = atencaoModalItem.id;
+                                    fecharAtencao();
+                                    irParaNo(id, true);
+                                }}
+                            >
+                                Revisar operações
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.modalPrimaryButton}
+                                disabled={validacaoRevisao !== null}
+                                onClick={() => void iniciarValidacaoRevisao(atencaoModalItem)}
+                            >
+                                {validacaoRevisao === "planejando" ? "Conferindo no ERP..." : "Roteiro continua válido"}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                open={confirmacaoRevisao !== null}
+                title={`Validar o roteiro do item ${confirmacaoRevisao?.item.codigoNormalizado ?? ""}?`}
+                variant="warning"
+                confirmLabel="Validar e atualizar a revisão"
+                loading={validacaoRevisao === "gravando"}
+                message={
+                    confirmacaoRevisao
+                        ? `A revisão do roteiro no ERP passa de "${confirmacaoRevisao.revisaoAnterior}" para "${confirmacaoRevisao.revisaoNova}". ${confirmacaoRevisao.operacoes === 1 ? "A operação continua exatamente como está" : `As ${confirmacaoRevisao.operacoes} operações continuam exatamente como estão`} (máquinas e consumos incluídos). Fica registrado que você validou.`
+                        : ""
+                }
+                onConfirm={confirmarValidacaoRevisao}
+                onClose={() => {
+                    if (validacaoRevisao !== "gravando") setConfirmacaoRevisao(null);
+                }}
+            />
             {roteiroExclusao && (
                 <div
                     className={styles.modalOverlay}

@@ -2,6 +2,10 @@
 
 import { X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+    alternativoParaNumero,
+    roteiroExistenteParaPayload as roteiroExistenteParaPayloadCompartilhado,
+} from "../utils/roteiro-payload";
 import type { KeyboardEvent as EventoTeclado, Ref } from "react";
 import styles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
 import {
@@ -288,18 +292,6 @@ function percentualDeTexto(valor: string): number {
 
 function simNaoParaFlag(valor: string) {
     return valor === "Sim" ? "1" : "0";
-}
-
-function alternativoParaNumero(valor?: string | null) {
-    const texto = String(valor ?? "").trim().toUpperCase();
-
-    if (!texto || texto.includes("PADRÃO") || texto.includes("PADRAO")) {
-        return 0;
-    }
-
-    const match = texto.match(/ALTERNATIVO\s+(\d+)/);
-
-    return match ? Number(match[1]) : 0;
 }
 
 function numeroParaRoteiro(alternativo?: string | number | null) {
@@ -1318,20 +1310,7 @@ export default function CadastroOperacaoModal({
      * revisão de alguma delas, a confirmação antes de gravar mostra.
      */
     function roteiroExistenteParaPayload(roteiro: RoteiroItem) {
-        return {
-            alternativo: alternativoParaNumero(roteiro.ALTERNATIVO),
-            seq: Number(roteiro.SEQ),
-            cod_operacao: String(roteiro.COD_OPERACAO ?? "").trim(),
-            cod_centro_trab: String(roteiro.COD_CENTRO_TRAB ?? "").trim(),
-            cod_unid_med: String(roteiro.COD_UNID_MED ?? "").trim(),
-            dt_inicio: roteiro.DT_INICIO || null,
-            dt_fim: roteiro.DT_FIM || null,
-            apontamento: String(roteiro.APONTAMENTO ?? "0"),
-            obrigatorio: String(roteiro.OBRIGATORIO ?? "0"),
-            tempo: roteiro.TEMPO ?? null,
-            observacao: roteiro.OBSERVACAO || null,
-            revisao: item?.revisao || null,
-        };
+        return roteiroExistenteParaPayloadCompartilhado(roteiro, item?.revisao || null);
     }
 
     function ehMesmoRoteiro(roteiro: RoteiroItem, roteiroComparar: RoteiroItem) {

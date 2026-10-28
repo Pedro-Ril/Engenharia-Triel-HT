@@ -56,6 +56,8 @@ export type Estrutura3DXNode = {
   id3DX?: string;
   title?: string;
   revisao?: string;
+  /* Comentário de quem liberou esta revisão no 3DX (ex.: o motivo da mudança). */
+  comentarioRevisao?: string | null;
   descricao?: string;
   responsavel?: string;
   status?: string;

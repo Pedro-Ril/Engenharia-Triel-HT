@@ -2852,3 +2852,57 @@
     width: 100%;
   }
 }
+
+/* "Roteiro com atenção": o comentário da revisão no 3DX, em destaque -- é o que ajuda a decidir. */
+.comentarioRevisao {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-border);
+  border-radius: 12px;
+  background: var(--warning-bg);
+}
+
+.comentarioRevisaoTitulo {
+  color: var(--warning-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comentarioRevisaoTexto {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.comentarioRevisaoVazio {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.erroValidacaoRevisao {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+/* Lista "Itens com atenção": o comentário numa linha, o texto inteiro no title. */
+.comentarioRevisaoCelula {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+  font-size: 13px;
+}
