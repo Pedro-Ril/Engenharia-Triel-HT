@@ -252,6 +252,14 @@ fi
 # Ubuntu; nao chega a exigir reconectar por SSH de novo). Nao trava a
 # instalacao se falhar (ex: netplan ausente numa distro derivada
 # diferente) -- so avisa.
+#
+# O NetworkManager sobe ANTES do netplan apply: na ordem inversa, o
+# apply entrega a interface a um NetworkManager que ainda nao esta
+# rodando, a maquina fica sem rede (e sem DNS) ate ele subir, e o
+# download do agente logo abaixo falhava com "Could not resolve host"
+# (visto ao vivo no TERMINALAGRO01, Ubuntu Server com eno2).
+systemctl enable --now NetworkManager
+
 if command -v netplan >/dev/null 2>&1; then
   echo "Ajustando o netplan para o NetworkManager poder gerenciar a rede..."
   cat > /etc/netplan/90-tv-corporativa-networkmanager.yaml <<'NETPLAN'
@@ -263,7 +271,24 @@ NETPLAN
   netplan apply || echo "Aviso: netplan apply falhou -- confira a rede manualmente." >&2
 fi
 
-systemctl enable --now NetworkManager
+# A troca de dono da interface derruba a rede por alguns segundos:
+# espera o nome do portal resolver e o portal responder antes de seguir.
+PORTAL_HOST=$(echo "$PORTAL_URL" | sed -E 's#^[a-zA-Z]+://##; s#[:/].*$##')
+echo "Aguardando a rede (portal: $PORTAL_HOST)..."
+REDE_OK=0
+for TENTATIVA in $(seq 1 45); do
+  if getent hosts "$PORTAL_HOST" >/dev/null 2>&1 && curl -s -o /dev/null --max-time 5 "$PORTAL_URL"; then
+    REDE_OK=1
+    break
+  fi
+  sleep 2
+done
+if [ "$REDE_OK" -ne 1 ]; then
+  echo "A rede nao voltou depois de ajustar o NetworkManager (o portal $PORTAL_HOST nao responde)." >&2
+  echo "Confira com: nmcli device status   e   getent hosts $PORTAL_HOST" >&2
+  echo "Quando a interface aparecer como conectada, rode este instalador de novo." >&2
+  exit 1
+fi
 
 # tvkiosk roda sem privilegio de root (ver useradd acima) -- "netdev" e
 # o grupo que as regras padrao de polkit do NetworkManager ja liberam
@@ -273,7 +298,20 @@ systemctl enable --now NetworkManager
 usermod -aG netdev tvkiosk
 
 mkdir -p "$DIR"
-curl -fsSL "$PORTAL_URL/api/tv/agente/download?plataforma=linux" -o "$DIR/agente.mjs"
+# Tenta algumas vezes: a rede acabou de trocar de dono. Laco proprio em vez
+# de --retry-all-errors, que nao existe no curl do Ubuntu 20.04 (7.68).
+AGENTE_OK=0
+for TENTATIVA in 1 2 3 4 5; do
+  if curl -fsSL "$PORTAL_URL/api/tv/agente/download?plataforma=linux" -o "$DIR/agente.mjs"; then
+    AGENTE_OK=1
+    break
+  fi
+  sleep 3
+done
+if [ "$AGENTE_OK" -ne 1 ]; then
+  echo "Nao foi possivel baixar o agente de $PORTAL_URL -- confira a rede e rode o instalador de novo." >&2
+  exit 1
+fi
 chown -R tvkiosk:tvkiosk /opt/portal-triel-ht
 
 echo "Instalando extensao de captura de tela via politica do navegador..."
