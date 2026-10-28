@@ -1,8 +1,10 @@
 import type {
   AprovacaoLote,
   DetalheAtualFuncionario,
+  DirecionamentoDaVez,
   FuncionarioRh,
   ItemAumentoSalarial,
+  FluxoPedidoCompra,
   PedidoCompraErp,
   PedidoCompraPainel,
   StatusAprovacao,
@@ -191,31 +193,121 @@ export async function listarPedidosCompraPainel(filtros: {
   status: StatusAprovacao | "todos";
   empresa: string;
   busca: string;
-}): Promise<ApiEnvelope<{ pedidos: PedidoCompraPainel[]; empresas: number[] }>> {
+  /* Prefixos separados por vírgula ("90.02, 90.90"). */
+  centroCusto: string;
+  /* Histórico: "7" | "30" | "90" | "365" dias, ou "" = tudo. Ignorado em "Na minha vez". */
+  dias: string;
+}): Promise<ApiEnvelope<{ pedidos: PedidoCompraPainel[] }>> {
   const parametros = new URLSearchParams({ status: filtros.status });
+  if (filtros.dias) parametros.set("dias", filtros.dias);
   if (filtros.empresa) parametros.set("empresa", filtros.empresa);
+  if (filtros.centroCusto) parametros.set("centroCusto", filtros.centroCusto);
   if (filtros.busca) parametros.set("busca", filtros.busca);
 
   const response = await fetch(`/api/aprovacoes/pedidos-compra?${parametros.toString()}`, { cache: "no-store" });
   return parseResponse(response);
 }
 
+export interface DecisaoPedidoCompra {
+  id: string;
+  empresa: number;
+  numero: number;
+  resultado: "avancou" | "aprovado" | "devolvido";
+  nivelNome: string;
+  proximoNivel: string | null;
+  direcionadoPara: string | null;
+}
+
+/* As rotas de pedido de compra aceitam até 200 ids por chamada: seleções maiores vão em blocos. */
+const PEDIDOS_POR_CHAMADA = 200;
+
+function emBlocos<T>(itens: T[]): T[][] {
+  const blocos: T[][] = [];
+  for (let inicio = 0; inicio < itens.length; inicio += PEDIDOS_POR_CHAMADA) {
+    blocos.push(itens.slice(inicio, inicio + PEDIDOS_POR_CHAMADA));
+  }
+  return blocos;
+}
+
+/* Antes de aprovar: o próximo nível de cada pedido marcado e a sugestão das regras. */
+export async function buscarDirecionamentoPedidosCompra(ids: string[]): Promise<ApiEnvelope<DirecionamentoDaVez[]>> {
+  const todos: DirecionamentoDaVez[] = [];
+
+  for (const bloco of emBlocos(ids)) {
+    const response = await fetch("/api/aprovacoes/pedidos-compra/direcionamento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: bloco }),
+    });
+    const resultado = await parseResponse<DirecionamentoDaVez[]>(response);
+    if (!resultado.ok || !resultado.data) return resultado;
+    todos.push(...resultado.data);
+  }
+
+  return { ok: true, data: todos };
+}
+
 export async function decidirPedidosCompra(dados: {
   ids: string[];
-  acao: "aprovar" | "reprovar";
+  acao: "aprovar" | "devolver";
   comentario?: string;
-}): Promise<ApiEnvelope<{ decididos: { empresa: number; numero: number }[]; ignorados: number }>> {
-  const response = await fetch("/api/aprovacoes/pedidos-compra/decidir", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(dados),
-  });
-  return parseResponse(response);
+  /* "todos" | "sugestao" (a de cada pedido) | id de uma pessoa do próximo nível. */
+  direcionarPara?: string;
+}): Promise<ApiEnvelope<{ decididos: DecisaoPedidoCompra[]; falhas: { id: string; motivo: string }[] }>> {
+  const decididos: DecisaoPedidoCompra[] = [];
+  const falhas: { id: string; motivo: string }[] = [];
+
+  for (const [indice, bloco] of emBlocos(dados.ids).entries()) {
+    const response = await fetch("/api/aprovacoes/pedidos-compra/decidir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...dados, ids: bloco }),
+    });
+    const resultado = await parseResponse<{ decididos: DecisaoPedidoCompra[]; falhas: { id: string; motivo: string }[] }>(
+      response
+    );
+
+    if (!resultado.ok || !resultado.data) {
+      /* Os blocos anteriores já foram decididos: devolve o que andou e o motivo do resto. */
+      if (indice === 0) return resultado;
+      const motivo = resultado.message ?? "Não foi possível registrar a decisão.";
+      falhas.push(...emBlocos(dados.ids).slice(indice).flat().map((id) => ({ id, motivo })));
+      break;
+    }
+
+    decididos.push(...resultado.data.decididos);
+    falhas.push(...resultado.data.falhas);
+  }
+
+  return { ok: true, data: { decididos, falhas } };
 }
 
 export async function buscarPedidoCompraDetalhe(
   id: string
-): Promise<ApiEnvelope<{ pedido: PedidoCompraPainel; erp: PedidoCompraErp | null; erroErp: string | null }>> {
+): Promise<
+  ApiEnvelope<{ pedido: PedidoCompraPainel; erp: PedidoCompraErp | null; erroErp: string | null; fluxo: FluxoPedidoCompra }>
+> {
   const response = await fetch(`/api/aprovacoes/pedidos-compra/${id}`, { cache: "no-store" });
+  return parseResponse(response);
+}
+
+/* =========================================================
+   Minhas Solicitações — andamento na alçada e reenvio
+   ========================================================= */
+
+export async function buscarAndamentoItem(itemId: string): Promise<ApiEnvelope<ItemAumentoSalarial>> {
+  const response = await fetch(`/api/aprovacoes/minhas/itens/${itemId}`, { cache: "no-store" });
+  return parseResponse(response);
+}
+
+export async function reenviarItemAprovacao(
+  itemId: string,
+  dados: { valorReajuste: number; percentualReajuste: number; comentario: string | null }
+): Promise<ApiEnvelope<ItemAumentoSalarial>> {
+  const response = await fetch(`/api/aprovacoes/minhas/itens/${itemId}/reenviar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
   return parseResponse(response);
 }

@@ -11,7 +11,8 @@ import {
   type StatusItemAprovacao,
 } from "@/lib/aprovacoes/aprovacoes";
 import { buscarConfigAprovacoes } from "@/lib/aprovacoes/config";
-import { contarPedidosPendentes } from "@/lib/aprovacoes/pedidos-compra";
+import { contarPedidosPendentes, iniciarFluxosSemEtapa } from "@/lib/aprovacoes/pedidos-compra";
+import { iniciarFluxosReajusteSemEtapa } from "@/lib/aprovacoes/aprovacoes";
 import { ehTipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
@@ -40,11 +41,15 @@ async function handleGET(request: Request) {
   };
 
   try {
+    /* Pendentes de antes das alçadas entram no nível 1 assim que a alçada existe (conta certo já na aba). */
+    if (acesso.tiposAtendidos.includes("pedido_compra")) await iniciarFluxosSemEtapa();
+    if (acesso.tiposAtendidos.includes("aumento_salarial")) await iniciarFluxosReajusteSemEtapa();
+
     const [itens, solicitacoes, opcoes, pendentesPorTipo, config, pedidosPendentes] = await Promise.all([
-      listarItensPainel(acesso.tiposAtendidos, filtros),
-      listarSolicitacoesPainel(acesso.tiposAtendidos, filtros),
+      listarItensPainel(acesso.tiposAtendidos, filtros, acesso.usuario.id),
+      listarSolicitacoesPainel(acesso.tiposAtendidos, filtros, acesso.usuario.id),
       listarOpcoesFiltroPainel(acesso.tiposAtendidos),
-      contarPendentesPorTipo(acesso.tiposAtendidos),
+      contarPendentesPorTipo(acesso.tiposAtendidos, acesso.usuario.id),
       buscarConfigAprovacoes(),
       /* Pedidos de compra têm tabela e escopo (empresa) próprios: contagem à parte. */
       acesso.tiposAtendidos.includes("pedido_compra")

@@ -9,8 +9,8 @@ import {
   Layers,
   PencilLine,
   ShieldOff,
+  Undo2,
   User,
-  XCircle,
 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
@@ -54,6 +54,7 @@ import {
 } from "../services/aprovacoes.service";
 import type { AprovacaoLote, ItemAumentoSalarial, StatusAprovacao } from "../types/aprovacoes.types";
 import { AbasTipoAprovacao } from "./AbasTipoAprovacao";
+import { CadeiaAprovacao } from "./CadeiaAprovacao";
 import { PainelPedidosCompra } from "./PainelPedidosCompra";
 
 type FiltroStatus = StatusAprovacao | "todos";
@@ -61,7 +62,7 @@ type FiltroStatus = StatusAprovacao | "todos";
 const OPCOES_STATUS: { value: FiltroStatus; label: string }[] = [
   { value: "pendente", label: "Pendentes" },
   { value: "aprovado", label: "Aprovados" },
-  { value: "reprovado", label: "Reprovados" },
+  { value: "devolvido", label: "Devolvidos" },
   { value: "todos", label: "Todos" },
 ];
 
@@ -90,6 +91,32 @@ function formatarMoeda(valor: number): string {
 
 function formatarReajuste(valor: number, percentual: number): string {
   return `${formatarMoeda(valor)} (${Number(percentual).toFixed(2)}%)`;
+}
+
+/*
+ * Situação do colaborador na alçada: "Sua vez" quando o nível pendente é
+ * o de quem está vendo, "Em outro nível" quando ainda está na cadeia mas
+ * não é com ele, e o status final quando terminou.
+ */
+function SituacaoNaAlcada({ item }: { item: ItemAumentoSalarial }) {
+  const pendente = item.status === "pendente";
+
+  return (
+    <Stack gap={4} align="center">
+      {pendente && item.naMinhaVez ? (
+        <Badge variant="warning">Sua vez</Badge>
+      ) : (
+        <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
+          {pendente ? "Em outro nível" : statusAprovacaoConfig[item.status].label}
+        </Badge>
+      )}
+      {pendente && item.nivelAtual && (
+        <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+          Nível {item.nivelAtual.ordem} de {item.nivelAtual.total} · {item.nivelAtual.nome}
+        </span>
+      )}
+    </Stack>
+  );
 }
 
 export function PainelAprovacoesPage() {
@@ -203,7 +230,8 @@ export function PainelAprovacoesPage() {
   const agrupado = modo === "solicitacao";
 
   const pendentesVisiveis = useMemo(
-    () => itens.filter((item) => item.status === "pendente"),
+    /* Só dá para selecionar o que está na vez do nível de quem decide. */
+    () => itens.filter((item) => item.naMinhaVez),
     [itens]
   );
 
@@ -342,6 +370,8 @@ export function PainelAprovacoesPage() {
         setItemIdSelecionado(null);
         setDetalhe(null);
         carregarLista();
+        /* Depois do carregarLista (que limpa o aviso): diz se aprovou de vez ou só subiu de nível. */
+        setAvisoLote(resultado.message ?? null);
       } else {
         setErroModal(resultado.message ?? "Não foi possível aprovar o colaborador.");
       }
@@ -373,7 +403,7 @@ export function PainelAprovacoesPage() {
         setDetalhe(null);
         carregarLista();
       } else {
-        setErroModal(resultado.message ?? "Não foi possível reprovar o colaborador.");
+        setErroModal(resultado.message ?? "Não foi possível devolver o colaborador.");
         setConfirmandoReprovar(false);
       }
     } finally {
@@ -467,7 +497,7 @@ export function PainelAprovacoesPage() {
         await carregarLote(numeroAberto);
         carregarLista();
       } else if (!resultado.ok) {
-        setErroLote(resultado.message ?? "Não foi possível reprovar o colaborador.");
+        setErroLote(resultado.message ?? "Não foi possível devolver o colaborador.");
         setItemReprovando(null);
       }
     } finally {
@@ -508,7 +538,8 @@ export function PainelAprovacoesPage() {
   }
 
   const naoEhAprovador = !carregando && tiposAtendidos.length === 0;
-  const pendente = detalhe?.status === "pendente";
+  /* Decide (e edita valores) só quem está no nível da vez. */
+  const pendente = detalhe?.status === "pendente" && detalhe.naMinhaVez;
   const novoSalarioPrevisto =
     detalhe && valorNumerico > 0 ? detalhe.salarioAtual + valorNumerico : (detalhe?.novoSalario ?? 0);
 
@@ -634,8 +665,8 @@ export function PainelAprovacoesPage() {
                       setAcaoLote("reprovar");
                     }}
                   >
-                    <XCircle size={16} />
-                    Reprovar selecionados
+                    <Undo2 size={16} />
+                    Devolver selecionados
                   </Button>
                   <Button
                     onClick={() => {
@@ -754,7 +785,7 @@ export function PainelAprovacoesPage() {
                             label=""
                             aria-label={`Selecionar ${item.funcionarioNome}`}
                             checked={selecionados.includes(item.id)}
-                            disabled={item.status !== "pendente"}
+                            disabled={!item.naMinhaVez}
                             onChange={() => alternarSelecao(item.id)}
                           />
                         </div>
@@ -783,9 +814,7 @@ export function PainelAprovacoesPage() {
                       <TableCell>{item.criadoPorNome}</TableCell>
                       <TableCell>{formatarData(item.criadoEm)}</TableCell>
                       <TableCell align="center">
-                        <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
-                          {statusAprovacaoConfig[item.status].label}
-                        </Badge>
+                        <SituacaoNaAlcada item={item} />
                       </TableCell>
                       <TableCell align="center">
                         <div onClick={(event) => event.stopPropagation()}>
@@ -901,7 +930,7 @@ export function PainelAprovacoesPage() {
                       <TableCell>{formatarDataAdmissao(item.dataAdmissao)}</TableCell>
                       <TableCell align="right">{formatarMoeda(item.salarioAtual)}</TableCell>
                       <TableCell align="center">
-                        {item.status === "pendente" ? (
+                        {item.status === "pendente" && item.naMinhaVez ? (
                           <Stack gap={6} align="center">
                             {/* Largura fixa: o campo é width:100% por padrão e esticaria a coluna, jogando a tabela para fora do modal. */}
                             <div style={{ width: 150 }}>
@@ -931,7 +960,7 @@ export function PainelAprovacoesPage() {
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {item.status === "pendente" ? (
+                        {item.status === "pendente" && item.naMinhaVez ? (
                           <Stack gap={6} align="center">
                             <div style={{ width: 118 }}>
                               <NumberInput
@@ -956,16 +985,14 @@ export function PainelAprovacoesPage() {
                       </TableCell>
                       <TableCell align="right">
                         {formatarMoeda(
-                          item.status === "pendente" && Number(valoresPorItem[item.id]?.valor) > 0
+                          item.status === "pendente" && item.naMinhaVez && Number(valoresPorItem[item.id]?.valor) > 0
                             ? item.salarioAtual + Number(valoresPorItem[item.id].valor)
                             : item.novoSalario
                         )}
                       </TableCell>
                       <TableCell align="center">
                         <Stack gap={4} align="center">
-                          <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
-                            {statusAprovacaoConfig[item.status].label}
-                          </Badge>
+                          <SituacaoNaAlcada item={item} />
                           {item.decididoPorNome && (
                             <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
                               {item.decididoPorNome}
@@ -974,11 +1001,11 @@ export function PainelAprovacoesPage() {
                         </Stack>
                       </TableCell>
                       <TableCell align="center">
-                        {item.status === "pendente" ? (
+                        {item.status === "pendente" && item.naMinhaVez ? (
                           <Stack direction="row" gap={6} justify="center">
                             <IconButton
-                              icon={<XCircle size={15} />}
-                              label={`Reprovar ${item.funcionarioNome}`}
+                              icon={<Undo2 size={15} />}
+                              label={`Devolver ${item.funcionarioNome}`}
                               size="small"
                               variant="danger"
                               disabled={itemProcessando !== null || !itemLoteValido(item.id)}
@@ -1022,8 +1049,8 @@ export function PainelAprovacoesPage() {
                 onClick={() => setConfirmandoReprovar(true)}
                 disabled={processando || (valoresEditados && !valoresValidos)}
               >
-                <XCircle size={16} />
-                Reprovar
+                <Undo2 size={16} />
+                Devolver
               </Button>
               <Button
                 onClick={() => setConfirmandoAprovar(true)}
@@ -1135,6 +1162,8 @@ export function PainelAprovacoesPage() {
                 </Field>
               )}
 
+              {detalhe.fluxo && <CadeiaAprovacao etapas={detalhe.fluxo.etapas} historico={detalhe.fluxo.historico} />}
+
               {pendente ? (
                 <Field label="Comentário (opcional para aprovar)" htmlFor="comentarioAprovar">
                   <Textarea
@@ -1215,13 +1244,13 @@ export function PainelAprovacoesPage() {
 
       <ConfirmDialog
         open={confirmandoReprovar}
-        title="Reprovar este colaborador?"
+        title="Devolver este colaborador ao solicitante?"
         variant="danger"
-        confirmLabel="Reprovar"
+        confirmLabel="Devolver"
         loading={processando}
         message={
           <Stack gap={12}>
-            <span>Explique o motivo da reprovação — o solicitante verá esse comentário no portal.</span>
+            <span>Explique o motivo da devolução — o solicitante vê no portal, ajusta e reenvia (recomeça do nível 1).</span>
             <Textarea
               rows={3}
               value={comentarioReprovar}
@@ -1229,11 +1258,11 @@ export function PainelAprovacoesPage() {
                 setComentarioReprovar(event.target.value);
                 if (erroComentarioReprovar) setErroComentarioReprovar(false);
               }}
-              placeholder="Motivo da reprovação (obrigatório)"
+              placeholder="Motivo da devolução (obrigatório)"
               disabled={processando}
               hasError={erroComentarioReprovar}
             />
-            {erroComentarioReprovar && <span style={{ color: "var(--danger-text)" }}>Informe o motivo da reprovação.</span>}
+            {erroComentarioReprovar && <span style={{ color: "var(--danger-text)" }}>Informe o motivo da devolução.</span>}
           </Stack>
         }
         onConfirm={handleConfirmarReprovar}
@@ -1246,13 +1275,13 @@ export function PainelAprovacoesPage() {
 
       <ConfirmDialog
         open={itemReprovando !== null}
-        title={itemReprovando ? `Reprovar ${itemReprovando.funcionarioNome}?` : ""}
+        title={itemReprovando ? `Devolver ${itemReprovando.funcionarioNome}?` : ""}
         variant="danger"
-        confirmLabel="Reprovar"
+        confirmLabel="Devolver"
         loading={itemProcessando !== null}
         message={
           <Stack gap={12}>
-            <span>Explique o motivo da reprovação — o solicitante verá esse comentário no portal.</span>
+            <span>Explique o motivo da devolução — o solicitante vê no portal, ajusta e reenvia (recomeça do nível 1).</span>
             <Textarea
               rows={3}
               value={comentarioItemLote}
@@ -1260,12 +1289,12 @@ export function PainelAprovacoesPage() {
                 setComentarioItemLote(event.target.value);
                 if (erroComentarioItemLote) setErroComentarioItemLote(false);
               }}
-              placeholder="Motivo da reprovação (obrigatório)"
+              placeholder="Motivo da devolução (obrigatório)"
               disabled={itemProcessando !== null}
               hasError={erroComentarioItemLote}
             />
             {erroComentarioItemLote && (
-              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da reprovação.</span>
+              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da devolução.</span>
             )}
           </Stack>
         }
@@ -1281,18 +1310,18 @@ export function PainelAprovacoesPage() {
         open={acaoLote !== null}
         title={
           acaoLote === "reprovar"
-            ? `Reprovar ${selecionados.length} colaborador(es)?`
+            ? `Devolver ${selecionados.length} colaborador(es)?`
             : `Aprovar ${selecionados.length} colaborador(es)?`
         }
         variant={acaoLote === "reprovar" ? "danger" : "warning"}
-        confirmLabel={acaoLote === "reprovar" ? "Reprovar todos" : "Aprovar todos"}
+        confirmLabel={acaoLote === "reprovar" ? "Devolver todos" : "Aprovar todos"}
         loading={processandoLote}
         message={
           <Stack gap={12}>
             <span>
               {acaoLote === "reprovar"
-                ? "O motivo abaixo será registrado em todos os colaboradores selecionados."
-                : "A decisão vale para todos os selecionados, com os valores como estão hoje — para ajustar valor ou percentual, decida o colaborador individualmente."}
+                ? "Todos os selecionados voltam ao solicitante, com o motivo abaixo. Ele ajusta e reenvia (recomeça do nível 1)."
+                : "Vale para todos os selecionados, no seu nível, com os valores como estão hoje. Quem tiver próximo nível sobe para ele; no último nível, fica aprovado. Para ajustar valor ou percentual, decida o colaborador individualmente."}
             </span>
             <Textarea
               rows={3}
@@ -1302,13 +1331,13 @@ export function PainelAprovacoesPage() {
                 if (erroComentarioLote) setErroComentarioLote(false);
               }}
               placeholder={
-                acaoLote === "reprovar" ? "Motivo da reprovação (obrigatório)" : "Comentário (opcional)"
+                acaoLote === "reprovar" ? "Motivo da devolução (obrigatório)" : "Comentário (opcional)"
               }
               disabled={processandoLote}
               hasError={erroComentarioLote}
             />
             {erroComentarioLote && (
-              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da reprovação.</span>
+              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da devolução.</span>
             )}
           </Stack>
         }

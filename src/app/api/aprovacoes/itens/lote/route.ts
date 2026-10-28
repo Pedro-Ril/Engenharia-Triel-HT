@@ -4,9 +4,9 @@ import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { isObject, optionalText, requiredText } from "@/lib/auth/validation";
 import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
-import { decidirItensEmLote, type ItemAumentoSalarial } from "@/lib/aprovacoes/aprovacoes";
+import { decidirItensEmLote, type DecisaoItem, type ItemAumentoSalarial } from "@/lib/aprovacoes/aprovacoes";
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
-import { notificarSolicitanteDecisao } from "@/lib/aprovacoes/notificacoes-email";
+import { notificarNivelDaVez, notificarSolicitanteDecisao } from "@/lib/aprovacoes/notificacoes-email";
 import { origemPublicaEfetivaAprovacoes } from "@/lib/aprovacoes/config";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
@@ -34,18 +34,26 @@ function lerItemIds(body: Record<string, unknown>): string[] {
  * (ver notificacoes-email.ts), então qualquer item do grupo serve de
  * base para montá-lo.
  */
-async function avisarSolicitantes(decididos: ItemAumentoSalarial[], origem: string): Promise<void> {
-  const porSolicitacao = new Map<number, ItemAumentoSalarial>();
+async function avisar(decididos: DecisaoItem[], origem: string): Promise<void> {
+  /* Terminou (aprovado/devolvido): avisa o solicitante. Subiu de nível: avisa quem decide agora. */
+  const terminaram = new Map<number, ItemAumentoSalarial>();
+  const subiram = new Map<number, string[]>();
 
-  for (const item of decididos) {
-    if (!porSolicitacao.has(item.aprovacaoNumero)) {
-      porSolicitacao.set(item.aprovacaoNumero, item);
+  for (const { item, etapa } of decididos) {
+    if (etapa.resultado === "avancou") {
+      subiram.set(item.aprovacaoNumero, [...(subiram.get(item.aprovacaoNumero) ?? []), item.id]);
+    } else if (!terminaram.has(item.aprovacaoNumero)) {
+      terminaram.set(item.aprovacaoNumero, item);
     }
   }
 
-  for (const item of porSolicitacao.values()) {
+  for (const item of terminaram.values()) {
     const solicitante = await buscarUsuarioPorId(item.criadoPorUsuarioId);
     await notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem);
+  }
+
+  for (const [numero, itemIds] of subiram) {
+    await notificarNivelDaVez(numero, itemIds, origem);
   }
 }
 
@@ -63,28 +71,25 @@ async function handlePOST(request: Request) {
     const itemIds = lerItemIds(body);
     const acao = requiredText(body.acao, "ação", 20);
 
-    if (acao !== "aprovar" && acao !== "reprovar") {
-      throw new ValidationError('A ação deve ser "aprovar" ou "reprovar".');
+    /* "reprovar" ainda é aceito e vale como devolver (telas antigas abertas). */
+    if (acao !== "aprovar" && acao !== "devolver" && acao !== "reprovar") {
+      throw new ValidationError('A ação deve ser "aprovar" ou "devolver".');
     }
+    const decisao = acao === "aprovar" ? "aprovar" : "devolver";
 
-    /* Mesma regra da decisão individual: reprovar exige motivo, aprovar não. */
+    /* Mesma regra da decisão individual: devolver exige motivo, aprovar não. */
     const comentario =
-      acao === "reprovar"
-        ? requiredText(body.comentario, "motivo da reprovação", 2000)
+      decisao === "devolver"
+        ? requiredText(body.comentario, "motivo da devolução", 2000)
         : optionalText(body.comentario, "comentário", 2000);
 
-    const resultado = await decidirItensEmLote(
-      itemIds,
-      usuario,
-      acao === "aprovar" ? "aprovado" : "reprovado",
-      comentario
-    );
+    const resultado = await decidirItensEmLote(itemIds, usuario, decisao, comentario);
 
     if (resultado.decididos.length > 0) {
       await registrarLog({
         nivel: "info",
         origem: "aprovacoes",
-        mensagem: `${usuario.nomeExibicao} ${acao === "aprovar" ? "aprovou" : "reprovou"} ${resultado.decididos.length} colaborador(es) em lote no painel.`,
+        mensagem: `${usuario.nomeExibicao} ${decisao === "aprovar" ? "aprovou" : "devolveu"} ${resultado.decididos.length} colaborador(es) em lote no painel, no seu nível.`,
         detalhes: JSON.stringify({
           acao,
           total: itemIds.length,
@@ -102,13 +107,17 @@ async function handlePOST(request: Request) {
      * "melhor esforço" -- falha vira log e nunca derruba a ação --
      * então não faz sentido segurar a tela esperando o SMTP.
      */
-      after(() => avisarSolicitantes(resultado.decididos, origem));
+      after(() => avisar(resultado.decididos, origem));
     }
 
-    const mensagem =
-      resultado.falhas.length === 0
-        ? `${resultado.decididos.length} colaborador(es) ${acao === "aprovar" ? "aprovado(s)" : "reprovado(s)"}.`
-        : `${resultado.decididos.length} decidido(s), ${resultado.falhas.length} não puderam ser decididos (já tinham decisão).`;
+    const subiram = resultado.decididos.filter((d) => d.etapa.resultado === "avancou").length;
+    const finais = resultado.decididos.length - subiram;
+    const partes = [
+      subiram > 0 ? `${subiram} subiu(ram) para o próximo nível` : null,
+      finais > 0 ? `${finais} ${decisao === "aprovar" ? "aprovado(s) em definitivo" : "devolvido(s) ao solicitante"}` : null,
+      resultado.falhas.length > 0 ? `${resultado.falhas.length} não decidido(s): ${resultado.falhas[0].motivo}` : null,
+    ].filter(Boolean);
+    const mensagem = partes.join(" · ") || "Nada foi decidido.";
 
     return NextResponse.json({
       ok: true,

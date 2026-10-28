@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FileText, ShoppingCart, XCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle2, FileText, ShoppingCart, Undo2 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -22,29 +22,133 @@ import { Textarea } from "@/components/ui/Textarea";
 import { EMPRESAS_PEDIDO_COMPRA, nomeEmpresaPedidoCompra } from "@/lib/aprovacoes/empresas-pedido-compra";
 
 import { statusAprovacaoConfig } from "../constants/approval-status";
-import { decidirPedidosCompra, listarPedidosCompraPainel } from "../services/aprovacoes.service";
-import type { PedidoCompraPainel, StatusAprovacao } from "../types/aprovacoes.types";
-import { formatarDataCurta, formatarValor, resumirTotais, somarPedidos } from "../utils/pedidos-compra-formato";
+import {
+  buscarDirecionamentoPedidosCompra,
+  decidirPedidosCompra,
+  listarPedidosCompraPainel,
+} from "../services/aprovacoes.service";
+import type { DirecionamentoDaVez, PedidoCompraPainel, StatusAprovacao } from "../types/aprovacoes.types";
+import {
+  agruparPorDestino,
+  formatarCentroCusto,
+  formatarDataCurta,
+  formatarValor,
+  motivosAtencao,
+  ordenarPedidos,
+  resumirCentrosCusto,
+  resumirTotais,
+  somarPedidos,
+  type GrupoDestino,
+  type OrdemPedidos,
+} from "../utils/pedidos-compra-formato";
 import { PedidoCompraDetalheModal } from "./PedidoCompraDetalheModal";
 import styles from "./PainelPedidosCompra.module.css";
 
 type FiltroStatus = StatusAprovacao | "todos";
 
 const OPCOES_STATUS: { value: FiltroStatus; label: string }[] = [
-  { value: "pendente", label: "Pendentes" },
+  { value: "pendente", label: "Na minha vez" },
   { value: "aprovado", label: "Aprovados" },
-  { value: "reprovado", label: "Reprovados" },
+  { value: "devolvido", label: "Devolvidos" },
   { value: "todos", label: "Todos" },
 ];
 
-const POR_PAGINA = 20;
+type AcaoDecisao = "aprovar" | "devolver";
 
-const SITUACAO_ERP: Record<string, string> = {
-  pendente: "Pendente no Focco",
-  parcial: "Parcial no Focco",
-  atendido: "Atendido no Focco",
-  cancelado: "Cancelado no Focco",
-};
+/* Linha compacta: cabe bem mais por página sem rolar demais. */
+const POR_PAGINA = 50;
+
+const OPCOES_ORDEM: { value: OrdemPedidos; label: string }[] = [
+  { value: "fila", label: "Ordem da fila" },
+  { value: "valor", label: "Maior valor primeiro" },
+  { value: "emissao", label: "Emissão mais antiga primeiro" },
+  { value: "empresa", label: "Empresa e número" },
+];
+
+/* Só para o histórico: a fila "Na minha vez" nunca é cortada por data. */
+const OPCOES_PERIODO = [
+  { value: "7", label: "Últimos 7 dias" },
+  { value: "30", label: "Últimos 30 dias" },
+  { value: "90", label: "Últimos 90 dias" },
+  { value: "365", label: "Último ano" },
+  { value: "", label: "Tudo" },
+];
+
+/*
+ * Os filtros de cada pessoa ficam no navegador dela: abrindo o painel de
+ * novo, volta como deixou. A busca por texto não fica (é pontual).
+ */
+const CHAVE_FILTROS = "painel-pedidos-compra-filtros";
+
+interface FiltrosSalvos {
+  status: FiltroStatus;
+  empresa: string;
+  centroCusto: string;
+  dias: string;
+  ordem: OrdemPedidos;
+}
+
+const FILTROS_PADRAO: FiltrosSalvos = { status: "pendente", empresa: "", centroCusto: "", dias: "30", ordem: "fila" };
+
+/* A aba só monta no navegador (depois de carregar os tipos), então dá para ler o localStorage na criação do estado. */
+function lerFiltrosSalvos(): FiltrosSalvos {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(CHAVE_FILTROS) ?? "null") as Partial<FiltrosSalvos> | null;
+    if (!salvo || typeof salvo !== "object") return FILTROS_PADRAO;
+    return {
+      status: OPCOES_STATUS.some((o) => o.value === salvo.status) ? salvo.status! : FILTROS_PADRAO.status,
+      empresa: typeof salvo.empresa === "string" ? salvo.empresa : "",
+      centroCusto: typeof salvo.centroCusto === "string" ? salvo.centroCusto : "",
+      dias: OPCOES_PERIODO.some((o) => o.value === salvo.dias) ? salvo.dias! : FILTROS_PADRAO.dias,
+      ordem: OPCOES_ORDEM.some((o) => o.value === salvo.ordem) ? salvo.ordem! : "fila",
+    };
+  } catch {
+    /* localStorage indisponível ou valor estragado: começa do padrão. */
+    return FILTROS_PADRAO;
+  }
+}
+
+/* Valores do campo "Direcionar para" além do id de uma pessoa. */
+const TODOS_DO_NIVEL = "todos";
+const SUGESTAO_DE_CADA = "sugestao";
+
+/*
+ * Opções de direcionamento para os pedidos marcados: um pedido só, as
+ * pessoas do próximo nível dele; vários, "a sugestão de cada um" e as
+ * pessoas que estão no próximo nível de TODOS (escolher alguém de fora
+ * faria parte deles falhar).
+ */
+function opcoesDirecionamento(direcionamentos: DirecionamentoDaVez[]): { value: string; label: string }[] {
+  if (direcionamentos.length === 1) {
+    const [unico] = direcionamentos;
+    return [
+      { value: TODOS_DO_NIVEL, label: `Todos do nível ${unico.proximoNivel}` },
+      ...unico.opcoes.map((pessoa) => ({
+        value: pessoa.id,
+        label: pessoa.id === unico.sugestao?.id ? `${pessoa.nome} (sugestão)` : pessoa.nome,
+      })),
+    ];
+  }
+
+  const [primeiro, ...demais] = direcionamentos;
+  const comuns = primeiro.opcoes.filter((pessoa) => demais.every((d) => d.opcoes.some((o) => o.id === pessoa.id)));
+
+  return [
+    { value: SUGESTAO_DE_CADA, label: "A sugestão de cada pedido" },
+    { value: TODOS_DO_NIVEL, label: "Todos do próximo nível" },
+    ...comuns.map((pessoa) => ({ value: pessoa.id, label: pessoa.nome })),
+  ];
+}
+
+/* "Darlan: 3 · todos do nível: 1" -- o que a sugestão de cada pedido vai fazer. */
+function resumirSugestoes(direcionamentos: DirecionamentoDaVez[]): string {
+  const contagem = new Map<string, number>();
+  for (const d of direcionamentos) {
+    const nome = d.sugestao?.nome ?? "todos do nível";
+    contagem.set(nome, (contagem.get(nome) ?? 0) + 1);
+  }
+  return [...contagem.entries()].map(([nome, total]) => `${nome}: ${total}`).join(" · ");
+}
 
 interface PainelPedidosCompraProps {
   /* Depois de decidir: o painel recarrega o contador da aba. */
@@ -57,29 +161,43 @@ interface PainelPedidosCompraProps {
  * valores entram aqui quando a consulta ao ERP for ligada
  * (Administração → Diretoria → Configurações → Pedidos de Compra).
  *
- * A fila já vem filtrada pelo servidor: empresas marcadas para o
- * diretor, e pedidos direcionados a ele ou a ninguém.
+ * Quem decide é a alçada da empresa (Diretoria → Alçadas): "Na minha
+ * vez" traz só o que está no nível do usuário agora; os demais filtros,
+ * o que já passou por ele. Ninguém vê o pedido antes do nível chegar.
  */
 export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
   const [pedidos, setPedidos] = useState<PedidoCompraPainel[]>([]);
-  const [empresasDoDiretor, setEmpresasDoDiretor] = useState<number[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const [status, setStatus] = useState<FiltroStatus>("pendente");
-  const [empresa, setEmpresa] = useState("");
+  const [salvos] = useState(lerFiltrosSalvos);
+  const [status, setStatus] = useState<FiltroStatus>(salvos.status);
+  const [empresa, setEmpresa] = useState(salvos.empresa);
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [busca, setBusca] = useState("");
+  /* "90.02, 90.90": o pedido entra se tiver algum item num desses centros de custo. */
+  const [centroCustoDigitado, setCentroCustoDigitado] = useState(salvos.centroCusto);
+  const [centroCusto, setCentroCusto] = useState(salvos.centroCusto);
+  const [dias, setDias] = useState(salvos.dias);
+  const [ordem, setOrdem] = useState<OrdemPedidos>(salvos.ordem);
+  /* Mostrar só os pedidos que fogem do normal (cancelado/atendido no Focco, sem dados do ERP). */
+  const [soAtencao, setSoAtencao] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [recarga, setRecarga] = useState(0);
 
   const [selecionados, setSelecionados] = useState<string[]>([]);
   /* Decisão em andamento: os ids e a ação (um pedido só, pelo botão da linha, ou a seleção). */
-  const [decisao, setDecisao] = useState<{ ids: string[]; acao: "aprovar" | "reprovar" } | null>(null);
+  const [decisao, setDecisao] = useState<{ ids: string[]; acao: AcaoDecisao } | null>(null);
   const [comentario, setComentario] = useState("");
   const [erroComentario, setErroComentario] = useState(false);
   const [processando, setProcessando] = useState(false);
+  /* Aprovando: o próximo nível de cada pedido marcado (null = carregando; vazio = nenhum tem próximo nível). */
+  const [direcionamentos, setDirecionamentos] = useState<DirecionamentoDaVez[] | null>([]);
+  const [direcionar, setDirecionar] = useState(TODOS_DO_NIVEL);
+  const [erroDirecionamento, setErroDirecionamento] = useState<string | null>(null);
+  /* Só a resposta da última abertura do diálogo vale (fechar e reabrir rápido não mistura). */
+  const consultaDirecionamento = useRef(0);
   const [abrindoPdf, setAbrindoPdf] = useState<string | null>(null);
   const [pedidoAbertoId, setPedidoAbertoId] = useState<string | null>(null);
 
@@ -89,14 +207,26 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
   }, [buscaDigitada]);
 
   useEffect(() => {
+    const timer = setTimeout(() => setCentroCusto(centroCustoDigitado.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [centroCustoDigitado]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAVE_FILTROS, JSON.stringify({ status, empresa, centroCusto, dias, ordem } satisfies FiltrosSalvos));
+    } catch {
+      /* Sem localStorage: só não lembra os filtros na próxima vez. */
+    }
+  }, [status, empresa, centroCusto, dias, ordem]);
+
+  useEffect(() => {
     let ativo = true;
 
-    listarPedidosCompraPainel({ status, empresa, busca }).then((resultado) => {
+    listarPedidosCompraPainel({ status, empresa, busca, centroCusto, dias }).then((resultado) => {
       if (!ativo) return;
 
       if (resultado.ok && resultado.data) {
         setPedidos(resultado.data.pedidos);
-        setEmpresasDoDiretor(resultado.data.empresas);
         setErro(null);
       } else {
         setErro(resultado.message ?? "Não foi possível carregar os pedidos de compra.");
@@ -111,41 +241,81 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
     return () => {
       ativo = false;
     };
-  }, [status, empresa, busca, recarga]);
+  }, [status, empresa, busca, centroCusto, dias, recarga]);
 
   function recarregar() {
     setCarregando(true);
     setRecarga((atual) => atual + 1);
   }
 
-  const pendentesVisiveis = useMemo(() => pedidos.filter((pedido) => pedido.status === "pendente"), [pedidos]);
-  const todosSelecionados = pendentesVisiveis.length > 0 && selecionados.length === pendentesVisiveis.length;
+  /* Quantos pedem atenção na lista que veio do servidor (antes do filtro "só com atenção"). */
+  const comAtencao = useMemo(() => pedidos.filter((pedido) => motivosAtencao(pedido).length > 0).length, [pedidos]);
 
-  /* Totais de TODA a lista filtrada (não só da página), e da seleção. */
-  const totais = useMemo(() => somarPedidos(pedidos), [pedidos]);
-  const totaisSelecionados = useMemo(
-    () => somarPedidos(pedidos.filter((pedido) => selecionados.includes(pedido.id))),
-    [pedidos, selecionados]
+  /* O que a tabela mostra: a lista do servidor, talvez só os com atenção, na ordem escolhida. */
+  const visiveis = useMemo(
+    () => ordenarPedidos(soAtencao ? pedidos.filter((pedido) => motivosAtencao(pedido).length > 0) : pedidos, ordem),
+    [pedidos, soAtencao, ordem]
   );
 
-  const totalPaginas = Math.max(1, Math.ceil(pedidos.length / POR_PAGINA));
+  /* Só dá para selecionar o que está na vez do usuário. */
+  const pendentesVisiveis = useMemo(() => visiveis.filter((pedido) => pedido.naMinhaVez), [visiveis]);
+  const todosSelecionados = pendentesVisiveis.length > 0 && selecionados.length === pendentesVisiveis.length;
+
+  /* Na fila da vez: para onde os pedidos vão ao aprovar, agrupados -- um clique decide o grupo inteiro. */
+  const grupos = useMemo(() => (status === "pendente" ? agruparPorDestino(visiveis) : []), [status, visiveis]);
+
+  /* Totais de TODA a lista filtrada (não só da página), e da seleção. */
+  const totais = useMemo(() => somarPedidos(visiveis), [visiveis]);
+  const totaisSelecionados = useMemo(
+    () => somarPedidos(visiveis.filter((pedido) => selecionados.includes(pedido.id))),
+    [visiveis, selecionados]
+  );
+
+  const totalPaginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
-  const pedidosPagina = pedidos.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA);
+  const pedidosPagina = visiveis.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA);
+
+  const grupoSelecionado = (grupo: GrupoDestino) =>
+    selecionados.length === grupo.ids.length && grupo.ids.every((id) => selecionados.includes(id));
 
   function alternarSelecao(id: string) {
     setSelecionados((atual) => (atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]));
   }
 
-  function abrirDecisao(ids: string[], acao: "aprovar" | "reprovar") {
+  function abrirDecisao(ids: string[], acao: AcaoDecisao) {
     setComentario("");
     setErroComentario(false);
     setDecisao({ ids, acao });
+    setDirecionar(TODOS_DO_NIVEL);
+    setErroDirecionamento(null);
+
+    const consulta = ++consultaDirecionamento.current;
+
+    if (acao !== "aprovar") {
+      setDirecionamentos([]);
+      return;
+    }
+
+    setDirecionamentos(null);
+    void buscarDirecionamentoPedidosCompra(ids).then((resultado) => {
+      if (consulta !== consultaDirecionamento.current) return;
+
+      const lista = resultado.ok && resultado.data ? resultado.data : [];
+      setDirecionamentos(lista);
+      if (!resultado.ok) {
+        setErroDirecionamento(resultado.message ?? "Não foi possível buscar a sugestão; o pedido vai para todos do próximo nível.");
+      }
+
+      /* Já vem escolhida a sugestão da regra; quem aprova pode trocar. */
+      if (lista.length === 1) setDirecionar(lista[0].sugestao?.id ?? TODOS_DO_NIVEL);
+      else if (lista.length > 1) setDirecionar(SUGESTAO_DE_CADA);
+    });
   }
 
   async function confirmarDecisao() {
     if (!decisao) return;
 
-    if (decisao.acao === "reprovar" && !comentario.trim()) {
+    if (decisao.acao === "devolver" && !comentario.trim()) {
       setErroComentario(true);
       return;
     }
@@ -157,17 +327,25 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
         ids: decisao.ids,
         acao: decisao.acao,
         comentario: comentario.trim() || undefined,
+        direcionarPara: decisao.acao === "aprovar" && direcionamentos?.length ? direcionar : undefined,
       });
 
       if (resultado.ok && resultado.data) {
-        const total = resultado.data.decididos.length;
-        const verbo = decisao.acao === "aprovar" ? "aprovado(s)" : "reprovado(s)";
+        const { decididos, falhas } = resultado.data;
+        const subiram = decididos.filter((d) => d.resultado === "avancou");
+        const aprovados = decididos.filter((d) => d.resultado === "aprovado").length;
+        const devolvidos = decididos.filter((d) => d.resultado === "devolvido").length;
 
-        setAviso(
-          resultado.data.ignorados > 0
-            ? `${total} pedido(s) ${verbo}. ${resultado.data.ignorados} já tinha(m) sido decidido(s) e ficou(aram) como estava(m).`
-            : `${total} pedido(s) ${verbo}.`
-        );
+        /* Diz o que aconteceu de verdade: aprovar no seu nível nem sempre aprova o pedido. */
+        const destinos = subiram.map((d) => (d.direcionadoPara ? `${d.proximoNivel} → ${d.direcionadoPara}` : d.proximoNivel));
+        const partes = [
+          subiram.length > 0 ? `${subiram.length} subiu(ram) para o próximo nível (${[...new Set(destinos)].join(", ")})` : null,
+          aprovados > 0 ? `${aprovados} aprovado(s) em definitivo` : null,
+          devolvidos > 0 ? `${devolvidos} devolvido(s) ao comprador` : null,
+          falhas.length > 0 ? `${falhas.length} não decidido(s): ${falhas[0].motivo}` : null,
+        ].filter(Boolean);
+
+        setAviso(partes.join(" · ") || "Nada foi decidido.");
         setDecisao(null);
         recarregar();
         onDecidido();
@@ -221,8 +399,8 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
     }
   }
 
-  const semEmpresa = !carregando && !erro && empresasDoDiretor.length === 0;
   const quantidade = decisao?.ids.length ?? 0;
+  const carregandoDirecionamento = decisao?.acao === "aprovar" && direcionamentos === null;
   const pedidoUnico = decisao && quantidade === 1 ? pedidos.find((pedido) => pedido.id === decisao.ids[0]) : null;
 
   return (
@@ -236,16 +414,23 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
           <Dropdown
             value={empresa}
             options={[
-              { value: "", label: "Todas as minhas empresas" },
-              ...EMPRESAS_PEDIDO_COMPRA.filter((item) => empresasDoDiretor.includes(item.codigo)).map((item) => ({
-                value: String(item.codigo),
-                label: item.nome,
-              })),
+              { value: "", label: "Todas as empresas" },
+              ...EMPRESAS_PEDIDO_COMPRA.map((item) => ({ value: String(item.codigo), label: item.nome })),
             ]}
             onValueChange={setEmpresa}
           />
         </Field>
 
+        <Field label="Centro de custo (algum item)">
+          <Input
+            value={centroCustoDigitado}
+            placeholder="Ex.: 90.02, 90.90"
+            onChange={(evento) => setCentroCustoDigitado(evento.target.value)}
+          />
+        </Field>
+      </FormGrid>
+
+      <FormGrid columns={3}>
         <Field label="Pedido, fornecedor ou comprador">
           <Input
             value={buscaDigitada}
@@ -253,16 +438,60 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
             onChange={(evento) => setBuscaDigitada(evento.target.value)}
           />
         </Field>
+
+        <Field label="Ordenar por">
+          <Dropdown value={ordem} options={OPCOES_ORDEM} onValueChange={(valor) => setOrdem(valor as OrdemPedidos)} />
+        </Field>
+
+        {status === "pendente" ? (
+          <Field label="Pedem atenção">
+            <Checkbox
+              label={`Só os que pedem atenção (${comAtencao})`}
+              checked={soAtencao}
+              disabled={comAtencao === 0 && !soAtencao}
+              onChange={() => setSoAtencao((atual) => !atual)}
+            />
+          </Field>
+        ) : (
+          <Field label="Período">
+            <Dropdown value={dias} options={OPCOES_PERIODO} onValueChange={setDias} />
+          </Field>
+        )}
       </FormGrid>
 
       {erro && <Alert variant="danger">{erro}</Alert>}
       {aviso && <Alert variant="success">{aviso}</Alert>}
 
-      {semEmpresa && (
-        <Alert variant="warning" title="Nenhuma empresa liberada para você">
-          Você é aprovador de pedidos de compra, mas ainda não tem nenhuma empresa marcada. Peça a um
-          administrador em Administração → Diretoria → Pedidos de Compra.
-        </Alert>
+      {!carregando && grupos.length > 0 && (
+        <Stack gap={8}>
+          <span className={styles.resumoTitulo}>Para onde vão ao aprovar (sugestão da regra)</span>
+          <div className={styles.resumo}>
+            {grupos.map((grupo) => (
+              <div
+                key={grupo.chave}
+                className={`${styles.destino} ${grupoSelecionado(grupo) ? styles.destinoAtivo : ""}`}
+              >
+                <button
+                  type="button"
+                  className={styles.destinoCorpo}
+                  aria-pressed={grupoSelecionado(grupo)}
+                  title="Marcar os pedidos deste grupo"
+                  onClick={() => setSelecionados(grupoSelecionado(grupo) ? [] : grupo.ids)}
+                >
+                  <span className={styles.destinoRotulo}>{grupo.rotulo}</span>
+                  <span className={styles.destinoDetalhe}>{grupo.detalhe}</span>
+                  <span className={styles.destinoNumeros}>
+                    {grupo.ids.length} pedido(s) · {resumirTotais(grupo.totais.porMoeda)}
+                  </span>
+                </button>
+                <Button onClick={() => abrirDecisao(grupo.ids, "aprovar")}>
+                  <CheckCircle2 size={15} />
+                  Aprovar {grupo.ids.length}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Stack>
       )}
 
       {selecionados.length > 0 && (
@@ -273,9 +502,9 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
             <Button variant="secondary" onClick={() => setSelecionados([])}>
               Limpar seleção
             </Button>
-            <Button variant="danger" onClick={() => abrirDecisao(selecionados, "reprovar")}>
-              <XCircle size={16} />
-              Reprovar selecionados
+            <Button variant="danger" onClick={() => abrirDecisao(selecionados, "devolver")}>
+              <Undo2 size={16} />
+              Devolver selecionados
             </Button>
             <Button onClick={() => abrirDecisao(selecionados, "aprovar")}>
               <CheckCircle2 size={16} />
@@ -287,19 +516,21 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
 
       {carregando ? (
         <Loader label="Carregando pedidos de compra..." />
-      ) : pedidos.length === 0 ? (
+      ) : visiveis.length === 0 ? (
         <EmptyState
           icon={<ShoppingCart size={28} />}
-          title={busca ? "Nenhum resultado para essa busca" : "Nenhum pedido de compra nesta situação"}
+          title={
+            busca || centroCusto || soAtencao ? "Nenhum resultado para esse filtro" : "Nenhum pedido de compra nesta situação"
+          }
         />
       ) : (
-        <Table minWidth={1100}>
+        <Table minWidth={980}>
           <TableHead>
             <TableRow>
               <TableHeaderCell align="center">
                 <Checkbox
                   label=""
-                  aria-label="Selecionar todos os pendentes"
+                  aria-label="Selecionar todos os da minha vez"
                   checked={todosSelecionados}
                   disabled={pendentesVisiveis.length === 0}
                   onChange={() =>
@@ -309,72 +540,98 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
               </TableHeaderCell>
               <TableHeaderCell>Pedido</TableHeaderCell>
               <TableHeaderCell>Fornecedor</TableHeaderCell>
+              <TableHeaderCell>Centro de custo</TableHeaderCell>
               <TableHeaderCell>Emissão</TableHeaderCell>
-              <TableHeaderCell align="center">Itens</TableHeaderCell>
-              <TableHeaderCell>Pagamento</TableHeaderCell>
               <TableHeaderCell align="right">Valor</TableHeaderCell>
-              <TableHeaderCell align="center">Situação</TableHeaderCell>
+              <TableHeaderCell>{status === "pendente" ? "Vai para" : "Situação"}</TableHeaderCell>
               <TableHeaderCell align="center">Ações</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {pedidosPagina.map((pedido) => {
               const pendente = pedido.status === "pendente";
-              const situacaoErp = pedido.situacaoErp ? SITUACAO_ERP[pedido.situacaoErp] : null;
+              const atencao = motivosAtencao(pedido);
 
               return (
-                <TableRow key={pedido.id} style={{ cursor: "pointer" }} onClick={() => setPedidoAbertoId(pedido.id)}>
+                <TableRow
+                  key={pedido.id}
+                  className={styles.linha}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setPedidoAbertoId(pedido.id)}
+                >
                   <TableCell align="center">
                     <div onClick={(evento) => evento.stopPropagation()}>
                       <Checkbox
                         label=""
                         aria-label={`Selecionar pedido ${pedido.numero}`}
                         checked={selecionados.includes(pedido.id)}
-                        disabled={!pendente}
+                        disabled={!pedido.naMinhaVez}
                         onChange={() => alternarSelecao(pedido.id)}
                       />
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Stack gap={2}>
+                    <span className={styles.pedido} title={`Aprovação #${pedido.numeroAprovacao} · enviado por ${pedido.enviadoPor}`}>
                       <strong>{pedido.numero}</strong>
-                      <span className={styles.secundario}>
-                        {pedido.empresaNome} · aprovação #{pedido.numeroAprovacao}
-                      </span>
-                    </Stack>
+                      <span className={styles.secundario}>{pedido.empresaNome}</span>
+                      {atencao.length > 0 && (
+                        <span className={styles.atencao} title={atencao.join(" · ")} aria-label={atencao.join(" · ")}>
+                          <AlertTriangle size={14} aria-hidden="true" />
+                        </span>
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    {pedido.fornecedorNome ? (
-                      <Stack gap={2}>
-                        <span className={styles.fornecedor}>{pedido.fornecedorNome}</span>
-                        {pedido.compradorNome && (
-                          <span className={styles.secundario}>Comprador: {pedido.compradorNome}</span>
-                        )}
-                      </Stack>
+                    <span
+                      className={styles.fornecedor}
+                      title={pedido.compradorNome ? `Comprador: ${pedido.compradorNome}` : undefined}
+                    >
+                      {pedido.fornecedorNome ?? "Sem dados do ERP"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {pedido.centrosCusto && pedido.centrosCusto.length > 0 ? (
+                      <span className={styles.secundario} title={pedido.centrosCusto.map(formatarCentroCusto).join(", ")}>
+                        {resumirCentrosCusto(pedido.centrosCusto)}
+                      </span>
                     ) : (
-                      <span className={styles.secundario}>Sem dados do ERP</span>
+                      <span className={styles.secundario}>-</span>
                     )}
                   </TableCell>
                   <TableCell>{formatarDataCurta(pedido.dataEmissao)}</TableCell>
-                  <TableCell align="center">{pedido.quantidadeItens ?? "-"}</TableCell>
-                  <TableCell>{pedido.condicaoPagamento ?? "-"}</TableCell>
                   <TableCell align="right">
-                    <strong>{formatarValor(pedido.valorTotal, pedido.moeda)}</strong>
+                    <strong className={styles.valor}>{formatarValor(pedido.valorTotal, pedido.moeda)}</strong>
                   </TableCell>
-                  <TableCell align="center">
-                    <Stack gap={4} align="center">
-                      <Badge variant={statusAprovacaoConfig[pedido.status].badgeVariant}>
-                        {statusAprovacaoConfig[pedido.status].label}
-                      </Badge>
-                      {pedido.decididoPor && (
-                        <span className={styles.secundario} title={pedido.comentario ?? undefined}>
-                          {pedido.decididoPor}
+                  <TableCell>
+                    {status === "pendente" ? (
+                      <span className={styles.vaiPara}>
+                        {pedido.vaiPara === null
+                          ? "Aprovação final"
+                          : pedido.vaiPara?.pessoa
+                            ? pedido.vaiPara.pessoa.nome
+                            : pedido.vaiPara
+                              ? `Todos da ${pedido.vaiPara.proximoNivel}`
+                              : "-"}
+                      </span>
+                    ) : pendente && pedido.naMinhaVez ? (
+                      <Badge variant="warning">Sua vez</Badge>
+                    ) : (
+                      <span
+                        className={styles.situacao}
+                        title={pedido.comentario ? `"${pedido.comentario}"` : undefined}
+                      >
+                        <Badge variant={statusAprovacaoConfig[pedido.status].badgeVariant}>
+                          {pendente ? "Em outro nível" : statusAprovacaoConfig[pedido.status].label}
+                        </Badge>
+                        <span className={styles.secundario}>
+                          {pendente && pedido.nivelAtual
+                            ? `Nível ${pedido.nivelAtual.ordem} de ${pedido.nivelAtual.total}${
+                                pedido.nivelAtual.direcionadoPara ? ` · ${pedido.nivelAtual.direcionadoPara}` : ""
+                              }`
+                            : (pedido.decididoPor ?? "")}
                         </span>
-                      )}
-                      {pendente && situacaoErp && pedido.situacaoErp !== "pendente" && (
-                        <span className={styles.secundario}>{situacaoErp}</span>
-                      )}
-                    </Stack>
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell align="center">
                     <Stack direction="row" gap={4} justify="center" onClick={(evento) => evento.stopPropagation()}>
@@ -385,7 +642,7 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
                         disabled={abrindoPdf === pedido.id}
                         onClick={() => void abrirPdf(pedido)}
                       />
-                      {pendente && (
+                      {pedido.naMinhaVez && (
                         <>
                           <IconButton
                             icon={<CheckCircle2 size={15} />}
@@ -394,10 +651,10 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
                             onClick={() => abrirDecisao([pedido.id], "aprovar")}
                           />
                           <IconButton
-                            icon={<XCircle size={15} />}
-                            label={`Reprovar pedido ${pedido.numero}`}
+                            icon={<Undo2 size={15} />}
+                            label={`Devolver pedido ${pedido.numero}`}
                             size="small"
-                            onClick={() => abrirDecisao([pedido.id], "reprovar")}
+                            onClick={() => abrirDecisao([pedido.id], "devolver")}
                           />
                         </>
                       )}
@@ -410,7 +667,7 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
         </Table>
       )}
 
-      {!carregando && pedidos.length > 0 && (
+      {!carregando && visiveis.length > 0 && (
         <div className={styles.totalizador}>
           <div className={styles.totalizadorBloco}>
             <span className={styles.totalizadorRotulo}>
@@ -451,19 +708,45 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
         open={decisao !== null}
         title={
           pedidoUnico
-            ? `${decisao?.acao === "reprovar" ? "Reprovar" : "Aprovar"} o pedido ${pedidoUnico.numero} (${nomeEmpresaPedidoCompra(pedidoUnico.empresa)})?`
-            : `${decisao?.acao === "reprovar" ? "Reprovar" : "Aprovar"} ${quantidade} pedido(s)?`
+            ? `${decisao?.acao === "devolver" ? "Devolver" : "Aprovar"} o pedido ${pedidoUnico.numero} (${nomeEmpresaPedidoCompra(pedidoUnico.empresa)})?`
+            : `${decisao?.acao === "devolver" ? "Devolver" : "Aprovar"} ${quantidade} pedido(s)?`
         }
-        variant={decisao?.acao === "reprovar" ? "danger" : "warning"}
-        confirmLabel={decisao?.acao === "reprovar" ? "Reprovar" : "Aprovar"}
-        loading={processando}
+        variant={decisao?.acao === "devolver" ? "danger" : "warning"}
+        confirmLabel={decisao?.acao === "devolver" ? "Devolver" : "Aprovar"}
+        loading={processando || carregandoDirecionamento}
         message={
           <Stack gap={12}>
             <span>
-              {decisao?.acao === "reprovar"
-                ? "O motivo abaixo é registrado no pedido e volta para o comprador no SupriConnect."
-                : "A decisão volta para o comprador no SupriConnect."}
+              {decisao?.acao === "devolver"
+                ? "O pedido volta para o comprador ajustar e reenviar (recomeça do nível 1). O motivo abaixo vai junto para o SupriConnect."
+                : "Você aprova no seu nível. Se houver próximo nível, o pedido sobe para ele; se for o último, fica aprovado e o comprador é avisado no SupriConnect."}
             </span>
+            {carregandoDirecionamento && <Loader label="Buscando o próximo nível..." />}
+            {erroDirecionamento && <Alert variant="warning">{erroDirecionamento}</Alert>}
+            {decisao?.acao === "aprovar" && direcionamentos && direcionamentos.length > 0 && (
+              <Field
+                label="Direcionar o próximo nível para"
+                hint={
+                  direcionar === SUGESTAO_DE_CADA
+                    ? `Sugestões: ${resumirSugestoes(direcionamentos)}.`
+                    : direcionar === TODOS_DO_NIVEL
+                      ? "Qualquer pessoa do próximo nível poderá decidir."
+                      : "Só essa pessoa verá e decidirá o pedido no próximo nível."
+                }
+              >
+                <Dropdown
+                  value={direcionar}
+                  options={opcoesDirecionamento(direcionamentos)}
+                  onValueChange={setDirecionar}
+                  disabled={processando}
+                />
+              </Field>
+            )}
+            {decisao?.acao === "aprovar" && direcionamentos && direcionamentos.length > 0 && direcionamentos.length < quantidade && (
+              <span className={styles.secundario}>
+                {quantidade - direcionamentos.length} pedido(s) já estão no último nível: serão aprovados em definitivo.
+              </span>
+            )}
             <Textarea
               rows={3}
               value={comentario}
@@ -472,13 +755,13 @@ export function PainelPedidosCompra({ onDecidido }: PainelPedidosCompraProps) {
                 if (erroComentario) setErroComentario(false);
               }}
               placeholder={
-                decisao?.acao === "reprovar" ? "Motivo da reprovação (obrigatório)" : "Comentário (opcional)"
+                decisao?.acao === "devolver" ? "Motivo da devolução (obrigatório)" : "Comentário (opcional)"
               }
               disabled={processando}
               hasError={erroComentario}
             />
             {erroComentario && (
-              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da reprovação.</span>
+              <span style={{ color: "var(--danger-text)" }}>Informe o motivo da devolução.</span>
             )}
           </Stack>
         }

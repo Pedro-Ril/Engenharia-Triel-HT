@@ -1,0 +1,29 @@
+.seletor {
+  display: none;
+}
+
+/*
+ * A prévia imita o papel do PDF: fundo branco nos dois temas de
+ * propósito (exceção deliberada) -- uma rubrica com fundo transparente e
+ * tinta escura sumiria no fundo do modo escuro.
+ */
+.previa {
+  display: block;
+  height: 44px;
+  max-width: 200px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  object-fit: contain;
+}
+
+.secundario {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.vazio {
+  color: var(--text-muted);
+  font-size: 14px;
+}

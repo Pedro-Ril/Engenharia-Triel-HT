@@ -17,7 +17,17 @@ export interface DefinicaoTipoAprovacao {
   descricao: string;
   /* Nome do ícone no catálogo do portal (src/lib/icons/icon-registry.ts) -- o mesmo do módulo. */
   icone: string;
+  /*
+   * O que a solicitação deste tipo carrega para escolher a alçada:
+   * reajuste conhece o setor do colaborador (o RH não traz empresa);
+   * pedido de compra, a empresa do Focco.
+   */
+  criteriosAlcada: CriterioAlcada[];
+  /* As sugestões de direcionamento podem olhar o centro de custo dos itens. */
+  centroCustoNaSugestao: boolean;
 }
+
+export type CriterioAlcada = "empresa" | "setor";
 
 export const TIPOS_APROVACAO: DefinicaoTipoAprovacao[] = [
   {
@@ -25,12 +35,16 @@ export const TIPOS_APROVACAO: DefinicaoTipoAprovacao[] = [
     label: "Reajuste Salarial",
     descricao: "Reajustes de salário enviados pelas lideranças para a direção decidir.",
     icone: "TrendingUp",
+    criteriosAlcada: ["setor"],
+    centroCustoNaSugestao: false,
   },
   {
     valor: "pedido_compra",
     label: "Pedidos de Compra",
     descricao: "Pedidos de compra do Focco enviados pelo SupriConnect, das empresas marcadas em Pedidos de Compra.",
     icone: "ShoppingCart",
+    criteriosAlcada: ["empresa"],
+    centroCustoNaSugestao: true,
   },
 ];
 
@@ -44,4 +58,12 @@ export function rotuloTipoAprovacao(valor: TipoAprovacao): string {
 
 export function iconeTipoAprovacao(valor: TipoAprovacao): string {
   return TIPOS_APROVACAO.find((tipo) => tipo.valor === valor)?.icone ?? "Folder";
+}
+
+export function criteriosAlcadaDoTipo(valor: TipoAprovacao): CriterioAlcada[] {
+  return TIPOS_APROVACAO.find((tipo) => tipo.valor === valor)?.criteriosAlcada ?? [];
+}
+
+export function centroCustoNaSugestaoDoTipo(valor: TipoAprovacao): boolean {
+  return TIPOS_APROVACAO.find((tipo) => tipo.valor === valor)?.centroCustoNaSugestao ?? false;
 }

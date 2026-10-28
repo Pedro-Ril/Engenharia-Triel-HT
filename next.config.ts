@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
    * driver que fala o protocolo do banco na mão (parsing de buffer
    * bruto), mesmo perfil de risco sob o Turbopack.
    */
-  serverExternalPackages: ["mssql", "tedious", "onvif", "node-firebird"],
+  serverExternalPackages: ["mssql", "tedious", "onvif", "node-firebird", "pdfjs-dist"],
 
   experimental: {
     /*

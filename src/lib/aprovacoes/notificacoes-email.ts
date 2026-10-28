@@ -5,7 +5,7 @@ import { montarBotaoEmailHtml, montarEmailHtml, montarLinkEmailHtml } from "@/li
 import { registrarLog } from "@/lib/monitoramento/logs";
 
 import type { AprovacaoLote, ItemAumentoSalarial, RelatorioSolicitacao } from "./aprovacoes";
-import { listarEmailsAtendentes } from "./atendentes";
+import { listarEmailsDaVez } from "./alcadas/fluxo";
 import { gerarSenhaRelatorio, montarAnexosRelatorio } from "./relatorio-anexos";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,12 +48,13 @@ async function enviarSemFalhar(params: {
 
 /*
  * Disparado depois que um LOTE novo é criado -- um único e-mail por
- * solicitação (nunca um por colaborador) pra todo mundo com acesso ao
- * painel.
+ * solicitação (nunca um por colaborador) para quem está no NÍVEL 1 das
+ * alçadas dos colaboradores. Os níveis de cima só são avisados quando
+ * chega a vez deles (notificarNivelDaVez).
  */
 export async function notificarDirecaoNovaSolicitacao(lote: AprovacaoLote, origem: string): Promise<void> {
-  const destinatarios = await listarEmailsAtendentes(lote.tipo);
-  const emails = destinatarios.map((d) => d.email).filter((email) => EMAIL_REGEX.test(email));
+  const destinatarios = await listarEmailsDaVez(lote.itens.map((item) => item.id));
+  const emails = destinatarios.filter((email) => EMAIL_REGEX.test(email));
   if (emails.length === 0) return;
 
   const link = `${origem}/aprovacoes/painel`;
@@ -71,6 +72,39 @@ export async function notificarDirecaoNovaSolicitacao(lote: AprovacaoLote, orige
     ${montarLinkEmailHtml(link)}
   `);
   const corpoTexto = `${lote.criadoPorNome} criou uma nova solicitação de reajuste salarial (#${lote.numero}) com ${quantidade} aguardando decisão da direção.\n\nOs detalhes estão no painel de aprovações:\n${link}`;
+
+  await enviarSemFalhar({ destinatario: emails, assunto, corpoHtml, corpoTexto });
+}
+
+/*
+ * Disparado quando um nível aprova e o colaborador sobe para o próximo:
+ * avisa quem decide agora. Mesma regra de sigilo -- só o número da
+ * solicitação, nada de nome ou valor.
+ */
+export async function notificarNivelDaVez(
+  numero: number,
+  itemIds: string[],
+  origem: string,
+  motivo: "subiu" | "reenviada" = "subiu"
+): Promise<void> {
+  const emails = (await listarEmailsDaVez(itemIds)).filter((email) => EMAIL_REGEX.test(email));
+  if (emails.length === 0) return;
+
+  const link = `${origem}/aprovacoes/painel`;
+  const assunto = `Solicitação #${numero} aguarda a sua aprovação — Portal Triel-HT`;
+  const situacao =
+    motivo === "reenviada"
+      ? "foi ajustada e reenviada pelo solicitante e agora"
+      : "foi aprovada no nível anterior e agora";
+  const corpoHtml = montarEmailHtml(`
+    <p style="margin: 0 0 18px; font-size: 16px;">Olá!</p>
+    <p style="margin: 0 0 18px;">
+      A solicitação de reajuste salarial <strong>#${numero}</strong> ${situacao} aguarda a sua decisão.
+    </p>
+    ${montarBotaoEmailHtml("Ver no painel de aprovações", link)}
+    ${montarLinkEmailHtml(link)}
+  `);
+  const corpoTexto = `A solicitação de reajuste salarial #${numero} ${situacao} aguarda a sua decisão.\n\n${link}`;
 
   await enviarSemFalhar({ destinatario: emails, assunto, corpoHtml, corpoTexto });
 }

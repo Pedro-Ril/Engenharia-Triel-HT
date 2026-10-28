@@ -36,6 +36,7 @@
     "Semaforo_Balaca",
     "Conversor_TXT_RH",
     "vitest.config.ts",
+    "vitest.integracao.config.ts",
     "tests",
     "**/*.test.ts"
   ]

@@ -1,6 +1,7 @@
 import type { TipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 
-export type StatusAprovacao = "pendente" | "aprovado" | "reprovado";
+/* "devolvido": algum nível da alçada devolveu ao solicitante (pode reenviar). */
+export type StatusAprovacao = "pendente" | "aprovado" | "reprovado" | "devolvido";
 /* Fonte única: src/lib/aprovacoes/tipos-aprovacao.ts (client-safe). */
 export type { TipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 
@@ -45,6 +46,12 @@ export interface ItemAumentoSalarial {
   resumoTitulo: string;
   /* Último envio do relatório da SOLICITAÇÃO (repetido em cada item dela). */
   relatorioEnviado: { em: string; por: string; para: string } | null;
+  /* É a vez de quem está vendo decidir (o nível pendente é o dele). */
+  naMinhaVez: boolean;
+  /* Pendente: em que nível da alçada está. */
+  nivelAtual: NivelAtual | null;
+  /* Só no detalhe: a cadeia e o histórico. */
+  fluxo?: { etapas: EtapaAprovacao[]; historico: EventoHistoricoAprovacao[] };
 }
 
 export interface AprovacaoLote {
@@ -103,8 +110,75 @@ export interface PedidoCompraPainel {
   /* Primeira entrega entre os itens, ISO. */
   entregaPrevista: string | null;
   temFoto: boolean;
-  /* Direcionado a um diretor que não pode mais decidir: liberado para todos da empresa. */
-  diretorIndisponivel: boolean;
+  /* Código do centro de custo dos itens, sem repetir; null = ainda não sabemos. */
+  centrosCusto: string[] | null;
+  /* É a vez de quem está vendo decidir (o nível pendente é o dele). */
+  naMinhaVez: boolean;
+  /* Pendente: em que nível da alçada está. */
+  nivelAtual: NivelAtual | null;
+  /*
+   * Na vez de quem está vendo: para onde vai ao aprovar, pela sugestão da
+   * regra (pessoa null = todos do próximo nível). null = quem vê é o
+   * último nível. Ausente fora da vez.
+   */
+  vaiPara?: { proximoNivel: string; pessoa: { id: string; nome: string } | null } | null;
+}
+
+export interface NivelAtual {
+  ordem: number;
+  total: number;
+  nome: string;
+  /* O nível foi direcionado a esta pessoa (só ela decide). */
+  direcionadoPara: string | null;
+}
+
+/* aguardando: o nível ainda não chegou | encerrado: o ciclo acabou antes (devolução). */
+export type StatusEtapa = "aguardando" | "pendente" | "aprovado" | "devolvido" | "encerrado";
+
+/* Um nível da cadeia do envio atual, como a tela mostra. */
+export interface EtapaAprovacao {
+  ciclo: number;
+  ordem: number;
+  nivelNome: string;
+  status: StatusEtapa;
+  decididoPor: string | null;
+  decididoEm: string | null;
+  comentario: string | null;
+  aprovadores: string[];
+  /* Direcionado a uma pessoa do nível: só ela decide. */
+  direcionadoPara: string | null;
+}
+
+export type AcaoHistoricoAprovacao = "enviado" | "reenviado" | "aprovado_nivel" | "aprovado" | "devolvido" | "direcionado";
+
+export interface PessoaDoNivel {
+  id: string;
+  nome: string;
+}
+
+/* Ao aprovar: para quem o próximo nível pode ir, e quem a regra da alçada sugere. */
+export interface DirecionamentoDaVez {
+  itemId: string;
+  proximoNivel: string;
+  opcoes: PessoaDoNivel[];
+  /* null = todos do nível. */
+  sugestao: PessoaDoNivel | null;
+}
+
+export interface EventoHistoricoAprovacao {
+  acao: AcaoHistoricoAprovacao;
+  ciclo: number | null;
+  nivelNome: string | null;
+  usuarioNome: string | null;
+  comentario: string | null;
+  criadoEm: string;
+  numeroAprovacao?: number;
+}
+
+export interface FluxoPedidoCompra {
+  etapas: EtapaAprovacao[];
+  historico: EventoHistoricoAprovacao[];
+  rodadas: { numeroAprovacao: number; enviadoEm: string; status: string }[];
 }
 
 /* Situação do pedido no Focco (calculada pela API do ERP a partir da posição e do saldo). */
@@ -134,6 +208,8 @@ export interface ItemPedidoErp {
   total: number;
   entrega: string | null;
   centroCusto: string | null;
+  /* Código do centro de custo (ex.: "9002204") -- para as sugestões de direcionamento. */
+  centroCustoCodigo: string | null;
   observacao: string | null;
 }
 

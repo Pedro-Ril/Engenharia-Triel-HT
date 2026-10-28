@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, FileText, XCircle } from "lucide-react";
+import { CheckCircle2, FileText, Undo2 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -15,8 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 
 import { statusAprovacaoConfig } from "../constants/approval-status";
 import { buscarPedidoCompraDetalhe } from "../services/aprovacoes.service";
-import type { PedidoCompraErp, PedidoCompraPainel } from "../types/aprovacoes.types";
+import type { FluxoPedidoCompra, PedidoCompraErp, PedidoCompraPainel } from "../types/aprovacoes.types";
 import { formatarDocumento, formatarValor } from "../utils/pedidos-compra-formato";
+import { CadeiaAprovacao } from "./CadeiaAprovacao";
 
 const SITUACAO_ERP: Record<string, { label: string; variant: "info" | "warning" | "success" | "danger" }> = {
   pendente: { label: "Pendente no Focco", variant: "info" },
@@ -38,7 +39,7 @@ interface PedidoCompraDetalheModalProps {
   pedidoId: string | null;
   abrindoPdf: boolean;
   onAbrirPdf: (pedido: PedidoCompraPainel) => void;
-  onDecidir: (pedido: PedidoCompraPainel, acao: "aprovar" | "reprovar") => void;
+  onDecidir: (pedido: PedidoCompraPainel, acao: "aprovar" | "devolver") => void;
   onClose: () => void;
 }
 
@@ -60,6 +61,7 @@ export function PedidoCompraDetalheModal({
     pedido: PedidoCompraPainel | null;
     erp: PedidoCompraErp | null;
     erroErp: string | null;
+    fluxo: FluxoPedidoCompra | null;
     erro: string | null;
   } | null>(null);
 
@@ -78,6 +80,7 @@ export function PedidoCompraDetalheModal({
               pedido: null,
               erp: null,
               erroErp: null,
+              fluxo: null,
               erro: resposta.message ?? "Não foi possível abrir o pedido.",
             }
       );
@@ -93,10 +96,12 @@ export function PedidoCompraDetalheModal({
   const pedido = atual?.pedido ?? null;
   const erp = atual?.erp ?? null;
   const erroErp = atual?.erroErp ?? null;
+  const fluxo = atual?.fluxo ?? null;
   const erro = atual?.erro ?? null;
 
   const moeda = erp?.moeda ?? pedido?.moeda ?? null;
   const pendente = pedido?.status === "pendente";
+  const naMinhaVez = pedido?.naMinhaVez ?? false;
   const valorMudou =
     pedido?.valorTotal !== null &&
     pedido?.valorTotal !== undefined &&
@@ -133,11 +138,11 @@ export function PedidoCompraDetalheModal({
               Ver PDF
             </Button>
 
-            {pendente && (
+            {naMinhaVez && (
               <Stack direction="row" gap={8} wrap>
-                <Button variant="danger" onClick={() => onDecidir(pedido, "reprovar")}>
-                  <XCircle size={16} />
-                  Reprovar
+                <Button variant="danger" onClick={() => onDecidir(pedido, "devolver")}>
+                  <Undo2 size={16} />
+                  Devolver
                 </Button>
                 <Button onClick={() => onDecidir(pedido, "aprovar")}>
                   <CheckCircle2 size={16} />
@@ -161,10 +166,10 @@ export function PedidoCompraDetalheModal({
               </Alert>
             )}
 
-            {pedido.diretorIndisponivel && pendente && (
-              <Alert variant="info" title="Liberado para os aprovadores da empresa">
-                O comprador enviou este pedido para {pedido.aprovadorNome}, que não aprova mais pedidos de{" "}
-                {pedido.empresaNome}. Por isso ele voltou para a fila de todos os aprovadores da empresa.
+            {pendente && !naMinhaVez && pedido.nivelAtual && (
+              <Alert variant="info" title="Aguardando outro nível">
+                Este pedido está no nível {pedido.nivelAtual.ordem} de {pedido.nivelAtual.total} (
+                {pedido.nivelAtual.nome}). Você vê o andamento, mas não decide agora.
               </Alert>
             )}
 
@@ -207,11 +212,11 @@ export function PedidoCompraDetalheModal({
                     : "-"}
                 </span>
               </Field>
-              <Field label="Diretor">
+              <Field label="Nível atual">
                 <span>
-                  {pedido.aprovadorNome
-                    ? `${pedido.aprovadorNome}${pedido.diretorIndisponivel ? " (não aprova mais)" : ""}`
-                    : "Qualquer aprovador da empresa"}
+                  {pedido.nivelAtual
+                    ? `${pedido.nivelAtual.ordem} de ${pedido.nivelAtual.total} · ${pedido.nivelAtual.nome}`
+                    : statusAprovacaoConfig[pedido.status].label}
                 </span>
               </Field>
               <Field label="Observação do envio">
@@ -222,8 +227,10 @@ export function PedidoCompraDetalheModal({
               </Field>
             </FormGrid>
 
+            {fluxo && <CadeiaAprovacao etapas={fluxo.etapas} historico={fluxo.historico} />}
+
             {pedido.decididoPor && pedido.decididoEm && (
-              <Alert variant={pedido.status === "aprovado" ? "success" : "danger"}>
+              <Alert variant={pedido.status === "aprovado" ? "success" : pedido.status === "devolvido" ? "info" : "danger"}>
                 {statusAprovacaoConfig[pedido.status].label} por {pedido.decididoPor} em{" "}
                 {formatarData(pedido.decididoEm)}
                 {pedido.comentario ? ` — ${pedido.comentario}` : ""}

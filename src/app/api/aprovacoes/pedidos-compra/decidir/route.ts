@@ -3,17 +3,26 @@ import { NextResponse } from "next/server";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalText, requiredText, requiredUuidArray } from "@/lib/auth/validation";
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
-import { decidirPedidosCompra } from "@/lib/aprovacoes/pedidos-compra";
+import { decidirPedidosCompra, type DirecionarPedidos } from "@/lib/aprovacoes/pedidos-compra";
 import { registrarLog } from "@/lib/monitoramento/logs";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/* "todos" (ou ausente) | "sugestao" | id de uma pessoa do próximo nível. */
+function lerDirecionamento(valor: unknown): DirecionarPedidos {
+  if (valor === undefined || valor === null || valor === "" || valor === "todos") return "todos";
+  if (valor === "sugestao") return "sugestao";
+  return { usuarioId: requiredUuidArray([valor], "direcionar para")[0] };
+}
+
 /*
- * Aprova ou reprova um ou vários pedidos de compra. Mesma regra do
- * reajuste: reprovar exige motivo, aprovar não. O SupriConnect fica
- * sabendo pela consulta de decisões (GET /api/externo/...?desde=).
+ * Aprova ou devolve, no nível do usuário, um ou vários pedidos de
+ * compra. Devolver exige motivo (o comprador precisa saber o que
+ * ajustar); aprovar não. Aprovando, dá para direcionar o próximo nível
+ * a uma pessoa dele (`direcionarPara`) -- só ela verá o pedido. O SupriConnect fica sabendo pela consulta de
+ * decisões (GET /api/externo/...?desde=) quando a cadeia termina.
  */
 async function handlePOST(request: Request) {
   const acesso = await requireAtendenteAprovacaoApi("pedido_compra");
@@ -31,27 +40,28 @@ async function handlePOST(request: Request) {
     }
 
     const acao = requiredText(body.acao, "ação", 20);
-    if (acao !== "aprovar" && acao !== "reprovar") {
-      throw new ValidationError('A ação deve ser "aprovar" ou "reprovar".');
+    if (acao !== "aprovar" && acao !== "devolver") {
+      throw new ValidationError('A ação deve ser "aprovar" ou "devolver".');
     }
 
     const comentario =
-      acao === "reprovar"
-        ? requiredText(body.comentario, "motivo da reprovação", 2000)
+      acao === "devolver"
+        ? requiredText(body.comentario, "motivo da devolução", 2000)
         : optionalText(body.comentario, "comentário", 2000);
 
     const resultado = await decidirPedidosCompra({
       ids: [...new Set(ids)],
       usuario: acesso.usuario,
-      decisao: acao === "aprovar" ? "aprovado" : "reprovado",
+      acao,
       comentario,
+      direcionarPara: lerDirecionamento(body.direcionarPara),
     });
 
     if (resultado.decididos.length > 0) {
       await registrarLog({
         nivel: "info",
         origem: "aprovacoes/pedidos-compra",
-        mensagem: `${acesso.usuario.nomeExibicao} ${acao === "aprovar" ? "aprovou" : "reprovou"} ${resultado.decididos.length} pedido(s) de compra.`,
+        mensagem: `${acesso.usuario.nomeExibicao} ${acao === "aprovar" ? "aprovou" : "devolveu"} ${resultado.decididos.length} pedido(s) de compra no seu nível.`,
         detalhes: JSON.stringify(resultado.decididos),
         metodo: "POST",
         caminho: new URL(request.url).pathname,

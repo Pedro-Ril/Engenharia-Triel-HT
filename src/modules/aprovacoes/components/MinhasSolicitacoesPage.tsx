@@ -25,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 import { rotuloTipoAprovacao, type TipoAprovacao } from "@/lib/aprovacoes/tipos-aprovacao";
 
 import { AbasTipoAprovacao } from "./AbasTipoAprovacao";
+import { AndamentoItemModal } from "./AndamentoItemModal";
 
 import { statusAprovacaoConfig } from "../constants/approval-status";
 import { enviarRelatorioSolicitacao, listarMinhasSolicitacoes } from "../services/aprovacoes.service";
@@ -37,6 +38,7 @@ const OPCOES_STATUS: { value: FiltroStatus; label: string }[] = [
   { value: "todos", label: "Todas" },
   { value: "pendente", label: "Com pendências" },
   { value: "aprovado", label: "Com aprovados" },
+  { value: "devolvido", label: "Com devolvidos" },
   { value: "reprovado", label: "Com reprovados" },
 ];
 
@@ -59,6 +61,8 @@ interface Solicitacao {
   pendentes: number;
   aprovados: number;
   reprovados: number;
+  /* Voltaram de algum nível da alçada: o solicitante ajusta e reenvia. */
+  devolvidos: number;
 }
 
 function formatarData(valorIso: string): string {
@@ -98,6 +102,7 @@ function resumoDecisoes(solicitacao: Solicitacao): string {
   const partes: string[] = [];
   if (solicitacao.aprovados > 0) partes.push(`${solicitacao.aprovados} aprovado(s)`);
   if (solicitacao.reprovados > 0) partes.push(`${solicitacao.reprovados} reprovado(s)`);
+  if (solicitacao.devolvidos > 0) partes.push(`${solicitacao.devolvidos} devolvido(s) para ajuste`);
   if (solicitacao.pendentes > 0) partes.push(`${solicitacao.pendentes} aguardando`);
   return partes.join(" · ");
 }
@@ -107,6 +112,9 @@ export function MinhasSolicitacoesPage() {
   const [carregando, setCarregando] = useState(true);
   /* O detalhe não precisa de requisição própria: a lista já traz todos os itens. */
   const [detalhe, setDetalhe] = useState<Solicitacao | null>(null);
+  /* Colaborador aberto no modal de andamento (cadeia, histórico, reenvio). */
+  const [andamentoId, setAndamentoId] = useState<string | null>(null);
+  const [avisoReenvio, setAvisoReenvio] = useState<string | null>(null);
 
   const [status, setStatus] = useState<FiltroStatus>("todos");
   const [tipo, setTipo] = useState<string>(TODOS);
@@ -171,6 +179,7 @@ export function MinhasSolicitacoesPage() {
           pendentes: 0,
           aprovados: 0,
           reprovados: 0,
+          devolvidos: 0,
         };
         mapa.set(item.aprovacaoNumero, solicitacao);
       }
@@ -179,6 +188,7 @@ export function MinhasSolicitacoesPage() {
       if (item.status === "pendente") solicitacao.pendentes += 1;
       if (item.status === "aprovado") solicitacao.aprovados += 1;
       if (item.status === "reprovado") solicitacao.reprovados += 1;
+      if (item.status === "devolvido") solicitacao.devolvidos += 1;
     }
 
     for (const solicitacao of mapa.values()) {
@@ -358,6 +368,8 @@ export function MinhasSolicitacoesPage() {
             </Field>
           </FormGrid>
 
+          {avisoReenvio && <Alert variant="success">{avisoReenvio}</Alert>}
+
           {feedbackRelatorio && (
             <Alert variant={feedbackRelatorio.variante}>{feedbackRelatorio.texto}</Alert>
           )}
@@ -521,6 +533,7 @@ export function MinhasSolicitacoesPage() {
                   <TableHeaderCell align="right">Novo salário</TableHeaderCell>
                   <TableHeaderCell align="center">Status</TableHeaderCell>
                   <TableHeaderCell>Decidido por</TableHeaderCell>
+                  <TableHeaderCell align="center">Andamento</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -564,9 +577,16 @@ export function MinhasSolicitacoesPage() {
                     </TableCell>
                     <TableCell align="right">{formatarMoeda(item.novoSalario)}</TableCell>
                     <TableCell align="center">
-                      <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
-                        {statusAprovacaoConfig[item.status].label}
-                      </Badge>
+                      <Stack gap={4} align="center">
+                        <Badge variant={statusAprovacaoConfig[item.status].badgeVariant}>
+                          {statusAprovacaoConfig[item.status].label}
+                        </Badge>
+                        {item.status === "pendente" && item.nivelAtual && (
+                          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                            Nível {item.nivelAtual.ordem} de {item.nivelAtual.total} · {item.nivelAtual.nome}
+                          </span>
+                        )}
+                      </Stack>
                     </TableCell>
                     <TableCell>
                       <Stack gap={4}>
@@ -577,6 +597,14 @@ export function MinhasSolicitacoesPage() {
                           </span>
                         )}
                       </Stack>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Button
+                        variant={item.status === "devolvido" ? "primary" : "secondary"}
+                        onClick={() => setAndamentoId(item.id)}
+                      >
+                        {item.status === "devolvido" ? "Ajustar e reenviar" : "Ver"}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -624,6 +652,19 @@ export function MinhasSolicitacoesPage() {
           </Stack>
         )}
       </Modal>
+
+      <AndamentoItemModal
+        itemId={andamentoId}
+        onClose={() => setAndamentoId(null)}
+        onReenviado={(mensagem) => {
+          setAndamentoId(null);
+          setDetalhe(null);
+          setAvisoReenvio(mensagem);
+          listarMinhasSolicitacoes().then((resultado) => {
+            if (resultado.ok && resultado.data) setItens(resultado.data);
+          });
+        }}
+      />
     </PageContainer>
   );
 }

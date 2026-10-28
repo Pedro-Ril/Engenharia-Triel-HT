@@ -29,7 +29,8 @@ async function handleGET(request: Request, context: RouteContext) {
   }
 
   try {
-    const lote = await buscarLotePorNumero(numero);
+    /* Só os colaboradores cuja cadeia já chegou ao nível de quem pede. */
+    const lote = await buscarLotePorNumero(numero, acesso.usuario.id, { somenteVisiveis: true });
 
     if (!lote) {
       return NextResponse.json({ ok: false, message: "Solicitação não encontrada." }, { status: 404 });

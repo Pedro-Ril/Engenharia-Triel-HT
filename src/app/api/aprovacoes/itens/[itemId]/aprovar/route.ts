@@ -6,7 +6,7 @@ import { isObject, optionalText } from "@/lib/auth/validation";
 import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { aprovarItem } from "@/lib/aprovacoes/aprovacoes";
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
-import { notificarSolicitanteDecisao } from "@/lib/aprovacoes/notificacoes-email";
+import { notificarNivelDaVez, notificarSolicitanteDecisao } from "@/lib/aprovacoes/notificacoes-email";
 import { optionalAjusteValores } from "@/lib/aprovacoes/validacao";
 import { origemPublicaEfetivaAprovacoes } from "@/lib/aprovacoes/config";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -31,13 +31,13 @@ async function handlePOST(request: Request, context: RouteContext) {
     const comentario = isObject(body) ? optionalText(body.comentario, "comentário", 2000) : null;
     const ajuste = optionalAjusteValores(body);
 
-    const item = await aprovarItem(itemId, usuario, comentario, ajuste);
+    const { item, etapa } = await aprovarItem(itemId, usuario, comentario, ajuste);
 
     await registrarLog({
       nivel: "info",
       origem: "aprovacoes",
-      mensagem: `${usuario.nomeExibicao} aprovou ${item.funcionarioNome} na solicitação #${item.aprovacaoNumero}.`,
-      detalhes: JSON.stringify({ itemId, aprovacaoNumero: item.aprovacaoNumero, comentario, ajustouValores: ajuste !== null }),
+      mensagem: `${usuario.nomeExibicao} aprovou ${item.funcionarioNome} no nível "${etapa.nivelNome}" da solicitação #${item.aprovacaoNumero}${etapa.resultado === "aprovado" ? " (aprovação final)" : ""}.`,
+      detalhes: JSON.stringify({ itemId, aprovacaoNumero: item.aprovacaoNumero, comentario, ajustouValores: ajuste !== null, etapa }),
       metodo: "POST",
       caminho: `/api/aprovacoes/itens/${itemId}/aprovar`,
       ipOrigem: extrairIpOrigem(request),
@@ -50,9 +50,18 @@ async function handlePOST(request: Request, context: RouteContext) {
      * "melhor esforço" -- falha vira log e nunca derruba a ação --
      * então não faz sentido segurar a tela esperando o SMTP.
      */
-    after(() => notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem));
+    after(() =>
+      etapa.resultado === "avancou"
+        ? notificarNivelDaVez(item.aprovacaoNumero, [item.id], origem)
+        : notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem)
+    );
 
-    return NextResponse.json({ ok: true, message: "Colaborador aprovado.", data: item });
+    const mensagem =
+      etapa.resultado === "avancou"
+        ? `Aprovado no seu nível. Subiu para "${etapa.proximoNivel}".`
+        : "Colaborador aprovado.";
+
+    return NextResponse.json({ ok: true, message: mensagem, data: item });
   } catch (error) {
     if (error instanceof ValidationError) {
       const status = error.message.includes("já foi decidido") ? 409 : 400;

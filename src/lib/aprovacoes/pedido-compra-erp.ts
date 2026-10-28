@@ -81,6 +81,7 @@ function normalizarItem(bruto: unknown): ItemPedidoErp | null {
     total: numero(valores?.total) ?? numero(valores?.liquidoComIpi) ?? 0,
     entrega: texto(datas?.entrega),
     centroCusto: rotulo(i.centroCusto),
+    centroCustoCodigo: texto(obj(i.centroCusto)?.codigo),
     observacao: texto(i.observacao),
   };
 }

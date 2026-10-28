@@ -16,5 +16,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    /* Os de integração usam o banco real: só com npm run test:integracao. */
+    exclude: ["src/**/*.integracao.test.ts", "node_modules/**"],
   },
 });

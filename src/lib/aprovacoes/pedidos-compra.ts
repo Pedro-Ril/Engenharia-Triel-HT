@@ -10,6 +10,20 @@ import type { PedidoCompraErp } from "@/modules/aprovacoes/types/aprovacoes.type
 import { registrarLog } from "@/lib/monitoramento/logs";
 
 import { nomeEmpresaPedidoCompra } from "./empresas-pedido-compra";
+import {
+  buscarDirecionamentosDaVez,
+  buscarFluxoDoItem,
+  decidirEtapa,
+  iniciarFluxo,
+  sqlColunasNivelAtual,
+  sqlNaVezDoUsuario,
+  sqlParticipaDaCadeia,
+  sqlSemCadeia,
+  type DirecionamentoDaVez,
+  type EtapaDoItem,
+  type EventoHistorico,
+} from "./alcadas/fluxo";
+import type { AcaoEtapa } from "./alcadas/regras";
 import { consultarPedidoCompraErp, ErroConsultaErp } from "./pedido-compra-erp";
 import { conferirChaveExterna } from "./pedidos-compra-admin";
 
@@ -70,10 +84,6 @@ export interface AprovadorPedidoCompra {
   email: string | null;
 }
 
-/* Na lista para o legado: o diretor e as empresas que ele aprova. */
-export interface AprovadorComEmpresas extends AprovadorPedidoCompra {
-  empresas: { codigo: number; nome: string }[];
-}
 
 export type SituacaoEnvio = "criado" | "ja_pendente";
 
@@ -157,122 +167,6 @@ export function lerEnvioPedidos(corpo: unknown): {
   };
 }
 
-const colunasAprovador = `
-  CONVERT(VARCHAR(36), u.[id]) AS [id],
-  LOWER(u.[sam_account_name]) AS [login],
-  u.[nome_exibicao] AS [nome],
-  u.[email],
-  e.[empresa]
-`;
-
-/*
- * Aprovador de pedido de compra = marcado como aprovador do tipo
- * (portal_aprovacoes_atendentes), ativo, e com a empresa no escopo
- * (portal_aprovacoes_pedido_compra_empresas). Sem empresa marcada, não
- * recebe pedido nenhum -- nega por padrão.
- */
-const juncoesAprovador = `
-  FROM dbo.portal_aprovacoes_atendentes AS a
-  INNER JOIN dbo.portal_usuarios AS u ON u.[id] = a.[usuario_id]
-  INNER JOIN dbo.portal_aprovacoes_pedido_compra_empresas AS e ON e.[usuario_id] = u.[id]
-  WHERE a.[tipo] = @tipo AND u.[ativo] = 1
-`;
-
-type LinhaAprovador = AprovadorPedidoCompra & { id: string; empresa: number };
-type AprovadorResolvido = AprovadorPedidoCompra & { id: string; empresas: Set<number> };
-
-function agruparAprovadores(linhas: LinhaAprovador[]): Map<string, AprovadorResolvido> {
-  const porLogin = new Map<string, AprovadorResolvido>();
-
-  linhas.forEach((linha) => {
-    const atual = porLogin.get(linha.login);
-    if (atual) {
-      atual.empresas.add(linha.empresa);
-    } else {
-      porLogin.set(linha.login, {
-        id: linha.id,
-        login: linha.login,
-        nome: linha.nome,
-        email: linha.email,
-        empresas: new Set([linha.empresa]),
-      });
-    }
-  });
-
-  return porLogin;
-}
-
-/*
- * Diretores que podem receber pedido de compra -- a lista que o legado
- * mostra para o comprador escolher. Com `empresa`, só quem aprova
- * aquela empresa.
- */
-export async function listarAprovadoresPedidoCompra(empresa: number | null): Promise<AprovadorComEmpresas[]> {
-  const pool = await getSqlServerPool();
-
-  const result = await pool
-    .request()
-    .input("tipo", sql.VarChar(40), TIPO_PEDIDO_COMPRA)
-    .query<LinhaAprovador>(`
-      SELECT ${colunasAprovador}
-      ${juncoesAprovador}
-      ORDER BY u.[nome_exibicao], e.[empresa];
-    `);
-
-  return [...agruparAprovadores(result.recordset).values()]
-    .filter((aprovador) => empresa === null || aprovador.empresas.has(empresa))
-    .map(({ login, nome, email, empresas }) => ({
-      login,
-      nome,
-      email,
-      empresas: [...empresas].map((codigo) => ({ codigo, nome: nomeEmpresaPedidoCompra(codigo) })),
-    }));
-}
-
-/*
- * Login -> usuário, recusando quem não é aprovador de pedidos de compra
- * ou não aprova a empresa do pedido que recebeu.
- */
-async function resolverAprovadores(pedidos: PedidoEnviado[]): Promise<Map<string, AprovadorResolvido>> {
-  const logins = [...new Set(pedidos.map((p) => p.aprovador).filter((l): l is string => !!l))];
-  if (logins.length === 0) return new Map();
-
-  const pool = await getSqlServerPool();
-  const request = pool.request().input("tipo", sql.VarChar(40), TIPO_PEDIDO_COMPRA);
-  logins.forEach((login, i) => request.input(`l${i}`, sql.NVarChar(100), login));
-
-  const result = await request.query<LinhaAprovador>(`
-    SELECT ${colunasAprovador}
-    ${juncoesAprovador}
-      AND LOWER(u.[sam_account_name]) IN (${logins.map((_, i) => `@l${i}`).join(", ")});
-  `);
-
-  const porLogin = agruparAprovadores(result.recordset);
-
-  const invalidos = logins.filter((login) => !porLogin.has(login));
-  if (invalidos.length > 0) {
-    throw new ValidationError(`Não é aprovador de pedidos de compra no portal: ${invalidos.join(", ")}.`);
-  }
-
-  const foraDoEscopo = pedidos.filter(
-    (pedido) => pedido.aprovador && !porLogin.get(pedido.aprovador)?.empresas.has(pedido.empresa)
-  );
-  if (foraDoEscopo.length > 0) {
-    const exemplos = foraDoEscopo
-      .slice(0, 5)
-      .map((p) => `${p.numero} (${nomeEmpresaPedidoCompra(p.empresa)}) → ${porLogin.get(p.aprovador!)?.nome}`);
-    throw new ValidationError(
-      `O diretor escolhido não aprova pedidos desta empresa: ${exemplos.join("; ")}${foraDoEscopo.length > 5 ? "…" : ""}.`
-    );
-  }
-
-  return porLogin;
-}
-
-function semId(aprovador: AprovadorResolvido | undefined): AprovadorPedidoCompra | null {
-  return aprovador ? { login: aprovador.login, nome: aprovador.nome, email: aprovador.email } : null;
-}
-
 /* Quantas consultas ao ERP correm ao mesmo tempo num envio grande. */
 const CONSULTAS_ERP_SIMULTANEAS = 6;
 
@@ -310,6 +204,11 @@ export function resumirPagamento(erp: Pick<PedidoCompraErp, "parcelas">): string
   return `${temEntrada ? "Entrada + " : ""}${prazos.join("/")} dias`;
 }
 
+/* Código do centro de custo de cada item, separados por vírgula (vazio = item sem centro de custo). */
+export function centrosCustoDosItens(erp: Pick<PedidoCompraErp, "itens">): string {
+  return erp.itens.map((item) => item.centroCustoCodigo ?? "").join(",");
+}
+
 /* A primeira entrega entre os itens, em ISO. */
 export function primeiraEntrega(erp: Pick<PedidoCompraErp, "itens">): string | null {
   const datas = erp.itens
@@ -331,7 +230,8 @@ function parametrosDaFoto(request: sql.Request, erp: PedidoCompraErp | null): sq
     .input("situacaoErp", sql.VarChar(20), erp?.situacao?.slice(0, 20) ?? null)
     .input("quantidadeItens", sql.Int, erp ? erp.itens.length : null)
     .input("condicaoPagamento", sql.NVarChar(120), erp ? (resumirPagamento(erp)?.slice(0, 120) ?? null) : null)
-    .input("entregaPrevista", sql.Date, erp ? primeiraEntrega(erp) : null);
+    .input("entregaPrevista", sql.Date, erp ? primeiraEntrega(erp) : null)
+    .input("centrosCustoItens", sql.NVarChar(sql.MAX), erp ? centrosCustoDosItens(erp) : null);
 }
 
 /*
@@ -412,7 +312,6 @@ async function tentarRegistrar(
     observacao: string | null;
     pedidos: PedidoEnviado[];
   },
-  aprovadores: Map<string, AprovadorResolvido>,
   fotos: Map<string, PedidoCompraErp>
 ): Promise<ResultadoEnvio> {
   const pool = await getSqlServerPool();
@@ -428,30 +327,22 @@ async function tentarRegistrar(
       const pendente = await new sql.Request(transaction)
         .input("empresa", sql.Int, pedido.empresa)
         .input("numero", sql.BigInt, pedido.numero)
-        .query<{ numero_aprovacao: number; login: string | null; nome: string | null; email: string | null }>(`
-          SELECT TOP 1
-            a.[numero] AS [numero_aprovacao],
-            LOWER(u.[sam_account_name]) AS [login],
-            p.[aprovador_nome] AS [nome],
-            u.[email]
+        .query<{ numero_aprovacao: number }>(`
+          SELECT TOP 1 a.[numero] AS [numero_aprovacao]
           FROM dbo.portal_aprovacoes_pedido_compra AS p WITH (UPDLOCK, HOLDLOCK)
           INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
-          LEFT JOIN dbo.portal_usuarios AS u ON u.[id] = p.[aprovador_usuario_id]
           WHERE p.[empresa] = @empresa AND p.[numero_pedido] = @numero AND p.[status] = 'pendente';
         `);
 
       const existente = pendente.recordset[0];
 
-      /* Já pendente: continua com o diretor do primeiro envio (é o que vale no painel). */
+      /* Já pendente: segue na cadeia em que está. */
       if (existente) {
         resultados.push({
           empresa: pedido.empresa,
           numero: pedido.numero,
           situacao: "ja_pendente",
-          aprovador:
-            existente.login && existente.nome
-              ? { login: existente.login, nome: existente.nome, email: existente.email }
-              : null,
+          aprovador: null,
           numeroAprovacao: existente.numero_aprovacao,
         });
       } else {
@@ -478,32 +369,44 @@ async function tentarRegistrar(
       numeroAprovacao = lote.recordset[0].numero;
 
       for (const pedido of novos) {
-        const aprovador = pedido.aprovador ? aprovadores.get(pedido.aprovador) : undefined;
         const foto = fotos.get(chaveDoPedido(pedido)) ?? null;
 
-        await parametrosDaFoto(new sql.Request(transaction), foto)
+        const inserido = await parametrosDaFoto(new sql.Request(transaction), foto)
           .input("aprovacaoId", sql.UniqueIdentifier, aprovacaoId)
           .input("empresa", sql.Int, pedido.empresa)
           .input("numero", sql.BigInt, pedido.numero)
-          .input("aprovadorId", sql.UniqueIdentifier, aprovador?.id ?? null)
-          .input("aprovadorNome", sql.NVarChar(200), aprovador?.nome ?? null)
-          .query(`
+          .query<{ id: string }>(`
             INSERT INTO dbo.portal_aprovacoes_pedido_compra
-              ([aprovacao_id], [empresa], [numero_pedido], [aprovador_usuario_id], [aprovador_nome],
+              ([aprovacao_id], [empresa], [numero_pedido],
                [fornecedor_codigo], [fornecedor_nome], [comprador_nome], [data_emissao], [valor_total],
                [moeda], [situacao_erp], [quantidade_itens], [condicao_pagamento], [entrega_prevista],
-               [snapshot_em])
-            VALUES (@aprovacaoId, @empresa, @numero, @aprovadorId, @aprovadorNome,
+               [centros_custo_itens], [snapshot_em])
+            OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
+            VALUES (@aprovacaoId, @empresa, @numero,
                @fornecedorCodigo, @fornecedorNome, @compradorNome, @dataEmissao, @valorTotal,
                @moeda, @situacaoErp, @quantidadeItens, @condicaoPagamento, @entregaPrevista,
-               CASE WHEN @fornecedorNome IS NULL THEN NULL ELSE SYSDATETIME() END);
+               @centrosCustoItens, CASE WHEN @fornecedorNome IS NULL THEN NULL ELSE SYSDATETIME() END);
           `);
+
+        /*
+         * Entra na cadeia da alçada da empresa. Sem alçada (ou com nível
+         * sem aprovador), a ValidationError desfaz o envio inteiro -- o
+         * mesmo tudo-ou-nada do resto da validação.
+         */
+        await iniciarFluxo(transaction, {
+          tipo: TIPO_PEDIDO_COMPRA,
+          itemId: inserido.recordset[0].id,
+          contexto: { empresa: pedido.empresa, setor: null },
+          usuario: { id: null, nome: params.enviadoPor || "SupriConnect" },
+          comentario: params.observacao,
+          nomeEmpresa: nomeEmpresaPedidoCompra,
+        });
 
         resultados.push({
           empresa: pedido.empresa,
           numero: pedido.numero,
           situacao: "criado",
-          aprovador: semId(aprovador),
+          aprovador: null,
           numeroAprovacao,
         });
       }
@@ -524,30 +427,42 @@ async function tentarRegistrar(
 }
 
 /*
- * Grava os pedidos como pendentes. Pedido que já está pendente não
- * duplica: volta como "ja_pendente" com a aprovação em que está. Um
- * pedido já decidido que chega de novo abre uma pendência nova (o
- * histórico da anterior fica).
+ * Grava os pedidos como pendentes, cada um na cadeia da alçada da sua
+ * empresa. Pedido que já está pendente não duplica: volta como
+ * "ja_pendente". Pedido devolvido (ou já decidido) que chega de novo
+ * abre uma aprovação nova, do nível 1 -- o histórico da anterior fica.
+ *
+ * O campo `aprovador` do envio não tem mais efeito: quem decide é a
+ * alçada (Administração → Diretoria → Alçadas).
  */
 export async function registrarPedidosParaAprovacao(params: {
   enviadoPor: string | null;
   observacao: string | null;
   pedidos: PedidoEnviado[];
 }): Promise<ResultadoEnvio> {
-  const aprovadores = await resolverAprovadores(params.pedidos);
   const fotos = await conferirNoErp(params.pedidos);
 
   try {
-    return await tentarRegistrar(params, aprovadores, fotos);
+    return await tentarRegistrar(params, fotos);
   } catch (error) {
     /* Dois envios do mesmo pedido ao mesmo tempo: o índice único segura um,
        e a segunda tentativa já o encontra pendente. */
-    if (ehViolacaoUnica(error)) return tentarRegistrar(params, aprovadores, fotos);
+    if (ehViolacaoUnica(error)) return tentarRegistrar(params, fotos);
     throw error;
   }
 }
 
-export type SituacaoPedido = "nao_enviado" | "pendente" | "aprovado" | "reprovado";
+/* "reprovado" só existe em pedidos decididos antes das alçadas; hoje a negativa é "devolvido". */
+export type SituacaoPedido = "nao_enviado" | "pendente" | "aprovado" | "devolvido" | "reprovado";
+
+/* Onde o pedido pendente está na cadeia: "nível 2 de 3 · Diretoria". */
+export interface NivelAtual {
+  ordem: number;
+  total: number;
+  nome: string;
+  /* O nível foi direcionado a esta pessoa (só ela decide). */
+  direcionadoPara: string | null;
+}
 
 export interface ConsultaSituacaoPedido extends ChavePedido {
   situacao: SituacaoPedido;
@@ -561,6 +476,8 @@ export interface ConsultaSituacaoPedido extends ChavePedido {
   comentario: string | null;
   /* Quantas vezes o pedido já foi mandado para aprovação. */
   envios: number;
+  /* Só para pendente: em que nível está. */
+  nivelAtual: NivelAtual | null;
 }
 
 interface LinhaSituacao {
@@ -577,6 +494,29 @@ interface LinhaSituacao {
   decidido_em: string | null;
   comentario_decisao: string | null;
   envios: number;
+  nivel_ordem: number | null;
+  nivel_nome: string | null;
+  nivel_total: number | null;
+  nivel_direcionado: string | null;
+}
+
+/* Nível pendente da cadeia atual do item `p` (ou NULL quando não está pendente). */
+const colunasNivelAtual = sqlColunasNivelAtual("p.[id]");
+
+function nivelAtualDe(linha: {
+  nivel_ordem: number | null;
+  nivel_nome: string | null;
+  nivel_total: number | null;
+  nivel_direcionado: string | null;
+}): NivelAtual | null {
+  return linha.nivel_ordem !== null && linha.nivel_nome
+    ? {
+        ordem: linha.nivel_ordem,
+        total: linha.nivel_total ?? linha.nivel_ordem,
+        nome: linha.nivel_nome,
+        direcionadoPara: linha.nivel_direcionado,
+      }
+    : null;
 }
 
 /* Datas sem fuso, no horário do servidor. */
@@ -592,7 +532,8 @@ const colunasSituacao = `
   a.[criado_por_nome] AS [enviado_por],
   p.[decidido_por_nome],
   CONVERT(VARCHAR(33), p.[decidido_em], 126) AS [decidido_em],
-  p.[comentario_decisao]
+  p.[comentario_decisao],
+  ${colunasNivelAtual}
 `;
 
 const juncoesSituacao = `
@@ -618,6 +559,7 @@ function paraSituacao(linha: LinhaSituacao): ConsultaSituacaoPedido {
     decididoEm: linha.decidido_em,
     comentario: linha.comentario_decisao,
     envios: linha.envios,
+    nivelAtual: nivelAtualDe(linha),
   };
 }
 
@@ -650,6 +592,7 @@ export async function buscarSituacaoPedido(chave: ChavePedido): Promise<Consulta
       decididoEm: null,
       comentario: null,
       envios: 0,
+      nivelAtual: null,
     };
   }
 
@@ -665,7 +608,7 @@ export interface ConsultaDecisoes {
 }
 
 /*
- * Pedidos decididos (aprovados/reprovados) depois de `desde` -- o
+ * Pedidos decididos (aprovados ou devolvidos) depois de `desde` -- o
  * legado consulta de tempos em tempos e guarda o `proximoDesde`. Sem
  * `desde`, começa pelas decisões mais antigas.
  *
@@ -690,7 +633,7 @@ export async function listarDecisoesPedidos(params: {
         ) AS [envios]
       ${juncoesSituacao}
       WHERE p.[decidido_em] IS NOT NULL
-        AND p.[status] IN ('aprovado', 'reprovado')
+        AND p.[status] IN ('aprovado', 'devolvido', 'reprovado')
         AND (@desde IS NULL OR p.[decidido_em] > CONVERT(DATETIME2, @desde, 126))
       ORDER BY p.[decidido_em];
     `);
@@ -729,43 +672,20 @@ export function lerDesde(valor: string | null): string | null {
    Painel de Aprovações (quem decide, logado no portal)
    --------------------------------------------------------------- */
 
-/*
- * O diretor escolhido no envio ainda pode decidir este pedido: ativo,
- * aprovador de pedido de compra e com a empresa do pedido marcada.
- */
-const diretorEscolhidoDisponivel = `
-  EXISTS (
-    SELECT 1
-    FROM dbo.portal_usuarios AS ud
-    INNER JOIN dbo.portal_aprovacoes_atendentes AS ad
-      ON ad.[usuario_id] = ud.[id] AND ad.[tipo] = 'pedido_compra'
-    INNER JOIN dbo.portal_aprovacoes_pedido_compra_empresas AS ed
-      ON ed.[usuario_id] = ud.[id] AND ed.[empresa] = p.[empresa]
-    WHERE ud.[id] = p.[aprovador_usuario_id] AND ud.[ativo] = 1
-  )
-`;
+/* É a vez do usuário decidir o pedido `p` (o nível pendente da cadeia é o dele). */
+const naMinhaVez = sqlNaVezDoUsuario("p.[id]");
 
 /*
- * O que o diretor enxerga: pedidos das empresas marcadas para ele em
- * Diretoria → Pedidos de Compra, e que foram direcionados a ele ou a
- * ninguém. Sem empresa marcada, não enxerga nada (nega por padrão).
- *
- * Pedido direcionado a um diretor que não pode mais decidir (perdeu a
- * empresa, deixou de ser aprovador, foi desativado) volta para a fila
- * de todos os aprovadores da empresa -- senão ficaria pendente sem
- * ninguém conseguir ver.
+ * O usuário enxerga o pedido `p`: a cadeia já chegou ao nível dele. Os
+ * decididos antes das alçadas (sem etapas) aparecem só para quem decidiu.
  */
-const escopoDoDiretor = `
-  EXISTS (
-    SELECT 1 FROM dbo.portal_aprovacoes_pedido_compra_empresas AS ee
-    WHERE ee.[usuario_id] = @usuarioId AND ee.[empresa] = p.[empresa]
+const visivelParaMim = `(
+  ${sqlParticipaDaCadeia("p.[id]")}
+  OR (
+    ${sqlSemCadeia("p.[id]")}
+    AND p.[decidido_por_usuario_id] = @usuarioId
   )
-  AND (
-    p.[aprovador_usuario_id] IS NULL
-    OR p.[aprovador_usuario_id] = @usuarioId
-    OR NOT ${diretorEscolhidoDisponivel}
-  )
-`;
+)`;
 
 export interface PedidoCompraPainel {
   id: string;
@@ -793,19 +713,40 @@ export interface PedidoCompraPainel {
   entregaPrevista: string | null;
   /* false = o pedido ainda não tem a foto do ERP (envio antigo ou ERP fora do ar). */
   temFoto: boolean;
-  /* Sem foto e sem tentativa recente: a lista pode consultar o ERP para completar. */
+  /* Código do centro de custo dos itens, sem repetir, na ordem dos itens; null = ainda não sabemos (foto antiga). */
+  centrosCusto: string[] | null;
+  /*
+   * Sem foto -- ou pendente sem os centros de custo -- e sem tentativa
+   * recente: a lista pode consultar o ERP para completar.
+   */
   podeCompletarFoto: boolean;
-  /* Direcionado a um diretor que não pode mais decidir: liberado para todos da empresa. */
-  diretorIndisponivel: boolean;
+  /* É a vez do usuário decidir (o nível pendente é o dele). */
+  naMinhaVez: boolean;
+  nivelAtual: NivelAtual | null;
+  /*
+   * Na vez do usuário: para onde o pedido vai ao aprovar, pela sugestão
+   * das regras (pessoa null = todos do próximo nível). null = o usuário
+   * é o último nível (aprova em definitivo). Ausente fora da vez dele.
+   */
+  vaiPara?: { proximoNivel: string; pessoa: { id: string; nome: string } | null } | null;
 }
 
 export interface FiltrosPedidosPainel {
+  /* "pendente" = na minha vez; os demais mostram o histórico do que chegou ao meu nível. */
   status: Exclude<SituacaoPedido, "nao_enviado"> | "todos";
   empresa: number | null;
   /* Número do pedido, nome de quem enviou ou do fornecedor. */
   busca: string;
   /* Um item só (detalhe do painel). */
   id?: string;
+  /* Prefixos de centro de custo, só dígitos ("9002"): o pedido entra se tiver algum item num deles. */
+  centrosCusto?: string[];
+  /*
+   * Histórico (todos os filtros menos "pendente"): só o que foi decidido --
+   * ou enviado, se ainda está em andamento -- nos últimos N dias. A fila
+   * da vez nunca é cortada por data.
+   */
+  dias?: number | null;
 }
 
 export async function listarPedidosPainel(
@@ -814,9 +755,17 @@ export async function listarPedidosPainel(
 ): Promise<PedidoCompraPainel[]> {
   const pool = await getSqlServerPool();
   const busca = filtros.busca.trim();
+  const prefixos = filtros.centrosCusto ?? [];
 
-  const result = await pool
-    .request()
+  const request = pool.request();
+  /* ",9002204,9090582" LIKE "%,9002%": algum item começa com o prefixo. */
+  prefixos.forEach((prefixo, i) => request.input(`cc${i}`, sql.VarChar(40), `%,${prefixo}%`));
+  const filtroCentroCusto = prefixos.length
+    ? `AND (${prefixos.map((_, i) => `(',' + ISNULL(p.[centros_custo_itens], '')) LIKE @cc${i}`).join(" OR ")})`
+    : "";
+
+  const result = await request
+    .input("dias", sql.Int, filtros.status === "pendente" ? null : (filtros.dias ?? null))
     .input("usuarioId", sql.UniqueIdentifier, usuarioId)
     .input("status", sql.VarChar(20), filtros.status === "todos" ? "" : filtros.status)
     .input("empresa", sql.Int, filtros.empresa)
@@ -845,9 +794,14 @@ export async function listarPedidosPainel(
       quantidade_itens: number | null;
       condicao_pagamento: string | null;
       entrega_prevista: string | null;
+      centros_custo_itens: string | null;
       tem_foto: number;
       pode_completar_foto: number;
-      diretor_indisponivel: number;
+      na_minha_vez: number;
+      nivel_ordem: number | null;
+      nivel_nome: string | null;
+      nivel_total: number | null;
+      nivel_direcionado: string | null;
     }>(`
       SELECT
         CONVERT(VARCHAR(36), p.[id]) AS [id],
@@ -860,17 +814,16 @@ export async function listarPedidosPainel(
         p.[quantidade_itens],
         p.[condicao_pagamento],
         CONVERT(VARCHAR(10), p.[entrega_prevista], 23) AS [entrega_prevista],
+        p.[centros_custo_itens],
         CASE WHEN p.[snapshot_em] IS NULL THEN 0 ELSE 1 END AS [tem_foto],
         CASE
-          WHEN p.[snapshot_em] IS NULL
+          WHEN (p.[snapshot_em] IS NULL OR (p.[status] = 'pendente' AND p.[centros_custo_itens] IS NULL))
             AND (p.[foto_tentativa_em] IS NULL
               OR p.[foto_tentativa_em] < DATEADD(MINUTE, -${MINUTOS_ENTRE_TENTATIVAS_DE_FOTO}, SYSDATETIME()))
           THEN 1 ELSE 0
         END AS [pode_completar_foto],
-        CASE
-          WHEN p.[aprovador_usuario_id] IS NOT NULL AND NOT ${diretorEscolhidoDisponivel} THEN 1
-          ELSE 0
-        END AS [diretor_indisponivel],
+        CASE WHEN ${naMinhaVez} THEN 1 ELSE 0 END AS [na_minha_vez],
+        ${colunasNivelAtual},
         a.[numero] AS [numero_aprovacao],
         p.[empresa],
         p.[numero_pedido],
@@ -884,10 +837,14 @@ export async function listarPedidosPainel(
         p.[comentario_decisao]
       FROM dbo.portal_aprovacoes_pedido_compra AS p
       INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
-      WHERE ${escopoDoDiretor}
+      WHERE (
+          (@status = 'pendente' AND p.[status] = 'pendente' AND ${naMinhaVez})
+          OR (@status <> 'pendente' AND ${visivelParaMim} AND (@status = '' OR p.[status] = @status))
+        )
         AND (@id IS NULL OR p.[id] = @id)
-        AND (@status = '' OR p.[status] = @status)
         AND (@empresa IS NULL OR p.[empresa] = @empresa)
+        AND (@dias IS NULL OR COALESCE(p.[decidido_em], p.[criado_em]) >= DATEADD(DAY, -@dias, CAST(SYSDATETIME() AS DATE)))
+        ${filtroCentroCusto}
         AND (
           @busca = ''
           OR CONVERT(VARCHAR(20), p.[numero_pedido]) LIKE @buscaLike
@@ -925,8 +882,13 @@ export async function listarPedidosPainel(
     condicaoPagamento: linha.condicao_pagamento,
     entregaPrevista: linha.entrega_prevista,
     temFoto: linha.tem_foto === 1,
+    centrosCusto:
+      linha.centros_custo_itens === null
+        ? null
+        : [...new Set(linha.centros_custo_itens.split(",").filter(Boolean))],
     podeCompletarFoto: linha.pode_completar_foto === 1,
-    diretorIndisponivel: linha.diretor_indisponivel === 1,
+    naMinhaVez: linha.na_minha_vez === 1,
+    nivelAtual: nivelAtualDe(linha),
   }));
 }
 
@@ -939,12 +901,14 @@ export const MINUTOS_ENTRE_TENTATIVAS_DE_FOTO = 60;
 /*
  * Completa a foto dos pedidos da lista que ainda não têm (enviados antes
  * da foto existir, ou com o ERP fora do ar no envio): consulta o ERP uma
- * vez, grava, e da próxima vez já vem do banco. Pedido não encontrado ou
+ * vez, grava, e da próxima vez já vem do banco. Pedido pendente que tem
+ * foto mas é de antes dos centros de custo ganha SÓ os centros de custo
+ * -- o resto da foto é do envio e não muda. Pedido não encontrado ou
  * ERP fora do ar: fica como está, sem travar a lista. Devolve quantos
  * foram completados (a rota relê a lista se for > 0).
  */
 export async function completarFotosFaltantes(
-  pedidos: Pick<PedidoCompraPainel, "id" | "empresa" | "numero" | "podeCompletarFoto">[]
+  pedidos: Pick<PedidoCompraPainel, "id" | "empresa" | "numero" | "podeCompletarFoto" | "temFoto">[]
 ): Promise<number> {
   const faltando = pedidos.filter((pedido) => pedido.podeCompletarFoto).slice(0, MAXIMO_FOTOS_POR_CARGA);
   if (faltando.length === 0) return 0;
@@ -963,6 +927,20 @@ export async function completarFotosFaltantes(
           const erp = await consultarPedidoCompraErp(pedido.empresa, pedido.numero, { timeoutMs: 8000 });
           if (!erp) return;
 
+          if (pedido.temFoto) {
+            await pool
+              .request()
+              .input("id", sql.UniqueIdentifier, pedido.id)
+              .input("centros", sql.NVarChar(sql.MAX), centrosCustoDosItens(erp))
+              .query(`
+                UPDATE dbo.portal_aprovacoes_pedido_compra SET [centros_custo_itens] = @centros
+                WHERE [id] = @id AND [centros_custo_itens] IS NULL;
+              `);
+            completadosIds.add(pedido.id);
+            completados += 1;
+            return;
+          }
+
           await parametrosDaFoto(pool.request(), erp)
             .input("id", sql.UniqueIdentifier, pedido.id)
             .query(`
@@ -977,6 +955,7 @@ export async function completarFotosFaltantes(
                   [quantidade_itens] = @quantidadeItens,
                   [condicao_pagamento] = @condicaoPagamento,
                   [entrega_prevista] = @entregaPrevista,
+                  [centros_custo_itens] = @centrosCustoItens,
                   [snapshot_em] = SYSDATETIME()
               WHERE [id] = @id AND [snapshot_em] IS NULL;
             `);
@@ -1007,7 +986,8 @@ export async function completarFotosFaltantes(
     await request.query(`
       UPDATE dbo.portal_aprovacoes_pedido_compra
       SET [foto_tentativa_em] = SYSDATETIME()
-      WHERE [id] IN (${pendentesDeFoto.map((_, i) => `@t${i}`).join(", ")}) AND [snapshot_em] IS NULL;
+      WHERE [id] IN (${pendentesDeFoto.map((_, i) => `@t${i}`).join(", ")})
+        AND ([snapshot_em] IS NULL OR [centros_custo_itens] IS NULL);
     `);
   }
 
@@ -1024,82 +1004,341 @@ export async function contarPedidosPendentes(usuarioId: string): Promise<number>
     .query<{ total: number }>(`
       SELECT COUNT(*) AS [total]
       FROM dbo.portal_aprovacoes_pedido_compra AS p
-      WHERE p.[status] = 'pendente' AND ${escopoDoDiretor};
+      WHERE p.[status] = 'pendente' AND ${naMinhaVez};
     `);
 
   return result.recordset[0]?.total ?? 0;
 }
 
-/* Empresas marcadas para o diretor: sem nenhuma, a tela explica por que está vazia. */
-export async function listarEmpresasDoDiretor(usuarioId: string): Promise<number[]> {
-  const pool = await getSqlServerPool();
-
-  const result = await pool
-    .request()
-    .input("usuarioId", sql.UniqueIdentifier, usuarioId)
-    .query<{ empresa: number }>(`
-      SELECT [empresa] FROM dbo.portal_aprovacoes_pedido_compra_empresas
-      WHERE [usuario_id] = @usuarioId
-      ORDER BY [empresa];
-    `);
-
-  return result.recordset.map((linha) => linha.empresa);
+export interface DecisaoPedido {
+  id: string;
+  empresa: number;
+  numero: number;
+  numeroAprovacao: number;
+  /* avancou: subiu de nível | aprovado: era o último | devolvido: voltou ao comprador. */
+  resultado: "avancou" | "aprovado" | "devolvido";
+  nivelNome: string;
+  proximoNivel: string | null;
+  /* Quem vai decidir o próximo nível, quando direcionado. */
+  direcionadoPara: string | null;
 }
 
 /*
- * Aprova ou reprova de uma vez os pedidos marcados. Só mexe no que
- * ainda está pendente E no escopo de quem decide -- um id de fora (ou
- * já decidido por outro diretor no meio tempo) é ignorado e volta na
- * contagem de "ignorados". Um UPDATE só: todos saem com o mesmo
- * decidido_em, que a consulta de decisões do legado trata como empate.
+ * Para quem direcionar o próximo nível ao aprovar: "todos" do nível, a
+ * "sugestao" das regras da alçada (calculada pedido a pedido), ou o id
+ * de uma pessoa do próximo nível.
+ */
+export type DirecionarPedidos = "todos" | "sugestao" | { usuarioId: string };
+
+/*
+ * Aprova ou devolve, no nível do usuário, os pedidos marcados -- cada um
+ * na sua transação: a etapa e o status do pedido mudam juntos. Pedido
+ * que não está na vez do usuário (outra pessoa do nível decidiu antes,
+ * ou ainda não chegou ao nível dele) entra em `falhas` com o motivo.
+ *
+ * O pedido só fica "aprovado" quando o último nível aprova; "devolvido"
+ * em qualquer nível encerra a cadeia e o comprador pode reenviar.
  */
 export async function decidirPedidosCompra(params: {
   ids: string[];
   usuario: { id: string; nomeExibicao: string };
-  decisao: "aprovado" | "reprovado";
+  acao: AcaoEtapa;
   comentario: string | null;
-}): Promise<{ decididos: { empresa: number; numero: number; numeroAprovacao: number }[]; ignorados: number }> {
+  direcionarPara?: DirecionarPedidos;
+}): Promise<{ decididos: DecisaoPedido[]; falhas: { id: string; motivo: string }[] }> {
   const pool = await getSqlServerPool();
-  const request = pool
-    .request()
-    .input("usuarioId", sql.UniqueIdentifier, params.usuario.id)
-    .input("nome", sql.NVarChar(200), params.usuario.nomeExibicao)
-    .input("decisao", sql.VarChar(20), params.decisao)
-    .input("comentario", sql.NVarChar(2000), params.comentario);
+  const decididos: DecisaoPedido[] = [];
+  const falhas: { id: string; motivo: string }[] = [];
 
-  params.ids.forEach((id, i) => request.input(`id${i}`, sql.UniqueIdentifier, id));
+  /*
+   * Direcionando: o próximo nível de cada pedido é olhado antes, fora das
+   * transações (a sugestão pode consultar o ERP). Pedido no último nível
+   * não tem o que direcionar e só é aprovado; a pessoa escolhida que não
+   * for do próximo nível de um pedido faz ESSE pedido falhar, com o motivo.
+   */
+  const modo = params.acao === "aprovar" ? (params.direcionarPara ?? "todos") : "todos";
+  const proximos =
+    modo === "todos"
+      ? new Map<string, DirecionamentoDaVez>()
+      : new Map((await buscarDirecionamentosPedidos(params.ids, params.usuario.id)).map((d) => [d.itemId, d]));
 
-  const result = await request.query<{ empresa: number; numero_pedido: number | string; numero_aprovacao: number }>(`
-    DECLARE @decididos TABLE ([aprovacao_id] UNIQUEIDENTIFIER, [empresa] INT, [numero_pedido] BIGINT);
+  const direcionarPara = (id: string): string | null => {
+    const proximo = proximos.get(id.toUpperCase());
+    if (modo === "todos" || !proximo) return null;
+    return modo === "sugestao" ? (proximo.sugestao?.id ?? null) : modo.usuarioId;
+  };
 
-    UPDATE p
-    SET [status] = @decisao,
-        [decidido_por_usuario_id] = @usuarioId,
-        [decidido_por_nome] = @nome,
-        [decidido_em] = SYSDATETIME(),
-        [comentario_decisao] = @comentario,
-        [atualizado_em] = SYSDATETIME()
-    OUTPUT INSERTED.[aprovacao_id], INSERTED.[empresa], INSERTED.[numero_pedido] INTO @decididos
-    FROM dbo.portal_aprovacoes_pedido_compra AS p
-    WHERE p.[id] IN (${params.ids.map((_, i) => `@id${i}`).join(", ")})
-      AND p.[status] = 'pendente'
-      AND ${escopoDoDiretor};
+  for (const id of params.ids) {
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
 
-    SELECT d.[empresa], d.[numero_pedido], a.[numero] AS [numero_aprovacao]
-    FROM @decididos AS d
-    INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = d.[aprovacao_id];
-  `);
+    try {
+      const item = await new sql.Request(transaction)
+        .input("id", sql.UniqueIdentifier, id)
+        .query<{ empresa: number; numero_pedido: number | string; status: string; numero_aprovacao: number }>(`
+          SELECT p.[empresa], p.[numero_pedido], p.[status], a.[numero] AS [numero_aprovacao]
+          FROM dbo.portal_aprovacoes_pedido_compra AS p WITH (UPDLOCK, HOLDLOCK)
+          INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
+          WHERE p.[id] = @id;
+        `);
 
-  const decididos = result.recordset.map((linha) => ({
-    empresa: linha.empresa,
-    numero: Number(linha.numero_pedido),
-    numeroAprovacao: linha.numero_aprovacao,
-  }));
+      const linha = item.recordset[0];
+      if (!linha) throw new ValidationError("Pedido não encontrado.");
+      if (linha.status !== "pendente") throw new ValidationError("Este pedido já foi decidido.");
 
-  return { decididos, ignorados: params.ids.length - decididos.length };
+      const etapa = await decidirEtapa(transaction, {
+        tipo: TIPO_PEDIDO_COMPRA,
+        itemId: id,
+        usuario: { id: params.usuario.id, nome: params.usuario.nomeExibicao },
+        acao: params.acao,
+        comentario: params.comentario,
+        direcionarPara: direcionarPara(id),
+      });
+
+      /* O pedido em si só muda quando a cadeia termina (aprovado) ou volta (devolvido). */
+      await new sql.Request(transaction)
+        .input("id", sql.UniqueIdentifier, id)
+        .input("terminou", sql.Bit, etapa.resultado !== "avancou")
+        .input("status", sql.VarChar(20), etapa.resultado === "devolvido" ? "devolvido" : "aprovado")
+        .input("usuarioId", sql.UniqueIdentifier, params.usuario.id)
+        .input("nome", sql.NVarChar(200), params.usuario.nomeExibicao)
+        .input("comentario", sql.NVarChar(2000), params.comentario)
+        .query(`
+          UPDATE dbo.portal_aprovacoes_pedido_compra
+          SET [status] = CASE WHEN @terminou = 1 THEN @status ELSE [status] END,
+              [decidido_por_usuario_id] = CASE WHEN @terminou = 1 THEN @usuarioId ELSE [decidido_por_usuario_id] END,
+              [decidido_por_nome] = CASE WHEN @terminou = 1 THEN @nome ELSE [decidido_por_nome] END,
+              [decidido_em] = CASE WHEN @terminou = 1 THEN SYSDATETIME() ELSE [decidido_em] END,
+              [comentario_decisao] = CASE WHEN @terminou = 1 THEN @comentario ELSE [comentario_decisao] END,
+              [atualizado_em] = SYSDATETIME()
+          WHERE [id] = @id;
+        `);
+
+      await transaction.commit();
+
+      decididos.push({
+        id,
+        empresa: linha.empresa,
+        numero: Number(linha.numero_pedido),
+        numeroAprovacao: linha.numero_aprovacao,
+        resultado: etapa.resultado,
+        nivelNome: etapa.nivelNome,
+        proximoNivel: etapa.proximoNivel,
+        direcionadoPara: etapa.direcionadoPara,
+      });
+    } catch (error) {
+      await transaction.rollback().catch(() => {});
+      if (!(error instanceof ValidationError)) throw error;
+      falhas.push({ id, motivo: error.message });
+    }
+  }
+
+  return { decididos, falhas };
 }
 
-/* Um pedido da fila do diretor -- null se não existe ou está fora do escopo dele. */
+/* Quantos pedidos por consulta de direcionamento (cada um pode precisar do ERP). */
+export const MAXIMO_PEDIDOS_DIRECIONAMENTO = 200;
+
+/*
+ * Para quem o próximo nível pode ser direcionado, e a sugestão das
+ * regras da alçada, para os pedidos na vez do usuário. A regra olha a
+ * empresa e o centro de custo dos itens; pedido cuja foto é de antes
+ * de guardarmos os centros de custo busca no ERP uma vez e grava.
+ * ERP fora do ar: segue sem os centros de custo (a sugestão cai na
+ * regra só da empresa).
+ */
+export async function buscarDirecionamentosPedidos(
+  ids: string[],
+  usuarioId: string,
+  opcoes: { completarNoErp?: boolean } = {}
+): Promise<DirecionamentoDaVez[]> {
+  const unicos = [...new Set(ids.map((id) => id.toUpperCase()))].slice(0, MAXIMO_PEDIDOS_DIRECIONAMENTO);
+  if (unicos.length === 0) return [];
+
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+  unicos.forEach((id, i) => request.input(`p${i}`, sql.UniqueIdentifier, id));
+
+  const pedidos = await request.query<{
+    id: string;
+    empresa: number;
+    numero_pedido: number | string;
+    centros_custo_itens: string | null;
+  }>(`
+    SELECT CONVERT(VARCHAR(36), [id]) AS [id], [empresa], [numero_pedido], [centros_custo_itens]
+    FROM dbo.portal_aprovacoes_pedido_compra
+    WHERE [status] = 'pendente' AND [id] IN (${unicos.map((_, i) => `@p${i}`).join(", ")});
+  `);
+
+  const centrosPorPedido = new Map(pedidos.recordset.map((p) => [p.id, p.centros_custo_itens]));
+  /* Na lista (centenas de pedidos) não consulta o ERP: a lista completa os centros de custo aos poucos. */
+  const semCentros = opcoes.completarNoErp === false ? [] : pedidos.recordset.filter((p) => p.centros_custo_itens === null);
+
+  for (let inicio = 0; inicio < semCentros.length; inicio += CONSULTAS_ERP_SIMULTANEAS) {
+    let erpFora = false;
+
+    await Promise.all(
+      semCentros.slice(inicio, inicio + CONSULTAS_ERP_SIMULTANEAS).map(async (pedido) => {
+        try {
+          const erp = await consultarPedidoCompraErp(pedido.empresa, Number(pedido.numero_pedido), { timeoutMs: 8000 });
+          if (!erp) return;
+
+          const centros = centrosCustoDosItens(erp);
+          centrosPorPedido.set(pedido.id, centros);
+          await pool
+            .request()
+            .input("id", sql.UniqueIdentifier, pedido.id)
+            .input("centros", sql.NVarChar(sql.MAX), centros)
+            .query(`
+              UPDATE dbo.portal_aprovacoes_pedido_compra SET [centros_custo_itens] = @centros
+              WHERE [id] = @id AND [centros_custo_itens] IS NULL;
+            `);
+        } catch (error) {
+          if (!(error instanceof ErroConsultaErp)) throw error;
+          erpFora = true;
+        }
+      })
+    );
+
+    if (erpFora) break;
+  }
+
+  return buscarDirecionamentosDaVez({
+    usuarioId,
+    contextos: new Map(
+      pedidos.recordset.map((pedido) => {
+        /* "" = pedido sem itens; "a,,b" = o 2º item sem centro de custo (conta como fora). */
+        const centros = centrosPorPedido.get(pedido.id);
+        return [pedido.id, { empresa: pedido.empresa, centrosCustoItens: centros ? centros.split(",") : [] }];
+      })
+    ),
+  });
+}
+
+/*
+ * Pedidos pendentes que entraram antes das alçadas (sem cadeia): entram
+ * no nível 1 da alçada da empresa assim que ela existir. Sem alçada
+ * ainda, ficam como estão -- a próxima carga tenta de novo.
+ */
+export async function iniciarFluxosSemEtapa(): Promise<number> {
+  const pool = await getSqlServerPool();
+
+  const semCadeia = await pool.request().query<{
+    id: string;
+    empresa: number;
+    enviado_por: string;
+    observacao: string | null;
+    enviado_em: string;
+  }>(`
+    SELECT TOP 50 CONVERT(VARCHAR(36), p.[id]) AS [id], p.[empresa], a.[criado_por_nome] AS [enviado_por], a.[observacao],
+           CONVERT(VARCHAR(33), p.[criado_em], 126) AS [enviado_em]
+    FROM dbo.portal_aprovacoes_pedido_compra AS p
+    INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
+    WHERE p.[status] = 'pendente'
+      AND NOT EXISTS (SELECT 1 FROM dbo.portal_aprovacoes_etapas AS e WHERE e.[item_id] = p.[id])
+    ORDER BY p.[criado_em];
+  `);
+
+  let iniciados = 0;
+
+  for (const pedido of semCadeia.recordset) {
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      await iniciarFluxo(transaction, {
+        tipo: TIPO_PEDIDO_COMPRA,
+        itemId: pedido.id,
+        contexto: { empresa: pedido.empresa, setor: null },
+        usuario: { id: null, nome: pedido.enviado_por },
+        comentario: pedido.observacao,
+        nomeEmpresa: nomeEmpresaPedidoCompra,
+        enviadoEm: pedido.enviado_em,
+      });
+      await transaction.commit();
+      iniciados += 1;
+    } catch (error) {
+      await transaction.rollback().catch(() => {});
+      if (!(error instanceof ValidationError)) throw error;
+    }
+  }
+
+  return iniciados;
+}
+
+export interface RodadaPedido {
+  numeroAprovacao: number;
+  enviadoEm: string;
+  status: string;
+}
+
+/*
+ * Cadeia e histórico do pedido no detalhe: a cadeia do envio atual e o
+ * histórico de TODAS as rodadas (cada reenvio depois de devolução é um
+ * item novo, com a sua aprovação).
+ */
+export async function buscarFluxoDoPedido(
+  id: string,
+  chave: ChavePedido
+): Promise<{ etapas: EtapaDoItem[]; historico: (EventoHistorico & { numeroAprovacao: number })[]; rodadas: RodadaPedido[] }> {
+  const pool = await getSqlServerPool();
+
+  const [fluxo, historico, rodadas] = await Promise.all([
+    buscarFluxoDoItem(id),
+    pool
+      .request()
+      .input("empresa", sql.Int, chave.empresa)
+      .input("numero", sql.BigInt, chave.numero)
+      .query<{
+        acao: EventoHistorico["acao"];
+        ciclo: number | null;
+        nivel_nome: string | null;
+        usuario_nome: string | null;
+        comentario: string | null;
+        criado_em: string;
+        numero_aprovacao: number;
+      }>(`
+        SELECT h.[acao], h.[ciclo], h.[nivel_nome], h.[usuario_nome], h.[comentario],
+               CONVERT(VARCHAR(33), h.[criado_em], 126) AS [criado_em], a.[numero] AS [numero_aprovacao]
+        FROM dbo.portal_aprovacoes_historico AS h
+        INNER JOIN dbo.portal_aprovacoes_pedido_compra AS p ON p.[id] = h.[item_id]
+        INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
+        WHERE p.[empresa] = @empresa AND p.[numero_pedido] = @numero
+        ORDER BY h.[criado_em], h.[id];
+      `),
+    pool
+      .request()
+      .input("empresa", sql.Int, chave.empresa)
+      .input("numero", sql.BigInt, chave.numero)
+      .query<{ numero_aprovacao: number; enviado_em: string; status: string }>(`
+        SELECT a.[numero] AS [numero_aprovacao], CONVERT(VARCHAR(33), p.[criado_em], 126) AS [enviado_em], p.[status]
+        FROM dbo.portal_aprovacoes_pedido_compra AS p
+        INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
+        WHERE p.[empresa] = @empresa AND p.[numero_pedido] = @numero
+        ORDER BY p.[criado_em];
+      `),
+  ]);
+
+  return {
+    etapas: fluxo.etapas,
+    historico: historico.recordset.map((linha) => ({
+      acao: linha.acao,
+      ciclo: linha.ciclo,
+      nivelNome: linha.nivel_nome,
+      usuarioNome: linha.usuario_nome,
+      comentario: linha.comentario,
+      criadoEm: linha.criado_em,
+      numeroAprovacao: linha.numero_aprovacao,
+    })),
+    rodadas: rodadas.recordset.map((linha) => ({
+      numeroAprovacao: linha.numero_aprovacao,
+      enviadoEm: linha.enviado_em,
+      status: linha.status,
+    })),
+  };
+}
+
+/* Um pedido que o usuário enxerga (a cadeia chegou ao nível dele) -- null se não. */
 export async function buscarPedidoDoDiretor(
   id: string,
   usuarioId: string
@@ -1113,9 +1352,75 @@ export async function buscarPedidoDoDiretor(
     .query<{ empresa: number; numero_pedido: number | string }>(`
       SELECT p.[empresa], p.[numero_pedido]
       FROM dbo.portal_aprovacoes_pedido_compra AS p
-      WHERE p.[id] = @id AND ${escopoDoDiretor};
+      WHERE p.[id] = @id AND ${visivelParaMim};
     `);
 
   const linha = result.recordset[0];
   return linha ? { empresa: linha.empresa, numero: Number(linha.numero_pedido) } : null;
+}
+
+export interface AprovacaoDoPedido {
+  nivelOrdem: number;
+  nivelNome: string;
+  usuarioId: string | null;
+  nome: string;
+  decididoEm: string;
+}
+
+/*
+ * Os níveis que já aprovaram o envio atual do pedido (para o carimbo do
+ * PDF) e o número da aprovação. Devolução não entra: num pedido
+ * devolvido, as aprovações daquela rodada não valem mais.
+ */
+export async function buscarAprovacoesDoPedido(
+  id: string
+): Promise<{ numeroAprovacao: number; status: string; totalNiveis: number; aprovacoes: AprovacaoDoPedido[] }> {
+  const pool = await getSqlServerPool();
+  const result = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .query<{
+      numero_aprovacao: number;
+      status: string;
+      ordem: number | null;
+      nivel_nome: string | null;
+      usuario_id: string | null;
+      nome: string | null;
+      decidido_em: string | null;
+      total_niveis: number;
+    }>(`
+      SELECT a.[numero] AS [numero_aprovacao], p.[status], e.[ordem], e.[nivel_nome],
+             (SELECT COUNT(*) FROM dbo.portal_aprovacoes_etapas AS et
+              WHERE et.[item_id] = p.[id]
+                AND et.[ciclo] = (SELECT MAX(ec.[ciclo]) FROM dbo.portal_aprovacoes_etapas AS ec WHERE ec.[item_id] = p.[id])) AS [total_niveis],
+             CONVERT(VARCHAR(36), e.[decidido_por_usuario_id]) AS [usuario_id], e.[decidido_por_nome] AS [nome],
+             CONVERT(VARCHAR(33), e.[decidido_em], 126) AS [decidido_em]
+      FROM dbo.portal_aprovacoes_pedido_compra AS p
+      INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = p.[aprovacao_id]
+      LEFT JOIN dbo.portal_aprovacoes_etapas AS e
+        ON e.[item_id] = p.[id] AND e.[status] = 'aprovado'
+        AND e.[ciclo] = (SELECT MAX(ec.[ciclo]) FROM dbo.portal_aprovacoes_etapas AS ec WHERE ec.[item_id] = p.[id])
+      WHERE p.[id] = @id
+      ORDER BY e.[ordem];
+    `);
+
+  const linhas = result.recordset;
+  const devolvido = linhas[0]?.status === "devolvido";
+
+  return {
+    numeroAprovacao: linhas[0]?.numero_aprovacao ?? 0,
+    status: linhas[0]?.status ?? "",
+    totalNiveis: linhas[0]?.total_niveis ?? 0,
+    aprovacoes: devolvido
+      ? []
+      : linhas
+          .filter((linha) => linha.ordem !== null && linha.nome && linha.decidido_em)
+          .map((linha) => ({
+            nivelOrdem: linha.ordem!,
+            nivelNome: linha.nivel_nome ?? "",
+            usuarioId: linha.usuario_id,
+            nome: linha.nome!,
+            decididoEm: linha.decidido_em!,
+          })),
+  };
 }

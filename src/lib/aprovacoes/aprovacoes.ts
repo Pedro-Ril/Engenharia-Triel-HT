@@ -4,11 +4,23 @@ import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { ValidationError } from "@/lib/auth/errors";
 import type { PortalUsuario } from "@/lib/auth/usuarios";
 
+import {
+  decidirEtapa,
+  iniciarFluxo,
+  sqlColunasNivelAtual,
+  sqlNaVezDoUsuario,
+  sqlParticipaDaCadeia,
+  sqlSemCadeia,
+  type ResultadoEtapa,
+} from "./alcadas/fluxo";
 import type { TipoAprovacao } from "./tipos-aprovacao";
 
 export const MAXIMO_COLABORADORES_POR_SOLICITACAO = 100;
 
-export type StatusItemAprovacao = "pendente" | "aprovado" | "reprovado";
+/* "reprovado" só existe em itens decididos antes das alçadas; hoje a negativa é "devolvido". */
+export type StatusItemAprovacao = "pendente" | "aprovado" | "reprovado" | "devolvido";
+
+const TIPO_REAJUSTE: TipoAprovacao = "aumento_salarial";
 
 export type { TipoAprovacao };
 
@@ -60,6 +72,10 @@ export interface ItemAumentoSalarial {
   resumoTitulo: string;
   /* Último envio do relatório da SOLICITAÇÃO (repetido em cada item dela). */
   relatorioEnviado: EnvioRelatorio | null;
+  /* É a vez de quem está consultando decidir (o nível pendente é o dele). */
+  naMinhaVez: boolean;
+  /* Pendente: em que nível da alçada está. */
+  nivelAtual: { ordem: number; total: number; nome: string; direcionadoPara: string | null } | null;
 }
 
 export interface AprovacaoLote {
@@ -131,8 +147,14 @@ interface ItemRow {
   relatorio_enviado_em: string | null;
   relatorio_enviado_por: string | null;
   relatorio_enviado_para: string | null;
+  na_minha_vez: number;
+  nivel_ordem: number | null;
+  nivel_nome: string | null;
+  nivel_total: number | null;
+  nivel_direcionado: string | null;
 }
 
+/* Toda consulta com colunasItem declara @usuarioId (quem está vendo; NULL = ninguém em particular). */
 const colunasItem = `
   CONVERT(VARCHAR(36), i.[id]) AS [item_id],
   CONVERT(VARCHAR(36), a.[id]) AS [aprovacao_id],
@@ -162,7 +184,9 @@ const colunasItem = `
   i.[decidido_por_nome],
   CONVERT(VARCHAR(33), i.[decidido_em], 126) AS [decidido_em],
   i.[comentario_decisao],
-  i.[observacao]
+  i.[observacao],
+  CASE WHEN ${sqlNaVezDoUsuario("i.[id]")} THEN 1 ELSE 0 END AS [na_minha_vez],
+  ${sqlColunasNivelAtual("i.[id]")}
 `;
 
 function formatarMoeda(valor: number): string {
@@ -205,8 +229,33 @@ function mapItemRow(row: ItemRow): ItemAumentoSalarial {
           para: row.relatorio_enviado_para ?? "-",
         }
       : null,
+    naMinhaVez: row.na_minha_vez === 1,
+    nivelAtual:
+      row.nivel_ordem !== null && row.nivel_nome
+        ? {
+            ordem: row.nivel_ordem,
+            total: row.nivel_total ?? row.nivel_ordem,
+            nome: row.nivel_nome,
+            direcionadoPara: row.nivel_direcionado,
+          }
+        : null,
   };
 }
+
+/*
+ * Quem enxerga o item `i` no painel: na fila ("pendente"), só quando é
+ * a vez do nível dele; no histórico, quando a cadeia já chegou ao nível
+ * dele. Itens de antes das alçadas (sem cadeia) seguem visíveis para
+ * quem decide reajuste, como antes.
+ */
+const visibilidadePainel = `(
+  (@status = 'pendente' AND i.[status] = 'pendente' AND ${sqlNaVezDoUsuario("i.[id]")})
+  OR (
+    @status <> 'pendente'
+    AND (${sqlParticipaDaCadeia("i.[id]")} OR ${sqlSemCadeia("i.[id]")})
+    AND (@status = '' OR i.[status] = @status)
+  )
+)`;
 
 export interface ItemCriarSolicitacaoParams {
   funcionarioCodigo: string;
@@ -295,7 +344,7 @@ export async function criarSolicitacaoAumentoSalarial(
     for (const item of params.itens) {
       const novoSalario = Math.round((item.salarioAtual + item.valorReajuste) * 100) / 100;
 
-      await new sql.Request(transaction)
+      const inserido = await new sql.Request(transaction)
         .input("aprovacaoId", sql.UniqueIdentifier, aprovacaoId)
         .input("funcionarioCodigo", sql.VarChar(30), item.funcionarioCodigo)
         .input("funcionarioNome", sql.NVarChar(200), item.funcionarioNome)
@@ -309,12 +358,26 @@ export async function criarSolicitacaoAumentoSalarial(
         .input("percentualReajuste", sql.Decimal(9, 4), item.percentualReajuste)
         .input("novoSalario", sql.Decimal(14, 2), novoSalario)
         .input("observacao", sql.NVarChar(2000), item.observacao)
-        .query(`
+        .query<{ id: string }>(`
           INSERT INTO dbo.portal_aprovacoes_aumento_salarial
             ([aprovacao_id], [funcionario_codigo], [funcionario_nome], [funcionario_cpf], [departamento], [setor], [data_admissao], [salario_atual], [valor_reajuste], [percentual_reajuste], [novo_salario], [observacao])
+          OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
           VALUES
             (@aprovacaoId, @funcionarioCodigo, @funcionarioNome, @funcionarioCpf, @departamento, @setor, @dataAdmissao, @salarioAtual, @valorReajuste, @percentualReajuste, @novoSalario, @observacao);
         `);
+
+      /*
+       * Cada colaborador entra na cadeia da alçada do SEU setor. Sem
+       * alçada (ou nível sem aprovador), a solicitação inteira não é
+       * criada -- o solicitante vê o motivo.
+       */
+      await iniciarFluxo(transaction, {
+        tipo: TIPO_REAJUSTE,
+        itemId: inserido.recordset[0].id,
+        contexto: { empresa: null, setor: item.setor },
+        usuario: { id: usuario.id, nome: usuario.nomeExibicao },
+        comentario: item.observacao ?? params.observacao,
+      });
     }
 
     await transaction.commit();
@@ -328,17 +391,38 @@ export async function criarSolicitacaoAumentoSalarial(
   return criado;
 }
 
-export async function buscarLotePorNumero(numero: number): Promise<AprovacaoLote | null> {
+/*
+ * O item `i` já chegou ao nível do usuário (ou é de antes das alçadas):
+ * o que o painel pode mostrar fora da fila. Sem @restringir, tudo.
+ */
+const visivelSeRestrito = `(
+  @restringir = 0
+  OR ${sqlParticipaDaCadeia("i.[id]")}
+  OR ${sqlSemCadeia("i.[id]")}
+)`;
+
+/*
+ * A solicitação com os colaboradores. Com `somenteVisiveis`, só os que a
+ * cadeia já trouxe ao nível do usuário -- na mesma solicitação pode
+ * haver colaborador de outro setor, numa alçada em que ele não está.
+ */
+export async function buscarLotePorNumero(
+  numero: number,
+  usuarioId: string | null = null,
+  opcoes: { somenteVisiveis?: boolean } = {}
+): Promise<AprovacaoLote | null> {
   const pool = await getSqlServerPool();
 
   const result = await pool
     .request()
     .input("numero", sql.Int, numero)
+    .input("usuarioId", sql.UniqueIdentifier, usuarioId)
+    .input("restringir", sql.Bit, opcoes.somenteVisiveis === true)
     .query<ItemRow>(`
       SELECT ${colunasItem}
       FROM dbo.portal_aprovacoes AS a
       INNER JOIN dbo.portal_aprovacoes_aumento_salarial AS i ON i.[aprovacao_id] = a.[id]
-      WHERE a.[numero] = @numero
+      WHERE a.[numero] = @numero AND ${visivelSeRestrito}
       ORDER BY i.[criado_em] ASC;
     `);
 
@@ -357,17 +441,23 @@ export async function buscarLotePorNumero(numero: number): Promise<AprovacaoLote
   };
 }
 
-export async function buscarItemPorId(itemId: string): Promise<ItemAumentoSalarial | null> {
+export async function buscarItemPorId(
+  itemId: string,
+  usuarioId: string | null = null,
+  opcoes: { somenteVisiveis?: boolean } = {}
+): Promise<ItemAumentoSalarial | null> {
   const pool = await getSqlServerPool();
 
   const result = await pool
     .request()
     .input("itemId", sql.UniqueIdentifier, itemId)
+    .input("usuarioId", sql.UniqueIdentifier, usuarioId)
+    .input("restringir", sql.Bit, opcoes.somenteVisiveis === true)
     .query<ItemRow>(`
       SELECT ${colunasItem}
       FROM dbo.portal_aprovacoes_aumento_salarial AS i
       INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = i.[aprovacao_id]
-      WHERE i.[id] = @itemId;
+      WHERE i.[id] = @itemId AND ${visivelSeRestrito};
     `);
 
   const row = result.recordset[0];
@@ -413,7 +503,8 @@ const ORDENACOES: Record<OrdemPainel, string> = {
  */
 export async function listarItensPainel(
   tiposAtendidos: TipoAprovacao[],
-  filtros: FiltrosPainel = {}
+  filtros: FiltrosPainel = {},
+  usuarioId: string
 ): Promise<ItemAumentoSalarial[]> {
   if (tiposAtendidos.length === 0) return [];
 
@@ -428,6 +519,7 @@ export async function listarItensPainel(
 
   const status = filtros.status ?? "pendente";
   request.input("status", sql.VarChar(20), status === "todos" ? "" : status);
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
 
   const busca = (filtros.busca ?? "").trim();
   request.input("busca", sql.NVarChar(200), busca);
@@ -444,7 +536,7 @@ export async function listarItensPainel(
     FROM dbo.portal_aprovacoes_aumento_salarial AS i
     INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = i.[aprovacao_id]
     WHERE a.[tipo] IN (${parametrosTipo.join(", ")})
-      AND (@status = '' OR i.[status] = @status)
+      AND ${visibilidadePainel}
       AND (
         @busca = ''
         OR i.[funcionario_nome] LIKE @buscaLike
@@ -480,7 +572,8 @@ export interface SolicitacaoResumoPainel {
  */
 export async function listarSolicitacoesPainel(
   tiposAtendidos: TipoAprovacao[],
-  filtros: FiltrosPainel = {}
+  filtros: FiltrosPainel = {},
+  usuarioId: string
 ): Promise<SolicitacaoResumoPainel[]> {
   if (tiposAtendidos.length === 0) return [];
 
@@ -495,6 +588,7 @@ export async function listarSolicitacoesPainel(
 
   const status = filtros.status ?? "pendente";
   request.input("status", sql.VarChar(20), status === "todos" ? "" : status);
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
 
   const busca = (filtros.busca ?? "").trim();
   request.input("busca", sql.NVarChar(200), busca);
@@ -518,28 +612,28 @@ export async function listarSolicitacoesPainel(
       a.[criado_por_nome],
       CONVERT(VARCHAR(33), a.[criado_em], 126) AS [criado_em],
       COUNT(*) AS [total_itens],
-      SUM(i.[valor_reajuste]) AS [total_reajuste],
-      SUM(CASE WHEN i.[status] = 'pendente' THEN 1 ELSE 0 END) AS [pendentes]
+      SUM(ia.[valor_reajuste]) AS [total_reajuste],
+      SUM(CASE WHEN ia.[status] = 'pendente' THEN 1 ELSE 0 END) AS [pendentes]
     FROM dbo.portal_aprovacoes AS a
-    INNER JOIN dbo.portal_aprovacoes_aumento_salarial AS i ON i.[aprovacao_id] = a.[id]
+    INNER JOIN dbo.portal_aprovacoes_aumento_salarial AS ia ON ia.[aprovacao_id] = a.[id]
     WHERE a.[tipo] IN (${parametrosTipo.join(", ")})
       AND EXISTS (
         SELECT 1
-        FROM dbo.portal_aprovacoes_aumento_salarial AS f
-        WHERE f.[aprovacao_id] = a.[id]
-          AND (@status = '' OR f.[status] = @status)
+        FROM dbo.portal_aprovacoes_aumento_salarial AS i
+        WHERE i.[aprovacao_id] = a.[id]
+          AND ${visibilidadePainel}
           AND (@tipoFiltro = '' OR a.[tipo] = @tipoFiltro)
-          AND (@departamento = '' OR f.[departamento] = @departamento)
-          AND (@setor = '' OR f.[setor] = @setor)
+          AND (@departamento = '' OR i.[departamento] = @departamento)
+          AND (@setor = '' OR i.[setor] = @setor)
           AND (
             @busca = ''
-            OR f.[funcionario_nome] LIKE @buscaLike
+            OR i.[funcionario_nome] LIKE @buscaLike
             OR a.[criado_por_nome] LIKE @buscaLike
           )
       )
     GROUP BY a.[numero], a.[tipo], a.[criado_por_nome], a.[criado_em]
     ORDER BY
-      CASE WHEN SUM(CASE WHEN i.[status] = 'pendente' THEN 1 ELSE 0 END) > 0 THEN 0 ELSE 1 END,
+      CASE WHEN SUM(CASE WHEN ia.[status] = 'pendente' THEN 1 ELSE 0 END) > 0 THEN 0 ELSE 1 END,
       a.[criado_em] DESC;
   `);
 
@@ -561,7 +655,8 @@ export async function listarSolicitacoesPainel(
  * abriu.
  */
 export async function contarPendentesPorTipo(
-  tiposAtendidos: TipoAprovacao[]
+  tiposAtendidos: TipoAprovacao[],
+  usuarioId: string
 ): Promise<Record<string, number>> {
   if (tiposAtendidos.length === 0) return {};
 
@@ -574,12 +669,15 @@ export async function contarPendentesPorTipo(
     return `@${nome}`;
   });
 
+  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+
   const result = await request.query<{ tipo: string; total: number }>(`
     SELECT a.[tipo], COUNT(*) AS [total]
     FROM dbo.portal_aprovacoes_aumento_salarial AS i
     INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = i.[aprovacao_id]
     WHERE a.[tipo] IN (${parametrosTipo.join(", ")})
       AND i.[status] = 'pendente'
+      AND ${sqlNaVezDoUsuario("i.[id]")}
     GROUP BY a.[tipo];
   `);
 
@@ -654,14 +752,29 @@ export interface AjusteValoresDecisao {
   percentualReajuste: number;
 }
 
+export interface DecisaoItem {
+  item: ItemAumentoSalarial;
+  /* avancou: subiu de nível | aprovado: era o último | devolvido: voltou ao solicitante. */
+  etapa: ResultadoEtapa;
+}
+
+/*
+ * Decide o colaborador no nível da vez de quem decide: aprovar sobe para
+ * o próximo nível (ou aprova em definitivo no último); devolver encerra
+ * a cadeia e o solicitante pode ajustar e reenviar. A etapa e o item
+ * mudam na mesma transação.
+ *
+ * O ajuste de valor/percentual continua valendo em qualquer nível -- o
+ * "original" guarda o que o solicitante pediu, na primeira alteração.
+ */
 async function decidirItem(
   itemId: string,
   usuario: Pick<PortalUsuario, "id" | "nomeExibicao">,
-  novoStatus: Extract<StatusItemAprovacao, "aprovado" | "reprovado">,
+  acao: "aprovar" | "devolver",
   comentario: string | null,
   ajuste: AjusteValoresDecisao | null
-): Promise<ItemAumentoSalarial> {
-  const atual = await buscarItemPorId(itemId);
+): Promise<DecisaoItem> {
+  const atual = await buscarItemPorId(itemId, usuario.id);
   if (!atual) {
     throw new ValidationError("Colaborador não encontrado nesta solicitação.");
   }
@@ -695,44 +808,72 @@ async function decidirItem(
   }
 
   const pool = await getSqlServerPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
 
-  const result = await pool
-    .request()
-    .input("itemId", sql.UniqueIdentifier, itemId)
-    .input("status", sql.VarChar(20), novoStatus)
-    .input("decididoPorUsuarioId", sql.UniqueIdentifier, usuario.id)
-    .input("decididoPorNome", sql.NVarChar(200), usuario.nomeExibicao)
-    .input("comentario", sql.NVarChar(2000), comentario)
-    .input("alterou", sql.Bit, alterou)
-    .input("valorReajuste", sql.Decimal(14, 2), valorReajuste)
-    .input("percentualReajuste", sql.Decimal(9, 4), percentualReajuste)
-    .input("novoSalario", sql.Decimal(14, 2), novoSalario)
-    .query(`
-      UPDATE dbo.portal_aprovacoes_aumento_salarial
-      SET
-        /* Guarda o que o solicitante pediu só na PRIMEIRA alteração -- depois disso o "original" já está registrado. */
-        [valor_reajuste_original] = CASE WHEN @alterou = 1 AND [valor_reajuste_original] IS NULL THEN [valor_reajuste] ELSE [valor_reajuste_original] END,
-        [percentual_reajuste_original] = CASE WHEN @alterou = 1 AND [percentual_reajuste_original] IS NULL THEN [percentual_reajuste] ELSE [percentual_reajuste_original] END,
-        [novo_salario_original] = CASE WHEN @alterou = 1 AND [novo_salario_original] IS NULL THEN [novo_salario] ELSE [novo_salario_original] END,
-        [valor_reajuste] = @valorReajuste,
-        [percentual_reajuste] = @percentualReajuste,
-        [novo_salario] = @novoSalario,
-        [status] = @status,
-        [decidido_por_usuario_id] = @decididoPorUsuarioId,
-        [decidido_por_nome] = @decididoPorNome,
-        [decidido_em] = SYSDATETIME(),
-        [comentario_decisao] = @comentario,
-        [atualizado_em] = SYSDATETIME()
-      WHERE [id] = @itemId AND [status] = 'pendente';
-    `);
+  let etapa: ResultadoEtapa;
 
-  if ((result.rowsAffected[0] ?? 0) === 0) {
-    throw new ValidationError("Este colaborador já foi decidido ou não existe.");
+  try {
+    /* Trava o item: duas pessoas do mesmo nível decidindo ao mesmo tempo -- a segunda recebe "já decidido". */
+    const travado = await new sql.Request(transaction)
+      .input("itemId", sql.UniqueIdentifier, itemId)
+      .query<{ status: string }>(`
+        SELECT [status] FROM dbo.portal_aprovacoes_aumento_salarial WITH (UPDLOCK, HOLDLOCK) WHERE [id] = @itemId;
+      `);
+    if (travado.recordset[0]?.status !== "pendente") {
+      throw new ValidationError("Este colaborador já foi decidido.");
+    }
+
+    etapa = await decidirEtapa(transaction, {
+      tipo: TIPO_REAJUSTE,
+      itemId,
+      usuario: { id: usuario.id, nome: usuario.nomeExibicao },
+      acao,
+      comentario,
+    });
+
+    const terminou = etapa.resultado !== "avancou";
+
+    await new sql.Request(transaction)
+      .input("itemId", sql.UniqueIdentifier, itemId)
+      .input("terminou", sql.Bit, terminou)
+      .input("status", sql.VarChar(20), etapa.resultado === "devolvido" ? "devolvido" : "aprovado")
+      .input("decididoPorUsuarioId", sql.UniqueIdentifier, usuario.id)
+      .input("decididoPorNome", sql.NVarChar(200), usuario.nomeExibicao)
+      .input("comentario", sql.NVarChar(2000), comentario)
+      .input("alterou", sql.Bit, alterou)
+      .input("valorReajuste", sql.Decimal(14, 2), valorReajuste)
+      .input("percentualReajuste", sql.Decimal(9, 4), percentualReajuste)
+      .input("novoSalario", sql.Decimal(14, 2), novoSalario)
+      .query(`
+        UPDATE dbo.portal_aprovacoes_aumento_salarial
+        SET
+          /* Guarda o que o solicitante pediu só na PRIMEIRA alteração -- depois disso o "original" já está registrado. */
+          [valor_reajuste_original] = CASE WHEN @alterou = 1 AND [valor_reajuste_original] IS NULL THEN [valor_reajuste] ELSE [valor_reajuste_original] END,
+          [percentual_reajuste_original] = CASE WHEN @alterou = 1 AND [percentual_reajuste_original] IS NULL THEN [percentual_reajuste] ELSE [percentual_reajuste_original] END,
+          [novo_salario_original] = CASE WHEN @alterou = 1 AND [novo_salario_original] IS NULL THEN [novo_salario] ELSE [novo_salario_original] END,
+          [valor_reajuste] = @valorReajuste,
+          [percentual_reajuste] = @percentualReajuste,
+          [novo_salario] = @novoSalario,
+          /* Só a última aprovação (ou a devolução) fecha o item; subir de nível não muda o status. */
+          [status] = CASE WHEN @terminou = 1 THEN @status ELSE [status] END,
+          [decidido_por_usuario_id] = CASE WHEN @terminou = 1 THEN @decididoPorUsuarioId ELSE [decidido_por_usuario_id] END,
+          [decidido_por_nome] = CASE WHEN @terminou = 1 THEN @decididoPorNome ELSE [decidido_por_nome] END,
+          [decidido_em] = CASE WHEN @terminou = 1 THEN SYSDATETIME() ELSE [decidido_em] END,
+          [comentario_decisao] = CASE WHEN @terminou = 1 THEN @comentario ELSE [comentario_decisao] END,
+          [atualizado_em] = SYSDATETIME()
+        WHERE [id] = @itemId;
+      `);
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
   }
 
-  const atualizado = await buscarItemPorId(itemId);
+  const atualizado = await buscarItemPorId(itemId, usuario.id);
   if (!atualizado) throw new Error("Item decidido mas não encontrado logo em seguida.");
-  return atualizado;
+  return { item: atualizado, etapa };
 }
 
 export function aprovarItem(
@@ -740,17 +881,18 @@ export function aprovarItem(
   usuario: Pick<PortalUsuario, "id" | "nomeExibicao">,
   comentario: string | null,
   ajuste: AjusteValoresDecisao | null = null
-): Promise<ItemAumentoSalarial> {
-  return decidirItem(itemId, usuario, "aprovado", comentario, ajuste);
+): Promise<DecisaoItem> {
+  return decidirItem(itemId, usuario, "aprovar", comentario, ajuste);
 }
 
-export function reprovarItem(
+/* Devolve ao solicitante (antes: "reprovar"). O motivo é obrigatório na rota. */
+export function devolverItem(
   itemId: string,
   usuario: Pick<PortalUsuario, "id" | "nomeExibicao">,
   comentario: string,
   ajuste: AjusteValoresDecisao | null = null
-): Promise<ItemAumentoSalarial> {
-  return decidirItem(itemId, usuario, "reprovado", comentario, ajuste);
+): Promise<DecisaoItem> {
+  return decidirItem(itemId, usuario, "devolver", comentario, ajuste);
 }
 
 export interface FalhaDecisaoLote {
@@ -759,34 +901,34 @@ export interface FalhaDecisaoLote {
 }
 
 export interface ResultadoDecisaoLote {
-  decididos: ItemAumentoSalarial[];
+  decididos: DecisaoItem[];
   falhas: FalhaDecisaoLote[];
 }
 
 /*
- * Decide vários colaboradores de uma vez no painel. Sem ajuste de
- * valores de propósito: mexer em valor é conferência individual, não
- * cabe numa ação que atinge a seleção inteira.
+ * Decide vários colaboradores de uma vez no painel, no nível de quem
+ * decide. Sem ajuste de valores de propósito: mexer em valor é
+ * conferência individual, não cabe numa ação que atinge a seleção.
  *
- * Um item que falha (já decidido por outra pessoa no meio do caminho)
- * não derruba os demais -- entra em `falhas` e a tela mostra o resumo.
+ * Um item que falha (já decidido por outra pessoa, ou não está na vez
+ * de quem decide) não derruba os demais -- entra em `falhas`.
  */
 export async function decidirItensEmLote(
   itemIds: string[],
   usuario: Pick<PortalUsuario, "id" | "nomeExibicao">,
-  novoStatus: Extract<StatusItemAprovacao, "aprovado" | "reprovado">,
+  acao: "aprovar" | "devolver",
   comentario: string | null
 ): Promise<ResultadoDecisaoLote> {
   if (itemIds.length === 0) {
     throw new ValidationError("Selecione ao menos um colaborador.");
   }
 
-  const decididos: ItemAumentoSalarial[] = [];
+  const decididos: DecisaoItem[] = [];
   const falhas: FalhaDecisaoLote[] = [];
 
   for (const itemId of itemIds) {
     try {
-      decididos.push(await decidirItem(itemId, usuario, novoStatus, comentario, null));
+      decididos.push(await decidirItem(itemId, usuario, acao, comentario, null));
     } catch (error) {
       falhas.push({
         itemId,
@@ -796,6 +938,136 @@ export async function decidirItensEmLote(
   }
 
   return { decididos, falhas };
+}
+
+/*
+ * O solicitante ajusta e reenvia um colaborador devolvido: os valores
+ * novos viram o "pedido" (o original da direção é zerado, já que a
+ * base mudou) e a cadeia recomeça do nível 1, num ciclo novo.
+ */
+export async function reenviarItem(
+  itemId: string,
+  usuario: Pick<PortalUsuario, "id" | "nomeExibicao">,
+  dados: { valorReajuste: number; percentualReajuste: number; comentario: string | null }
+): Promise<ItemAumentoSalarial> {
+  const atual = await buscarItemPorId(itemId, usuario.id);
+  if (!atual || atual.criadoPorUsuarioId.toUpperCase() !== usuario.id.toUpperCase()) {
+    throw new ValidationError("Colaborador não encontrado nas suas solicitações.");
+  }
+  if (atual.status !== "devolvido") {
+    throw new ValidationError("Só dá para reenviar um colaborador devolvido.");
+  }
+  if (!Number.isFinite(dados.valorReajuste) || dados.valorReajuste <= 0) {
+    throw new ValidationError("O valor do reajuste deve ser maior que zero.");
+  }
+  if (!Number.isFinite(dados.percentualReajuste) || dados.percentualReajuste <= 0) {
+    throw new ValidationError("O percentual do reajuste deve ser maior que zero.");
+  }
+
+  const valorReajuste = Math.round(dados.valorReajuste * 100) / 100;
+  const percentualReajuste = Math.round(dados.percentualReajuste * 10000) / 10000;
+  const novoSalario = Math.round((atual.salarioAtual + valorReajuste) * 100) / 100;
+
+  const pool = await getSqlServerPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const atualizado = await new sql.Request(transaction)
+      .input("itemId", sql.UniqueIdentifier, itemId)
+      .input("valorReajuste", sql.Decimal(14, 2), valorReajuste)
+      .input("percentualReajuste", sql.Decimal(9, 4), percentualReajuste)
+      .input("novoSalario", sql.Decimal(14, 2), novoSalario)
+      .query(`
+        UPDATE dbo.portal_aprovacoes_aumento_salarial
+        SET [valor_reajuste] = @valorReajuste,
+            [percentual_reajuste] = @percentualReajuste,
+            [novo_salario] = @novoSalario,
+            [valor_reajuste_original] = NULL,
+            [percentual_reajuste_original] = NULL,
+            [novo_salario_original] = NULL,
+            [status] = 'pendente',
+            [decidido_por_usuario_id] = NULL,
+            [decidido_por_nome] = NULL,
+            [decidido_em] = NULL,
+            [comentario_decisao] = NULL,
+            [atualizado_em] = SYSDATETIME()
+        WHERE [id] = @itemId AND [status] = 'devolvido';
+      `);
+
+    if ((atualizado.rowsAffected[0] ?? 0) === 0) {
+      throw new ValidationError("Este colaborador não está mais devolvido.");
+    }
+
+    await iniciarFluxo(transaction, {
+      tipo: TIPO_REAJUSTE,
+      itemId,
+      contexto: { empresa: null, setor: atual.setor },
+      usuario: { id: usuario.id, nome: usuario.nomeExibicao },
+      comentario: dados.comentario,
+    });
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
+  }
+
+  const final = await buscarItemPorId(itemId, usuario.id);
+  if (!final) throw new Error("Item reenviado mas não encontrado logo em seguida.");
+  return final;
+}
+
+/*
+ * Colaboradores pendentes que entraram antes das alçadas (sem cadeia):
+ * entram no nível 1 da alçada do setor assim que ela existir. Sem
+ * alçada ainda, ficam como estão -- a próxima carga do painel tenta de
+ * novo. Devolve os ids que entraram (para avisar o nível 1).
+ */
+export async function iniciarFluxosReajusteSemEtapa(): Promise<string[]> {
+  const pool = await getSqlServerPool();
+
+  const semCadeia = await pool.request().query<{
+    id: string;
+    setor: string | null;
+    observacao: string | null;
+    criado_por_usuario_id: string | null;
+    criado_por_nome: string;
+    enviado_em: string;
+  }>(`
+    SELECT TOP 100 CONVERT(VARCHAR(36), i.[id]) AS [id], i.[setor], i.[observacao],
+           CONVERT(VARCHAR(33), i.[criado_em], 126) AS [enviado_em],
+           CONVERT(VARCHAR(36), a.[criado_por_usuario_id]) AS [criado_por_usuario_id], a.[criado_por_nome]
+    FROM dbo.portal_aprovacoes_aumento_salarial AS i
+    INNER JOIN dbo.portal_aprovacoes AS a ON a.[id] = i.[aprovacao_id]
+    WHERE i.[status] = 'pendente' AND ${sqlSemCadeia("i.[id]")}
+    ORDER BY i.[criado_em];
+  `);
+
+  const iniciados: string[] = [];
+
+  for (const item of semCadeia.recordset) {
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      await iniciarFluxo(transaction, {
+        tipo: TIPO_REAJUSTE,
+        itemId: item.id,
+        contexto: { empresa: null, setor: item.setor },
+        usuario: { id: item.criado_por_usuario_id, nome: item.criado_por_nome },
+        comentario: item.observacao,
+        enviadoEm: item.enviado_em,
+      });
+      await transaction.commit();
+      iniciados.push(item.id);
+    } catch (error) {
+      await transaction.rollback().catch(() => {});
+      if (!(error instanceof ValidationError)) throw error;
+    }
+  }
+
+  return iniciados;
 }
 
 export interface RelatorioSolicitacao {
@@ -843,6 +1115,7 @@ export async function montarRelatorioSolicitacao(
     observacao: lote.observacao,
     aprovados,
     totalItens: lote.itens.length,
-    totalReprovados: lote.itens.filter((item) => item.status === "reprovado").length,
+    /* Devolvido conta junto: não foi aprovado nesta rodada. */
+    totalReprovados: lote.itens.filter((item) => item.status === "reprovado" || item.status === "devolvido").length,
   };
 }

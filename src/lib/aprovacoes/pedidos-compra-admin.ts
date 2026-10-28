@@ -6,12 +6,11 @@ import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { fetchMonitorado } from "@/lib/monitoramento/integracao-externa";
 
-import { ehEmpresaPedidoCompra } from "./empresas-pedido-compra";
-
 /*
- * Administração dos pedidos de compra (Diretoria -> Pedidos de
- * Compra): escopo por empresa de cada diretor e a integração -- URLs do
- * ERP e a chave que o SupriConnect usa para chamar o portal.
+ * Administração dos pedidos de compra (Diretoria -> Configurações ->
+ * Pedidos de Compra): a integração -- URLs do ERP e a chave que o
+ * SupriConnect usa para chamar o portal. Quem aprova é a alçada
+ * (Diretoria -> Alçadas, src/lib/aprovacoes/alcadas).
  */
 
 /* ---------------------------------------------------------------
@@ -256,89 +255,4 @@ export async function testarConsultaPedidoErp(params: { empresa: number; numero:
       corpo: error instanceof Error ? `Sem resposta do ERP: ${error.message}` : "Sem resposta do ERP.",
     };
   }
-}
-
-/* ---------------------------------------------------------------
-   Escopo por empresa
-   --------------------------------------------------------------- */
-
-export interface EscopoEmpresasAprovador {
-  usuarioId: string;
-  empresas: number[];
-}
-
-export async function listarEscopoEmpresas(): Promise<EscopoEmpresasAprovador[]> {
-  const pool = await getSqlServerPool();
-
-  const result = await pool.request().query<{ usuario_id: string; empresa: number }>(`
-    SELECT CONVERT(VARCHAR(36), [usuario_id]) AS [usuario_id], [empresa]
-    FROM dbo.portal_aprovacoes_pedido_compra_empresas
-    ORDER BY [usuario_id], [empresa];
-  `);
-
-  const porUsuario = new Map<string, number[]>();
-  result.recordset.forEach((linha) => {
-    const lista = porUsuario.get(linha.usuario_id) ?? [];
-    lista.push(linha.empresa);
-    porUsuario.set(linha.usuario_id, lista);
-  });
-
-  return [...porUsuario.entries()].map(([usuarioId, empresas]) => ({ usuarioId, empresas }));
-}
-
-/* Substitui as empresas do diretor pelas marcadas na tela. */
-export async function definirEmpresasAprovador(params: {
-  usuarioId: string;
-  empresas: number[];
-  alteradoPor: string;
-}): Promise<EscopoEmpresasAprovador> {
-  const empresas = [...new Set(params.empresas)];
-
-  if (!empresas.every(ehEmpresaPedidoCompra)) {
-    throw new ValidationError("Empresa inválida.");
-  }
-
-  const pool = await getSqlServerPool();
-
-  /* Empresa só faz efeito para quem é aprovador de pedido de compra. */
-  if (empresas.length > 0) {
-    const aprovador = await pool
-      .request()
-      .input("usuarioId", sql.UniqueIdentifier, params.usuarioId)
-      .query(`
-        SELECT 1 AS [ok] FROM dbo.portal_aprovacoes_atendentes
-        WHERE [usuario_id] = @usuarioId AND [tipo] = 'pedido_compra';
-      `);
-
-    if (aprovador.recordset.length === 0) {
-      throw new ValidationError("Marque o usuário como aprovador de Pedidos de Compra na aba Aprovadores primeiro.");
-    }
-  }
-
-  const transaction = new sql.Transaction(pool);
-  await transaction.begin();
-
-  try {
-    await new sql.Request(transaction)
-      .input("usuarioId", sql.UniqueIdentifier, params.usuarioId)
-      .query(`DELETE FROM dbo.portal_aprovacoes_pedido_compra_empresas WHERE [usuario_id] = @usuarioId;`);
-
-    for (const empresa of empresas) {
-      await new sql.Request(transaction)
-        .input("usuarioId", sql.UniqueIdentifier, params.usuarioId)
-        .input("empresa", sql.Int, empresa)
-        .input("criadoPor", sql.NVarChar(200), params.alteradoPor)
-        .query(`
-          INSERT INTO dbo.portal_aprovacoes_pedido_compra_empresas ([usuario_id], [empresa], [criado_por])
-          VALUES (@usuarioId, @empresa, @criadoPor);
-        `);
-    }
-
-    await transaction.commit();
-  } catch (error) {
-    await transaction.rollback().catch(() => {});
-    throw error;
-  }
-
-  return { usuarioId: params.usuarioId, empresas: empresas.sort((a, b) => a - b) };
 }

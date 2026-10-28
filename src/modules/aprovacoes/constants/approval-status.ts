@@ -1,6 +1,6 @@
 import type { StatusAprovacao } from "../types/aprovacoes.types";
 
-export type StatusAprovacaoBadgeVariant = "warning" | "success" | "danger";
+export type StatusAprovacaoBadgeVariant = "warning" | "success" | "danger" | "info";
 
 export interface StatusAprovacaoConfig {
   label: string;
@@ -11,4 +11,5 @@ export const statusAprovacaoConfig: Record<StatusAprovacao, StatusAprovacaoConfi
   pendente: { label: "Pendente", badgeVariant: "warning" },
   aprovado: { label: "Aprovado", badgeVariant: "success" },
   reprovado: { label: "Reprovado", badgeVariant: "danger" },
+  devolvido: { label: "Devolvido", badgeVariant: "info" },
 };

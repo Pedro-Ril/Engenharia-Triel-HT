@@ -33,7 +33,7 @@ vi.mock("@/lib/database/sql-server", async (importOriginal) => ({
 
 vi.mock("@/lib/monitoramento/integracao-externa", () => ({ fetchMonitorado: vi.fn() }));
 
-const { conferirChaveExterna, definirEmpresasAprovador, montarUrlPedido, salvarConfigPedidosCompra } = await import(
+const { conferirChaveExterna, montarUrlPedido, salvarConfigPedidosCompra } = await import(
   "./pedidos-compra-admin"
 );
 
@@ -87,24 +87,6 @@ describe("conferirChaveExterna", () => {
   it("hash gravado em maiúsculas (CHAR(64) editado à mão) ainda confere", async () => {
     proximoRecordset = [{ chave_externa_hash: sha256("abc123").toUpperCase() }];
     await expect(conferirChaveExterna("abc123")).resolves.toBe("valida");
-  });
-});
-
-describe("definirEmpresasAprovador", () => {
-  const usuarioId = "11111111-1111-1111-1111-111111111111";
-
-  it("recusa empresa que não é do Focco sem tocar no banco", async () => {
-    await expect(definirEmpresasAprovador({ usuarioId, empresas: [2, 99], alteradoPor: "x" })).rejects.toThrow(
-      ValidationError
-    );
-    expect(consultas).toHaveLength(0);
-  });
-
-  it("recusa marcar empresa para quem não é aprovador de pedido de compra", async () => {
-    proximoRecordset = [];
-    await expect(definirEmpresasAprovador({ usuarioId, empresas: [2], alteradoPor: "x" })).rejects.toThrow(
-      /aprovador de Pedidos de Compra/
-    );
   });
 });
 

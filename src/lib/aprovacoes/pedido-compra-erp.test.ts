@@ -108,6 +108,7 @@ describe("normalizarPedidoErp", () => {
       total: 0.1,
       entrega: "21/10/2026",
       centroCusto: "ABTS - MARICA OF 2972",
+      centroCustoCodigo: "9090582",
     });
   });
 

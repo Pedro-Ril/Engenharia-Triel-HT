@@ -11,10 +11,12 @@ import type {
 import type { WikiArtigo, WikiTopico } from "@/modules/wiki/types/wiki.types";
 
 import type {
-  AprovacaoAtendente,
+  AlcadaConfig,
+  DadosAlcadaEnvio,
+  HistoricoAlcada,
+  RubricaAprovador,
   ConfigAprovacoes,
   ConfigPedidosCompra,
-  EscopoEmpresasAprovador,
   ResultadoTesteErpPedido,
   Atualizacao,
   AtualizacaoTag,
@@ -1267,39 +1269,55 @@ export async function contarRegrasEscopoPorUsuario(): Promise<ApiEnvelope<Record
 }
 
 /* =========================================================
-   Aprovações — aprovadores (usuário x setor x tipo)
+   Aprovações — alçadas (níveis e aprovadores por tipo)
    ========================================================= */
 
-export async function listarAtendentesAprovacoes(): Promise<ApiEnvelope<AprovacaoAtendente[]>> {
-  const response = await fetch("/api/admin/aprovacoes/atendentes");
-  return parseResponse<AprovacaoAtendente[]>(response);
+export async function listarAlcadas(): Promise<
+  ApiEnvelope<{ alcadas: AlcadaConfig[]; historico: HistoricoAlcada[]; setores: string[] }>
+> {
+  const response = await fetch("/api/admin/aprovacoes/alcadas", { cache: "no-store" });
+  return parseResponse(response);
 }
 
-export async function adicionarAtendenteAprovacao(dados: {
-  usuarioId: string;
-  tipo: string;
-}): Promise<ApiEnvelope<AprovacaoAtendente>> {
-  const response = await fetch("/api/admin/aprovacoes/atendentes", {
-    method: "POST",
+export async function salvarAlcada(dados: DadosAlcadaEnvio, id?: string): Promise<ApiEnvelope<AlcadaConfig>> {
+  const response = await fetch(id ? `/api/admin/aprovacoes/alcadas/${id}` : "/api/admin/aprovacoes/alcadas", {
+    method: id ? "PUT" : "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
   });
-  return parseResponse<AprovacaoAtendente>(response);
+  return parseResponse<AlcadaConfig>(response);
 }
 
-export async function removerAtendenteAprovacao(
-  usuarioId: string,
-  tipo: string
-): Promise<ApiEnvelope<null>> {
-  const parametros = new URLSearchParams({ usuarioId, tipo });
-  const response = await fetch(`/api/admin/aprovacoes/atendentes?${parametros.toString()}`, {
-    method: "DELETE",
-  });
+export async function excluirAlcada(id: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/aprovacoes/alcadas/${id}`, { method: "DELETE" });
   return parseResponse<null>(response);
 }
 
+/* Rubricas dos aprovadores (PNG estampado no PDF do pedido de compra). */
+export async function listarRubricas(): Promise<ApiEnvelope<RubricaAprovador[]>> {
+  const response = await fetch("/api/admin/aprovacoes/rubricas", { cache: "no-store" });
+  return parseResponse<RubricaAprovador[]>(response);
+}
+
+export async function enviarRubrica(usuarioId: string, arquivo: File): Promise<ApiEnvelope<null>> {
+  const formulario = new FormData();
+  formulario.append("arquivo", arquivo);
+  const response = await fetch(`/api/admin/aprovacoes/rubricas/${usuarioId}`, { method: "PUT", body: formulario });
+  return parseResponse<null>(response);
+}
+
+export async function removerRubrica(usuarioId: string): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/aprovacoes/rubricas/${usuarioId}`, { method: "DELETE" });
+  return parseResponse<null>(response);
+}
+
+/* Endereço da prévia (só administrador). `versao` evita a imagem antiga em cache depois de trocar. */
+export function urlPreviaRubrica(usuarioId: string, versao: string | null): string {
+  return `/api/admin/aprovacoes/rubricas/${usuarioId}?v=${encodeURIComponent(versao ?? "")}`;
+}
+
 /* =========================================================
-   Aprovações — pedidos de compra (escopo por empresa e integração)
+   Aprovações — pedidos de compra (integração com o ERP e o SupriConnect)
    ========================================================= */
 
 export async function buscarConfigPedidosCompra(): Promise<ApiEnvelope<ConfigPedidosCompra>> {
@@ -1343,23 +1361,6 @@ export async function testarErpPedidosCompra(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ResultadoTesteErpPedido>(response);
-}
-
-export async function listarEscopoEmpresasPedidosCompra(): Promise<ApiEnvelope<EscopoEmpresasAprovador[]>> {
-  const response = await fetch("/api/admin/aprovacoes/pedidos-compra/empresas");
-  return parseResponse<EscopoEmpresasAprovador[]>(response);
-}
-
-export async function salvarEmpresasAprovadorPedidosCompra(
-  usuarioId: string,
-  empresas: number[]
-): Promise<ApiEnvelope<EscopoEmpresasAprovador>> {
-  const response = await fetch(`/api/admin/aprovacoes/pedidos-compra/empresas/${usuarioId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ empresas }),
-  });
-  return parseResponse<EscopoEmpresasAprovador>(response);
 }
 
 export async function buscarConfigAprovacoes(): Promise<ApiEnvelope<ConfigAprovacoes>> {

@@ -40,6 +40,7 @@ vi.mock("@/lib/database/sql-server", async (importOriginal) => ({
 }));
 
 const {
+  centrosCustoDosItens,
   completarFotosFaltantes,
   conferirNoErp,
   dataIso,
@@ -251,6 +252,7 @@ describe("primeiraEntrega", () => {
     total: 0,
     entrega,
     centroCusto: null,
+    centroCustoCodigo: null,
     observacao: null,
   });
 
@@ -261,6 +263,15 @@ describe("primeiraEntrega", () => {
   it("ignora itens sem data ou com data inválida", () => {
     expect(primeiraEntrega({ itens: [item(null), item("31/02/2026"), item("10/11/2026")] })).toBe("2026-11-10");
     expect(primeiraEntrega({ itens: [] })).toBeNull();
+  });
+});
+
+describe("centrosCustoDosItens", () => {
+  const item = (centroCustoCodigo: string | null) => ({ centroCustoCodigo }) as PedidoCompraErp["itens"][number];
+
+  it("um código por item, na ordem, vazio para item sem centro de custo", () => {
+    expect(centrosCustoDosItens({ itens: [item("9002204"), item(null), item("9002204")] })).toBe("9002204,,9002204");
+    expect(centrosCustoDosItens({ itens: [] })).toBe("");
   });
 });
 
@@ -326,6 +337,7 @@ describe("completarFotosFaltantes", () => {
     empresa: 2,
     numero,
     podeCompletarFoto,
+    temFoto: false,
   });
 
   const atualizacoesDeFoto = () => consultas.filter((c) => c.sql.includes("[snapshot_em] = SYSDATETIME()"));
@@ -369,5 +381,15 @@ describe("completarFotosFaltantes", () => {
     const pedidos = Array.from({ length: 50 }, (_, i) => semFoto(i + 1));
 
     await expect(completarFotosFaltantes(pedidos)).resolves.toBe(30);
+  });
+
+  it("pedido que já tem foto ganha só os centros de custo (a foto do envio não muda)", async () => {
+    consultarPedidoCompraErp.mockImplementation(async (_e: number, n: number) => pedidoErp(n));
+
+    await expect(completarFotosFaltantes([{ ...semFoto(1), temFoto: true }])).resolves.toBe(1);
+
+    expect(atualizacoesDeFoto()).toHaveLength(0);
+    const centros = consultas.filter((c) => c.sql.includes("SET [centros_custo_itens] = @centros"));
+    expect(centros).toHaveLength(1);
   });
 });

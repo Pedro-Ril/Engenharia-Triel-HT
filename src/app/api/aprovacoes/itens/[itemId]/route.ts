@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { buscarFluxoDoItem } from "@/lib/aprovacoes/alcadas/fluxo";
 import { buscarItemPorId } from "@/lib/aprovacoes/aprovacoes";
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -19,13 +20,16 @@ async function handleGET(request: Request, context: RouteContext) {
   const { itemId } = await context.params;
 
   try {
-    const item = await buscarItemPorId(itemId);
+    /* Só se a cadeia já chegou ao nível de quem pede -- ninguém vê antes da hora. */
+    const item = await buscarItemPorId(itemId, acesso.usuario.id, { somenteVisiveis: true });
 
     if (!item) {
       return NextResponse.json({ ok: false, message: "Colaborador não encontrado." }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, data: item });
+    const fluxo = await buscarFluxoDoItem(itemId);
+
+    return NextResponse.json({ ok: true, data: { ...item, fluxo } });
   } catch (error) {
     console.error("Erro ao buscar item de aprovação:", error);
     return NextResponse.json(

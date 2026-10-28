@@ -1,0 +1,132 @@
+.cadeia {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.etapa {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+}
+
+.icone {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--text-faint);
+}
+
+.etapaTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.etapaTitulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.etapaStatus {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.etapaDetalhe {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Estado de cada nível: a cor diz onde a solicitação está. */
+.pendente {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.pendente .icone,
+.pendente .etapaStatus {
+  color: var(--warning-text);
+}
+
+.pendente .etapaStatus {
+  background: var(--warning-bg-strong);
+}
+
+.aprovado .icone {
+  color: var(--success-text);
+}
+
+.aprovado .etapaStatus {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.devolvido {
+  border-color: var(--danger-border);
+}
+
+.devolvido .icone {
+  color: var(--danger-text);
+}
+
+.devolvido .etapaStatus {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.aguardando,
+.encerrado {
+  opacity: 0.75;
+}
+
+.historico {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--border);
+  list-style: none;
+}
+
+.historico li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.historicoQuando {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.historicoComentario {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.vazio {
+  color: var(--text-muted);
+  font-size: 13px;
+}

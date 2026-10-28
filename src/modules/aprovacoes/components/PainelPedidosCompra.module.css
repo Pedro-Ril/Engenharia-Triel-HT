@@ -54,3 +54,110 @@
   font-size: 18px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Linha compacta: uma linha por pedido, texto que não cabe vira reticências. */
+.linha td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  white-space: nowrap;
+}
+
+.pedido {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fornecedor {
+  display: inline-block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.valor {
+  font-variant-numeric: tabular-nums;
+}
+
+.atencao {
+  display: inline-flex;
+  color: var(--warning-text);
+}
+
+.vaiPara {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.situacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Resumo por destino: um bloco por "para onde vai", com o total e o atalho para aprovar o grupo. */
+.resumoTitulo {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.destino {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface-soft);
+}
+
+.destinoAtivo {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+}
+
+.destinoCorpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.destinoCorpo:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.destinoRotulo {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.destinoDetalhe {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.destinoNumeros {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

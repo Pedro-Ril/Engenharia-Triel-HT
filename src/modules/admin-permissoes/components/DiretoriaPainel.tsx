@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Gavel, Settings, ShieldCheck, ShoppingCart } from "lucide-react";
+import { GitBranch, Settings, ShieldCheck } from "lucide-react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Tabs } from "@/components/ui/Tabs";
 
 import type { PortalModulo, PortalPermissao, PortalUsuarioAdmin } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
-import { AprovacoesAtendentesPainel } from "./AprovacoesAtendentesPainel";
+import { AlcadasPainel } from "./AlcadasPainel";
 import { AprovacoesConfigPainel } from "./AprovacoesConfigPainel";
 import { AprovacoesEscopoPainel } from "./AprovacoesEscopoPainel";
 import { AprovacoesPedidosCompraConfigPainel } from "./AprovacoesPedidosCompraConfigPainel";
-import { AprovacoesPedidosCompraPainel } from "./AprovacoesPedidosCompraPainel";
 
 interface DiretoriaPainelProps {
   usuarios: PortalUsuarioAdmin[];
@@ -29,12 +28,11 @@ interface DiretoriaPainelProps {
  * "Aprovadores" governa quem DECIDE (e de quais tipos). Tipos novos
  * aparecem sozinhos na aba de aprovadores.
  */
-type AbaDiretoria = "escopo" | "pedidos-compra" | "aprovadores" | "configuracoes";
+type AbaDiretoria = "escopo" | "alcadas" | "configuracoes";
 
 const ABAS: { valor: AbaDiretoria; label: string; icon: typeof ShieldCheck }[] = [
   { valor: "escopo", label: "Reajuste Salarial", icon: ShieldCheck },
-  { valor: "pedidos-compra", label: "Pedidos de Compra", icon: ShoppingCart },
-  { valor: "aprovadores", label: "Aprovadores", icon: Gavel },
+  { valor: "alcadas", label: "Alçadas", icon: GitBranch },
   { valor: "configuracoes", label: "Configurações", icon: Settings },
 ];
 
@@ -63,17 +61,8 @@ export function DiretoriaPainel({ usuarios, permissoes, modulos, onFeedback }: D
           />
         )}
 
-        {aba === "pedidos-compra" && (
-          <AprovacoesPedidosCompraPainel usuarios={usuarios} onFeedback={onFeedback} />
-        )}
-
-        {aba === "aprovadores" && (
-          <AprovacoesAtendentesPainel
-            usuarios={usuarios}
-            permissoes={permissoes}
-            modulos={modulos}
-            onFeedback={onFeedback}
-          />
+        {aba === "alcadas" && (
+          <AlcadasPainel usuarios={usuarios} permissoes={permissoes} modulos={modulos} onFeedback={onFeedback} />
         )}
 
         {aba === "configuracoes" && <ConfiguracoesDiretoria onFeedback={onFeedback} />}

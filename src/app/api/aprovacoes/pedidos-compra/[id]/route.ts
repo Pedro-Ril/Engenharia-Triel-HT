@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
 import { consultarPedidoCompraErp, ErroConsultaErp } from "@/lib/aprovacoes/pedido-compra-erp";
-import { listarPedidosPainel } from "@/lib/aprovacoes/pedidos-compra";
+import { buscarFluxoDoPedido, listarPedidosPainel } from "@/lib/aprovacoes/pedidos-compra";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -35,6 +35,8 @@ async function handleGET(_request: Request, context: RouteContext) {
       return NextResponse.json({ ok: false, message: "Pedido não encontrado." }, { status: 404 });
     }
 
+    const fluxo = await buscarFluxoDoPedido(pedido.id, { empresa: pedido.empresa, numero: pedido.numero });
+
     let erp = null;
     let erroErp: string | null = null;
 
@@ -46,7 +48,7 @@ async function handleGET(_request: Request, context: RouteContext) {
       erroErp = error.message;
     }
 
-    return NextResponse.json({ ok: true, data: { pedido, erp, erroErp } });
+    return NextResponse.json({ ok: true, data: { pedido, erp, erroErp, fluxo } });
   } catch (error) {
     console.error("Erro ao abrir o pedido de compra:", error);
     return NextResponse.json(

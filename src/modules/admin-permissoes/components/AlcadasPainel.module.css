@@ -1,0 +1,197 @@
+/* Cadeia de níveis de uma regra: Nível 1 > Nível 2 > Nível 3. */
+.cadeia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.cadeiaPasso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seta {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+.nivel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+}
+
+.nivelOrdem {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nivelNome {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.nivelPessoas {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Editor: um bloco por nível. */
+.nivelEdicao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface-soft);
+}
+
+.nivelEdicaoTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pessoas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pessoa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.pessoaRemover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pessoaRemover:hover {
+  background: var(--bg-hover-brand);
+  color: var(--primary);
+}
+
+.pessoaRemover:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 1px;
+}
+
+.vazio {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.historico {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historico li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.historico li:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.historicoQuando {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Aprovador sem a permissão do Painel de Aprovações: não vai conseguir decidir. */
+.semAcesso {
+  color: var(--warning-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pessoaSemAcesso {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+/* Sugestões de direcionamento: na regra (lista) e no editor (uma linha por sugestão). */
+.sugestoesTitulo {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sugestoes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.sugestoes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sugestaoEdicao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface-soft);
+}
+
+.ajuda {
+  color: var(--text-muted);
+  font-size: 13px;
+}

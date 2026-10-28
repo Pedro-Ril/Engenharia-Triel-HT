@@ -4,7 +4,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { extrairIpOrigem } from "@/lib/auth/login-historico";
 import { isObject, requiredText } from "@/lib/auth/validation";
 import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
-import { reprovarItem } from "@/lib/aprovacoes/aprovacoes";
+import { devolverItem } from "@/lib/aprovacoes/aprovacoes";
 import { requireAtendenteAprovacaoApi } from "@/lib/aprovacoes/autorizacao-aprovacoes";
 import { notificarSolicitanteDecisao } from "@/lib/aprovacoes/notificacoes-email";
 import { optionalAjusteValores } from "@/lib/aprovacoes/validacao";
@@ -19,7 +19,11 @@ interface RouteContext {
   params: Promise<{ itemId: string }>;
 }
 
-/* Comentário obrigatório em reprovar (diferente de aprovar) -- mesma convenção já usada em desenho-aprovacao. */
+/*
+ * Devolve o colaborador ao solicitante (o caminho continua /reprovar
+ * para não quebrar quem chama). Motivo obrigatório: o solicitante
+ * precisa saber o que ajustar antes de reenviar.
+ */
 async function handlePOST(request: Request, context: RouteContext) {
   const acesso = await requireAtendenteAprovacaoApi("aumento_salarial");
   if (acesso.negado) return acesso.negado;
@@ -33,16 +37,16 @@ async function handlePOST(request: Request, context: RouteContext) {
       throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");
     }
 
-    const comentario = requiredText(body.comentario, "comentário", 2000);
+    const comentario = requiredText(body.comentario, "motivo da devolução", 2000);
     const ajuste = optionalAjusteValores(body);
 
-    const item = await reprovarItem(itemId, usuario, comentario, ajuste);
+    const { item, etapa } = await devolverItem(itemId, usuario, comentario, ajuste);
 
     await registrarLog({
       nivel: "info",
       origem: "aprovacoes",
-      mensagem: `${usuario.nomeExibicao} reprovou ${item.funcionarioNome} na solicitação #${item.aprovacaoNumero}.`,
-      detalhes: JSON.stringify({ itemId, aprovacaoNumero: item.aprovacaoNumero, comentario, ajustouValores: ajuste !== null }),
+      mensagem: `${usuario.nomeExibicao} devolveu ${item.funcionarioNome} no nível "${etapa.nivelNome}" da solicitação #${item.aprovacaoNumero}.`,
+      detalhes: JSON.stringify({ itemId, aprovacaoNumero: item.aprovacaoNumero, comentario, ajustouValores: ajuste !== null, etapa }),
       metodo: "POST",
       caminho: `/api/aprovacoes/itens/${itemId}/reprovar`,
       ipOrigem: extrairIpOrigem(request),
@@ -57,16 +61,16 @@ async function handlePOST(request: Request, context: RouteContext) {
      */
     after(() => notificarSolicitanteDecisao(item, solicitante?.email ?? null, origem));
 
-    return NextResponse.json({ ok: true, message: "Colaborador reprovado.", data: item });
+    return NextResponse.json({ ok: true, message: "Colaborador devolvido ao solicitante.", data: item });
   } catch (error) {
     if (error instanceof ValidationError) {
       const status = error.message.includes("já foi decidido") ? 409 : 400;
       return NextResponse.json({ ok: false, message: error.message }, { status });
     }
 
-    console.error("Erro ao reprovar colaborador:", error);
+    console.error("Erro ao devolver colaborador:", error);
     return NextResponse.json(
-      { ok: false, message: "Não foi possível reprovar o colaborador." },
+      { ok: false, message: "Não foi possível devolver o colaborador." },
       { status: 500 }
     );
   }

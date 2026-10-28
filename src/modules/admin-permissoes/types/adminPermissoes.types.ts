@@ -161,14 +161,6 @@ export interface ConfigAprovacoes {
   atualizadoPor: string | null;
 }
 
-/* Quem decide as pendências do painel de aprovações: uma linha por usuário + tipo de aprovação que ele aprova. */
-export interface AprovacaoAtendente {
-  id: string;
-  usuarioId: string;
-  usuarioNome: string;
-  tipo: string;
-}
-
 /* Pedidos de compra: integração com o ERP e situação da chave do SupriConnect. */
 export interface ConfigPedidosCompra {
   urlPedido: string | null;
@@ -183,18 +175,74 @@ export interface ConfigPedidosCompra {
   atualizadoPor: string | null;
 }
 
-/* Empresas do Focco (empr_id) que o diretor aprova. */
-export interface EscopoEmpresasAprovador {
-  usuarioId: string;
-  empresas: number[];
-}
-
 export interface ResultadoTesteErpPedido {
   url: string;
   ambiente: "producao" | "teste";
   status: number | null;
   duracaoMs: number;
   corpo: string;
+}
+
+/* Alçadas de aprovação (Diretoria → Alçadas). */
+export interface AlcadaNivelUsuario {
+  id: string;
+  nome: string;
+}
+
+export interface AlcadaNivel {
+  id: string;
+  ordem: number;
+  nome: string;
+  usuarios: AlcadaNivelUsuario[];
+}
+
+/* Quem já vem escolhido no próximo nível quando o anterior aprova (quem aprova pode trocar). */
+export interface AlcadaSugestao {
+  id: string;
+  nivelId: string;
+  empresa: number | null;
+  centrosCusto: string | null;
+  /* null = todos do nível. */
+  usuarioId: string | null;
+  usuarioNome: string | null;
+}
+
+export interface AlcadaConfig {
+  id: string;
+  tipo: string;
+  empresa: number | null;
+  setor: string | null;
+  niveis: AlcadaNivel[];
+  sugestoes: AlcadaSugestao[];
+  atualizadoEm: string;
+  atualizadoPor: string | null;
+}
+
+/* Rubrica de um aprovador, estampada no PDF do pedido de compra quando ele aprova. */
+export interface RubricaAprovador {
+  usuarioId: string;
+  nome: string;
+  naAlcada: boolean;
+  temRubrica: boolean;
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
+export interface HistoricoAlcada {
+  tipo: string;
+  descricao: string;
+  usuarioNome: string | null;
+  criadoEm: string;
+}
+
+/* O que a tela manda ao salvar: níveis em ordem, com os ids das pessoas. */
+export interface DadosAlcadaEnvio {
+  tipo: string;
+  empresa: number | null;
+  setor: string | null;
+  niveis: { id?: string; nome: string; usuarioIds: string[] }[];
+  /* nivelIndice: posição (0 = 1º) do nível na lista `niveis` acima. */
+  sugestoes: { nivelIndice: number; empresa: number | null; centrosCusto: string | null; usuarioId: string | null }[];
 }
 
 export interface ResultadoTesteConexaoFirebird {
