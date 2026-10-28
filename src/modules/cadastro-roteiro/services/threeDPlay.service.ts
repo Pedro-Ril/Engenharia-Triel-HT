@@ -19,6 +19,19 @@ const API_3DX = "http://proserver.trielht.com.br:1001/api/search";
 const DASHBOARD_3DPLAY_URL =
     "https://dashboard-prd.trielht.com.br/3ddashboard/#dashboard:3ea76c30-e6a4-4288-ab68-1214e947068c/tabId:ALtXQt70g02ipB6XdW0L/app:X3DPLAW_AP/content:X3DContentId=";
 
+/*
+ * Product Explorer (ENOSCEN_AP), na mesma aba do dashboard: ao lado do
+ * 3D Navigate, mostra a árvore do produto e o 3D juntos. Usado pelo
+ * Terminal de Fábrica nos aparelhos configurados para ele
+ * (Administração → Terminal de Fábrica → Visualização). Formato copiado
+ * de uma abertura real pela busca do 3DEXPERIENCE (307592, 28/10/2026):
+ * versão 2.1 e contextId vazio -- cada pessoa abre no seu contexto padrão.
+ */
+const DASHBOARD_PRODUCT_EXPLORER_URL =
+    "https://dashboard-prd.trielht.com.br/3ddashboard/#dashboard:3ea76c30-e6a4-4288-ab68-1214e947068c/tabId:ALtXQt70g02ipB6XdW0L/app:ENOSCEN_AP/content:X3DContentId=";
+
+const ICONES_3DSPACE = "https://space-prd.trielht.com.br/3dspace/snresources/images/icons";
+
 const CONTEXT_ID = "VPLMProjectLeader.Company Name.Common Space";
 
 /* O que a busca precisa: um nó da árvore serve, um pai do ERP também. */
@@ -135,6 +148,41 @@ export function montarUrl3DPlay(modelo: Modelo3DPlay) {
     return `${DASHBOARD_3DPLAY_URL}${encodeURIComponent(
         JSON.stringify(content)
     )}`;
+}
+
+export function montarUrlProductExplorer(modelo: Modelo3DPlay) {
+    const objectId = String(modelo.physicalId || "").trim();
+
+    if (!objectId) {
+        throw new Error("Modelo sem Physical ID para abrir no Product Explorer.");
+    }
+
+    const revisao = String(modelo.revisao || "").trim();
+
+    const content = {
+        protocol: "3DXContent",
+        version: "2.1",
+        source: "X3DSEAR_AP",
+        widgetId: `preview-${Date.now()}`,
+        data: {
+            items: [
+                {
+                    envId: "OnPremise",
+                    objectId,
+                    serviceId: "3DSpace",
+                    objectType: modelo.tipo || "VPMReference",
+                    displayName: modelo.titulo || modelo.codigo || modelo.id3DX || "Item 3DEXPERIENCE",
+                    contextId: "",
+                    displayPreview: `${ICONES_3DSPACE}/large/I_VPMNavProduct108x144.png`,
+                    displayIcon: `${ICONES_3DSPACE}/small/I_VPMNavProduct.png`,
+                    displayType: "Physical Product",
+                    ...(revisao ? { "ds6wg:revision": revisao } : {}),
+                },
+            ],
+        },
+    };
+
+    return `${DASHBOARD_PRODUCT_EXPLORER_URL}${encodeURIComponent(JSON.stringify(content))}`;
 }
 
 /* Devolve false se o navegador bloqueou a abertura. */

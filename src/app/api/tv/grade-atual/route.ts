@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { buscarSlotVigente } from "@/lib/tv/grades";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
+import { aplicarVisualizacaoNaUrl } from "@/lib/terminal-fabrica/visualizacao-3d";
+import { buscarVisualizacaoDoAparelho } from "@/lib/terminal-fabrica/visualizacao";
 import { requireTerminalApi } from "@/lib/tv/terminais";
 
 export const runtime = "nodejs";
@@ -16,7 +18,22 @@ async function handleGET(request: Request) {
   }
 
   try {
-    const slot = await buscarSlotVigente(acesso.terminal.gradeId);
+    const slotBruto = await buscarSlotVigente(acesso.terminal.gradeId);
+
+    /* A página do Terminal de Fábrica recebe em qual app o 3D abre neste aparelho. */
+    const visualizacao = slotBruto?.itens.some((item) => item.urlPaginaWeb?.includes("/terminal-fabrica"))
+      ? await buscarVisualizacaoDoAparelho(acesso.terminal.id)
+      : null;
+    const slot =
+      slotBruto && visualizacao
+        ? {
+            ...slotBruto,
+            itens: slotBruto.itens.map((item) =>
+              item.urlPaginaWeb ? { ...item, urlPaginaWeb: aplicarVisualizacaoNaUrl(item.urlPaginaWeb, visualizacao) } : item
+            ),
+          }
+        : slotBruto;
+
     return NextResponse.json({
       ok: true,
       data: {

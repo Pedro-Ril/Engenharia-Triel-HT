@@ -1,3 +1,4 @@
+import type { Visualizacao3D } from "@/lib/terminal-fabrica/visualizacao-3d";
 import type { FuncionarioRh } from "@/modules/aprovacoes/types/aprovacoes.types";
 import type { DownloadAdmin } from "@/modules/downloads/types/downloads.types";
 import type {
@@ -505,6 +506,32 @@ export async function buscarBuscasTerminalFabrica(params: {
  * Impressão de desenho na Consulta 2D / 3D: quem pode (permissão por
  * usuário) e o que já foi pedido para imprimir.
  */
+/* Em qual app o 3D abre em cada aparelho do Terminal de Fábrica (3D Play ou Product Explorer). */
+export interface AparelhoTerminalFabrica {
+  id: string;
+  nome: string | null;
+  grade: string;
+  ultimoHeartbeatEm: string | null;
+  visualizacao: Visualizacao3D;
+}
+
+export async function listarAparelhosTerminalFabrica(): Promise<ApiEnvelope<AparelhoTerminalFabrica[]>> {
+  const response = await fetch("/api/admin/terminal-fabrica/visualizacao", { cache: "no-store" });
+  return parseResponse<AparelhoTerminalFabrica[]>(response);
+}
+
+export async function salvarVisualizacaoAparelho(
+  terminalId: string,
+  visualizacao: Visualizacao3D
+): Promise<ApiEnvelope<null>> {
+  const response = await fetch(`/api/admin/terminal-fabrica/visualizacao/${terminalId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visualizacao }),
+  });
+  return parseResponse<null>(response);
+}
+
 export async function listarPermissoesImpressaoTerminal(): Promise<
   ApiEnvelope<PermissaoImpressaoTerminal[]>
 > {
