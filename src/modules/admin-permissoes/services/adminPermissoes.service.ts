@@ -27,6 +27,7 @@ import type {
   ConfigEstruturaSubstituicao,
   ConfigIntegraLantek,
   ConfigConferenciaDerivados,
+  ConfigEngenhariaVersatil,
   ConfigIntegraTubest,
   ConfigMateriaPrima,
   ConfiguracaoAd,
@@ -919,6 +920,30 @@ export async function salvarConfigIntegraTubest(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigIntegraTubest>(response);
+}
+
+export async function buscarConfigEngenhariaVersatil(): Promise<ConfigEngenhariaVersatil | null> {
+  const response = await fetch("/api/admin/engenharia-versatil/config");
+  const body = await parseResponse<ConfigEngenhariaVersatil>(response);
+  return body.data ?? null;
+}
+
+export async function salvarConfigEngenhariaVersatil(dados: {
+  pastaProjetos: string | null;
+  pastaPdf: string | null;
+  pastaDxf: string | null;
+  abasBlacklist: string[];
+  abasComDxf: string[];
+  erpApiUrl: string | null;
+  erpCodEmpresa: number | null;
+  erpAmbiente: "teste" | "producao";
+}): Promise<ApiEnvelope<ConfigEngenhariaVersatil>> {
+  const response = await fetch("/api/admin/engenharia-versatil/config", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<ConfigEngenhariaVersatil>(response);
 }
 
 export async function buscarConfigConferenciaDerivados(): Promise<ConfigConferenciaDerivados[] | null> {

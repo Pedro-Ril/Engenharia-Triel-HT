@@ -350,6 +350,20 @@ export interface ConfigIntegraTubest {
   atualizadoPor: string | null;
 }
 
+/* Engenharia Versátil (espelha src/lib/engenharia-versatil/separacao.ts). */
+export interface ConfigEngenhariaVersatil {
+  pastaProjetos: string | null;
+  pastaPdf: string | null;
+  pastaDxf: string | null;
+  abasBlacklist: string[];
+  abasComDxf: string[];
+  erpApiUrl: string | null;
+  erpCodEmpresa: number | null;
+  erpAmbiente: "teste" | "producao";
+  atualizadoEm: string | null;
+  atualizadoPor: string | null;
+}
+
 /* Pastas da Conferência de Derivados de uma empresa (espelha src/lib/conferencia-derivados/config.ts). */
 export interface ConfigConferenciaDerivados {
   empresaId: string;
