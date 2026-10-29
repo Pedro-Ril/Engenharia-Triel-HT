@@ -113,7 +113,9 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
   }
 
   const linhas = analise?.linhas ?? [];
-  const filtradas = filtro === "todas" ? linhas : linhas.filter((l) => l.situacao === filtro);
+  /* O que já está certo no ERP não pede ação: fica só no cartão "Fator certo", fora da tabela. */
+  const pendentes = linhas.filter((l) => l.situacao !== "ok");
+  const filtradas = filtro === "todas" ? pendentes : pendentes.filter((l) => l.situacao === filtro);
   const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
   const inicio = (paginaAtual - 1) * POR_PAGINA;
@@ -129,9 +131,9 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
   const ambienteRotulo = analise?.ambiente === "producao" ? "PRODUÇÃO" : "TESTE";
 
   const opcoesFiltro = [
-    { value: "todas", label: `Todos (${linhas.length})` },
+    { value: "todas", label: `Todos (${pendentes.length})` },
     ...(Object.keys(SITUACAO) as SituacaoFator[])
-      .filter((s) => (analise?.totais[s] ?? 0) > 0)
+      .filter((s) => s !== "ok" && (analise?.totais[s] ?? 0) > 0)
       .map((s) => ({ value: s, label: `${SITUACAO[s].rotulo} (${analise!.totais[s]})` })),
   ];
 
@@ -225,85 +227,95 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
               </Button>
             </Stack>
 
-            <Table minWidth={960}>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell align="center">
-                    <div className={styles.checkboxCentro}>
-                      <Checkbox
-                        label=""
-                        aria-label="Marcar todos os itens que podem ser gravados"
-                        checked={todosMarcados}
-                        disabled={marcaveisFiltradas.length === 0}
-                        onChange={(e) =>
-                          setMarcados((atual) => {
-                            const proximo = new Set(atual);
-                            for (const l of marcaveisFiltradas) {
-                              if (e.target.checked) proximo.add(l.codigo);
-                              else proximo.delete(l.codigo);
-                            }
-                            return proximo;
-                          })
-                        }
-                      />
-                    </div>
-                  </TableHeaderCell>
-                  <TableHeaderCell>Código</TableHeaderCell>
-                  <TableHeaderCell>Aba</TableHeaderCell>
-                  <TableHeaderCell>Unid.</TableHeaderCell>
-                  <TableHeaderCell align="right">Peso planilha (kg)</TableHeaderCell>
-                  <TableHeaderCell align="right">Peso líq. ERP (kg)</TableHeaderCell>
-                  <TableHeaderCell align="right">Fator atual</TableHeaderCell>
-                  <TableHeaderCell align="right">Fator novo</TableHeaderCell>
-                  <TableHeaderCell>Situação</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visiveis.map((l: LinhaFator) => (
-                  <TableRow key={l.codigo} className={DESTACADAS.includes(l.situacao) ? styles.linhaAlerta : undefined}>
-                    <TableCell align="center">
-                      {l.marcavel && (
-                        <div className={styles.checkboxCentro}>
-                          <Checkbox
-                            label=""
-                            aria-label={`Gravar o fator de ${l.codigo}`}
-                            checked={marcados.has(l.codigo)}
-                            onChange={(e) => alternar(l.codigo, e.target.checked)}
-                          />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <strong>{l.codigo}</strong>
-                    </TableCell>
-                    <TableCell>{l.aba}</TableCell>
-                    <TableCell>{l.unidEstoque ?? "—"}</TableCell>
-                    <TableCell align="right">
-                      <span className={styles.numero}>{numero(l.pesoPlanilha, 4)}</span>
-                    </TableCell>
-                    <TableCell align="right">
-                      <span className={styles.numero}>{numero(l.pesoErp, 4)}</span>
-                    </TableCell>
-                    <TableCell align="right">
-                      <span className={styles.numero}>{numero(l.taxaAtual, 6)}</span>
-                    </TableCell>
-                    <TableCell align="right">
-                      {l.operacao ? (
-                        <span className={styles.numero}>
-                          {numero(l.taxaProposta, 6)}
-                          <span className={styles.detalhe}>pelo peso {l.origemPeso === "planilha" ? "da planilha" : "do ERP"}</span>
-                        </span>
-                      ) : (
-                        <span className={styles.secundario}>—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={SITUACAO[l.situacao].variante}>{SITUACAO[l.situacao].rotulo}</Badge>
-                    </TableCell>
+            {analise.totais.ok > 0 && pendentes.length > 0 && (
+              <span className={styles.secundario}>
+                {analise.totais.ok} item(ns) com o fator certo no ERP não aparecem na lista.
+              </span>
+            )}
+
+            {pendentes.length === 0 ? (
+              <Alert variant="success">Todos os itens já estão com o fator certo no ERP. Nada a fazer.</Alert>
+            ) : (
+              <Table minWidth={960}>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell align="center">
+                      <div className={styles.checkboxCentro}>
+                        <Checkbox
+                          label=""
+                          aria-label="Marcar todos os itens que podem ser gravados"
+                          checked={todosMarcados}
+                          disabled={marcaveisFiltradas.length === 0}
+                          onChange={(e) =>
+                            setMarcados((atual) => {
+                              const proximo = new Set(atual);
+                              for (const l of marcaveisFiltradas) {
+                                if (e.target.checked) proximo.add(l.codigo);
+                                else proximo.delete(l.codigo);
+                              }
+                              return proximo;
+                            })
+                          }
+                        />
+                      </div>
+                    </TableHeaderCell>
+                    <TableHeaderCell>Código</TableHeaderCell>
+                    <TableHeaderCell>Aba</TableHeaderCell>
+                    <TableHeaderCell>Unid.</TableHeaderCell>
+                    <TableHeaderCell align="right">Peso planilha (kg)</TableHeaderCell>
+                    <TableHeaderCell align="right">Peso líq. ERP (kg)</TableHeaderCell>
+                    <TableHeaderCell align="right">Fator atual</TableHeaderCell>
+                    <TableHeaderCell align="right">Fator novo</TableHeaderCell>
+                    <TableHeaderCell>Situação</TableHeaderCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {visiveis.map((l: LinhaFator) => (
+                    <TableRow key={l.codigo} className={DESTACADAS.includes(l.situacao) ? styles.linhaAlerta : undefined}>
+                      <TableCell align="center">
+                        {l.marcavel && (
+                          <div className={styles.checkboxCentro}>
+                            <Checkbox
+                              label=""
+                              aria-label={`Gravar o fator de ${l.codigo}`}
+                              checked={marcados.has(l.codigo)}
+                              onChange={(e) => alternar(l.codigo, e.target.checked)}
+                            />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <strong>{l.codigo}</strong>
+                      </TableCell>
+                      <TableCell>{l.aba}</TableCell>
+                      <TableCell>{l.unidEstoque ?? "—"}</TableCell>
+                      <TableCell align="right">
+                        <span className={styles.numero}>{numero(l.pesoPlanilha, 4)}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <span className={styles.numero}>{numero(l.pesoErp, 4)}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        <span className={styles.numero}>{numero(l.taxaAtual, 6)}</span>
+                      </TableCell>
+                      <TableCell align="right">
+                        {l.operacao ? (
+                          <span className={styles.numero}>
+                            {numero(l.taxaProposta, 6)}
+                            <span className={styles.detalhe}>pelo peso {l.origemPeso === "planilha" ? "da planilha" : "do ERP"}</span>
+                          </span>
+                        ) : (
+                          <span className={styles.secundario}>—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={SITUACAO[l.situacao].variante}>{SITUACAO[l.situacao].rotulo}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
 
             {filtradas.length > 0 && (
               <Stack direction="row" justify="between" align="center" gap={12} wrap>
