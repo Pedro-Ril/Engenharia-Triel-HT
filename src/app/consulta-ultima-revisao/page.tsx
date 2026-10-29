@@ -1,10 +1,6 @@
-import { registrarAcessoModuloSemFalhar } from "@/lib/auth/acesso-modulo";
-import { requireModuloAccess } from "@/lib/auth/autorizacao";
-import { ConsultaUltimaRevisaoPage } from "@/modules/consulta-ultima-revisao/components/ConsultaUltimaRevisaoPage";
+import { redirect } from "next/navigation";
 
-export default async function Page() {
-  const usuario = await requireModuloAccess("consulta-ultima-revisao");
-  await registrarAcessoModuloSemFalhar(usuario.id, "consulta-ultima-revisao");
-
-  return <ConsultaUltimaRevisaoPage />;
+/* A Consulta última revisão virou uma aba do 3DExperience (permissão "3dexperience"). */
+export default function Page() {
+  redirect("/3dexperience?aba=ultima-revisao");
 }

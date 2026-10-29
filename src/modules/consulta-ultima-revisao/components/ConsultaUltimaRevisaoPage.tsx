@@ -1,19 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Boxes, GitCompare, Home, Layers, Search } from "lucide-react";
+import { Boxes, GitCompare, Layers, Search } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
-import { PageContainer } from "@/components/ui/PageContainer";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Stack } from "@/components/ui/Stack";
 import { Switch } from "@/components/ui/Switch";
@@ -160,19 +157,7 @@ export function ConsultaUltimaRevisaoPage() {
   }, [estrutura, apenasDesatualizados]);
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Consulta Última Revisão"
-        description="Explode a estrutura do item no 3DX e aponta os componentes que não estão na última revisão."
-      />
-
-      <Breadcrumb
-        items={[
-          { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "Consulta Última Revisão", current: true, icon: <GitCompare size={14} /> },
-        ]}
-      />
-
+    <Stack gap={20}>
       <Card>
         <Stack gap={16}>
           <Stack direction="row" gap={12} align="end" wrap>
@@ -270,6 +255,6 @@ export function ConsultaUltimaRevisaoPage() {
           </Card>
         </>
       )}
-    </PageContainer>
+    </Stack>
   );
 }

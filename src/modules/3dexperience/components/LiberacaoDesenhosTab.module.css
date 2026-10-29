@@ -1,0 +1,29 @@
+.totais {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.secundario {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.mensagem {
+  max-width: 360px;
+  color: var(--text-soft);
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -8,7 +8,8 @@ import { comMetricasApi } from "@/lib/monitoramento/metricas";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MODULO_CHAVE = "consulta-ultima-revisao";
+/* A consulta é uma aba do 3DExperience: vale a permissão dele. */
+const MODULO_CHAVE = "3dexperience";
 
 interface RouteContext {
   params: Promise<{ codigo: string }>;
