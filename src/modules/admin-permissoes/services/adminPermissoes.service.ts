@@ -921,13 +921,14 @@ export async function salvarConfigIntegraTubest(dados: {
   return parseResponse<ConfigIntegraTubest>(response);
 }
 
-export async function buscarConfigConferenciaDerivados(): Promise<ConfigConferenciaDerivados | null> {
+export async function buscarConfigConferenciaDerivados(): Promise<ConfigConferenciaDerivados[] | null> {
   const response = await fetch("/api/admin/conferencia-derivados/config");
-  const body = await parseResponse<ConfigConferenciaDerivados>(response);
+  const body = await parseResponse<ConfigConferenciaDerivados[]>(response);
   return body.data ?? null;
 }
 
 export async function salvarConfigConferenciaDerivados(dados: {
+  empresaId: string;
   pastaPdf: string | null;
   pastaDxf: string | null;
   pastaStep: string | null;

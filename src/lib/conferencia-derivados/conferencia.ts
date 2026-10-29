@@ -12,7 +12,7 @@ import type {
   ResultadoTipo,
 } from "@/modules/conferencia-derivados/types/conferenciaDerivados.types";
 
-import { obterPastasPorTipo } from "./config";
+import { obterPastasDaEmpresa } from "./config";
 import {
   adicionarNomeAoIndice,
   codigoTemArquivo,
@@ -82,7 +82,8 @@ async function indexarPasta(
 async function conferirTipo(
   tipo: TipoArquivoDerivado,
   pasta: string | null,
-  codigos: string[]
+  codigos: string[],
+  empresaNome: string
 ): Promise<ResultadoTipo> {
   const definicao = definicaoDoTipo(tipo);
   const vazio = { tipo, pasta: pasta ?? "", totalArquivosNaPasta: 0, encontrados: 0, faltando: [] };
@@ -90,7 +91,7 @@ async function conferirTipo(
   if (!pasta) {
     return {
       ...vazio,
-      erro: `A pasta de ${definicao.rotulo} não está configurada. Peça a um administrador para preencher em Administração > Configurações.`,
+      erro: `A pasta de ${definicao.rotulo} da empresa ${empresaNome} não está configurada. Peça a um administrador para preencher em Administração > Configurações > Arquivos Derivados.`,
     };
   }
 
@@ -119,19 +120,22 @@ async function conferirTipo(
   }
 }
 
+/* Confere nas pastas da empresa informada (a do cadastro do usuário; ver a rota). */
 export async function conferirArquivosDerivados(
   codigos: string[],
-  tipos: TipoArquivoDerivado[]
+  tipos: TipoArquivoDerivado[],
+  empresa: { id: string; nome: string }
 ): Promise<ResultadoConferencia> {
   const inicio = Date.now();
-  const pastas = await obterPastasPorTipo();
+  const pastas = await obterPastasDaEmpresa(empresa.id);
 
   /* Pastas diferentes, servidor de arquivo único: em paralelo. */
   const resultados = await Promise.all(
-    tipos.map((tipo) => conferirTipo(tipo, pastas[tipo], codigos))
+    tipos.map((tipo) => conferirTipo(tipo, pastas[tipo], codigos, empresa.nome))
   );
 
   return {
+    empresa: empresa.nome,
     totalCodigos: codigos.length,
     tipos: resultados,
     duracaoMs: Date.now() - inicio,

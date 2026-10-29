@@ -4,6 +4,7 @@ import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject } from "@/lib/auth/validation";
 import { conferirArquivosDerivados } from "@/lib/conferencia-derivados/conferencia";
+import { resolverEmpresaDoUsuario } from "@/lib/empresas/empresas";
 import { separarCodigos } from "@/lib/conferencia-derivados/regra-codigo";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import {
@@ -67,7 +68,15 @@ async function handlePOST(request: Request) {
     const tipos = lerTipos(corpo.tipos);
     const codigos = lerCodigos(corpo.codigos);
 
-    const resultado = await conferirArquivosDerivados(codigos, tipos);
+    /* Multiempresa: as pastas são as da empresa do cadastro do usuário. */
+    const empresa = await resolverEmpresaDoUsuario(acesso.usuario);
+    if (!empresa) {
+      throw new ValidationError(
+        "Seu cadastro não está ligado a nenhuma empresa ativa, então não dá para saber em quais pastas conferir. Peça a um administrador para ajustar o código de empresa do seu usuário."
+      );
+    }
+
+    const resultado = await conferirArquivosDerivados(codigos, tipos, empresa);
 
     return NextResponse.json({ ok: true, data: resultado });
   } catch (error) {

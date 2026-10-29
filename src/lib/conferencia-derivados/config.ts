@@ -1,9 +1,20 @@
 import "server-only";
 
+import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import type { TipoArquivoDerivado } from "@/modules/conferencia-derivados/constants/tipos-arquivo";
 
-export interface ConfigConferenciaDerivados {
+/*
+ * Pastas de cada empresa (eng_conferencia_derivados_pastas, migração
+ * 0143). A conferência usa as da empresa do cadastro do usuário; a
+ * administração lista todas as empresas ativas, configuradas ou não.
+ */
+export interface PastasEmpresaConferencia {
+  empresaId: string;
+  empresaNome: string;
+  empresaCodigo: string | null;
+  /* Usuários cujo cadastro aponta para esta empresa. */
+  totalUsuarios: number;
   pastaPdf: string | null;
   pastaDxf: string | null;
   pastaStep: string | null;
@@ -11,7 +22,11 @@ export interface ConfigConferenciaDerivados {
   atualizadoPor: string | null;
 }
 
-type LinhaConfig = {
+type LinhaPastas = {
+  empresa_id: string;
+  empresa_nome: string;
+  empresa_codigo: string | null;
+  total_usuarios: number;
   pasta_pdf: string | null;
   pasta_dxf: string | null;
   pasta_step: string | null;
@@ -19,50 +34,74 @@ type LinhaConfig = {
   atualizado_por: string | null;
 };
 
-/* Singleton id = 1, mesmo desenho de integra_lantek_config. */
-export async function buscarConfigConferenciaDerivados(): Promise<ConfigConferenciaDerivados> {
-  const pool = await getSqlServerPool();
-
-  const result = await pool.request().query<LinhaConfig>(`
-    SELECT
-      [pasta_pdf],
-      [pasta_dxf],
-      [pasta_step],
-      CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em],
-      [atualizado_por]
-    FROM dbo.eng_conferencia_derivados_config
-    WHERE [id] = 1;
-  `);
-
-  const row = result.recordset[0];
-
+function paraPastas(linha: LinhaPastas): PastasEmpresaConferencia {
   return {
-    pastaPdf: row?.pasta_pdf ?? null,
-    pastaDxf: row?.pasta_dxf ?? null,
-    pastaStep: row?.pasta_step ?? null,
-    atualizadoEm: row?.atualizado_em ?? null,
-    atualizadoPor: row?.atualizado_por ?? null,
+    empresaId: linha.empresa_id,
+    empresaNome: linha.empresa_nome,
+    empresaCodigo: linha.empresa_codigo,
+    totalUsuarios: linha.total_usuarios,
+    pastaPdf: linha.pasta_pdf,
+    pastaDxf: linha.pasta_dxf,
+    pastaStep: linha.pasta_step,
+    atualizadoEm: linha.atualizado_em,
+    atualizadoPor: linha.atualizado_por,
   };
 }
 
-export async function salvarConfigConferenciaDerivados(params: {
+const SELECT_PASTAS = `
+  SELECT
+    CONVERT(VARCHAR(36), e.[id]) AS [empresa_id],
+    e.[nome] AS [empresa_nome],
+    e.[codigo] AS [empresa_codigo],
+    (
+      SELECT COUNT(*) FROM dbo.portal_usuarios AS u
+      WHERE LOWER(LTRIM(RTRIM(u.[codigo_empresa]))) = LOWER(LTRIM(RTRIM(e.[codigo])))
+    ) AS [total_usuarios],
+    p.[pasta_pdf],
+    p.[pasta_dxf],
+    p.[pasta_step],
+    CONVERT(VARCHAR(33), p.[atualizado_em], 126) AS [atualizado_em],
+    p.[atualizado_por]
+  FROM dbo.portal_empresas AS e
+  LEFT JOIN dbo.eng_conferencia_derivados_pastas AS p
+    ON p.[empresa_id] = e.[id]`;
+
+export async function listarPastasPorEmpresa(): Promise<PastasEmpresaConferencia[]> {
+  const pool = await getSqlServerPool();
+  const result = await pool.request().query<LinhaPastas>(`
+    ${SELECT_PASTAS}
+    WHERE e.[ativa] = 1
+    ORDER BY e.[nome];
+  `);
+  return result.recordset.map(paraPastas);
+}
+
+export async function salvarPastasEmpresa(params: {
+  empresaId: string;
   pastaPdf: string | null;
   pastaDxf: string | null;
   pastaStep: string | null;
   atualizadoPor: string;
-}): Promise<ConfigConferenciaDerivados> {
+}): Promise<PastasEmpresaConferencia> {
   const pool = await getSqlServerPool();
-  const request = pool.request();
 
+  const empresa = await pool
+    .request()
+    .input("empresaId", sql.UniqueIdentifier, params.empresaId)
+    .query<{ id: string }>(`SELECT [id] FROM dbo.portal_empresas WHERE [id] = @empresaId AND [ativa] = 1;`);
+  if (!empresa.recordset[0]) throw new ValidationError("Empresa não encontrada ou inativa.");
+
+  const request = pool.request();
+  request.input("empresaId", sql.UniqueIdentifier, params.empresaId);
   request.input("pastaPdf", sql.NVarChar(300), params.pastaPdf);
   request.input("pastaDxf", sql.NVarChar(300), params.pastaDxf);
   request.input("pastaStep", sql.NVarChar(300), params.pastaStep);
   request.input("atualizadoPor", sql.NVarChar(150), params.atualizadoPor);
 
   await request.query(`
-    MERGE dbo.eng_conferencia_derivados_config AS destino
-    USING (SELECT 1 AS [id]) AS origem
-    ON destino.[id] = origem.[id]
+    MERGE dbo.eng_conferencia_derivados_pastas AS destino
+    USING (SELECT @empresaId AS [empresa_id]) AS origem
+    ON destino.[empresa_id] = origem.[empresa_id]
     WHEN MATCHED THEN
       UPDATE SET
         [pasta_pdf] = @pastaPdf,
@@ -71,20 +110,35 @@ export async function salvarConfigConferenciaDerivados(params: {
         [atualizado_em] = SYSDATETIME(),
         [atualizado_por] = @atualizadoPor
     WHEN NOT MATCHED THEN
-      INSERT ([id], [pasta_pdf], [pasta_dxf], [pasta_step], [atualizado_em], [atualizado_por])
-      VALUES (1, @pastaPdf, @pastaDxf, @pastaStep, SYSDATETIME(), @atualizadoPor);
+      INSERT ([empresa_id], [pasta_pdf], [pasta_dxf], [pasta_step], [atualizado_por])
+      VALUES (@empresaId, @pastaPdf, @pastaDxf, @pastaStep, @atualizadoPor);
   `);
 
-  return buscarConfigConferenciaDerivados();
+  const atualizada = await pool
+    .request()
+    .input("empresaId", sql.UniqueIdentifier, params.empresaId)
+    .query<LinhaPastas>(`${SELECT_PASTAS} WHERE e.[id] = @empresaId;`);
+  return paraPastas(atualizada.recordset[0]);
 }
 
-/* A pasta de cada tipo, como a conferência precisa. */
-export async function obterPastasPorTipo(): Promise<Record<TipoArquivoDerivado, string | null>> {
-  const config = await buscarConfigConferenciaDerivados();
+/* A pasta de cada tipo da empresa, como a conferência precisa (null = não configurada). */
+export async function obterPastasDaEmpresa(
+  empresaId: string
+): Promise<Record<TipoArquivoDerivado, string | null>> {
+  const pool = await getSqlServerPool();
+  const result = await pool
+    .request()
+    .input("empresaId", sql.UniqueIdentifier, empresaId)
+    .query<Pick<LinhaPastas, "pasta_pdf" | "pasta_dxf" | "pasta_step">>(`
+      SELECT [pasta_pdf], [pasta_dxf], [pasta_step]
+      FROM dbo.eng_conferencia_derivados_pastas
+      WHERE [empresa_id] = @empresaId;
+    `);
+  const linha = result.recordset[0];
 
   return {
-    pdf: config.pastaPdf,
-    dxf: config.pastaDxf,
-    step: config.pastaStep,
+    pdf: linha?.pasta_pdf ?? null,
+    dxf: linha?.pasta_dxf ?? null,
+    step: linha?.pasta_step ?? null,
   };
 }

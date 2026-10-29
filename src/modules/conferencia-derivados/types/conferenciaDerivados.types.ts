@@ -16,6 +16,8 @@ export interface ResultadoTipo {
 }
 
 export interface ResultadoConferencia {
+  /* Empresa (do cadastro do usuário) cujas pastas foram lidas. */
+  empresa: string;
   totalCodigos: number;
   tipos: ResultadoTipo[];
   duracaoMs: number;

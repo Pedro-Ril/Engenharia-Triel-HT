@@ -350,7 +350,12 @@ export interface ConfigIntegraTubest {
   atualizadoPor: string | null;
 }
 
+/* Pastas da Conferência de Derivados de uma empresa (espelha src/lib/conferencia-derivados/config.ts). */
 export interface ConfigConferenciaDerivados {
+  empresaId: string;
+  empresaNome: string;
+  empresaCodigo: string | null;
+  totalUsuarios: number;
   pastaPdf: string | null;
   pastaDxf: string | null;
   pastaStep: string | null;

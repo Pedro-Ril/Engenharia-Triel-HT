@@ -45,7 +45,7 @@ const ROTULO_SITUACAO: Record<SituacaoCodigo, string> = {
   "nao-conferido": "Não conferido",
 };
 
-export function ConferenciaDerivadosPage() {
+export function ConferenciaDerivadosPage({ empresaNome }: { empresaNome: string | null }) {
   /* As três marcadas: é o "4 - Todos" do script, o uso mais comum. */
   const [tipos, setTipos] = useState<TipoArquivoDerivado[]>(["pdf", "dxf", "step"]);
   const [texto, setTexto] = useState("");
@@ -212,7 +212,17 @@ export function ConferenciaDerivadosPage() {
       />
 
       <Stack gap={20}>
-        <Card title="O que conferir" description="Marque os tipos de arquivo que devem existir para cada código.">
+        {!empresaNome && (
+          <Alert variant="warning" title="Empresa não identificada">
+            Seu cadastro não está ligado a nenhuma empresa ativa, então não dá para saber em quais pastas conferir. Peça a
+            um administrador para ajustar o código de empresa do seu usuário.
+          </Alert>
+        )}
+
+        <Card
+          title="O que conferir"
+          description={`Marque os tipos de arquivo que devem existir para cada código.${empresaNome ? ` A conferência usa as pastas da empresa ${empresaNome}.` : ""}`}
+        >
           <div className={styles.tipos}>
             {TIPOS_ARQUIVO.map((definicao) => (
               <Checkbox
@@ -284,7 +294,7 @@ export function ConferenciaDerivadosPage() {
                 onClick={conferir}
                 loading={conferindo}
                 loadingLabel="Conferindo as pastas…"
-                disabled={codigos.length === 0 || tipos.length === 0}
+                disabled={!empresaNome || codigos.length === 0 || tipos.length === 0}
               >
                 <FileSearch size={16} /> Conferir
               </Button>
@@ -301,7 +311,7 @@ export function ConferenciaDerivadosPage() {
         {resultado && (
           <Card
             title="Resultado"
-            description={`${resultado.totalCodigos} código(s) conferido(s) em ${(resultado.duracaoMs / 1000).toFixed(1)}s.`}
+            description={`${resultado.totalCodigos} código(s) conferido(s) nas pastas de ${resultado.empresa} em ${(resultado.duracaoMs / 1000).toFixed(1)}s.`}
           >
             <Stack gap={16}>
               {tiposComErro.map((t) => (
