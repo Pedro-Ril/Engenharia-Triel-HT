@@ -515,11 +515,39 @@ export async function buscarRodada(id: string): Promise<{ rodada: Rodada; desenh
   };
 }
 
-export async function listarRodadas(limite = 30): Promise<Rodada[]> {
+export type TipoRodada = "todas" | "simulacao" | "liberacao";
+
+/* Histórico paginado, mais recentes primeiro; filtra por parte do código do pai e por tipo. */
+export async function listarRodadas(params: {
+  pagina: number;
+  porPagina: number;
+  codigo: string | null;
+  tipo: TipoRodada;
+}): Promise<{ itens: Rodada[]; total: number }> {
   const pool = await getSqlServerPool();
-  const result = await pool
-    .request()
-    .input("limite", sql.Int, limite)
-    .query<LinhaRodada>(`SELECT TOP (@limite) ${COLUNAS_RODADA} FROM dbo.portal_3dx_liberacoes AS r ORDER BY r.[criado_em] DESC;`);
-  return result.recordset.map(paraRodada);
+  const filtros: string[] = [];
+  if (params.codigo) filtros.push("r.[codigo_pai] LIKE '%' + @codigo + '%'");
+  if (params.tipo !== "todas") filtros.push("r.[dry_run] = @dryRun");
+  const where = filtros.length ? `WHERE ${filtros.join(" AND ")}` : "";
+
+  function comFiltros() {
+    const request = pool.request();
+    if (params.codigo) request.input("codigo", sql.NVarChar(50), params.codigo);
+    if (params.tipo !== "todas") request.input("dryRun", sql.Bit, params.tipo === "simulacao");
+    return request;
+  }
+
+  const [itens, total] = await Promise.all([
+    comFiltros()
+      .input("offset", sql.Int, (params.pagina - 1) * params.porPagina)
+      .input("porPagina", sql.Int, params.porPagina)
+      .query<LinhaRodada>(`
+        SELECT ${COLUNAS_RODADA} FROM dbo.portal_3dx_liberacoes AS r
+        ${where}
+        ORDER BY r.[criado_em] DESC
+        OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;`),
+    comFiltros().query<{ total: number }>(`SELECT COUNT(*) AS [total] FROM dbo.portal_3dx_liberacoes AS r ${where};`),
+  ]);
+
+  return { itens: itens.recordset.map(paraRodada), total: total.recordset[0]?.total ?? 0 };
 }

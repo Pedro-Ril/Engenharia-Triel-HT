@@ -46,3 +46,15 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(160px, 200px);
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .filtros {
+    grid-template-columns: 1fr;
+  }
+}

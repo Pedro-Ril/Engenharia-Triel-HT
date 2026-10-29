@@ -70,7 +70,16 @@ export async function liberarSimulacao(id: string, desenhos: string[]): Promise<
   return parseResponse(response);
 }
 
-export async function listarRodadas(): Promise<ApiEnvelope<Rodada[]>> {
-  const response = await fetch("/api/3dexperience/liberacao", { cache: "no-store" });
+export type TipoRodada = "todas" | "simulacao" | "liberacao";
+
+export async function listarRodadas(params: {
+  pagina: number;
+  porPagina: number;
+  codigo: string;
+  tipo: TipoRodada;
+}): Promise<ApiEnvelope<{ itens: Rodada[]; total: number }>> {
+  const busca = new URLSearchParams({ pagina: String(params.pagina), porPagina: String(params.porPagina), tipo: params.tipo });
+  if (params.codigo) busca.set("codigo", params.codigo);
+  const response = await fetch(`/api/3dexperience/liberacao?${busca.toString()}`, { cache: "no-store" });
   return parseResponse(response);
 }

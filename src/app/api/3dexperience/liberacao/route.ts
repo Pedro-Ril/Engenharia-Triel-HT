@@ -3,19 +3,37 @@ import { after, NextResponse } from "next/server";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject, requiredText } from "@/lib/auth/validation";
-import { executarSimulacao, iniciarSimulacao, listarRodadas } from "@/lib/3dexperience/liberacao-desenhos";
+import {
+  executarSimulacao,
+  iniciarSimulacao,
+  listarRodadas,
+  type TipoRodada,
+} from "@/lib/3dexperience/liberacao-desenhos";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* Últimas rodadas (simulações e liberações) -- o registro do período de teste. */
-async function handleGET() {
+const TIPOS: TipoRodada[] = ["todas", "simulacao", "liberacao"];
+
+/*
+ * Histórico de rodadas (simulações e liberações), paginado -- o registro
+ * do período de teste. Query: pagina, porPagina, codigo (parte do código
+ * do pai), tipo (todas | simulacao | liberacao).
+ */
+async function handleGET(request: Request) {
   const acesso = await verificarAcessoModuloApi("3dexperience");
   if (acesso.negado) return acesso.negado;
 
+  const url = new URL(request.url);
+  const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
+  const porPagina = Math.min(100, Math.max(1, Number(url.searchParams.get("porPagina")) || 20));
+  const codigo = (url.searchParams.get("codigo") ?? "").trim().slice(0, 50) || null;
+  const tipoParam = url.searchParams.get("tipo") as TipoRodada | null;
+  const tipo = tipoParam && TIPOS.includes(tipoParam) ? tipoParam : "todas";
+
   try {
-    return NextResponse.json({ ok: true, data: await listarRodadas() });
+    return NextResponse.json({ ok: true, data: await listarRodadas({ pagina, porPagina, codigo, tipo }) });
   } catch (error) {
     console.error("Erro ao listar as rodadas de liberação de desenhos:", error);
     return NextResponse.json({ ok: false, message: "Não foi possível listar as rodadas." }, { status: 500 });

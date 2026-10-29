@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
+import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
@@ -26,8 +28,17 @@ import {
   type DesenhoDaRodada,
   type Rodada,
   type StatusRodada,
+  type TipoRodada,
 } from "../services/liberacaoDesenhos.service";
 import styles from "./LiberacaoDesenhosTab.module.css";
+
+const POR_PAGINA_HISTORICO = 20;
+
+const OPCOES_TIPO: { value: TipoRodada; label: string }[] = [
+  { value: "todas", label: "Todas" },
+  { value: "simulacao", label: "Simulações" },
+  { value: "liberacao", label: "Liberações" },
+];
 
 const EM_ANDAMENTO: StatusRodada[] = ["explodindo", "buscando_desenhos", "processando"];
 
@@ -82,22 +93,40 @@ export function LiberacaoDesenhosTab() {
   const [iniciando, setIniciando] = useState(false);
   const [rodadaId, setRodadaId] = useState<string | null>(null);
   const [dados, setDados] = useState<{ rodada: Rodada; desenhos: DesenhoDaRodada[] } | null>(null);
-  const [historico, setHistorico] = useState<Rodada[] | null>(null);
+  const [historico, setHistorico] = useState<{ itens: Rodada[]; total: number } | null>(null);
   const [recargaHistorico, setRecargaHistorico] = useState(0);
+  const [paginaHistorico, setPaginaHistorico] = useState(1);
+  const [buscaDigitada, setBuscaDigitada] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [tipoHistorico, setTipoHistorico] = useState<TipoRodada>("todas");
   const [confirmando, setConfirmando] = useState(false);
   const [liberando, setLiberando] = useState(false);
   /* physicalIds dos desenhos marcados para liberar (ver marcadosPorPadrao). */
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
 
+  /* Busca no histórico com debounce de 400 ms: só consulta quando a pessoa para de digitar. */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscaAplicada(buscaDigitada.trim());
+      setPaginaHistorico(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [buscaDigitada]);
+
   useEffect(() => {
     let ativo = true;
-    listarRodadas().then((resultado) => {
+    listarRodadas({
+      pagina: paginaHistorico,
+      porPagina: POR_PAGINA_HISTORICO,
+      codigo: buscaAplicada,
+      tipo: tipoHistorico,
+    }).then((resultado) => {
       if (ativo && resultado.ok && resultado.data) setHistorico(resultado.data);
     });
     return () => {
       ativo = false;
     };
-  }, [recargaHistorico]);
+  }, [recargaHistorico, paginaHistorico, buscaAplicada, tipoHistorico]);
 
   /* Acompanha a rodada aberta: em andamento, pergunta de novo a cada 3 s. */
   useEffect(() => {
@@ -199,6 +228,8 @@ export function LiberacaoDesenhosTab() {
   const aLiberar = desenhos.filter((d) => marcados.has(d.desenhoPhysicalId)).length;
   const todosMarcados = desenhos.length > 0 && aLiberar === desenhos.length;
   const comTituloDiferente = desenhos.filter(tituloDiferenteDoItem).length;
+  const totalPaginasHistorico = historico ? Math.max(1, Math.ceil(historico.total / POR_PAGINA_HISTORICO)) : 1;
+  const filtrandoHistorico = buscaAplicada !== "" || tipoHistorico !== "todas";
 
   return (
     <Stack gap={20}>
@@ -385,45 +416,82 @@ export function LiberacaoDesenhosTab() {
         </Card>
       )}
 
-      <Card title="Histórico" description="As últimas rodadas — simulações e liberações. Clique para ver os desenhos.">
-        {!historico ? (
-          <Loader label="Carregando…" />
-        ) : historico.length === 0 ? (
-          <EmptyState icon={<History size={28} />} title="Nenhuma rodada ainda" />
-        ) : (
-          <Table minWidth={760}>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Quando</TableHeaderCell>
-                <TableHeaderCell>Item pai</TableHeaderCell>
-                <TableHeaderCell>Tipo</TableHeaderCell>
-                <TableHeaderCell>Situação</TableHeaderCell>
-                <TableHeaderCell align="right">Em trabalho</TableHeaderCell>
-                <TableHeaderCell align="right">Liberados</TableHeaderCell>
-                <TableHeaderCell align="right">Erros</TableHeaderCell>
-                <TableHeaderCell>Quem</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {historico.map((r) => (
-                <TableRow key={r.id} style={{ cursor: "pointer" }} onClick={() => abrirRodada(r.id)}>
-                  <TableCell>{formatarData(r.criadoEm)}</TableCell>
-                  <TableCell>
-                    <strong>{r.codigoPai}</strong>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={r.dryRun ? "info" : "success"}>{r.dryRun ? "Simulação" : "Liberação"}</Badge>
-                  </TableCell>
-                  <TableCell>{ETAPA[r.status]}</TableCell>
-                  <TableCell align="right">{r.totalEmTrabalho ?? "-"}</TableCell>
-                  <TableCell align="right">{r.totalLiberados ?? "-"}</TableCell>
-                  <TableCell align="right">{r.totalErros ?? "-"}</TableCell>
-                  <TableCell>{r.usuarioNome}</TableCell>
+      <Card title="Histórico" description="Simulações e liberações, das mais recentes para as mais antigas. Clique para ver os desenhos.">
+        <Stack gap={16}>
+          <div className={styles.filtros}>
+            <Field label="Item pai" htmlFor="historicoCodigo">
+              <Input
+                id="historicoCodigo"
+                value={buscaDigitada}
+                placeholder="Buscar pelo código"
+                onChange={(evento) => setBuscaDigitada(evento.target.value)}
+              />
+            </Field>
+            <Field label="Tipo">
+              <Dropdown
+                value={tipoHistorico}
+                options={OPCOES_TIPO}
+                onValueChange={(valor) => {
+                  setTipoHistorico(valor as TipoRodada);
+                  setPaginaHistorico(1);
+                }}
+              />
+            </Field>
+          </div>
+
+          {!historico ? (
+            <Loader label="Carregando…" />
+          ) : historico.itens.length === 0 ? (
+            <EmptyState
+              icon={<History size={28} />}
+              title={filtrandoHistorico ? "Nenhuma rodada encontrada com esses filtros" : "Nenhuma rodada ainda"}
+            />
+          ) : (
+            <Table minWidth={760}>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Quando</TableHeaderCell>
+                  <TableHeaderCell>Item pai</TableHeaderCell>
+                  <TableHeaderCell>Tipo</TableHeaderCell>
+                  <TableHeaderCell>Situação</TableHeaderCell>
+                  <TableHeaderCell align="right">Em trabalho</TableHeaderCell>
+                  <TableHeaderCell align="right">Liberados</TableHeaderCell>
+                  <TableHeaderCell align="right">Erros</TableHeaderCell>
+                  <TableHeaderCell>Quem</TableHeaderCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+              </TableHead>
+              <TableBody>
+                {historico.itens.map((r) => (
+                  <TableRow key={r.id} style={{ cursor: "pointer" }} onClick={() => abrirRodada(r.id)}>
+                    <TableCell>{formatarData(r.criadoEm)}</TableCell>
+                    <TableCell>
+                      <strong>{r.codigoPai}</strong>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={r.dryRun ? "info" : "success"}>{r.dryRun ? "Simulação" : "Liberação"}</Badge>
+                    </TableCell>
+                    <TableCell>{ETAPA[r.status]}</TableCell>
+                    <TableCell align="right">{r.totalEmTrabalho ?? "-"}</TableCell>
+                    <TableCell align="right">{r.totalLiberados ?? "-"}</TableCell>
+                    <TableCell align="right">{r.totalErros ?? "-"}</TableCell>
+                    <TableCell>{r.usuarioNome}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          {historico && totalPaginasHistorico > 1 && (
+            <Stack direction="row" justify="between" align="center" gap={12} wrap>
+              <span className={styles.secundario}>{historico.total} rodada(s)</span>
+              <Pagination
+                page={paginaHistorico}
+                totalPages={totalPaginasHistorico}
+                onPageChange={setPaginaHistorico}
+              />
+            </Stack>
+          )}
+        </Stack>
       </Card>
 
       <ConfirmDialog
