@@ -8,12 +8,13 @@ export const metadata = {
 
 const ABAS: AbaTresDExperience[] = ["ultima-revisao", "liberar-desenhos"];
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ aba?: string; codigo?: string }> }) {
   const usuario = await requireModuloAccess("3dexperience");
   await registrarAcessoModuloSemFalhar(usuario.id, "3dexperience");
 
-  const { aba } = await searchParams;
+  const { aba, codigo } = await searchParams;
   const abaInicial = ABAS.find((valor) => valor === aba) ?? "ultima-revisao";
+  const codigoInicial = (codigo ?? "").trim().slice(0, 50);
 
-  return <TresDExperiencePage abaInicial={abaInicial} />;
+  return <TresDExperiencePage abaInicial={abaInicial} codigoInicial={codigoInicial} />;
 }

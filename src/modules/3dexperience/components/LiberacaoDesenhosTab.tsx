@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, FileCheck2, History, PlayCircle } from "lucide-react";
+import { AlertTriangle, FileCheck2, GitCompare, History, PlayCircle } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -87,11 +87,28 @@ function formatarData(valorIso: string | null): string {
  * real só acontece com confirmação.
  * Período de teste: tudo fica registrado e aparece no histórico.
  */
-export function LiberacaoDesenhosTab() {
-  const [codigo, setCodigo] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
+interface LiberacaoDesenhosTabProps {
+  /* Código compartilhado com a aba Consulta última revisão. */
+  codigoInicial?: string;
+  onCodigoChange?: (codigo: string) => void;
+  /* Simulação já disparada ao chegar com um código (ou o erro ao dispará-la). */
+  rodadaInicialId?: string | null;
+  erroInicial?: string | null;
+  /* Mostra o atalho para a Consulta última revisão (levando o código). */
+  onIrParaConsulta?: () => void;
+}
+
+export function LiberacaoDesenhosTab({
+  codigoInicial = "",
+  onCodigoChange,
+  rodadaInicialId = null,
+  erroInicial = null,
+  onIrParaConsulta,
+}: LiberacaoDesenhosTabProps = {}) {
+  const [codigo, setCodigo] = useState(codigoInicial);
+  const [erro, setErro] = useState<string | null>(erroInicial);
   const [iniciando, setIniciando] = useState(false);
-  const [rodadaId, setRodadaId] = useState<string | null>(null);
+  const [rodadaId, setRodadaId] = useState<string | null>(rodadaInicialId);
   const [dados, setDados] = useState<{ rodada: Rodada; desenhos: DesenhoDaRodada[] } | null>(null);
   const [historico, setHistorico] = useState<{ itens: Rodada[]; total: number } | null>(null);
   const [recargaHistorico, setRecargaHistorico] = useState(0);
@@ -249,7 +266,10 @@ export function LiberacaoDesenhosTab() {
                 value={codigo}
                 placeholder="Ex.: 300309"
                 disabled={iniciando || emAndamento}
-                onChange={(evento) => setCodigo(evento.target.value)}
+                onChange={(evento) => {
+                  setCodigo(evento.target.value);
+                  onCodigoChange?.(evento.target.value);
+                }}
                 onKeyDown={(evento) => {
                   if (evento.key === "Enter") void simular();
                 }}
@@ -259,6 +279,12 @@ export function LiberacaoDesenhosTab() {
               <PlayCircle size={16} />
               Simular
             </Button>
+            {onIrParaConsulta && (
+              <Button variant="secondary" onClick={onIrParaConsulta}>
+                <GitCompare size={16} />
+                Ir para Consulta última revisão
+              </Button>
+            )}
           </Stack>
           {erro && <Alert variant="danger">{erro}</Alert>}
         </Stack>

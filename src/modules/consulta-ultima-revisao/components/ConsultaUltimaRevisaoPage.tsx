@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Boxes, GitCompare, Layers, Search } from "lucide-react";
+import { Boxes, FileCheck2, GitCompare, Layers, Search } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -109,8 +109,23 @@ function NoArvore({ no, expandidoInicial }: { no: NoEstrutura3DX; expandidoInici
   );
 }
 
-export function ConsultaUltimaRevisaoPage() {
-  const [codigoDigitado, setCodigoDigitado] = useState("");
+interface ConsultaUltimaRevisaoPageProps {
+  /* Dentro do 3DEXPERIENCE: o código compartilhado com a aba de liberação. */
+  codigoInicial?: string;
+  onCodigoChange?: (codigo: string) => void;
+  /* Mostra o atalho para a Liberação de desenhos (levando o código). */
+  onIrParaLiberacao?: () => void;
+  /* Enquanto a simulação disparada pelo atalho está sendo criada. */
+  irParaLiberacaoCarregando?: boolean;
+}
+
+export function ConsultaUltimaRevisaoPage({
+  codigoInicial = "",
+  onCodigoChange,
+  onIrParaLiberacao,
+  irParaLiberacaoCarregando = false,
+}: ConsultaUltimaRevisaoPageProps = {}) {
+  const [codigoDigitado, setCodigoDigitado] = useState(codigoInicial);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [estrutura, setEstrutura] = useState<EstruturaUltimaRevisao | null>(null);
@@ -166,7 +181,10 @@ export function ConsultaUltimaRevisaoPage() {
                 value={codigoDigitado}
                 placeholder="Ex.: 295007"
                 disabled={carregando}
-                onChange={(event) => setCodigoDigitado(event.target.value)}
+                onChange={(event) => {
+                  setCodigoDigitado(event.target.value);
+                  onCodigoChange?.(event.target.value);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") handleBuscar();
                 }}
@@ -177,6 +195,19 @@ export function ConsultaUltimaRevisaoPage() {
               <Search size={16} />
               Consultar
             </Button>
+
+            {onIrParaLiberacao && (
+              <Button
+                variant="secondary"
+                onClick={onIrParaLiberacao}
+                disabled={carregando}
+                loading={irParaLiberacaoCarregando}
+                title={codigoDigitado.trim() ? "Abre a Liberação de desenhos e já simula este código" : undefined}
+              >
+                <FileCheck2 size={16} />
+                {codigoDigitado.trim() ? "Simular liberação de desenhos" : "Ir para Liberação de desenhos"}
+              </Button>
+            )}
           </Stack>
 
           {erro && <Alert variant="danger">{erro}</Alert>}
