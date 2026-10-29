@@ -27,3 +27,22 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.checkboxCentro {
+  display: flex;
+  justify-content: center;
+}
+
+.linhaAlerta {
+  background: var(--warning-bg);
+}
+
+.alertaTitulo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--warning-text);
+  font-size: 12px;
+  font-weight: 600;
+}

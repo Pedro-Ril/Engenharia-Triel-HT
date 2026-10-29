@@ -34,19 +34,19 @@ export function TresDExperiencePage({ abaInicial }: TresDExperiencePageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="3DExperience"
+        title="3DEXPERIENCE"
         description="Ferramentas que consultam e atualizam o 3DEXPERIENCE a partir da estrutura do item."
       />
 
       <Breadcrumb
         items={[
           { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "3DExperience", current: true, icon: <Box size={14} /> },
+          { label: "3DEXPERIENCE", current: true, icon: <Box size={14} /> },
         ]}
       />
 
       <Tabs
-        ariaLabel="Ferramentas do 3DExperience"
+        ariaLabel="Ferramentas do 3DEXPERIENCE"
         value={aba}
         onValueChange={trocarAba}
         items={[

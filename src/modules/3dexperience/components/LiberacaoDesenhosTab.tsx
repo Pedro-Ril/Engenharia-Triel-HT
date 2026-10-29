@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileCheck2, History, PlayCircle } from "lucide-react";
+import { AlertTriangle, FileCheck2, History, PlayCircle } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
@@ -47,6 +48,22 @@ const ACAO: Record<AcaoDesenho, { label: string; variant: "success" | "warning" 
   erro: { label: "Erro", variant: "danger" },
 };
 
+/* O título do desenho deveria ser o código do item; diferente disso, a linha alerta (ex.: "F0298804_novo" no 307748). */
+function tituloDiferenteDoItem(d: DesenhoDaRodada): boolean {
+  const titulo = (d.desenhoTitulo ?? "").trim().toUpperCase();
+  const item = (d.itemCodigo ?? "").trim().toUpperCase();
+  return Boolean(titulo && item && titulo !== item);
+}
+
+/* Ao terminar a simulação, já vem marcado tudo o que dá para liberar, menos o que tem título diferente do item. */
+function marcadosPorPadrao(desenhos: DesenhoDaRodada[]): Set<string> {
+  return new Set(
+    desenhos
+      .filter((d) => d.acao === "seria_liberado" && !tituloDiferenteDoItem(d))
+      .map((d) => d.desenhoPhysicalId)
+  );
+}
+
 function formatarData(valorIso: string | null): string {
   return valorIso ? new Date(valorIso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "-";
 }
@@ -54,8 +71,9 @@ function formatarData(valorIso: string | null): string {
 /*
  * Liberação de desenhos em trabalho: explode a estrutura do pai no 3DX,
  * busca os desenhos de todos os itens e libera todo desenho IN_WORK, de
- * baixo para cima. Sempre simula antes (nada muda no 3DX); a liberação
- * real só acontece com confirmação, a partir de uma simulação concluída.
+ * baixo para cima. Sempre simula antes (nada muda no 3DX); a simulação
+ * lista só o que dá para liberar, o usuário marca quais vão, e a liberação
+ * real só acontece com confirmação.
  * Período de teste: tudo fica registrado e aparece no histórico.
  */
 export function LiberacaoDesenhosTab() {
@@ -68,6 +86,8 @@ export function LiberacaoDesenhosTab() {
   const [recargaHistorico, setRecargaHistorico] = useState(0);
   const [confirmando, setConfirmando] = useState(false);
   const [liberando, setLiberando] = useState(false);
+  /* physicalIds dos desenhos marcados para liberar (ver marcadosPorPadrao). */
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let ativo = true;
@@ -93,6 +113,7 @@ export function LiberacaoDesenhosTab() {
         if (EM_ANDAMENTO.includes(resultado.data.rodada.status)) {
           timer = setTimeout(atualizar, 3000);
         } else {
+          setMarcados(marcadosPorPadrao(resultado.data.desenhos));
           setRecargaHistorico((n) => n + 1);
         }
       } else {
@@ -107,6 +128,21 @@ export function LiberacaoDesenhosTab() {
     };
   }, [rodadaId]);
 
+  function abrirRodada(id: string | null) {
+    if (id === rodadaId) return;
+    setMarcados(new Set());
+    setRodadaId(id);
+  }
+
+  function alternar(physicalId: string, marcar: boolean) {
+    setMarcados((atual) => {
+      const proximo = new Set(atual);
+      if (marcar) proximo.add(physicalId);
+      else proximo.delete(physicalId);
+      return proximo;
+    });
+  }
+
   async function simular() {
     const codigoLimpo = codigo.trim();
     if (!codigoLimpo) {
@@ -119,7 +155,7 @@ export function LiberacaoDesenhosTab() {
       const resultado = await iniciarSimulacao(codigoLimpo);
       if (resultado.ok && resultado.data) {
         setDados(null);
-        setRodadaId(resultado.data.id);
+        abrirRodada(resultado.data.id);
         setRecargaHistorico((n) => n + 1);
       } else {
         setErro(resultado.message ?? "Não foi possível iniciar a simulação.");
@@ -133,11 +169,14 @@ export function LiberacaoDesenhosTab() {
     if (!dados) return;
     setLiberando(true);
     try {
-      const resultado = await liberarSimulacao(dados.rodada.id);
+      const escolhidos = dados.desenhos
+        .filter((d) => d.acao === "seria_liberado" && marcados.has(d.desenhoPhysicalId))
+        .map((d) => d.desenhoPhysicalId);
+      const resultado = await liberarSimulacao(dados.rodada.id, escolhidos);
       if (resultado.ok && resultado.data) {
         setConfirmando(false);
         setDados(null);
-        setRodadaId(resultado.data.id);
+        abrirRodada(resultado.data.id);
         setRecargaHistorico((n) => n + 1);
       } else {
         setConfirmando(false);
@@ -149,10 +188,17 @@ export function LiberacaoDesenhosTab() {
   }
 
   const rodada = dados?.rodada ?? null;
-  const desenhos = dados?.desenhos ?? [];
+  const todos = dados?.desenhos ?? [];
   const emAndamento = rodada ? EM_ANDAMENTO.includes(rodada.status) : rodadaId !== null;
-  const aLiberar = dados?.desenhos.filter((d) => d.acao === "seria_liberado").length ?? 0;
-  const podeLiberar = Boolean(rodada?.dryRun && rodada.status === "concluida" && !rodada.liberacaoId && aLiberar > 0);
+  /* Na simulação, só o que dá para liberar; na liberação, tudo o que foi enviado (com o resultado). */
+  const desenhos = rodada?.dryRun ? todos.filter((d) => d.acao === "seria_liberado") : todos;
+  const foraDaLista = todos.length - desenhos.length;
+  const podeLiberar = Boolean(
+    rodada?.dryRun && rodada.status === "concluida" && !rodada.liberacaoId && desenhos.length > 0
+  );
+  const aLiberar = desenhos.filter((d) => marcados.has(d.desenhoPhysicalId)).length;
+  const todosMarcados = desenhos.length > 0 && aLiberar === desenhos.length;
+  const comTituloDiferente = desenhos.filter(tituloDiferenteDoItem).length;
 
   return (
     <Stack gap={20}>
@@ -219,29 +265,63 @@ export function LiberacaoDesenhosTab() {
               {podeLiberar && (
                 <Stack direction="row" justify="between" align="center" gap={12} wrap>
                   <span className={styles.secundario}>
-                    A simulação terminou. Confira a lista e, se estiver certa, libere de verdade.
+                    A simulação terminou. Marque os desenhos que devem ser liberados de verdade.
                   </span>
-                  <Button variant="danger" onClick={() => setConfirmando(true)}>
+                  <Button variant="danger" disabled={aLiberar === 0} onClick={() => setConfirmando(true)}>
                     <FileCheck2 size={16} />
-                    Liberar {aLiberar} desenho(s) no 3DX
+                    {aLiberar === 0 ? "Marque os desenhos a liberar" : `Liberar ${aLiberar} desenho(s) no 3DX`}
                   </Button>
                 </Stack>
               )}
               {rodada.dryRun && rodada.liberacaoId && (
                 <Alert variant="info">
-                  Esta simulação já foi liberada.{" "}
-                  <button type="button" className={styles.link} onClick={() => setRodadaId(rodada.liberacaoId)}>
+                  Esta simulação já foi liberada; para liberar outros desenhos, simule de novo.{" "}
+                  <button type="button" className={styles.link} onClick={() => abrirRodada(rodada.liberacaoId)}>
                     Ver a liberação
                   </button>
                 </Alert>
               )}
 
+              {rodada.dryRun && rodada.status === "concluida" && foraDaLista > 0 && (
+                <span className={styles.secundario}>
+                  {foraDaLista} desenho(s) da estrutura não aparecem aqui porque não podem ser liberados (já
+                  liberados, fora de trabalho ou com erro).
+                </span>
+              )}
+
+              {comTituloDiferente > 0 && (
+                <Alert variant="warning">
+                  {comTituloDiferente} desenho(s) com título diferente do código do item — estão destacados na lista.
+                  Confira antes de liberar.
+                </Alert>
+              )}
+
               {desenhos.length === 0 ? (
-                !emAndamento && <span className={styles.secundario}>Nenhum desenho encontrado na estrutura.</span>
+                !emAndamento && (
+                  <span className={styles.secundario}>
+                    {rodada.dryRun ? "Nenhum desenho para liberar nesta estrutura." : "Nenhum desenho nesta rodada."}
+                  </span>
+                )
               ) : (
                 <Table minWidth={900}>
                   <TableHead>
                     <TableRow>
+                      {podeLiberar && (
+                        <TableHeaderCell align="center">
+                          <div className={styles.checkboxCentro}>
+                            <Checkbox
+                              label=""
+                              aria-label="Marcar todos"
+                              checked={todosMarcados}
+                              onChange={(evento) =>
+                                setMarcados(
+                                  evento.target.checked ? new Set(desenhos.map((d) => d.desenhoPhysicalId)) : new Set()
+                                )
+                              }
+                            />
+                          </div>
+                        </TableHeaderCell>
+                      )}
                       <TableHeaderCell align="right">#</TableHeaderCell>
                       <TableHeaderCell>Item</TableHeaderCell>
                       <TableHeaderCell align="center">Nível</TableHeaderCell>
@@ -252,7 +332,22 @@ export function LiberacaoDesenhosTab() {
                   </TableHead>
                   <TableBody>
                     {desenhos.map((d) => (
-                      <TableRow key={d.desenhoPhysicalId}>
+                      <TableRow
+                        key={d.desenhoPhysicalId}
+                        className={tituloDiferenteDoItem(d) ? styles.linhaAlerta : undefined}
+                      >
+                        {podeLiberar && (
+                          <TableCell align="center">
+                            <div className={styles.checkboxCentro}>
+                              <Checkbox
+                                label=""
+                                aria-label={`Liberar ${d.desenhoTitulo ?? d.desenhoPhysicalId}`}
+                                checked={marcados.has(d.desenhoPhysicalId)}
+                                onChange={(evento) => alternar(d.desenhoPhysicalId, evento.target.checked)}
+                              />
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell align="right">{d.ordem}</TableCell>
                         <TableCell>
                           <strong>{d.itemCodigo ?? "-"}</strong>
@@ -263,12 +358,21 @@ export function LiberacaoDesenhosTab() {
                         <TableCell>
                           {d.desenhoTitulo ?? d.desenhoPhysicalId}
                           {d.desenhoRevisao ? ` | ${d.desenhoRevisao}` : ""}
+                          {tituloDiferenteDoItem(d) && (
+                            <span className={styles.alertaTitulo}>
+                              <AlertTriangle size={13} aria-hidden="true" />
+                              Título diferente do item
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>{d.statusAntes ?? "-"}</TableCell>
                         <TableCell>
                           <Stack gap={4}>
                             <Badge variant={ACAO[d.acao].variant}>{ACAO[d.acao].label}</Badge>
-                            {d.mensagem && <span className={styles.mensagem}>{d.mensagem}</span>}
+                            {/* "Seria promovido / promovido para RELEASED" só repete o badge; as outras mensagens (erro, ignorado…) ficam. */}
+                            {d.mensagem && d.acao !== "seria_liberado" && d.acao !== "liberado" && (
+                              <span className={styles.mensagem}>{d.mensagem}</span>
+                            )}
                           </Stack>
                         </TableCell>
                       </TableRow>
@@ -302,7 +406,7 @@ export function LiberacaoDesenhosTab() {
             </TableHead>
             <TableBody>
               {historico.map((r) => (
-                <TableRow key={r.id} style={{ cursor: "pointer" }} onClick={() => setRodadaId(r.id)}>
+                <TableRow key={r.id} style={{ cursor: "pointer" }} onClick={() => abrirRodada(r.id)}>
                   <TableCell>{formatarData(r.criadoEm)}</TableCell>
                   <TableCell>
                     <strong>{r.codigoPai}</strong>
@@ -328,7 +432,7 @@ export function LiberacaoDesenhosTab() {
         variant="danger"
         confirmLabel="Sim, liberar no 3DX"
         loading={liberando}
-        message={`Os desenhos em trabalho da estrutura de ${rodada?.codigoPai ?? ""} passam para RELEASED no 3DEXPERIENCE de produção, de baixo para cima. Não há desfazer simples: voltar exige um administrador do 3DX. Tudo fica registrado no histórico.`}
+        message={`Os ${aLiberar} desenho(s) marcados da estrutura de ${rodada?.codigoPai ?? ""} passam para RELEASED no 3DEXPERIENCE de produção, de baixo para cima. Não há desfazer simples: voltar exige um administrador do 3DX. Tudo fica registrado no histórico.`}
         onConfirm={liberar}
         onClose={() => {
           if (!liberando) setConfirmando(false);

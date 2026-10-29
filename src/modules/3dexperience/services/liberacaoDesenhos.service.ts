@@ -61,8 +61,12 @@ export async function buscarRodada(id: string): Promise<ApiEnvelope<{ rodada: Ro
   return parseResponse(response);
 }
 
-export async function liberarSimulacao(id: string): Promise<ApiEnvelope<{ id: string }>> {
-  const response = await fetch(`/api/3dexperience/liberacao/${id}/liberar`, { method: "POST" });
+export async function liberarSimulacao(id: string, desenhos: string[]): Promise<ApiEnvelope<{ id: string }>> {
+  const response = await fetch(`/api/3dexperience/liberacao/${id}/liberar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ desenhos }),
+  });
   return parseResponse(response);
 }
 

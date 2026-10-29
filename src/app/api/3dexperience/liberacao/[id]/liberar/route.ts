@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { requiredUuidArray } from "@/lib/auth/validation";
+import { isObject, requiredUuidArray } from "@/lib/auth/validation";
 import { iniciarLiberacao } from "@/lib/3dexperience/liberacao-desenhos";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
@@ -12,9 +12,21 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/* Os physicalIds dos desenhos marcados na tela (sem repetição). */
+function desenhosEscolhidos(body: unknown): string[] {
+  const lista = isObject(body) ? body.desenhos : undefined;
+  if (!Array.isArray(lista) || lista.length === 0) {
+    throw new ValidationError("Marque pelo menos um desenho para liberar.");
+  }
+  const ids = lista.map((valor) => (typeof valor === "string" ? valor.trim() : ""));
+  if (ids.some((id) => !id || id.length > 64)) throw new ValidationError("Lista de desenhos inválida.");
+  return [...new Set(ids)];
+}
+
 /*
- * LIBERA de verdade no 3DX (produção) os desenhos que a simulação {id}
- * apontou. Sem desfazer simples: a tela confirma antes de chamar.
+ * LIBERA de verdade no 3DX (produção) os desenhos marcados (body
+ * `{ desenhos: physicalId[] }`), dentre os que a simulação {id} apontou.
+ * Sem desfazer simples: a tela confirma antes de chamar.
  */
 async function handlePOST(request: Request, context: RouteContext) {
   const acesso = await verificarAcessoModuloApi("3dexperience");
@@ -23,12 +35,13 @@ async function handlePOST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const simulacaoId = requiredUuidArray([id], "simulação")[0];
-    const liberacaoId = await iniciarLiberacao(simulacaoId, acesso.usuario);
+    const desenhos = desenhosEscolhidos(await request.json().catch(() => null));
+    const liberacaoId = await iniciarLiberacao(simulacaoId, desenhos, acesso.usuario);
 
     await registrarLog({
       nivel: "info",
       origem: "3dexperience/liberacao",
-      mensagem: `${acesso.usuario.nomeExibicao} iniciou a liberação real de desenhos (simulação ${simulacaoId}).`,
+      mensagem: `${acesso.usuario.nomeExibicao} iniciou a liberação real de ${desenhos.length} desenho(s) (simulação ${simulacaoId}).`,
       metodo: "POST",
       caminho: new URL(request.url).pathname,
     });

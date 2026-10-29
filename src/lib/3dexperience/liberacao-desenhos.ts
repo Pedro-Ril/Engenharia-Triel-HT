@@ -290,17 +290,29 @@ export async function executarSimulacao(rodadaId: string, codigoPai: string) {
 }
 
 /*
- * LIBERAÇÃO real a partir de uma simulação concluída: só os desenhos que
- * ela apontou como "seria liberado", na mesma ordem (de baixo para cima).
+ * LIBERAÇÃO real a partir de uma simulação concluída: os desenhos que o
+ * usuário marcou, todos entre os que ela apontou como "seria liberado",
+ * na mesma ordem (de baixo para cima).
  */
-export async function iniciarLiberacao(simulacaoId: string, usuario: { id: string; nomeExibicao: string }) {
+export async function iniciarLiberacao(
+  simulacaoId: string,
+  desenhosEscolhidos: string[],
+  usuario: { id: string; nomeExibicao: string }
+) {
   const simulacao = await buscarRodada(simulacaoId);
   if (!simulacao || !simulacao.rodada.dryRun) throw new ValidationError("Simulação não encontrada.");
   if (simulacao.rodada.status !== "concluida") throw new ValidationError("A simulação ainda não terminou.");
   if (simulacao.rodada.liberacaoId) throw new ValidationError("Esta simulação já foi liberada.");
+  if (desenhosEscolhidos.length === 0) throw new ValidationError("Marque pelo menos um desenho para liberar.");
 
-  const alvo = simulacao.desenhos.filter((d) => d.acao === "seria_liberado");
-  if (alvo.length === 0) throw new ValidationError("A simulação não apontou nenhum desenho para liberar.");
+  /* Só o que a simulação apontou como liberável; a ordem (de baixo para cima) é a da simulação. */
+  const liberaveis = simulacao.desenhos.filter((d) => d.acao === "seria_liberado");
+  const idsLiberaveis = new Set(liberaveis.map((d) => d.desenhoPhysicalId));
+  if (desenhosEscolhidos.some((id) => !idsLiberaveis.has(id))) {
+    throw new ValidationError("Há desenho marcado que a simulação não apontou como liberável. Simule de novo.");
+  }
+  const escolhidos = new Set(desenhosEscolhidos);
+  const alvo = liberaveis.filter((d) => escolhidos.has(d.desenhoPhysicalId));
 
   await garantirNenhumaEmAndamento();
   const rodadaId = await criarRodada({
