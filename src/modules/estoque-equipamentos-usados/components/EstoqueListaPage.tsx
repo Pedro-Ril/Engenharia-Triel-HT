@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, Home, MonitorPlay, Plus, Trash2, Warehouse } from "lucide-react";
+import { Copy, Eye, Hash, Home, MonitorPlay, Plus, Trash2, Warehouse } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
@@ -24,6 +25,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
+import { Textarea } from "@/components/ui/Textarea";
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ import {
   buscarSequenciaEquipamentos,
   duplicarEquipamento,
   excluirEquipamento,
+  trocarNumeroEquipamento,
   listarCamposComPendencia,
   listarEquipamentos,
 } from "../services/estoque.service";
@@ -116,6 +119,15 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
   const [novoNumeroDuplicar, setNovoNumeroDuplicar] = useState("");
   const [duplicando, setDuplicando] = useState(false);
   const [erroDuplicacao, setErroDuplicacao] = useState<string | null>(null);
+
+  const [equipamentoTrocandoNumero, setEquipamentoTrocandoNumero] = useState<Equipamento | null>(null);
+  const [novoNumeroTroca, setNovoNumeroTroca] = useState("");
+  const [trocarSerieJunto, setTrocarSerieJunto] = useState(false);
+  const [desfazerIntegracao, setDesfazerIntegracao] = useState(false);
+  const [motivoTroca, setMotivoTroca] = useState("");
+  const [confirmandoTroca, setConfirmandoTroca] = useState(false);
+  const [trocandoNumero, setTrocandoNumero] = useState(false);
+  const [erroTroca, setErroTroca] = useState<string | null>(null);
 
   useEffect(() => {
     listarCamposComPendencia().then(setPendenciasConfig);
@@ -270,6 +282,48 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       }
     } finally {
       setExcluindo(false);
+    }
+  }
+
+  function abrirTrocaNumero(equipamento: Equipamento) {
+    setEquipamentoTrocandoNumero(equipamento);
+    setNovoNumeroTroca("");
+    /* Número de série igual ao número do equipamento = é o "número do carro": acompanha a troca. */
+    setTrocarSerieJunto((equipamento.numeroSerie ?? "").trim() === String(equipamento.numero));
+    setDesfazerIntegracao(false);
+    setMotivoTroca("");
+    setErroTroca(null);
+  }
+
+  function validarTrocaNumero(): string | null {
+    if (!equipamentoTrocandoNumero) return "Equipamento não selecionado.";
+    const novoNumero = Number(novoNumeroTroca);
+    if (!Number.isInteger(novoNumero) || novoNumero <= 0) return "Informe um número inteiro válido.";
+    if (novoNumero === equipamentoTrocandoNumero.numero) return "O número novo é igual ao atual.";
+    if (motivoTroca.trim().length < 5) return "Explique o motivo da troca (pelo menos 5 caracteres).";
+    return null;
+  }
+
+  async function handleConfirmarTrocaNumero() {
+    if (!equipamentoTrocandoNumero) return;
+    setTrocandoNumero(true);
+    try {
+      const resultado = await trocarNumeroEquipamento(equipamentoTrocandoNumero.id, {
+        novoNumero: Number(novoNumeroTroca),
+        trocarNumeroSerie: trocarSerieJunto,
+        desfazerIntegracao,
+        motivo: motivoTroca.trim(),
+      });
+      if (resultado.ok && resultado.data) {
+        setConfirmandoTroca(false);
+        setEquipamentoTrocandoNumero(null);
+        router.push(`/estoque-equipamentos-usados/${resultado.data.novoId}`);
+      } else {
+        setConfirmandoTroca(false);
+        setErroTroca(resultado.message ?? "Não foi possível trocar o número.");
+      }
+    } finally {
+      setTrocandoNumero(false);
     }
   }
 
@@ -458,6 +512,12 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
                                       onSelect: () => abrirDuplicacao(equipamento),
                                     },
                                     {
+                                      value: "trocar-numero",
+                                      label: "Trocar número",
+                                      icon: <Hash size={15} />,
+                                      onSelect: () => abrirTrocaNumero(equipamento),
+                                    },
+                                    {
                                       value: "excluir",
                                       label: "Excluir",
                                       icon: <Trash2 size={15} />,
@@ -539,6 +599,99 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
           </Field>
         </Stack>
       </Modal>
+
+      <Modal
+        open={equipamentoTrocandoNumero !== null && !confirmandoTroca}
+        title={equipamentoTrocandoNumero ? `Trocar número do equipamento #${equipamentoTrocandoNumero.numero}` : ""}
+        description="Movimentações, evidências, anexos e histórico vão junto para o número novo. O endereço da tela do equipamento muda."
+        onClose={() => {
+          if (trocandoNumero) return;
+          setEquipamentoTrocandoNumero(null);
+        }}
+        footer={
+          <Stack direction="row" gap={8} justify="end">
+            <Button variant="secondary" onClick={() => setEquipamentoTrocandoNumero(null)} disabled={trocandoNumero}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const erro = validarTrocaNumero();
+                setErroTroca(erro);
+                if (!erro) setConfirmandoTroca(true);
+              }}
+            >
+              Trocar número
+            </Button>
+          </Stack>
+        }
+      >
+        {equipamentoTrocandoNumero && (
+          <Stack gap={16}>
+            {erroTroca && <Alert variant="danger">{erroTroca}</Alert>}
+
+            <Field label="Novo número" htmlFor="novoNumeroTroca" required>
+              <NumberInput
+                id="novoNumeroTroca"
+                prefix="#"
+                min={1}
+                value={novoNumeroTroca}
+                onChange={(event) => setNovoNumeroTroca(event.target.value)}
+                disabled={trocandoNumero}
+              />
+            </Field>
+
+            <Checkbox
+              id="trocarSerieJunto"
+              label="Trocar também o número de série"
+              hint={`Hoje: ${equipamentoTrocandoNumero.numeroSerie || "vazio"}. Só troca se o número de série for igual ao número atual do equipamento.`}
+              checked={trocarSerieJunto}
+              onChange={(event) => setTrocarSerieJunto(event.target.checked)}
+              disabled={trocandoNumero}
+            />
+
+            <Checkbox
+              id="desfazerIntegracao"
+              label="Desfazer a integração com o ERP e buscar a NF de entrada de novo"
+              hint="Use quando o número antigo puxou a NF ou o extrato de outro carro. Apaga o que a integração criou, volta a NF digitada na entrada e o status, e a busca roda de novo com o número novo."
+              checked={desfazerIntegracao}
+              onChange={(event) => setDesfazerIntegracao(event.target.checked)}
+              disabled={trocandoNumero}
+            />
+
+            <Field label="Motivo" htmlFor="motivoTroca" required hint="Fica registrado no histórico do equipamento.">
+              <Textarea
+                id="motivoTroca"
+                rows={3}
+                value={motivoTroca}
+                onChange={(event) => setMotivoTroca(event.target.value)}
+                disabled={trocandoNumero}
+              />
+            </Field>
+          </Stack>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmandoTroca}
+        title={
+          equipamentoTrocandoNumero
+            ? `Trocar #${equipamentoTrocandoNumero.numero} por #${novoNumeroTroca}?`
+            : "Trocar número?"
+        }
+        variant="warning"
+        message={
+          desfazerIntegracao
+            ? "O número muda e a integração com o ERP é desfeita: o que ela criou é apagado e a NF de entrada será buscada de novo."
+            : "O número muda e tudo o que é do equipamento vai junto. Essa ação fica registrada no histórico."
+        }
+        confirmLabel="Trocar número"
+        loading={trocandoNumero}
+        onConfirm={handleConfirmarTrocaNumero}
+        onClose={() => {
+          if (trocandoNumero) return;
+          setConfirmandoTroca(false);
+        }}
+      />
     </PageContainer>
   );
 }

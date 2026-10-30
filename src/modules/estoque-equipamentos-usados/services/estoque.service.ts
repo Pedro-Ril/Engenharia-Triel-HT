@@ -520,3 +520,20 @@ export async function buscarPainelGerencial(): Promise<ApiEnvelope<PainelGerenci
     return { ok: false, message: "Sem conexão com o Portal." };
   }
 }
+
+/* Troca o número do equipamento (admin). Volta o id do registro novo. */
+export async function trocarNumeroEquipamento(
+  id: string,
+  dados: { novoNumero: number; trocarNumeroSerie: boolean; desfazerIntegracao: boolean; motivo: string }
+): Promise<ApiEnvelope<{ novoId: string; numeroAntigo: number; novoNumero: number }>> {
+  try {
+    const response = await fetch(`/api/estoque-equipamentos-usados/${id}/numero`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+    });
+    return await parseResponse<{ novoId: string; numeroAntigo: number; novoNumero: number }>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
+}
