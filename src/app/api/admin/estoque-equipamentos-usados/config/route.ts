@@ -57,6 +57,9 @@ interface ConfigBody {
   urlNfSaidaTeste?: unknown;
   intervaloVerificacaoNfMinutos?: unknown;
   campoMascaraChave?: unknown;
+  urlExtrato?: unknown;
+  urlExtratoTeste?: unknown;
+  intervaloExtratoMinutos?: unknown;
 }
 
 async function handlePATCH(request: Request) {
@@ -122,6 +125,19 @@ async function handlePATCH(request: Request) {
       throw new ValidationError("O intervalo de verificação de NF não pode ser negativo.");
     }
 
+    const urlExtrato = validarUrl(
+      optionalText(body.urlExtrato, "URL do extrato do item", 300),
+      "A URL do extrato do item"
+    );
+    const urlExtratoTeste = validarUrl(
+      optionalText(body.urlExtratoTeste, "URL do extrato do item (teste)", 300),
+      "A URL do extrato do item (teste)"
+    );
+    const intervaloExtratoMinutos = optionalInteger(body.intervaloExtratoMinutos, "intervalo do extrato", 60);
+    if (intervaloExtratoMinutos < 15 || intervaloExtratoMinutos > 1440) {
+      throw new ValidationError("O intervalo do extrato deve ficar entre 15 e 1440 minutos.");
+    }
+
     const campoMascaraChave = optionalText(body.campoMascaraChave, "campo mapeado como mascara", 50);
     if (campoMascaraChave && !OPCOES_CAMPO_MASCARA_NF.some((opcao) => opcao.chave === campoMascaraChave)) {
       throw new ValidationError("Campo mapeado como mascara inválido.");
@@ -144,6 +160,9 @@ async function handlePATCH(request: Request) {
       urlNfSaidaTeste,
       intervaloVerificacaoNfMinutos,
       campoMascaraChave: campoMascaraChave || CHAVE_MASCARA_NUMERO_SEQUENCIAL,
+      urlExtrato,
+      urlExtratoTeste,
+      intervaloExtratoMinutos,
       atualizadoPor: acesso.usuario.samAccountName,
     });
 

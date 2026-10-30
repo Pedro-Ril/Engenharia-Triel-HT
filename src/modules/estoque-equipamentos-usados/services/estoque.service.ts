@@ -10,6 +10,8 @@ import type {
   HistoricoAlteracaoDadosTecnicos,
   MotivoBaixa,
   PainelBiEstoque,
+  ResultadoSincronizacaoErp,
+  SituacaoErpEquipamento,
   StatusEquipamento,
   TentativaIntegracaoNf,
   TipoEquipamento,
@@ -489,4 +491,21 @@ export async function validarEquipamentoNoErp(
 export async function buscarPainelBiEstoque(): Promise<ApiEnvelope<PainelBiEstoque>> {
   const response = await fetch("/api/estoque-equipamentos-usados/painel", { cache: "no-store" });
   return parseResponse<PainelBiEstoque>(response);
+}
+
+/* ---------- integração pelo extrato do ERP ---------- */
+
+export async function buscarSituacaoErp(id: string): Promise<SituacaoErpEquipamento | null> {
+  const response = await fetch(`/api/estoque-equipamentos-usados/${id}/erp`, { cache: "no-store" });
+  const body = await parseResponse<SituacaoErpEquipamento>(response).catch(() => null);
+  return body?.data ?? null;
+}
+
+export async function atualizarDoErp(id: string): Promise<ApiEnvelope<ResultadoSincronizacaoErp>> {
+  try {
+    const response = await fetch(`/api/estoque-equipamentos-usados/${id}/erp`, { method: "POST" });
+    return await parseResponse<ResultadoSincronizacaoErp>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
 }

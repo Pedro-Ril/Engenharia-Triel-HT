@@ -12,13 +12,15 @@ import {
 } from "./tipos-equipamento";
 import { buscarEmpresaPorCodigo } from "@/lib/empresas/empresas";
 
-export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "baixado";
+export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "em_reforma" | "baixado";
 export type TipoAcaoMovimentacao =
   | "entrada"
   | "emprestimo"
   | "consignacao"
+  | "reforma"
   | "retorno"
   | "baixa"
+  | "transferencia"
   | "nf_vinculada";
 export type MotivoBaixa = "venda" | "descarte" | "perda" | "outro";
 
@@ -62,6 +64,10 @@ export interface MovimentacaoEquipamento {
   dataAcao: string;
   criadoPorNome: string;
   criadoEm: string;
+  /* "erp" = lançada pela integração a partir do extrato do ERP. */
+  origem: "portal" | "erp";
+  /* Já casada com uma movimentação do extrato do ERP (mesma NF). */
+  confirmadaErp: boolean;
 }
 
 export interface EquipamentoComEstrato extends Equipamento {
@@ -164,6 +170,8 @@ interface MovimentacaoRow {
   data_acao: string;
   criado_por_nome: string;
   criado_em: string;
+  origem: "portal" | "erp";
+  erp_id_movimentacao: string | null;
 }
 
 function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
@@ -181,6 +189,8 @@ function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
     dataAcao: row.data_acao,
     criadoPorNome: row.criado_por_nome,
     criadoEm: row.criado_em,
+    origem: row.origem,
+    confirmadaErp: Boolean(row.erp_id_movimentacao),
   };
 }
 
@@ -309,7 +319,9 @@ export async function buscarEquipamentoPorId(id: string): Promise<EquipamentoCom
           [observacoes],
           CONVERT(VARCHAR(10), [data_acao], 23) AS [data_acao],
           [criado_por_nome],
-          CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em]
+          CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
+          [origem],
+          [erp_id_movimentacao]
         FROM dbo.com_estoque_equipamentos_usados_movimentacoes
         WHERE [equipamento_id] = @id
         ORDER BY [data_acao] ASC, [criado_em] ASC;
@@ -703,12 +715,12 @@ interface RegistrarMovimentacaoParams {
 }
 
 const STATUS_PERMITIDO_PARA_ACAO: Record<
-  Exclude<TipoAcaoMovimentacao, "entrada" | "nf_vinculada">,
+  Exclude<TipoAcaoMovimentacao, "entrada" | "nf_vinculada" | "reforma" | "transferencia">,
   { statusExigidos: StatusEquipamento[]; novoStatus: StatusEquipamento }
 > = {
   emprestimo: { statusExigidos: ["em_estoque"], novoStatus: "emprestado" },
   consignacao: { statusExigidos: ["em_estoque"], novoStatus: "consignado" },
-  retorno: { statusExigidos: ["emprestado", "consignado"], novoStatus: "em_estoque" },
+  retorno: { statusExigidos: ["emprestado", "consignado", "em_reforma"], novoStatus: "em_estoque" },
   baixa: { statusExigidos: ["em_estoque"], novoStatus: "baixado" },
 };
 
@@ -716,13 +728,14 @@ const LABEL_STATUS: Record<StatusEquipamento, string> = {
   em_estoque: "em estoque",
   emprestado: "emprestado",
   consignado: "em consignação",
+  em_reforma: "em reforma/conserto",
   baixado: "baixado",
 };
 
 async function registrarMovimentacao(
   params: RegistrarMovimentacaoParams
 ): Promise<EquipamentoComEstrato> {
-  const regra = STATUS_PERMITIDO_PARA_ACAO[params.tipoAcao as Exclude<TipoAcaoMovimentacao, "entrada" | "nf_vinculada">];
+  const regra = STATUS_PERMITIDO_PARA_ACAO[params.tipoAcao as Exclude<TipoAcaoMovimentacao, "entrada" | "nf_vinculada" | "reforma" | "transferencia">];
 
   const pool = await getSqlServerPool();
   const transaction = new sql.Transaction(pool);

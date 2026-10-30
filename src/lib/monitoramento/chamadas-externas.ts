@@ -11,6 +11,7 @@ export type ServicoExterno =
   | "erp_estoque_usados_clientes"
   | "erp_estoque_usados_nf_entrada"
   | "erp_estoque_usados_nf_saida"
+  | "erp_estoque_usados_extrato"
   | "erp_rh_firebird"
   | "erp_3dx_estrutura"
   | "erp_integra_tubest"

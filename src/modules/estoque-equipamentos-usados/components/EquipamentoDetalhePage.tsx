@@ -90,6 +90,7 @@ import {
   nfEntradaIntegradaComErp as calcularNfEntradaIntegradaComErp,
 } from "../constants";
 import styles from "./EquipamentoDetalhePage.module.css";
+import { ErpExtratoCard } from "./ErpExtratoCard";
 
 const ACEITA_EVIDENCIAS = "image/*,.pdf,.doc,.docx,.xls,.xlsx";
 
@@ -97,6 +98,7 @@ const STATUS_LABELS: Record<StatusEquipamento, string> = {
   em_estoque: "Em estoque",
   emprestado: "Emprestado",
   consignado: "Em consignação",
+  em_reforma: "Em reforma/conserto",
   baixado: "Baixado",
 };
 
@@ -104,6 +106,7 @@ const STATUS_BADGE: Record<StatusEquipamento, "success" | "warning" | "info" | "
   em_estoque: "success",
   emprestado: "warning",
   consignado: "info",
+  em_reforma: "warning",
   baixado: "neutral",
 };
 
@@ -112,7 +115,9 @@ const ACAO_LABELS: Record<TipoAcaoMovimentacao, string> = {
   emprestimo: "Empréstimo",
   consignacao: "Consignação",
   retorno: "Retorno ao estoque",
+  reforma: "Saída para reforma/conserto",
   baixa: "Baixa",
+  transferencia: "Transferência entre empresas",
   nf_vinculada: "NF de entrada vinculada",
 };
 
@@ -137,6 +142,7 @@ const TIPO_NF_LABEL: Record<TipoNfIntegracao, string> = {
   saida_emprestimo: "Saída — Empréstimo",
   saida_consignacao: "Saída — Consignação",
   saida_venda: "Saída — Venda",
+  extrato: "Extrato do item",
 };
 
 const OPCOES_MOTIVO_BAIXA: { value: MotivoBaixa; label: string }[] = [
@@ -146,7 +152,10 @@ const OPCOES_MOTIVO_BAIXA: { value: MotivoBaixa; label: string }[] = [
   { value: "outro", label: "Outro" },
 ];
 
+/* "AAAA-MM-DD" vem do banco sem fuso: formata direto (new Date leria como UTC e mostraria o dia anterior). */
 function formatarData(dataIso: string): string {
+  const soData = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dataIso);
+  if (soData) return `${soData[3]}/${soData[2]}/${soData[1]}`;
   return new Date(dataIso).toLocaleDateString("pt-BR");
 }
 
@@ -605,7 +614,8 @@ export function EquipamentoDetalhePage({
   const nfEntradaIntegradaComErp = calcularNfEntradaIntegradaComErp(equipamento);
   const podeEmprestar = equipamento.status === "em_estoque" && nfEntradaIntegradaComErp;
   const podeConsignar = equipamento.status === "em_estoque" && nfEntradaIntegradaComErp;
-  const podeRetornar = equipamento.status === "emprestado" || equipamento.status === "consignado";
+  const podeRetornar =
+    equipamento.status === "emprestado" || equipamento.status === "consignado" || equipamento.status === "em_reforma";
   const podeBaixar = equipamento.status === "em_estoque";
 
   /*
@@ -840,7 +850,16 @@ export function EquipamentoDetalhePage({
 
               return (
                 <TableRow key={movimentacao.id}>
-                  <TableCell>{ACAO_LABELS[movimentacao.tipoAcao]}</TableCell>
+                  <TableCell>
+                    {ACAO_LABELS[movimentacao.tipoAcao]}
+                    {movimentacao.origem === "erp" ? (
+                      <div>
+                        <Badge variant="info">Do ERP</Badge>
+                      </div>
+                    ) : movimentacao.confirmadaErp ? (
+                      <div className={styles.infoLabel}>Confirmada no ERP</div>
+                    ) : null}
+                  </TableCell>
                   <TableCell>{movimentacao.numeroNf ?? "-"}</TableCell>
                   <TableCell>{formatarMoeda(movimentacao.valor)}</TableCell>
                   <TableCell>
@@ -880,6 +899,12 @@ export function EquipamentoDetalhePage({
           </TableBody>
         </Table>
       </Card>
+
+      <ErpExtratoCard
+        equipamentoId={equipamento.id}
+        status={equipamento.status}
+        identificadoNoErp={Boolean(equipamento.erpCodigoItem && equipamento.erpIdItem)}
+      />
 
       <Modal
         open={modalAberto === "emprestimo" || modalAberto === "consignacao"}

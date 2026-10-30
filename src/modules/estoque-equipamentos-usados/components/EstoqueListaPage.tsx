@@ -52,6 +52,7 @@ const STATUS_LABELS: Record<StatusEquipamento, string> = {
   em_estoque: "Em estoque",
   emprestado: "Emprestado",
   consignado: "Em consignação",
+  em_reforma: "Em reforma/conserto",
   baixado: "Baixado",
 };
 
@@ -59,6 +60,7 @@ const STATUS_BADGE: Record<StatusEquipamento, "success" | "warning" | "info" | "
   em_estoque: "success",
   emprestado: "warning",
   consignado: "info",
+  em_reforma: "warning",
   baixado: "neutral",
 };
 

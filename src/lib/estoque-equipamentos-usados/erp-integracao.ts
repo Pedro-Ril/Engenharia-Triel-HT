@@ -19,6 +19,11 @@ export interface ConfigErpEstoqueUsados {
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
   ultimaExecucaoNfEm: string | null;
+  /* Extrato do item (GET /api/estoque-usados/extrato): sem URL, a sincronização não roda. */
+  urlExtrato: string | null;
+  urlExtratoTeste: string | null;
+  intervaloExtratoMinutos: number;
+  ultimaExecucaoExtratoEm: string | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }
@@ -40,6 +45,10 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
     intervalo_verificacao_nf_minutos: number | null;
     campo_mascara_chave: string;
     ultima_execucao_nf_em: string | null;
+    url_extrato: string | null;
+    url_extrato_teste: string | null;
+    intervalo_extrato_minutos: number | null;
+    ultima_execucao_extrato_em: string | null;
     atualizado_em: string | null;
     atualizado_por: string | null;
   }>(`
@@ -57,6 +66,10 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
       [intervalo_verificacao_nf_minutos],
       [campo_mascara_chave],
       CONVERT(VARCHAR(33), [ultima_execucao_nf_em], 126) AS [ultima_execucao_nf_em],
+      [url_extrato],
+      [url_extrato_teste],
+      [intervalo_extrato_minutos],
+      CONVERT(VARCHAR(33), [ultima_execucao_extrato_em], 126) AS [ultima_execucao_extrato_em],
       CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em],
       [atualizado_por]
     FROM dbo.com_estoque_equipamentos_usados_config
@@ -79,6 +92,10 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
     intervaloVerificacaoNfMinutos: row?.intervalo_verificacao_nf_minutos ?? 5,
     campoMascaraChave: row?.campo_mascara_chave || CHAVE_MASCARA_NUMERO_SEQUENCIAL,
     ultimaExecucaoNfEm: row?.ultima_execucao_nf_em ?? null,
+    urlExtrato: row?.url_extrato ?? null,
+    urlExtratoTeste: row?.url_extrato_teste ?? null,
+    intervaloExtratoMinutos: row?.intervalo_extrato_minutos || 60,
+    ultimaExecucaoExtratoEm: row?.ultima_execucao_extrato_em ?? null,
     atualizadoEm: row?.atualizado_em ?? null,
     atualizadoPor: row?.atualizado_por ?? null,
   };
@@ -97,6 +114,9 @@ export async function salvarConfigErpEstoqueUsados(params: {
   urlNfSaidaTeste: string | null;
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
+  urlExtrato: string | null;
+  urlExtratoTeste: string | null;
+  intervaloExtratoMinutos: number;
   atualizadoPor: string;
 }): Promise<ConfigErpEstoqueUsados> {
   const pool = await getSqlServerPool();
@@ -114,6 +134,9 @@ export async function salvarConfigErpEstoqueUsados(params: {
   request.input("urlNfSaidaTeste", sql.NVarChar(300), params.urlNfSaidaTeste);
   request.input("intervaloVerificacaoNfMinutos", sql.Int, params.intervaloVerificacaoNfMinutos ?? 5);
   request.input("campoMascaraChave", sql.NVarChar(50), params.campoMascaraChave);
+  request.input("urlExtrato", sql.NVarChar(300), params.urlExtrato);
+  request.input("urlExtratoTeste", sql.NVarChar(300), params.urlExtratoTeste);
+  request.input("intervaloExtratoMinutos", sql.Int, params.intervaloExtratoMinutos);
   request.input("atualizadoPor", sql.NVarChar(150), params.atualizadoPor);
 
   await request.query(`
@@ -134,11 +157,14 @@ export async function salvarConfigErpEstoqueUsados(params: {
         [url_nf_saida_teste] = @urlNfSaidaTeste,
         [intervalo_verificacao_nf_minutos] = @intervaloVerificacaoNfMinutos,
         [campo_mascara_chave] = @campoMascaraChave,
+        [url_extrato] = @urlExtrato,
+        [url_extrato_teste] = @urlExtratoTeste,
+        [intervalo_extrato_minutos] = @intervaloExtratoMinutos,
         [atualizado_em] = SYSDATETIME(),
         [atualizado_por] = @atualizadoPor
     WHEN NOT MATCHED THEN
-      INSERT ([id], [url_validar_item], [url_validar_item_teste], [url_clientes], [url_clientes_teste], [usar_ambiente_teste], [chave_api], [url_nf_entrada], [url_nf_entrada_teste], [url_nf_saida], [url_nf_saida_teste], [intervalo_verificacao_nf_minutos], [campo_mascara_chave], [atualizado_em], [atualizado_por])
-      VALUES (1, @urlValidarItem, @urlValidarItemTeste, @urlClientes, @urlClientesTeste, @usarAmbienteTeste, @chaveApi, @urlNfEntrada, @urlNfEntradaTeste, @urlNfSaida, @urlNfSaidaTeste, @intervaloVerificacaoNfMinutos, @campoMascaraChave, SYSDATETIME(), @atualizadoPor);
+      INSERT ([id], [url_validar_item], [url_validar_item_teste], [url_clientes], [url_clientes_teste], [usar_ambiente_teste], [chave_api], [url_nf_entrada], [url_nf_entrada_teste], [url_nf_saida], [url_nf_saida_teste], [intervalo_verificacao_nf_minutos], [campo_mascara_chave], [url_extrato], [url_extrato_teste], [intervalo_extrato_minutos], [atualizado_em], [atualizado_por])
+      VALUES (1, @urlValidarItem, @urlValidarItemTeste, @urlClientes, @urlClientesTeste, @usarAmbienteTeste, @chaveApi, @urlNfEntrada, @urlNfEntradaTeste, @urlNfSaida, @urlNfSaidaTeste, @intervaloVerificacaoNfMinutos, @campoMascaraChave, @urlExtrato, @urlExtratoTeste, @intervaloExtratoMinutos, SYSDATETIME(), @atualizadoPor);
   `);
 
   return buscarConfigErpEstoqueUsados();
@@ -150,6 +176,16 @@ export async function salvarConfigErpEstoqueUsados(params: {
  * configurado desde então (ver nf-entrada-scheduler.ts). Não mexe em
  * mais nenhuma coluna, então não precisa de MERGE nem de atualizadoPor.
  */
+export async function marcarUltimaExecucaoExtrato(): Promise<void> {
+  const pool = await getSqlServerPool();
+
+  await pool.request().query(`
+    UPDATE dbo.com_estoque_equipamentos_usados_config
+    SET [ultima_execucao_extrato_em] = SYSDATETIME()
+    WHERE [id] = 1;
+  `);
+}
+
 export async function marcarUltimaExecucaoNf(): Promise<void> {
   const pool = await getSqlServerPool();
 

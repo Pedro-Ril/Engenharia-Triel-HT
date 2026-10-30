@@ -324,8 +324,26 @@ export interface ConfigErpEstoqueUsados {
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
   ultimaExecucaoNfEm: string | null;
+  urlExtrato: string | null;
+  urlExtratoTeste: string | null;
+  intervaloExtratoMinutos: number;
+  ultimaExecucaoExtratoEm: string | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
+}
+
+export interface ResultadoSincronizacaoExtrato {
+  equipamentoId: string;
+  numero: number;
+  statusAntes: string;
+  statusDepois: string;
+  motivoStatus: string;
+  movimentosErpNovos: number;
+  movimentosErpRemovidos: number;
+  movimentacoesCriadas: number;
+  movimentacoesVinculadas: number;
+  movimentacoesRemovidas: number;
+  erro: string | null;
 }
 
 export interface ConfigIntegraLantek {

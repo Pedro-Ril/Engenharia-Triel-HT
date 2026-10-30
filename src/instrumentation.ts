@@ -33,6 +33,11 @@ export async function register() {
   );
   iniciarAgendadorNfEntrada();
 
+  const { iniciarAgendadorExtratoErp } = await import(
+    "@/lib/estoque-equipamentos-usados/extrato-scheduler"
+  );
+  iniciarAgendadorExtratoErp();
+
   const { iniciarAgendadorAutoResolucaoChamados } = await import(
     "@/lib/chamados/scheduler"
   );

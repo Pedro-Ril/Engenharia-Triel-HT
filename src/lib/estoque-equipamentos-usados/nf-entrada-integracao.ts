@@ -491,7 +491,7 @@ export async function tentarBuscarNfEntrada(
   }
 }
 
-export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda";
+export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda" | "extrato";
 
 export interface TentativaIntegracaoNf {
   id: string;

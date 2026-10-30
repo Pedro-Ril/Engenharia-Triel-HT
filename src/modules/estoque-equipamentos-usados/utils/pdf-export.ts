@@ -40,6 +40,7 @@ const STATUS_LABELS: Record<StatusEquipamento, string> = {
   em_estoque: "Em estoque",
   emprestado: "Emprestado",
   consignado: "Em consignação",
+  em_reforma: "Em reforma/conserto",
   baixado: "Baixado",
 };
 
@@ -47,6 +48,7 @@ const STATUS_CORES: Record<StatusEquipamento, { bg: [number, number, number]; te
   em_estoque: { bg: [236, 253, 243], text: [22, 101, 52] },
   emprestado: { bg: [255, 247, 237], text: [154, 52, 18] },
   consignado: { bg: [239, 246, 255], text: [29, 78, 216] },
+  em_reforma: { bg: [245, 243, 255], text: [109, 40, 217] },
   baixado: { bg: [243, 244, 246], text: [75, 85, 99] },
 };
 
@@ -55,7 +57,9 @@ const ACAO_LABELS: Record<TipoAcaoMovimentacao, string> = {
   emprestimo: "Empréstimo",
   consignacao: "Consignação",
   retorno: "Retorno ao estoque",
+  reforma: "Saída para reforma/conserto",
   baixa: "Baixa",
+  transferencia: "Transferência entre empresas",
   nf_vinculada: "NF de entrada vinculada",
 };
 
@@ -68,6 +72,10 @@ const RODAPE_Y = ALTURA_PAGINA - 12;
 
 function formatarData(data?: string | null): string {
   if (!data) return "-";
+
+  /* "AAAA-MM-DD" vem do banco sem fuso: formata direto (new Date leria como UTC e mostraria o dia anterior). */
+  const soData = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data);
+  if (soData) return `${soData[3]}/${soData[2]}/${soData[1]}`;
 
   const date = new Date(data);
   if (Number.isNaN(date.getTime())) return "-";

@@ -41,12 +41,13 @@ import styles from "./PainelBiEstoquePage.module.css";
 const INTERVALO_ATUALIZACAO_MS = 60_000;
 const INTERVALO_RELOGIO_MS = 1_000;
 
-const ORDEM_STATUS: StatusEquipamento[] = ["em_estoque", "emprestado", "consignado", "baixado"];
+const ORDEM_STATUS: StatusEquipamento[] = ["em_estoque", "emprestado", "consignado", "em_reforma", "baixado"];
 
 const STATUS_LABEL: Record<StatusEquipamento, string> = {
   em_estoque: "Em estoque",
   emprestado: "Emprestado",
   consignado: "Consignado",
+  em_reforma: "Em reforma",
   baixado: "Baixado",
 };
 
@@ -54,6 +55,7 @@ const STATUS_COR: Record<StatusEquipamento, string> = {
   em_estoque: "#16a34a",
   emprestado: "#d97706",
   consignado: "#2563eb",
+  em_reforma: "#7c3aed",
   baixado: "#64748b",
 };
 
@@ -65,8 +67,10 @@ const ACAO_LABEL: Record<TipoAcaoMovimentacao, string> = {
   entrada: "Entrada",
   emprestimo: "Empréstimo",
   consignacao: "Consignação",
+  reforma: "Reforma/conserto",
   retorno: "Retorno",
   baixa: "Baixa",
+  transferencia: "Transferência",
   nf_vinculada: "NF vinculada",
 };
 
@@ -74,9 +78,11 @@ const ACAO_COR: Record<TipoAcaoMovimentacao, string> = {
   entrada: "#16a34a",
   emprestimo: "#d97706",
   consignacao: "#2563eb",
+  reforma: "#7c3aed",
   retorno: "#0d9488",
   baixa: "#64748b",
-  nf_vinculada: "#7c3aed",
+  transferencia: "#0891b2",
+  nf_vinculada: "#a855f7",
 };
 
 const MESES_ABREV = [

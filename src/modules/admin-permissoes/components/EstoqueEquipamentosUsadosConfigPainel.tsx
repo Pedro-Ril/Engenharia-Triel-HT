@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
@@ -13,6 +14,7 @@ import { Loader } from "@/components/ui/Loader";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { Stack } from "@/components/ui/Stack";
 import { Switch } from "@/components/ui/Switch";
+import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
 
 import {
   CHAVE_MASCARA_NUMERO_SEQUENCIAL,
@@ -21,8 +23,17 @@ import {
 import {
   buscarConfigErpEstoqueUsados,
   salvarConfigErpEstoqueUsados,
+  sincronizarExtratoEstoqueUsados,
 } from "../services/adminPermissoes.service";
-import type { ConfigErpEstoqueUsados } from "../types/adminPermissoes.types";
+import type { ConfigErpEstoqueUsados, ResultadoSincronizacaoExtrato } from "../types/adminPermissoes.types";
+
+const STATUS_LABEL: Record<string, string> = {
+  em_estoque: "Em estoque",
+  emprestado: "Emprestado",
+  consignado: "Em consignação",
+  em_reforma: "Em reforma/conserto",
+  baixado: "Baixado",
+};
 import type { FeedbackHandler } from "../types/toast.types";
 
 interface EstoqueEquipamentosUsadosConfigPainelProps {
@@ -52,7 +63,16 @@ export function EstoqueEquipamentosUsadosConfigPainel({
   const [urlNfSaidaTeste, setUrlNfSaidaTeste] = useState("");
   const [intervaloVerificacaoNf, setIntervaloVerificacaoNf] = useState("");
   const [campoMascaraChave, setCampoMascaraChave] = useState(CHAVE_MASCARA_NUMERO_SEQUENCIAL);
+  const [urlExtrato, setUrlExtrato] = useState("");
+  const [urlExtratoTeste, setUrlExtratoTeste] = useState("");
+  const [intervaloExtrato, setIntervaloExtrato] = useState("60");
   const [salvando, setSalvando] = useState(false);
+  const [sincronizando, setSincronizando] = useState<"simular" | "aplicar" | null>(null);
+  const [confirmandoSincronizar, setConfirmandoSincronizar] = useState(false);
+  const [resultadoExtrato, setResultadoExtrato] = useState<{
+    simular: boolean;
+    resultados: ResultadoSincronizacaoExtrato[];
+  } | null>(null);
 
   useEffect(() => {
     async function carregar() {
@@ -73,6 +93,9 @@ export function EstoqueEquipamentosUsadosConfigPainel({
         dados?.intervaloVerificacaoNfMinutos ? String(dados.intervaloVerificacaoNfMinutos) : ""
       );
       setCampoMascaraChave(dados?.campoMascaraChave ?? CHAVE_MASCARA_NUMERO_SEQUENCIAL);
+      setUrlExtrato(dados?.urlExtrato ?? "");
+      setUrlExtratoTeste(dados?.urlExtratoTeste ?? "");
+      setIntervaloExtrato(String(dados?.intervaloExtratoMinutos ?? 60));
       setCarregando(false);
     }
 
@@ -96,6 +119,9 @@ export function EstoqueEquipamentosUsadosConfigPainel({
         urlNfSaidaTeste: urlNfSaidaTeste.trim() || null,
         intervaloVerificacaoNfMinutos: intervaloVerificacaoNf.trim() ? Number(intervaloVerificacaoNf) : null,
         campoMascaraChave,
+        urlExtrato: urlExtrato.trim() || null,
+        urlExtratoTeste: urlExtratoTeste.trim() || null,
+        intervaloExtratoMinutos: Number(intervaloExtrato) || 60,
       });
 
       if (resultado.ok && resultado.data) {
@@ -112,6 +138,24 @@ export function EstoqueEquipamentosUsadosConfigPainel({
       setSalvando(false);
     }
   }
+
+  async function handleSincronizar(simular: boolean) {
+    setConfirmandoSincronizar(false);
+    setSincronizando(simular ? "simular" : "aplicar");
+    try {
+      const resposta = await sincronizarExtratoEstoqueUsados(simular);
+      if (resposta.ok && resposta.data) {
+        setResultadoExtrato(resposta.data);
+        onFeedback("success", simular ? "Simulação concluída" : "Sincronização concluída", resposta.message ?? "");
+      } else {
+        onFeedback("danger", "Não foi possível consultar o extrato", resposta.message ?? "Tente novamente.");
+      }
+    } finally {
+      setSincronizando(null);
+    }
+  }
+
+  const urlExtratoAtiva = usarAmbienteTeste ? config?.urlExtratoTeste : config?.urlExtrato;
 
   if (carregando) {
     return <Loader label="Carregando configuração..." />;
@@ -288,6 +332,131 @@ export function EstoqueEquipamentosUsadosConfigPainel({
             </Field>
           </FormGrid>
         </div>
+
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            paddingTop: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
+          <div>
+            <strong>Extrato do item — movimentações e status</strong>
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
+              Depois que a NF de entrada identifica o equipamento no ERP, o Portal lê o extrato do item a cada
+              intervalo e o status passa a seguir o ERP (empréstimo, consignação, reforma, retorno, venda). Só para
+              de consultar quando o equipamento é baixado. Sem URL, a sincronização fica desligada.
+            </p>
+          </div>
+
+          <FormGrid columns={3}>
+            <Field
+              label="URL do extrato — Produção"
+              htmlFor="urlExtrato"
+              hint="Ex: http://proserver.trielht.com.br:1000/api/estoque-usados/extrato"
+            >
+              <Input id="urlExtrato" value={urlExtrato} onChange={(e) => setUrlExtrato(e.target.value)} disabled={salvando} />
+            </Field>
+            <Field label="URL do extrato — Teste" htmlFor="urlExtratoTeste">
+              <Input
+                id="urlExtratoTeste"
+                value={urlExtratoTeste}
+                onChange={(e) => setUrlExtratoTeste(e.target.value)}
+                disabled={salvando}
+              />
+            </Field>
+            <Field label="Intervalo (minutos)" htmlFor="intervaloExtrato" hint="De 15 a 1440. Padrão: 60.">
+              <NumberInput
+                id="intervaloExtrato"
+                min={15}
+                max={1440}
+                value={intervaloExtrato}
+                onChange={(e) => setIntervaloExtrato(e.target.value)}
+                disabled={salvando}
+              />
+            </Field>
+          </FormGrid>
+
+          <Stack direction="row" justify="between" align="center" wrap>
+            <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
+              Última sincronização automática: {formatarData(config?.ultimaExecucaoExtratoEm ?? null)}
+            </span>
+            <Stack direction="row" gap={8}>
+              <Button
+                variant="secondary"
+                onClick={() => handleSincronizar(true)}
+                loading={sincronizando === "simular"}
+                disabled={sincronizando !== null || !urlExtratoAtiva}
+              >
+                Simular (não grava)
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmandoSincronizar(true)}
+                loading={sincronizando === "aplicar"}
+                disabled={sincronizando !== null || !urlExtratoAtiva}
+              >
+                Sincronizar agora
+              </Button>
+            </Stack>
+          </Stack>
+
+          {resultadoExtrato && (
+            <Stack gap={8}>
+              <strong>
+                {resultadoExtrato.simular ? "Simulação — nada foi gravado" : "Resultado da sincronização"}
+                {` · ${resultadoExtrato.resultados.length} equipamento(s)`}
+              </strong>
+              <div style={{ overflowX: "auto" }}>
+                <Table minWidth={760}>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeaderCell>Equipamento</TableHeaderCell>
+                      <TableHeaderCell>Status</TableHeaderCell>
+                      <TableHeaderCell align="right">Lançadas</TableHeaderCell>
+                      <TableHeaderCell align="right">Confirmadas</TableHeaderCell>
+                      <TableHeaderCell align="right">Canceladas</TableHeaderCell>
+                      <TableHeaderCell>Observação</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {resultadoExtrato.resultados.map((r) => (
+                      <TableRow key={r.equipamentoId}>
+                        <TableCell>{r.numero}</TableCell>
+                        <TableCell>
+                          {r.statusAntes === r.statusDepois ? (
+                            STATUS_LABEL[r.statusAntes] ?? r.statusAntes
+                          ) : (
+                            <Badge variant="warning">
+                              {STATUS_LABEL[r.statusAntes] ?? r.statusAntes} → {STATUS_LABEL[r.statusDepois] ?? r.statusDepois}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell align="right">{r.movimentacoesCriadas}</TableCell>
+                        <TableCell align="right">{r.movimentacoesVinculadas}</TableCell>
+                        <TableCell align="right">{r.movimentosErpRemovidos}</TableCell>
+                        <TableCell>{r.erro ?? (r.statusAntes !== r.statusDepois ? r.motivoStatus : "")}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Stack>
+          )}
+        </div>
+
+        <ConfirmDialog
+          open={confirmandoSincronizar}
+          title="Sincronizar todos com o ERP?"
+          message="O status de cada equipamento passa a ser o do ERP e as movimentações do extrato entram no histórico do Portal. Rode a simulação antes para conferir o que vai mudar."
+          confirmLabel="Sincronizar"
+          variant="warning"
+          loading={sincronizando === "aplicar"}
+          onConfirm={() => handleSincronizar(false)}
+          onClose={() => setConfirmandoSincronizar(false)}
+        />
 
         {config?.atualizadoEm && (
           <p>

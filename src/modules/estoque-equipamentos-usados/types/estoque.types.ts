@@ -12,13 +12,15 @@ export interface ClienteEstoqueItem {
   cnpj: string | null;
 }
 
-export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "baixado";
+export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "em_reforma" | "baixado";
 export type TipoAcaoMovimentacao =
   | "entrada"
   | "emprestimo"
   | "consignacao"
+  | "reforma"
   | "retorno"
   | "baixa"
+  | "transferencia"
   | "nf_vinculada";
 export type MotivoBaixa = "venda" | "descarte" | "perda" | "outro";
 
@@ -62,6 +64,10 @@ export interface MovimentacaoEquipamento {
   dataAcao: string;
   criadoPorNome: string;
   criadoEm: string;
+  /* "erp" = lançada pela integração a partir do extrato do ERP. */
+  origem: "portal" | "erp";
+  /* Já casada com uma movimentação do extrato do ERP (mesma NF). */
+  confirmadaErp: boolean;
 }
 
 export interface AnexoMovimentacao {
@@ -91,7 +97,51 @@ export interface HistoricoAlteracaoDadosTecnicos {
 
 /* "ambiguo": o ERP devolveu mais de uma NF possível e nada foi aplicado -- alguém precisa escolher. */
 export type StatusTentativaIntegracaoNf = "sucesso" | "nao_encontrado" | "erro" | "ambiguo";
-export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda";
+export type TipoNfIntegracao = "entrada" | "saida_emprestimo" | "saida_consignacao" | "saida_venda" | "extrato";
+
+/* Espelho de src/lib/estoque-equipamentos-usados/extrato-integracao.ts (server-only). */
+export interface MovimentoErpGravado {
+  idMovimentacao: string;
+  data: string;
+  tipo: string;
+  tipoLabel: string;
+  sentido: string;
+  nfNumero: string | null;
+  nfSerie: string | null;
+  cfop: number | null;
+  naturezaOperacao: string | null;
+  contraparteNome: string | null;
+  contraparteCnpj: string | null;
+  valorTotalItem: number | null;
+  custoCompra: number | null;
+  localDepois: string | null;
+  vendaDeConsignacao: boolean | null;
+  removido: boolean;
+}
+
+export interface SituacaoErpEquipamento {
+  local: string | null;
+  desde: string | null;
+  codEmp: number | null;
+  contraparte: string | null;
+  custoCompra: number | null;
+  sincronizadoEm: string | null;
+  erro: string | null;
+  movimentos: MovimentoErpGravado[];
+}
+
+export interface ResultadoSincronizacaoErp {
+  numero: number;
+  statusAntes: StatusEquipamento;
+  statusDepois: StatusEquipamento;
+  motivoStatus: string;
+  movimentosErpNovos: number;
+  movimentosErpRemovidos: number;
+  movimentacoesCriadas: number;
+  movimentacoesVinculadas: number;
+  movimentacoesRemovidas: number;
+  erro: string | null;
+}
 
 export interface TentativaIntegracaoNf {
   id: string;

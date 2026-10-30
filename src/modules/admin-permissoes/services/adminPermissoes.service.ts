@@ -24,6 +24,7 @@ import type {
   BuscaTerminalFabrica,
   ChamadosConfig,
   ConfigErpEstoqueUsados,
+  ResultadoSincronizacaoExtrato,
   ConfigEstruturaSubstituicao,
   ConfigIntegraLantek,
   ConfigConferenciaDerivados,
@@ -869,6 +870,9 @@ export async function salvarConfigErpEstoqueUsados(dados: {
   urlNfSaidaTeste: string | null;
   intervaloVerificacaoNfMinutos: number | null;
   campoMascaraChave: string;
+  urlExtrato: string | null;
+  urlExtratoTeste: string | null;
+  intervaloExtratoMinutos: number;
 }): Promise<ApiEnvelope<ConfigErpEstoqueUsados>> {
   const response = await fetch("/api/admin/estoque-equipamentos-usados/config", {
     method: "PATCH",
@@ -876,6 +880,22 @@ export async function salvarConfigErpEstoqueUsados(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<ConfigErpEstoqueUsados>(response);
+}
+
+/* Sincroniza todos pelo extrato do ERP; simular=true mostra o que mudaria sem gravar. */
+export async function sincronizarExtratoEstoqueUsados(
+  simular: boolean
+): Promise<ApiEnvelope<{ simular: boolean; resultados: ResultadoSincronizacaoExtrato[] }>> {
+  try {
+    const response = await fetch("/api/admin/estoque-equipamentos-usados/extrato", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ simular }),
+    });
+    return await parseResponse<{ simular: boolean; resultados: ResultadoSincronizacaoExtrato[] }>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
 }
 
 export async function buscarConfigIntegraLantek(): Promise<ConfigIntegraLantek | null> {

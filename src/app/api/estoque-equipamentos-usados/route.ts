@@ -31,7 +31,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MODULO_CHAVE = "estoque-equipamentos-usados";
-const STATUS_VALIDOS: StatusEquipamento[] = ["em_estoque", "emprestado", "consignado", "baixado"];
+const STATUS_VALIDOS: StatusEquipamento[] = ["em_estoque", "emprestado", "consignado", "em_reforma", "baixado"];
 const uniqueIdentifierPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function hoje(): string {
