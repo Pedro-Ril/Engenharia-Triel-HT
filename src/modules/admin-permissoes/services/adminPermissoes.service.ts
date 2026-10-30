@@ -934,6 +934,7 @@ export async function salvarConfigEngenhariaVersatil(dados: {
   pastaDxf: string | null;
   abasBlacklist: string[];
   abasComDxf: string[];
+  abasFator: string[];
   erpApiUrl: string | null;
   erpCodEmpresa: number | null;
   erpAmbiente: "teste" | "producao";

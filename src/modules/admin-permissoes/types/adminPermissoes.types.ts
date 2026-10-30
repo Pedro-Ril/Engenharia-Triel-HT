@@ -357,6 +357,7 @@ export interface ConfigEngenhariaVersatil {
   pastaDxf: string | null;
   abasBlacklist: string[];
   abasComDxf: string[];
+  abasFator: string[];
   erpApiUrl: string | null;
   erpCodEmpresa: number | null;
   erpAmbiente: "teste" | "producao";

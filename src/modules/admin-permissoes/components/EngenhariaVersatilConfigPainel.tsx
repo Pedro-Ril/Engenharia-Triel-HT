@@ -48,6 +48,7 @@ export function EngenhariaVersatilConfigPainel({ onFeedback }: EngenhariaVersati
   const [pastaDxf, setPastaDxf] = useState("");
   const [blacklist, setBlacklist] = useState("");
   const [abasComDxf, setAbasComDxf] = useState("");
+  const [abasFator, setAbasFator] = useState("");
   const [erpApiUrl, setErpApiUrl] = useState("");
   const [erpCodEmpresa, setErpCodEmpresa] = useState("");
   const [erpAmbiente, setErpAmbiente] = useState<"teste" | "producao">("teste");
@@ -63,6 +64,7 @@ export function EngenhariaVersatilConfigPainel({ onFeedback }: EngenhariaVersati
       setPastaDxf(dados?.pastaDxf ?? "");
       setBlacklist((dados?.abasBlacklist ?? []).join("\n"));
       setAbasComDxf((dados?.abasComDxf ?? []).join("\n"));
+      setAbasFator((dados?.abasFator ?? []).join("\n"));
       setErpApiUrl(dados?.erpApiUrl ?? "");
       setErpCodEmpresa(dados?.erpCodEmpresa ? String(dados.erpCodEmpresa) : "");
       setErpAmbiente(dados?.erpAmbiente ?? "teste");
@@ -81,6 +83,7 @@ export function EngenhariaVersatilConfigPainel({ onFeedback }: EngenhariaVersati
         pastaDxf: pastaDxf.trim() || null,
         abasBlacklist: paraLista(blacklist),
         abasComDxf: paraLista(abasComDxf),
+        abasFator: paraLista(abasFator),
         erpApiUrl: erpApiUrl.trim() || null,
         erpCodEmpresa: erpCodEmpresa.trim() ? Number(erpCodEmpresa) : null,
         erpAmbiente,
@@ -151,6 +154,22 @@ export function EngenhariaVersatilConfigPainel({ onFeedback }: EngenhariaVersati
               rows={5}
               value={abasComDxf}
               onChange={(e) => setAbasComDxf(e.target.value)}
+              disabled={salvando}
+            />
+          </Field>
+        </FormGrid>
+
+        <FormGrid columns={2}>
+          <Field
+            label="Abas do fator de conversão"
+            htmlFor="versatilAbasFator"
+            hint="Uma por linha. Só os itens dessas abas entram na conferência de pesos e fatores. Vazio: todas fora da blacklist."
+          >
+            <Textarea
+              id="versatilAbasFator"
+              rows={5}
+              value={abasFator}
+              onChange={(e) => setAbasFator(e.target.value)}
               disabled={salvando}
             />
           </Field>

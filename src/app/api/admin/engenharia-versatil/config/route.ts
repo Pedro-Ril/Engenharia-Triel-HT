@@ -61,6 +61,7 @@ async function handlePATCH(request: Request) {
       pastaDxf: optionalText(corpo.pastaDxf, "Pasta de DXF", 300),
       abasBlacklist: listaDeAbas(corpo.abasBlacklist, "Abas ignoradas"),
       abasComDxf: listaDeAbas(corpo.abasComDxf, "Abas com DXF"),
+      abasFator: listaDeAbas(corpo.abasFator, "Abas do fator de conversão"),
       erpApiUrl: erpApiUrl ? erpApiUrl.replace(/\/+$/, "") : null,
       erpCodEmpresa,
       erpAmbiente: corpo.erpAmbiente,

@@ -65,3 +65,58 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+
+.avisoErp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.linkJson {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.json {
+  position: relative;
+  margin: 0;
+  padding: 16px;
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface-muted);
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.jsonIcone {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--text-faint);
+}
+
+.resumoAjuste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.situacaoAcoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

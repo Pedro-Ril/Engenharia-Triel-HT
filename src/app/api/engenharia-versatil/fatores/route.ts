@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { gravarFatores } from "@/lib/engenharia-versatil/fator-conversao";
+import { ErroGravacaoFatores, gravarFatores } from "@/lib/engenharia-versatil/fator-conversao";
 import { lerPlanilhaEnviada } from "@/lib/engenharia-versatil/planilha-enviada";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
@@ -47,6 +47,10 @@ async function handlePOST(request: Request) {
 
     return NextResponse.json({ ok: true, data: resultado });
   } catch (error) {
+    /* Recusa do ERP: devolve também as chamadas (enviado + resposta) para a tela mostrar o JSON. */
+    if (error instanceof ErroGravacaoFatores) {
+      return NextResponse.json({ ok: false, message: error.message, data: { chamadas: error.chamadas } }, { status: 400 });
+    }
     if (error instanceof ValidationError) {
       return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
     }

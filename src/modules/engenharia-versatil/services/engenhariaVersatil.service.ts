@@ -106,7 +106,6 @@ export type SituacaoFator =
   | "alterar"
   | "ok"
   | "peso_divergente"
-  | "erp_sem_peso"
   | "planilha_sem_peso"
   | "estoque_kg"
   | "sem_unidade"
@@ -134,8 +133,19 @@ export interface AnaliseFatores {
   arquivoPlanilha: string;
   codEmpresa: number;
   ambiente: "teste" | "producao";
+  abas: string[];
   linhas: LinhaFator[];
   totais: Record<SituacaoFator, number>;
+}
+
+/* Uma chamada ao ERP como foi: o que mostramos no "retorno completo do ERP". */
+export interface ChamadaErp {
+  etapa: "simulacao" | "gravacao";
+  metodo: "POST" | "PUT";
+  url: string;
+  enviado: unknown;
+  status: number | null;
+  resposta: unknown;
 }
 
 export interface ResultadoFatores {
@@ -144,6 +154,7 @@ export interface ResultadoFatores {
   incluidos: number;
   alterados: number;
   erro: string | null;
+  chamadas: ChamadaErp[];
 }
 
 export async function analisarFatores(planilha: File): Promise<ApiEnvelope<AnaliseFatores>> {
@@ -155,5 +166,28 @@ export async function gravarFatores(planilha: File, marcados: string[]): Promise
   const form = comPlanilha(planilha);
   form.append("marcados", JSON.stringify(marcados));
   const response = await fetch("/api/engenharia-versatil/fatores", { method: "POST", body: form });
+  return parseResponse(response);
+}
+
+export interface ResultadoAjustePeso {
+  id: string;
+  ambiente: "teste" | "producao";
+  codigo: string;
+  pesoAntes: number | null;
+  pesoDepois: number | null;
+  brutoAntes: number | null;
+  brutoDepois: number | null;
+  taxaAntes: number | null;
+  taxaDepois: number | null;
+  leitura: string | null;
+  avisos: string[];
+  chamadas: ChamadaErp[];
+}
+
+export async function ajustarPeso(planilha: File, codigo: string, peso: number): Promise<ApiEnvelope<ResultadoAjustePeso>> {
+  const form = comPlanilha(planilha);
+  form.append("codigo", codigo);
+  form.append("peso", String(peso));
+  const response = await fetch("/api/engenharia-versatil/fatores/peso", { method: "POST", body: form });
   return parseResponse(response);
 }

@@ -40,6 +40,8 @@ export interface ConfigEngenhariaVersatil {
   pastaDxf: string | null;
   abasBlacklist: string[];
   abasComDxf: string[];
+  /* Abas que entram na conferência de pesos e fator de conversão (vazia = todas fora da blacklist). */
+  abasFator: string[];
   /* API Oracle do ERP (rotas /api/fator-conversao), empresa e ambiente. */
   erpApiUrl: string | null;
   erpCodEmpresa: number | null;
@@ -63,6 +65,7 @@ export async function buscarConfigEngenhariaVersatil(): Promise<ConfigEngenharia
     pasta_dxf: string | null;
     abas_blacklist: string | null;
     abas_com_dxf: string | null;
+    abas_fator: string | null;
     erp_api_url: string | null;
     erp_cod_empresa: number | null;
     erp_ambiente: string | null;
@@ -70,7 +73,7 @@ export async function buscarConfigEngenhariaVersatil(): Promise<ConfigEngenharia
     atualizado_por: string | null;
   }>(`
     SELECT [pasta_projetos], [pasta_pdf], [pasta_dxf], [abas_blacklist], [abas_com_dxf],
-           [erp_api_url], [erp_cod_empresa], [erp_ambiente],
+           [abas_fator], [erp_api_url], [erp_cod_empresa], [erp_ambiente],
            CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em], [atualizado_por]
     FROM dbo.eng_versatil_config WHERE [id] = 1;
   `);
@@ -81,6 +84,7 @@ export async function buscarConfigEngenhariaVersatil(): Promise<ConfigEngenharia
     pastaDxf: row?.pasta_dxf ?? null,
     abasBlacklist: lista(row?.abas_blacklist ?? null),
     abasComDxf: lista(row?.abas_com_dxf ?? null),
+    abasFator: lista(row?.abas_fator ?? null),
     erpApiUrl: row?.erp_api_url ?? null,
     erpCodEmpresa: row?.erp_cod_empresa ?? null,
     /* Qualquer coisa que não seja "producao" explícito é teste. */
@@ -96,6 +100,7 @@ export async function salvarConfigEngenhariaVersatil(params: {
   pastaDxf: string | null;
   abasBlacklist: string[];
   abasComDxf: string[];
+  abasFator: string[];
   erpApiUrl: string | null;
   erpCodEmpresa: number | null;
   erpAmbiente: "teste" | "producao";
@@ -109,6 +114,7 @@ export async function salvarConfigEngenhariaVersatil(params: {
     .input("pastaDxf", sql.NVarChar(300), params.pastaDxf)
     .input("abasBlacklist", sql.NVarChar(2000), params.abasBlacklist.join("\n") || null)
     .input("abasComDxf", sql.NVarChar(2000), params.abasComDxf.join("\n") || null)
+    .input("abasFator", sql.NVarChar(2000), params.abasFator.join("\n") || null)
     .input("erpApiUrl", sql.NVarChar(300), params.erpApiUrl)
     .input("erpCodEmpresa", sql.Int, params.erpCodEmpresa)
     .input("erpAmbiente", sql.VarChar(10), params.erpAmbiente)
@@ -119,12 +125,13 @@ export async function salvarConfigEngenhariaVersatil(params: {
       WHEN MATCHED THEN UPDATE SET
         [pasta_projetos] = @pastaProjetos, [pasta_pdf] = @pastaPdf, [pasta_dxf] = @pastaDxf,
         [abas_blacklist] = @abasBlacklist, [abas_com_dxf] = @abasComDxf,
+        [abas_fator] = @abasFator,
         [erp_api_url] = @erpApiUrl, [erp_cod_empresa] = @erpCodEmpresa, [erp_ambiente] = @erpAmbiente,
         [atualizado_em] = SYSDATETIME(), [atualizado_por] = @atualizadoPor
       WHEN NOT MATCHED THEN INSERT
-        ([id], [pasta_projetos], [pasta_pdf], [pasta_dxf], [abas_blacklist], [abas_com_dxf],
+        ([id], [pasta_projetos], [pasta_pdf], [pasta_dxf], [abas_blacklist], [abas_com_dxf], [abas_fator],
          [erp_api_url], [erp_cod_empresa], [erp_ambiente], [atualizado_em], [atualizado_por])
-        VALUES (1, @pastaProjetos, @pastaPdf, @pastaDxf, @abasBlacklist, @abasComDxf,
+        VALUES (1, @pastaProjetos, @pastaPdf, @pastaDxf, @abasBlacklist, @abasComDxf, @abasFator,
                 @erpApiUrl, @erpCodEmpresa, @erpAmbiente, SYSDATETIME(), @atualizadoPor);
     `);
   return buscarConfigEngenhariaVersatil();

@@ -32,6 +32,7 @@ import {
   type SituacaoItem,
 } from "../services/engenhariaVersatil.service";
 import styles from "./EngenhariaVersatil.module.css";
+import { BotaoDetalhes } from "./BotaoDetalhes";
 import { FatoresConversaoCard } from "./FatoresConversaoCard";
 import { TabelaArquivos, type LinhaArquivo, type VarianteSituacao } from "./TabelaArquivos";
 
@@ -79,6 +80,9 @@ export function EngenhariaVersatilPage() {
   const [historico, setHistorico] = useState<{ itens: Separacao[]; total: number } | null>(null);
   const [pagina, setPagina] = useState(1);
   const [recarga, setRecarga] = useState(0);
+  /* Os cards mostram só o resumo; listas e tabelas ficam recolhidas. */
+  const [detalhesPrevia, setDetalhesPrevia] = useState(false);
+  const [detalhesResultado, setDetalhesResultado] = useState(false);
 
   useEffect(() => {
     let ativo = true;
@@ -97,7 +101,10 @@ export function EngenhariaVersatilPage() {
     setAnalisando(true);
     try {
       const resultado = await analisarPlanilha(arquivo);
-      if (resultado.ok && resultado.data) setPrevia(resultado.data);
+      if (resultado.ok && resultado.data) {
+        setPrevia(resultado.data);
+        setDetalhesPrevia(false);
+      }
       else setErro(resultado.message ?? "Não foi possível analisar a planilha.");
     } finally {
       setAnalisando(false);
@@ -118,6 +125,7 @@ export function EngenhariaVersatilPage() {
     const resultado = await buscarSeparacao(id);
     if (resultado.ok && resultado.data) {
       setAberta(resultado.data);
+      setDetalhesResultado(false);
       setPrevia(null);
     } else {
       setErro(resultado.message ?? "Não foi possível abrir a separação.");
@@ -170,7 +178,7 @@ export function EngenhariaVersatilPage() {
     <PageContainer>
       <PageHeader
         title="Engenharia Versátil"
-        description="Separa a engenharia de um projeto: cria as pastas a partir das abas da planilha e copia os desenhos para a pasta do projeto na rede."
+        description="Separa a engenharia de um projeto: cria as pastas a partir das abas da planilha, copia os desenhos para a pasta do projeto na rede e cadastra o fator de conversão no ERP."
       />
 
       <Breadcrumb
@@ -214,29 +222,18 @@ export function EngenhariaVersatilPage() {
                 <StatCard label="Não encontrados" value={previa.totais.naoEncontrados} variant="warning" />
               </div>
 
-              <div className={styles.pastas}>
-                {previa.plano.pastas.map((p) => (
-                  <span key={p.caminho} className={styles.pasta}>
-                    {p.caminho}
-                    <Badge variant={p.criar ? "info" : "neutral"}>{p.criar ? "nova" : "já existe"}</Badge>
-                  </span>
-                ))}
-              </div>
-
-              {previa.plano.abasIgnoradas.length > 0 && (
-                <Alert variant="info">
-                  Abas que não viram pasta:{" "}
-                  {previa.plano.abasIgnoradas
-                    .map((a) => `${a.aba} (${MOTIVO[a.motivo]}${a.motivo === "sem_arquivos" ? `, ${a.itens} itens` : ""})`)
-                    .join(" · ")}
-                </Alert>
-              )}
-
               <Stack direction="row" justify="between" align="center" gap={12} wrap>
-                <Button variant="secondary" onClick={() => planilha && void analisar(planilha)} disabled={analisando}>
-                  <RefreshCw size={16} />
-                  Analisar de novo
-                </Button>
+                <Stack direction="row" gap={12} wrap>
+                  <Button variant="secondary" onClick={() => planilha && void analisar(planilha)} disabled={analisando}>
+                    <RefreshCw size={16} />
+                    Analisar de novo
+                  </Button>
+                  <BotaoDetalhes
+                    aberto={detalhesPrevia}
+                    onAlternar={() => setDetalhesPrevia((v) => !v)}
+                    quantidade={linhasPrevia.length}
+                  />
+                </Stack>
                 <Button onClick={() => setConfirmando(true)} disabled={!temTrabalho}>
                   <FolderPlus size={16} />
                   {temTrabalho
@@ -245,7 +242,29 @@ export function EngenhariaVersatilPage() {
                 </Button>
               </Stack>
 
-              <TabelaArquivos linhas={linhasPrevia} />
+              {detalhesPrevia && (
+                <>
+                  <div className={styles.pastas}>
+                    {previa.plano.pastas.map((p) => (
+                      <span key={p.caminho} className={styles.pasta}>
+                        {p.caminho}
+                        <Badge variant={p.criar ? "info" : "neutral"}>{p.criar ? "nova" : "já existe"}</Badge>
+                      </span>
+                    ))}
+                  </div>
+
+                  {previa.plano.abasIgnoradas.length > 0 && (
+                    <Alert variant="info">
+                      Abas que não viram pasta:{" "}
+                      {previa.plano.abasIgnoradas
+                        .map((a) => `${a.aba} (${MOTIVO[a.motivo]}${a.motivo === "sem_arquivos" ? `, ${a.itens} itens` : ""})`)
+                        .join(" · ")}
+                    </Alert>
+                  )}
+
+                  <TabelaArquivos linhas={linhasPrevia} />
+                </>
+              )}
             </Stack>
           </Card>
         )}
@@ -269,10 +288,23 @@ export function EngenhariaVersatilPage() {
                 <StatCard label="Não encontrados" value={aberta.separacao.arquivosNaoEncontrados} variant="warning" />
                 <StatCard label="Erros" value={aberta.separacao.arquivosComErro} variant="danger" />
               </div>
-              {aberta.separacao.status !== "erro" && aberta.separacao.mensagem && (
-                <Alert variant="info">{aberta.separacao.mensagem}</Alert>
+              {(linhasResultado.length > 0 || aberta.separacao.mensagem) && (
+                <div>
+                  <BotaoDetalhes
+                    aberto={detalhesResultado}
+                    onAlternar={() => setDetalhesResultado((v) => !v)}
+                    quantidade={linhasResultado.length}
+                  />
+                </div>
               )}
-              {linhasResultado.length > 0 && <TabelaArquivos linhas={linhasResultado} />}
+              {detalhesResultado && (
+                <>
+                  {aberta.separacao.status !== "erro" && aberta.separacao.mensagem && (
+                    <Alert variant="info">{aberta.separacao.mensagem}</Alert>
+                  )}
+                  {linhasResultado.length > 0 && <TabelaArquivos linhas={linhasResultado} />}
+                </>
+              )}
             </Stack>
           </Card>
         )}

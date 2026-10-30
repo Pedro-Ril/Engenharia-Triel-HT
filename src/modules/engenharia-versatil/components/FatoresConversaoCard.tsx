@@ -22,10 +22,12 @@ import {
   gravarFatores,
   type AnaliseFatores,
   type LinhaFator,
-  type ResultadoFatores,
   type SituacaoFator,
 } from "../services/engenhariaVersatil.service";
+import { AjustarPesoModal } from "./AjustarPesoModal";
+import { BotaoDetalhes } from "./BotaoDetalhes";
 import styles from "./EngenhariaVersatil.module.css";
+import { RetornoErpAviso, type AvisoErp } from "./RetornoErpAviso";
 import type { VarianteSituacao } from "./TabelaArquivos";
 
 const POR_PAGINA = 25;
@@ -35,16 +37,15 @@ const SITUACAO: Record<SituacaoFator, { rotulo: string; variante: VarianteSituac
   alterar: { rotulo: "Fator errado: alterar", variante: "info" },
   ok: { rotulo: "Fator certo", variante: "success" },
   peso_divergente: { rotulo: "Peso divergente", variante: "warning" },
-  erp_sem_peso: { rotulo: "ERP sem peso", variante: "warning" },
-  planilha_sem_peso: { rotulo: "Planilha sem peso", variante: "neutral" },
+  planilha_sem_peso: { rotulo: "Planilha sem peso", variante: "warning" },
   estoque_kg: { rotulo: "Estoque já em KG", variante: "neutral" },
   sem_unidade: { rotulo: "Sem unidade de estoque no ERP", variante: "danger" },
   planilha_conflito: { rotulo: "Pesos diferentes na planilha", variante: "warning" },
   nao_encontrado: { rotulo: "Não existe no ERP", variante: "danger" },
 };
 
-/* Linhas que pedem atenção: destacadas, desmarcadas, com o fator pelo peso da planilha. */
-const DESTACADAS: SituacaoFator[] = ["peso_divergente", "erp_sem_peso"];
+/* Linhas que pedem atenção (destacadas): peso divergente (desmarcado; marcando, grava pelo peso da planilha) e planilha sem peso (sem como calcular). */
+const DESTACADAS: SituacaoFator[] = ["peso_divergente", "planilha_sem_peso"];
 
 function numero(valor: number | null, casas: number): string {
   return valor === null ? "—" : valor.toLocaleString("pt-BR", { maximumFractionDigits: casas });
@@ -66,12 +67,14 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
   const [pagina, setPagina] = useState(1);
   const [confirmando, setConfirmando] = useState(false);
   const [gravando, setGravando] = useState(false);
-  const [resultado, setResultado] = useState<ResultadoFatores | null>(null);
+  const [aviso, setAviso] = useState<AvisoErp | null>(null);
+  const [detalhes, setDetalhes] = useState(false);
+  /* Item de peso divergente com a janela "Ajustar peso" aberta. */
+  const [ajustando, setAjustando] = useState<LinhaFator | null>(null);
   const [copiado, setCopiado] = useState(false);
 
-  async function conferir(manterResultado = false) {
+  async function conferir() {
     setErro(null);
-    if (!manterResultado) setResultado(null);
     setConferindo(true);
     try {
       const r = await analisarFatores(planilha);
@@ -93,10 +96,23 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
       const r = await gravarFatores(planilha, [...marcados]);
       setConfirmando(false);
       if (r.ok && r.data) {
-        setResultado(r.data);
-        await conferir(true);
+        const d = r.data;
+        setAviso({
+          variante: d.erro ? "danger" : "success",
+          titulo: d.erro ? `Gravação incompleta no ERP (${d.ambiente})` : `Gravado no ERP (${d.ambiente})`,
+          descricao: d.erro
+            ? `${d.incluidos} incluído(s) e ${d.alterados} alterado(s) antes do erro: ${d.erro}`
+            : `${d.incluidos} fator(es) incluído(s) e ${d.alterados} alterado(s). A lista já foi conferida de novo.`,
+          retorno: { ambiente: d.ambiente, incluidos: d.incluidos, alterados: d.alterados, erro: d.erro, chamadas: d.chamadas },
+        });
+        await conferir();
       } else {
-        setErro(r.message ?? "Não foi possível gravar os fatores no ERP.");
+        setAviso({
+          variante: "danger",
+          titulo: "Gravação recusada",
+          descricao: `${r.message ?? "Não foi possível gravar os fatores no ERP."} Nada foi gravado.`,
+          retorno: { mensagem: r.message ?? null, ...((r.data as object | undefined) ?? {}) },
+        });
       }
     } finally {
       setGravando(false);
@@ -167,16 +183,14 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
             {analise ? "Conferir de novo" : "Conferir pesos e fatores"}
           </Button>
           {conferindo && <Loader label="Consultando o ERP…" />}
+          {analise && !conferindo && (
+            <span className={styles.secundario}>
+              {analise.abas.length ? `Itens da(s) aba(s): ${analise.abas.join(", ")}.` : "Itens de todas as abas fora da blacklist."}
+            </span>
+          )}
         </Stack>
 
         {erro && <Alert variant="danger">{erro}</Alert>}
-        {resultado && (
-          <Alert variant={resultado.erro ? "danger" : "success"}>
-            {resultado.erro
-              ? `Gravação incompleta no ERP (${resultado.ambiente}): ${resultado.incluidos} incluído(s), ${resultado.alterados} alterado(s). ${resultado.erro}`
-              : `Gravado no ERP (${resultado.ambiente}): ${resultado.incluidos} fator(es) incluído(s) e ${resultado.alterados} alterado(s). A lista abaixo já foi conferida de novo.`}
-          </Alert>
-        )}
 
         {analise && (
           <>
@@ -185,19 +199,32 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
               <StatCard label="Fator errado (alterar)" value={analise.totais.alterar} variant="info" />
               <StatCard label="Fator certo" value={analise.totais.ok} variant="success" />
               <StatCard
-                label="Peso divergente / ERP sem peso"
-                value={analise.totais.peso_divergente + analise.totais.erp_sem_peso}
+                label="Peso divergente / planilha sem peso"
+                value={analise.totais.peso_divergente + analise.totais.planilha_sem_peso}
                 variant="warning"
               />
               <StatCard label="Não existem no ERP" value={analise.totais.nao_encontrado} variant="danger" />
             </div>
 
+            <Stack direction="row" justify="between" align="center" gap={12} wrap>
+              <BotaoDetalhes aberto={detalhes} onAlternar={() => setDetalhes((v) => !v)} quantidade={pendentes.length} />
+              <Button onClick={() => setConfirmando(true)} disabled={escolhidas.length === 0}>
+                {escolhidas.length === 0
+                  ? "Marque os itens para gravar"
+                  : `Gravar ${escolhidas.length} fator(es) no ERP (${ambienteRotulo})`}
+              </Button>
+            </Stack>
+          </>
+        )}
+
+        {analise && detalhes && (
+          <>
             {comProblema.length > 0 && (
               <Alert variant="warning">
                 <Stack direction="row" justify="between" align="center" gap={12} wrap>
                   <span>
-                    {comProblema.length} item(ns) com peso divergente ou sem peso no ERP estão destacados e desmarcados.
-                    Marcando, o fator é gravado com o peso da planilha.
+                    {comProblema.length} item(ns) destacados: com peso divergente do ERP (desmarcados; marcando, o fator
+                    é gravado com o peso da planilha) ou sem peso na planilha (corrija a planilha).
                   </span>
                   <Button variant="secondary" onClick={() => void copiarCodigos()}>
                     <ClipboardCopy size={16} />
@@ -207,25 +234,18 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
               </Alert>
             )}
 
-            <Stack direction="row" justify="between" align="end" gap={12} wrap>
-              <div className={styles.filtro}>
-                <Field label="Mostrar">
-                  <Dropdown
-                    value={filtro}
-                    options={opcoesFiltro}
-                    onValueChange={(valor) => {
-                      setFiltro(valor);
-                      setPagina(1);
-                    }}
-                  />
-                </Field>
-              </div>
-              <Button onClick={() => setConfirmando(true)} disabled={escolhidas.length === 0}>
-                {escolhidas.length === 0
-                  ? "Marque os itens para gravar"
-                  : `Gravar ${escolhidas.length} fator(es) no ERP (${ambienteRotulo})`}
-              </Button>
-            </Stack>
+            <div className={styles.filtro}>
+              <Field label="Mostrar">
+                <Dropdown
+                  value={filtro}
+                  options={opcoesFiltro}
+                  onValueChange={(valor) => {
+                    setFiltro(valor);
+                    setPagina(1);
+                  }}
+                />
+              </Field>
+            </div>
 
             {analise.totais.ok > 0 && pendentes.length > 0 && (
               <span className={styles.secundario}>
@@ -309,7 +329,14 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={SITUACAO[l.situacao].variante}>{SITUACAO[l.situacao].rotulo}</Badge>
+                        <div className={styles.situacaoAcoes}>
+                          <Badge variant={SITUACAO[l.situacao].variante}>{SITUACAO[l.situacao].rotulo}</Badge>
+                          {l.situacao === "peso_divergente" && (
+                            <Button variant="secondary" onClick={() => setAjustando(l)}>
+                              Ajustar peso
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -338,13 +365,31 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
         variant={analise?.ambiente === "producao" ? "danger" : "default"}
         loading={gravando}
         message={`Empresa ${analise?.codEmpresa ?? ""}, unidade de estoque → KG: ${aIncluir} inclusão(ões) e ${aAlterar} alteração(ões)${
-          peloPesoDaPlanilha ? `, ${peloPesoDaPlanilha} delas pelo peso da planilha (peso divergente ou sem peso no ERP)` : ""
+          peloPesoDaPlanilha ? `, ${peloPesoDaPlanilha} delas pelo peso da planilha` : ""
         }. O ERP confere tudo antes de gravar; se recusar algum item, nada é gravado.`}
         onConfirm={gravar}
         onClose={() => {
           if (!gravando) setConfirmando(false);
         }}
       />
+
+      {ajustando && (
+        <AjustarPesoModal
+          linha={ajustando}
+          planilha={planilha}
+          ambienteRotulo={ambienteRotulo}
+          onFechar={() => setAjustando(null)}
+          onConcluido={(novoAviso, gravou) => {
+            setAviso(novoAviso);
+            if (gravou) {
+              setAjustando(null);
+              void conferir();
+            }
+          }}
+        />
+      )}
+
+      <RetornoErpAviso aviso={aviso} onFechar={() => setAviso(null)} />
     </Card>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classificarFator, itensDaPlanilha, type ItemErpFator } from "./fator-regras";
+import { classificarFator, itensDaPlanilha, manterProporcaoBruta, origemDoPeso, type ItemErpFator } from "./fator-regras";
 import { lerAba } from "./separacao-regras";
 
 const erp = (parcial: Partial<ItemErpFator>): ItemErpFator => ({
@@ -13,6 +13,15 @@ const erp = (parcial: Partial<ItemErpFator>): ItemErpFator => ({
 const item = (pesoPlanilha: number | null) => ({ codigo: "X", aba: "CHAPARIA", pesoPlanilha });
 
 describe("itensDaPlanilha", () => {
+  it("só as abas do fator (ex.: CHAPARIA), sem diferenciar maiúsculas", () => {
+    const abas = [
+      lerAba("CHAPARIA", [["Nº DO ITEM", "Nº DA PEÇA", "Peso"], ["1", 100, 0.11]]),
+      lerAba("USINAGEM", [["Nº DO ITEM", "Nº DA PEÇA", "Peso"], ["1", 200, 0.5]]),
+      lerAba("COMPRADOS", [["Nº DO ITEM", "Nº DA PEÇA", "Peso"], ["1", 300, 0.3]]),
+    ];
+    expect(itensDaPlanilha(abas, ["original", "MESTRA"], ["chaparia"]).map((i) => i.codigo)).toEqual(["100"]);
+  });
+
   it("um por código, sem as abas da blacklist", () => {
     const abas = [
       lerAba("MESTRA", [["Nº DO ITEM", "Nº DA PEÇA", "Peso"], ["1", 100, 9]]),
@@ -61,12 +70,19 @@ describe("classificarFator", () => {
     expect(l.taxaProposta).toBeCloseTo(1 / 18.29, 10);
   });
 
-  it("ERP sem peso com conversão antiga: alterar pela planilha, desmarcado", () => {
+  it("ERP sem peso com fator diferente: alterar pelo peso da planilha, já marcado (ERP sem peso não é problema)", () => {
     const l = classificarFator(item(0.607), erp({ pesoLiq: null, conversaoKg: { id: 9, taxa: 1.6393442623 } }));
-    expect([l.situacao, l.operacao, l.origemPeso, l.marcadoPorPadrao]).toEqual(["erp_sem_peso", "alterar", "planilha", false]);
+    expect([l.situacao, l.operacao, l.origemPeso, l.marcadoPorPadrao]).toEqual(["alterar", "alterar", "planilha", true]);
   });
 
-  it("divergente cuja conversão já bate com a planilha: nada a marcar", () => {
+  it("ERP sem peso (vazio ou 0) com o fator já batendo com a planilha: fator certo", () => {
+    for (const pesoLiq of [null, 0]) {
+      const l = classificarFator(item(1.484), erp({ pesoLiq, conversaoKg: { id: 3, taxa: 0.6738544474 } }));
+      expect([l.situacao, l.operacao, l.marcavel]).toEqual(["ok", null, false]);
+    }
+  });
+
+  it("divergente cuja conversão já bate com a planilha: continua divergente (peso do ERP diferente), nada a marcar", () => {
     const l = classificarFator(item(0.5), erp({ pesoLiq: 0.7, conversaoKg: { id: 2, taxa: 2 } }));
     expect([l.situacao, l.operacao, l.marcavel]).toEqual(["peso_divergente", null, false]);
   });
@@ -87,10 +103,50 @@ describe("classificarFator", () => {
     expect([l.situacao, l.marcavel]).toEqual(["planilha_conflito", false]);
   });
 
+  it("ERP sem peso e sem fator: incluir pelo peso da planilha, já marcado", () => {
+    const l = classificarFator(item(0.332), erp({ unidEstoque: "PC", pesoLiq: 0 }));
+    expect([l.situacao, l.operacao, l.origemPeso, l.marcadoPorPadrao]).toEqual(["incluir", "incluir", "planilha", true]);
+    expect(l.taxaProposta).toBeCloseTo(1 / 0.332, 10);
+  });
+
   it("estoque em KG, item fora do ERP e planilha sem peso: só aviso", () => {
     expect(classificarFator(item(1), erp({ unidEstoque: "KG", pesoLiq: 1 })).situacao).toBe("estoque_kg");
     expect(classificarFator(item(1), undefined).situacao).toBe("nao_encontrado");
     expect(classificarFator(item(null), erp({ pesoLiq: 1 })).situacao).toBe("planilha_sem_peso");
     expect(classificarFator(item(0), erp({ pesoLiq: 1 })).marcavel).toBe(false);
+  });
+});
+
+describe("ajuste de peso", () => {
+  it("bruto acompanha o líquido só quando hoje segue 1,1 x líquido", () => {
+    expect(manterProporcaoBruta(0.124, 0.1364)).toBe(true);
+    expect(manterProporcaoBruta(31.228, 34.3508)).toBe(true);
+    expect(manterProporcaoBruta(0.124, 0.2)).toBe(false);
+    expect(manterProporcaoBruta(0.124, null)).toBe(false);
+    expect(manterProporcaoBruta(null, 0.13)).toBe(false);
+  });
+
+  it("origem do peso escolhido", () => {
+    expect(origemDoPeso(0.121, 0.121, 0.124)).toBe("planilha");
+    expect(origemDoPeso(0.124, 0.121, 0.124)).toBe("erp");
+    expect(origemDoPeso(0.122, 0.121, 0.124)).toBe("digitado");
+  });
+});
+
+describe("divergência já decidida em Ajustar peso", () => {
+  const erpComPesoDoErp = { codigo: "X", unidEstoque: "UN", pesoLiq: 0.124, conversaoKg: { id: 1, taxa: 1 / 0.124 } };
+
+  it("escolheu o peso do ERP e o ERP está com ele e com o fator certo: some da lista (ok)", () => {
+    const l = classificarFator({ codigo: "X", aba: "CHAPARIA", pesoPlanilha: 0.121 }, erpComPesoDoErp, 0.124);
+    expect([l.situacao, l.marcavel]).toEqual(["ok", false]);
+  });
+
+  it("sem decisão registrada, continua divergente", () => {
+    expect(classificarFator({ codigo: "X", aba: "CHAPARIA", pesoPlanilha: 0.121 }, erpComPesoDoErp).situacao).toBe("peso_divergente");
+  });
+
+  it("decisão antiga, mas o peso do ERP mudou depois (ex.: importação do 3DX): volta a aparecer", () => {
+    const mudou = { ...erpComPesoDoErp, pesoLiq: 0.13 };
+    expect(classificarFator({ codigo: "X", aba: "CHAPARIA", pesoPlanilha: 0.121 }, mudou, 0.124).situacao).toBe("peso_divergente");
   });
 });
