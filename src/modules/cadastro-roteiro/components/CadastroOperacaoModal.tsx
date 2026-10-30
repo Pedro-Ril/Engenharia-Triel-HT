@@ -162,8 +162,8 @@ const API_UNIDADE_MEDIDA =
  * reinseria as operações, levando junto consumos e máscaras e
  * desligando as operações das ordens e do MRP.
  */
-const API_IMPORTAR_ROTEIRO =
-    "http://proserver.trielht.com.br:1000/api/v2/roteiro/importar";
+/* Pelo servidor do Portal: o ERP registra o usuário logado (X-Usuario-Portal) em vez de "API". */
+const API_IMPORTAR_ROTEIRO = "/api/cadastro-roteiro/erp/importar";
 
 /*
  * Simula a gravação sem gravar (mesmo plano da v2). Roda em todo
@@ -171,8 +171,7 @@ const API_IMPORTAR_ROTEIRO =
  * o envio muda além do que a pessoa mexeu (exclusões, revisão de outras
  * operações) passa por confirmação.
  */
-const API_VALIDAR_ROTEIRO =
-    "http://proserver.trielht.com.br:1000/api/v2/roteiro/importar/validar";
+const API_VALIDAR_ROTEIRO = "/api/cadastro-roteiro/erp/importar?validar=1";
 
 /*
  * Vigência fixa: não aparece na tela e vai sempre a padrão. A situação

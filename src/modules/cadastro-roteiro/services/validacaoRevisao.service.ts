@@ -9,8 +9,9 @@ import { buscarRoteiroCompletoErp } from "./cadastroRoteiro.service";
  * plano não mexer em mais nada além da revisão.
  */
 
-const API_VALIDAR_ROTEIRO = "http://proserver.trielht.com.br:1000/api/v2/roteiro/importar/validar";
-const API_IMPORTAR_ROTEIRO = "http://proserver.trielht.com.br:1000/api/v2/roteiro/importar";
+/* Pelo servidor do Portal: o ERP registra o usuário logado (X-Usuario-Portal) em vez de "API". */
+const API_VALIDAR_ROTEIRO = "/api/cadastro-roteiro/erp/importar?validar=1";
+const API_IMPORTAR_ROTEIRO = "/api/cadastro-roteiro/erp/importar";
 const COD_EMP = 2;
 
 export type PayloadRevisao = {

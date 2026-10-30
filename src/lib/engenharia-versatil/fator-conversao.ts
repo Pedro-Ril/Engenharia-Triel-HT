@@ -2,6 +2,7 @@ import "server-only";
 
 import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
+import { cabecalhoUsuarioErp } from "@/lib/erp/usuario-erp";
 
 import {
   classificarFatores,
@@ -37,6 +38,8 @@ export interface ContextoErp {
   apiUrl: string;
   codEmpresa: number;
   ambiente: "teste" | "producao";
+  /* Quem grava (sam_account_name): o ERP registra esse login em vez de "API". */
+  samAccountName?: string;
 }
 
 function contexto(config: ConfigEngenhariaVersatil): ContextoErp {
@@ -246,7 +249,7 @@ async function chamarErp<T>(
   try {
     resposta = await fetch(url, {
       method: metodo,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...cabecalhoUsuarioErp(ctx.samAccountName) },
       cache: "no-store",
       signal: AbortSignal.timeout(120_000),
       body: JSON.stringify(enviado),
@@ -295,11 +298,11 @@ export async function gravarFatores(
   conteudo: Buffer,
   nomeArquivo: string,
   marcados: string[],
-  usuario: { id: string; nomeExibicao: string }
+  usuario: { id: string; nomeExibicao: string; samAccountName: string }
 ): Promise<ResultadoFatores> {
   const analise = await analisarFatores(conteudo, nomeArquivo);
   const config = await buscarConfigEngenhariaVersatil();
-  const ctx = contexto(config);
+  const ctx = { ...contexto(config), samAccountName: usuario.samAccountName };
 
   const marcaveis = new Map(analise.linhas.filter((l) => l.marcavel).map((l) => [l.codigo, l]));
   const fora = marcados.filter((c) => !marcaveis.has(c));
@@ -468,7 +471,7 @@ export async function ajustarPesoItem(
   nomeArquivo: string,
   codigo: string,
   peso: number,
-  usuario: { id: string; nomeExibicao: string }
+  usuario: { id: string; nomeExibicao: string; samAccountName: string }
 ): Promise<ResultadoAjustePeso> {
   if (!Number.isFinite(peso) || peso <= 0 || peso >= 1e9) {
     throw new ValidationError("Informe um peso maior que zero (em kg).");
@@ -481,7 +484,7 @@ export async function ajustarPesoItem(
   }
 
   const config = await buscarConfigEngenhariaVersatil();
-  const ctx = contexto(config);
+  const ctx = { ...contexto(config), samAccountName: usuario.samAccountName };
   const erpAtual = (await consultarErp(ctx, [codigo])).get(codigo);
   const proporcional = manterProporcaoBruta(erpAtual?.pesoLiq ?? null, erpAtual?.pesoBrt);
 

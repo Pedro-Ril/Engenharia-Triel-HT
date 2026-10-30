@@ -31,6 +31,8 @@ const API_ESTRUTURA_V2 = "http://proserver.trielht.com.br:1000/api/v2/estrutura"
 const API_ITEM = "http://proserver.trielht.com.br:1000/api/item";
 /* Estrutura do ERP (a mesma da Consulta de Estrutura), usada nas peças Ciber. */
 const API_ESTRUTURA = "http://proserver.trielht.com.br:1000/api/estrutura";
+/* Exclusões pelo servidor do Portal: o ERP registra o usuário logado em vez de "API". */
+const API_ROTEIRO_ERP_PORTAL = "/api/cadastro-roteiro/erp";
 
 const EMPR_ID_FIXO = 2;
 
@@ -369,7 +371,7 @@ export async function deletarOperacaoRoteiro({
   alternativo,
   seq,
 }: DeletarOperacaoRoteiroPayload) {
-  const response = await fetch(`${API_ROTEIRO_V2}/operacao`, {
+  const response = await fetch(`${API_ROTEIRO_ERP_PORTAL}/operacao`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -402,7 +404,7 @@ export type DeletarRoteiroCompletoPayload = {
 export async function deletarRoteiroCompleto({
   codItem,
 }: DeletarRoteiroCompletoPayload) {
-  const response = await fetch(`${API_ROTEIRO_V2}`, {
+  const response = await fetch(`${API_ROTEIRO_ERP_PORTAL}/roteiro`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
