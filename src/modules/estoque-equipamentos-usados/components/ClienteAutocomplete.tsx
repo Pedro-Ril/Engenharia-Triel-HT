@@ -6,6 +6,18 @@ import { buscarClientesEstoque } from "../services/estoque.service";
 import type { ClienteEstoqueItem } from "../types/estoque.types";
 import styles from "./ClienteAutocomplete.module.css";
 
+/* Últimos 6 dígitos do CNPJ/CPF, para diferenciar clientes de mesmo nome (ex.: filiais). */
+function finalCnpj(item: ClienteEstoqueItem): string | null {
+  const digitos = (item.cnpj ?? "").replace(/\D/g, "");
+  /* Com o hífen do CNPJ antes dos 2 dígitos verificadores: "000128" vira "0001-28". */
+  return digitos.length >= 6 ? `${digitos.slice(-6, -2)}-${digitos.slice(-2)}` : null;
+}
+
+function rotulo(item: ClienteEstoqueItem): string {
+  const final = finalCnpj(item);
+  return `${item.cod_cli} | ${item.descricao}${final ? ` (${final})` : ""}`;
+}
+
 interface ClienteAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
@@ -65,11 +77,18 @@ export function ClienteAutocomplete({ value, onChange, disabled, onSelecionarIte
 
   const sugestoes = useMemo(() => {
     const termo = inputValue.trim().toLowerCase();
+    /* CNPJ busca só pelos dígitos: "1985-00", "198500" e "17.917.566/0001-85" funcionam. */
+    const termoDigitos = termo.replace(/\D/g, "");
     const lista = termo
       ? clientes.filter((item) => {
           const codigo = String(item.cod_cli ?? "").toLowerCase();
           const descricao = String(item.descricao ?? "").toLowerCase();
-          return codigo.includes(termo) || descricao.includes(termo);
+          const cnpj = (item.cnpj ?? "").replace(/\D/g, "");
+          return (
+            codigo.includes(termo) ||
+            descricao.includes(termo) ||
+            (termoDigitos.length >= 3 && cnpj.includes(termoDigitos))
+          );
         })
       : clientes;
     return lista.slice(0, 30);
@@ -79,13 +98,12 @@ export function ClienteAutocomplete({ value, onChange, disabled, onSelecionarIte
     /*
      * O valor persistido é só a descrição — código e descrição sempre
      * ficam em colunas separadas no banco (nome_cliente/codigo_cliente),
-     * nunca concatenados numa string só. "cod | descrição" é só efeito
+     * nunca concatenados numa string só. "cod | descrição (final do CNPJ)" é só efeito
      * visual: aqui embaixo no próprio campo de busca (pra confirmar o
      * item certo foi escolhido) e, na exibição de leitura, remontado a
      * partir das duas colunas separadas — nunca gravado assim.
      */
-    const texto = `${item.cod_cli} | ${item.descricao}`;
-    setInputValue(texto);
+    setInputValue(rotulo(item));
     setUltimoValorEmitido(item.descricao);
     onChange(item.descricao);
     onSelecionarItem?.(item);
@@ -97,7 +115,7 @@ export function ClienteAutocomplete({ value, onChange, disabled, onSelecionarIte
       <input
         type="text"
         className={styles.input}
-        placeholder="Digite código ou descrição do cliente"
+        placeholder="Digite código, nome ou final do CNPJ do cliente"
         value={inputValue}
         disabled={disabled}
         autoComplete="off"
@@ -120,7 +138,7 @@ export function ClienteAutocomplete({ value, onChange, disabled, onSelecionarIte
               className={styles.item}
               onClick={() => selecionar(item)}
             >
-              {item.cod_cli} | {item.descricao}
+              {rotulo(item)}
             </button>
           ))}
         </div>
