@@ -275,3 +275,32 @@ export interface PainelBiEstoque {
   clientesComEquipamentoFora: PainelBiCliente[];
   atualizadoEm: string;
 }
+
+/* Espelho de src/lib/estoque-equipamentos-usados/painel-gerencial-regras.ts. */
+export interface PainelGerencial {
+  valorAtivo: number;
+  valorPorStatus: { status: StatusEquipamento; quantidade: number; valorTotal: number }[];
+  quantidadeFora: number;
+  valorFora: number;
+  percentualForaValor: number | null;
+  prazoMedioForaDias: number | null;
+  acima180: { quantidade: number; valor: number };
+  maiorPrazo: { numero: number; dias: number; cliente: string | null } | null;
+  aging: { faixa: string; emprestado: number; consignado: number; em_reforma: number; quantidade: number }[];
+  valorForaPorTipo: { tipoNome: string; valorTotal: number; quantidade: number }[];
+  fluxoPorMes: { mes: string; saidas: number; retornos: number; vendas: number }[];
+  consignacoes: {
+    viraramVenda: number;
+    voltaram: number;
+    emAberto: number;
+    diasMedioAteVenda: number | null;
+    diasMedioAteRetorno: number | null;
+  };
+  clientesFora: { nomeCliente: string; valorTotal: number; quantidade: number; prazoMedioDias: number }[];
+  atualizadoEm: string;
+}
+
+export interface PainelGerencialCompleto {
+  quantidade: PainelBiEstoque;
+  gerencial: PainelGerencial;
+}

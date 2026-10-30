@@ -10,6 +10,7 @@ import type {
   HistoricoAlteracaoDadosTecnicos,
   MotivoBaixa,
   PainelBiEstoque,
+  PainelGerencialCompleto,
   ResultadoSincronizacaoErp,
   SituacaoErpEquipamento,
   StatusEquipamento,
@@ -507,5 +508,15 @@ export async function atualizarDoErp(id: string): Promise<ApiEnvelope<ResultadoS
     return await parseResponse<ResultadoSincronizacaoErp>(response);
   } catch {
     return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
+}
+
+/* Painel gerencial (TV, sem sessão): as duas páginas numa chamada. */
+export async function buscarPainelGerencial(): Promise<ApiEnvelope<PainelGerencialCompleto>> {
+  try {
+    const response = await fetch("/api/estoque-equipamentos-usados/painel/gerencial", { cache: "no-store" });
+    return await parseResponse<PainelGerencialCompleto>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal." };
   }
 }
