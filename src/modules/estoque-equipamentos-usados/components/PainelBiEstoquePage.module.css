@@ -1,7 +1,22 @@
-.painel {
-  box-sizing: border-box;
+/* Tela inteira; o palco dentro dela é o painel no tamanho-base, escalado (ver MolduraEscalavel). */
+.moldura {
+  position: relative;
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
+  background: var(--bg-page);
+}
+
+.palco {
+  width: 100%;
+  height: 100%;
+  transform-origin: top left;
+}
+
+.painel {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   padding: 18px 26px 14px;
   display: flex;
   flex-direction: column;

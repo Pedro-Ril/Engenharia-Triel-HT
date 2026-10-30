@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -138,6 +138,53 @@ function KpiTile({ icone, rotulo, valor, destaque = "neutro" }: KpiTileProps) {
   );
 }
 
+/*
+ * Base do desenho do painel: 1920 px de largura (Full HD). A tela real
+ * (TV 4K, Full HD, notebook) escala o painel inteiro a partir dela --
+ * numa TV 4K tudo fica 2x maior, num notebook um pouco menor --, então
+ * fontes, gráficos e espaçamentos crescem juntos e o layout nunca muda.
+ * A área de desenho sempre preenche a tela toda: se a tela for mais
+ * "baixa" que 16:9, a escala passa a ser pela altura (mínimo 1000 px de
+ * desenho), e a largura sobra para os gráficos.
+ */
+const LARGURA_BASE = 1920;
+const ALTURA_MINIMA_BASE = 1000;
+
+function MolduraEscalavel({ children }: { children: ReactNode }) {
+  const molduraRef = useRef<HTMLDivElement>(null);
+  const [escala, setEscala] = useState<{ fator: number; largura: number; altura: number } | null>(null);
+
+  useEffect(() => {
+    const moldura = molduraRef.current;
+    if (!moldura) return;
+    const medir = () => {
+      const largura = moldura.clientWidth;
+      const altura = moldura.clientHeight;
+      if (!largura || !altura) return;
+      const fator = Math.min(largura / LARGURA_BASE, altura / ALTURA_MINIMA_BASE);
+      setEscala({ fator, largura: largura / fator, altura: altura / fator });
+    };
+    const observador = new ResizeObserver(medir);
+    observador.observe(moldura);
+    return () => observador.disconnect();
+  }, []);
+
+  return (
+    <div ref={molduraRef} className={styles.moldura}>
+      <div
+        className={styles.palco}
+        style={
+          escala
+            ? { width: escala.largura, height: escala.altura, transform: `scale(${escala.fator})` }
+            : undefined
+        }
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function PainelBiEstoquePage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -242,23 +289,27 @@ export function PainelBiEstoquePage() {
 
   if (erro && !dados) {
     return (
-      <div className={styles.painel}>
-        <div className={styles.estadoVazio}>
-          <AlertTriangle size={40} />
-          <p>{erro}</p>
+      <MolduraEscalavel>
+        <div className={styles.painel}>
+          <div className={styles.estadoVazio}>
+            <AlertTriangle size={40} />
+            <p>{erro}</p>
+          </div>
         </div>
-      </div>
+      </MolduraEscalavel>
     );
   }
 
   if (!dados) {
     return (
-      <div className={styles.painel}>
-        <div className={styles.estadoVazio}>
-          <div className={styles.spinner} />
-          <p>Carregando painel…</p>
+      <MolduraEscalavel>
+        <div className={styles.painel}>
+          <div className={styles.estadoVazio}>
+            <div className={styles.spinner} />
+            <p>Carregando painel…</p>
+          </div>
         </div>
-      </div>
+      </MolduraEscalavel>
     );
   }
 
@@ -280,6 +331,7 @@ export function PainelBiEstoquePage() {
   const maiorClienteFora = dados.clientesComEquipamentoFora[0]?.quantidade ?? 0;
 
   return (
+    <MolduraEscalavel>
     <div className={styles.painel}>
       <header className={styles.header}>
         <div className={styles.marca}>
@@ -513,5 +565,6 @@ export function PainelBiEstoquePage() {
         Atualizado às {new Date(dados.atualizadoEm).toLocaleTimeString("pt-BR")}
       </footer>
     </div>
+    </MolduraEscalavel>
   );
 }
