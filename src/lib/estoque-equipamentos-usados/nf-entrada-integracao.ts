@@ -53,6 +53,8 @@ export interface EquipamentoPendenteNf {
   codigoCliente: string;
   valorMascara: string;
   numeroNfEntradaAtual: string | null;
+  /* Nome do cliente no cadastro -- desempata a NF quando o cliente não tem CNPJ no ERP (pessoa física). */
+  nomeCliente: string | null;
 }
 
 /*
@@ -80,6 +82,7 @@ export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPenden
     codigo_cliente: string | null;
     valor_mascara: string | null;
     numero_nf_entrada: string | null;
+    nome_cliente: string | null;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), [id]) AS [id],
@@ -89,7 +92,8 @@ export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPenden
       [codigo_empresa],
       [codigo_cliente],
       ${selectExpr} AS [valor_mascara],
-      [numero_nf_entrada]
+      [numero_nf_entrada],
+      [nome_cliente]
     FROM dbo.com_estoque_equipamentos_usados
     WHERE [nf_entrada_confirmada_em] IS NULL
       AND [codigo_empresa] IS NOT NULL AND [codigo_empresa] <> ''
@@ -106,6 +110,7 @@ export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPenden
     codigoCliente: row.codigo_cliente as string,
     valorMascara: row.valor_mascara as string,
     numeroNfEntradaAtual: row.numero_nf_entrada,
+    nomeCliente: row.nome_cliente,
   }));
 }
 
@@ -137,6 +142,7 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
       codigo_empresa: string | null;
       codigo_cliente: string | null;
       valor_mascara: string | null;
+      nome_cliente: string | null;
     }>(`
       SELECT
         CONVERT(VARCHAR(36), [id]) AS [id],
@@ -147,6 +153,7 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
         CONVERT(VARCHAR(33), [nf_entrada_confirmada_em], 126) AS [nf_entrada_confirmada_em],
         [codigo_empresa],
         [codigo_cliente],
+        [nome_cliente],
         ${selectExpr} AS [valor_mascara]
       FROM dbo.com_estoque_equipamentos_usados
       WHERE [id] = @id;
@@ -186,6 +193,7 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
     codigoCliente: row.codigo_cliente,
     valorMascara: row.valor_mascara,
     numeroNfEntradaAtual: row.numero_nf_entrada,
+    nomeCliente: row.nome_cliente,
   };
 }
 
@@ -384,6 +392,8 @@ export async function tentarBuscarNfEntrada(
       chaveMascara: equipamento.valorMascara,
       cnpjCliente,
       cnpjProprio,
+      numeroNfDigitado: equipamento.numeroNfEntradaAtual,
+      nomeCliente: equipamento.nomeCliente,
     });
 
     if (selecao.tipo === "nenhum") {

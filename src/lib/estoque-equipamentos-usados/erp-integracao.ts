@@ -351,8 +351,35 @@ function mapearClienteErp(bruto: unknown): ClienteErpEstoqueUsados | null {
   return {
     cod_cli: String(codigo),
     descricao: String(descricao ?? ""),
-    cnpj: normalizarCnpj(linha.cnpj ?? linha.CNPJ),
+    /* Pessoa física: o CPF vem num campo próprio (quando a API mandar), e o Portal trata igual ao CNPJ. */
+    cnpj: normalizarCnpj(linha.cnpj ?? linha.CNPJ ?? linha.cnpj_cpf ?? linha.CNPJ_CPF ?? linha.cpf ?? linha.CPF),
   };
+}
+
+/*
+ * A API de clientes devolve o mesmo código mais de uma vez (JOIN com
+ * endereços/filiais no ERP). Fica uma linha por código + documento:
+ * linhas idênticas viram uma; a sem documento sai quando o mesmo código
+ * tem outra com documento; documentos diferentes (filiais, ex.: 127
+ * MAGNABOSCO 0001-61 e 0007-57) continuam as duas -- o final do CNPJ no
+ * autocomplete é o que diferencia.
+ */
+export function deduplicarClientesErp(clientes: ClienteErpEstoqueUsados[]): ClienteErpEstoqueUsados[] {
+  const porCodigo = new Map<string, ClienteErpEstoqueUsados[]>();
+  for (const cliente of clientes) porCodigo.set(cliente.cod_cli, [...(porCodigo.get(cliente.cod_cli) ?? []), cliente]);
+
+  const resultado: ClienteErpEstoqueUsados[] = [];
+  for (const doCodigo of porCodigo.values()) {
+    const comDocumento = doCodigo.filter((c) => c.cnpj);
+    const base = comDocumento.length > 0 ? comDocumento : doCodigo.slice(0, 1);
+    const vistos = new Set<string>();
+    for (const cliente of base) {
+      if (vistos.has(cliente.cnpj ?? "")) continue;
+      vistos.add(cliente.cnpj ?? "");
+      resultado.push(cliente);
+    }
+  }
+  return resultado;
 }
 
 /*
@@ -395,9 +422,9 @@ export async function listarClientesErp(): Promise<ClienteErpEstoqueUsados[]> {
         ? ((data as { data: unknown[] }).data)
         : [];
 
-    return linhas
-      .map(mapearClienteErp)
-      .filter((cliente): cliente is ClienteErpEstoqueUsados => cliente !== null);
+    return deduplicarClientesErp(
+      linhas.map(mapearClienteErp).filter((cliente): cliente is ClienteErpEstoqueUsados => cliente !== null)
+    );
   } catch (error) {
     mensagemErro = error instanceof Error ? error.message : "Erro desconhecido.";
     return [];
@@ -468,6 +495,24 @@ export type ResultadoSelecaoNf =
   | { tipo: "nenhum" }
   | { tipo: "ambiguo"; candidatos: CandidatoNfEntrada[]; motivo: string };
 
+/* "016185", "16185/1" -> "16185": só o número, sem série nem zeros à esquerda. */
+function normalizarNumeroNfEntrada(valor: string | null | undefined): string | null {
+  const digitos = String(valor ?? "").split("/")[0].replace(/\D/g, "").replace(/^0+/, "");
+  return digitos || null;
+}
+
+/* Nome para comparar: sem acento, sem pontuação, maiúsculas, espaços únicos. */
+function normalizarNome(valor: string | null | undefined): string | null {
+  const nome = String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+  return nome || null;
+}
+
 /* A máscara do Focco é uma lista de campos separada por "#". */
 function segmentosMascara(mascara: string): string[] {
   return mascara.split("#").map((parte) => parte.trim());
@@ -496,6 +541,9 @@ export function selecionarNfEntrada(
     cnpjCliente: string | null;
     /* CNPJ da própria empresa do equipamento -- ver o filtro abaixo. */
     cnpjProprio?: string | null;
+    /* NF que a pessoa digitou na entrada e o nome do cliente -- desempate (ver abaixo). */
+    numeroNfDigitado?: string | null;
+    nomeCliente?: string | null;
   }
 ): ResultadoSelecaoNf {
   if (candidatos.length === 0) return { tipo: "nenhum" };
@@ -543,6 +591,28 @@ export function selecionarNfEntrada(
       motivo:
         "Todas as NFs candidatas têm a própria empresa como fornecedora — numa entrada o fornecedor é quem entregou o equipamento.",
     };
+  }
+
+  /*
+   * Desempate pela NF digitada: se UMA candidata tem o mesmo número da NF
+   * que a pessoa informou na entrada E é do mesmo cliente, é ela. "Mesmo
+   * cliente" é o CNPJ quando o cliente tem CNPJ no ERP; sem CNPJ (pessoa
+   * física), o nome -- frágil sozinho, mas aqui só confirma uma NF que já
+   * bate pelo número exato.
+   */
+  const nfDigitada = normalizarNumeroNfEntrada(criterios.numeroNfDigitado);
+  if (nfDigitada) {
+    const nomeCliente = normalizarNome(criterios.nomeCliente);
+    const pelaNfDigitada = base.filter(
+      (candidato) =>
+        normalizarNumeroNfEntrada(candidato.numeroNf) === nfDigitada &&
+        (criterios.cnpjCliente
+          ? candidato.fornecedorCnpj === criterios.cnpjCliente
+          : Boolean(nomeCliente) && normalizarNome(candidato.fornecedorDescricao) === nomeCliente)
+    );
+    if (pelaNfDigitada.length === 1) {
+      return { tipo: "unico", nf: pelaNfDigitada[0], confirmadoPorCnpj: Boolean(criterios.cnpjCliente) };
+    }
   }
 
   if (criterios.cnpjCliente) {

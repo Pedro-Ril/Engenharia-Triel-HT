@@ -134,7 +134,7 @@ export function ClienteAutocomplete({ value, onChange, disabled, onSelecionarIte
           {sugestoes.map((item) => (
             <button
               type="button"
-              key={`${item.cod_cli}-${item.descricao}`}
+              key={`${item.cod_cli}-${item.descricao}-${item.cnpj ?? ""}`}
               className={styles.item}
               onClick={() => selecionar(item)}
             >
