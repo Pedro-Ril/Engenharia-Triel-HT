@@ -487,18 +487,35 @@ export async function buscarSeparacao(id: string): Promise<{ separacao: Separaca
   };
 }
 
-export async function listarSeparacoes(params: { pagina: number; porPagina: number }): Promise<{ itens: Separacao[]; total: number }> {
+/* Histórico paginado; filtra por parte do número do projeto e por parte do nome de quem fez. */
+export async function listarSeparacoes(params: {
+  pagina: number;
+  porPagina: number;
+  projeto?: string | null;
+  usuario?: string | null;
+}): Promise<{ itens: Separacao[]; total: number }> {
   const pool = await getSqlServerPool();
+  const filtros: string[] = [];
+  if (params.projeto) filtros.push("[numero_projeto] LIKE '%' + @projeto + '%'");
+  if (params.usuario) filtros.push("[usuario_nome] LIKE '%' + @usuario + '%'");
+  const where = filtros.length ? `WHERE ${filtros.join(" AND ")}` : "";
+  const comFiltros = () => {
+    const r = pool.request();
+    if (params.projeto) r.input("projeto", sql.NVarChar(30), params.projeto);
+    if (params.usuario) r.input("usuario", sql.NVarChar(200), params.usuario);
+    return r;
+  };
+
   const [itens, total] = await Promise.all([
-    pool
-      .request()
+    comFiltros()
       .input("offset", sql.Int, (params.pagina - 1) * params.porPagina)
       .input("porPagina", sql.Int, params.porPagina)
       .query<LinhaSeparacao>(`
         SELECT ${COLUNAS} FROM dbo.eng_versatil_separacoes
+        ${where}
         ORDER BY [criado_em] DESC OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
       `),
-    pool.request().query<{ total: number }>(`SELECT COUNT(*) AS [total] FROM dbo.eng_versatil_separacoes;`),
+    comFiltros().query<{ total: number }>(`SELECT COUNT(*) AS [total] FROM dbo.eng_versatil_separacoes ${where};`),
   ]);
   return { itens: itens.recordset.map(paraSeparacao), total: total.recordset[0]?.total ?? 0 };
 }

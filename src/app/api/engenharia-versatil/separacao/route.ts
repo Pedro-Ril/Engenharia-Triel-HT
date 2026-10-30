@@ -10,7 +10,7 @@ import { registrarLog } from "@/lib/monitoramento/logs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* Histórico das separações (pagina, porPagina). */
+/* Histórico das separações (pagina, porPagina, projeto, usuario). */
 async function handleGET(request: Request) {
   const acesso = await verificarAcessoModuloApi("engenharia-versatil");
   if (acesso.negado) return acesso.negado;
@@ -18,9 +18,11 @@ async function handleGET(request: Request) {
   const url = new URL(request.url);
   const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
   const porPagina = Math.min(100, Math.max(1, Number(url.searchParams.get("porPagina")) || 20));
+  const projeto = (url.searchParams.get("projeto") ?? "").trim().slice(0, 30) || null;
+  const usuario = (url.searchParams.get("usuario") ?? "").trim().slice(0, 200) || null;
 
   try {
-    return NextResponse.json({ ok: true, data: await listarSeparacoes({ pagina, porPagina }) });
+    return NextResponse.json({ ok: true, data: await listarSeparacoes({ pagina, porPagina, projeto, usuario }) });
   } catch (error) {
     console.error("Erro ao listar as separações da Engenharia Versátil:", error);
     return NextResponse.json({ ok: false, message: "Não foi possível listar as separações." }, { status: 500 });

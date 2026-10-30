@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FolderPlus, FolderTree, History, Home, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { FolderPlus, FolderTree, Home, RefreshCw } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -9,21 +9,17 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Loader } from "@/components/ui/Loader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
 
 import {
   analisarPlanilha,
   buscarSeparacao,
   executarSeparacao,
-  listarSeparacoes,
   type AcaoItem,
   type ItemSeparacao,
   type MotivoAbaIgnorada,
@@ -34,9 +30,8 @@ import {
 import styles from "./EngenhariaVersatil.module.css";
 import { BotaoDetalhes } from "./BotaoDetalhes";
 import { FatoresConversaoCard } from "./FatoresConversaoCard";
+import { HistoricoVersatil } from "./HistoricoVersatil";
 import { TabelaArquivos, type LinhaArquivo, type VarianteSituacao } from "./TabelaArquivos";
-
-const POR_PAGINA = 20;
 
 const SITUACAO: Record<SituacaoItem, { rotulo: string; variante: VarianteSituacao }> = {
   copiar: { rotulo: "Vai copiar", variante: "info" },
@@ -77,22 +72,11 @@ export function EngenhariaVersatilPage() {
   const [confirmando, setConfirmando] = useState(false);
   const [executando, setExecutando] = useState(false);
   const [aberta, setAberta] = useState<{ separacao: Separacao; itens: ItemSeparacao[] } | null>(null);
-  const [historico, setHistorico] = useState<{ itens: Separacao[]; total: number } | null>(null);
-  const [pagina, setPagina] = useState(1);
+  /* Avisa o histórico de que houve gravação nova (separação, fatores, ajuste de peso). */
   const [recarga, setRecarga] = useState(0);
   /* Os cards mostram só o resumo; listas e tabelas ficam recolhidas. */
   const [detalhesPrevia, setDetalhesPrevia] = useState(false);
   const [detalhesResultado, setDetalhesResultado] = useState(false);
-
-  useEffect(() => {
-    let ativo = true;
-    listarSeparacoes({ pagina, porPagina: POR_PAGINA }).then((resultado) => {
-      if (ativo && resultado.ok && resultado.data) setHistorico(resultado.data);
-    });
-    return () => {
-      ativo = false;
-    };
-  }, [pagina, recarga]);
 
   async function analisar(arquivo: File) {
     setErro(null);
@@ -172,7 +156,6 @@ export function EngenhariaVersatilPage() {
   }));
 
   const temTrabalho = Boolean(previa && (previa.totais.copiar > 0 || previa.totais.pastasCriar > 0));
-  const totalPaginas = historico ? Math.max(1, Math.ceil(historico.total / POR_PAGINA)) : 1;
 
   return (
     <PageContainer>
@@ -269,7 +252,13 @@ export function EngenhariaVersatilPage() {
           </Card>
         )}
 
-        {planilha && <FatoresConversaoCard key={`${planilha.name}-${planilha.lastModified}`} planilha={planilha} />}
+        {planilha && (
+          <FatoresConversaoCard
+            key={`${planilha.name}-${planilha.lastModified}`}
+            planilha={planilha}
+            onGravado={() => setRecarga((n) => n + 1)}
+          />
+        )}
 
         {aberta && (
           <Card
@@ -309,57 +298,7 @@ export function EngenhariaVersatilPage() {
           </Card>
         )}
 
-        <Card title="Histórico" description="As separações feitas, das mais recentes para as mais antigas. Clique para ver os arquivos.">
-          {!historico ? (
-            <Loader label="Carregando…" />
-          ) : historico.itens.length === 0 ? (
-            <EmptyState icon={<History size={28} />} title="Nenhuma separação ainda" />
-          ) : (
-            <Stack gap={16}>
-              <Table minWidth={820}>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Quando</TableHeaderCell>
-                    <TableHeaderCell>Projeto</TableHeaderCell>
-                    <TableHeaderCell>Planilha</TableHeaderCell>
-                    <TableHeaderCell>Situação</TableHeaderCell>
-                    <TableHeaderCell align="right">Pastas</TableHeaderCell>
-                    <TableHeaderCell align="right">Copiados</TableHeaderCell>
-                    <TableHeaderCell align="right">Não encontrados</TableHeaderCell>
-                    <TableHeaderCell align="right">Erros</TableHeaderCell>
-                    <TableHeaderCell>Quem</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {historico.itens.map((s) => (
-                    <TableRow key={s.id} style={{ cursor: "pointer" }} onClick={() => void abrirSeparacao(s.id)}>
-                      <TableCell>{formatarData(s.criadoEm)}</TableCell>
-                      <TableCell>
-                        <strong>{s.numeroProjeto}</strong>
-                      </TableCell>
-                      <TableCell>{s.arquivoPlanilha}</TableCell>
-                      <TableCell>
-                        <Badge variant={s.status === "concluida" ? "success" : s.status === "erro" ? "danger" : "info"}>
-                          {s.status === "concluida" ? "Concluída" : s.status === "erro" ? "Erro" : "Executando"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell align="right">{s.pastasCriadas}</TableCell>
-                      <TableCell align="right">{s.arquivosCopiados}</TableCell>
-                      <TableCell align="right">{s.arquivosNaoEncontrados}</TableCell>
-                      <TableCell align="right">{s.arquivosComErro}</TableCell>
-                      <TableCell>{s.usuarioNome}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {totalPaginas > 1 && (
-                <Stack direction="row" justify="end">
-                  <Pagination page={pagina} totalPages={totalPaginas} onPageChange={setPagina} />
-                </Stack>
-              )}
-            </Stack>
-          )}
-        </Card>
+        <HistoricoVersatil recarga={recarga} onAbrirSeparacao={(id) => void abrirSeparacao(id)} />
       </Stack>
 
       <ConfirmDialog

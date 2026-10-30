@@ -581,3 +581,187 @@ export async function ajustarPesoItem(
 
   return { id, ambiente: ctx.ambiente, codigo, ...resultado, chamadas: registro };
 }
+
+/* ------------------------------------------------------------------ histórico */
+
+export type TipoGravacaoFator = "fator" | "peso";
+
+export interface GravacaoFator {
+  id: string;
+  numeroProjeto: string;
+  arquivoPlanilha: string;
+  codEmpresa: number;
+  ambiente: "teste" | "producao";
+  status: "concluida" | "erro";
+  /* "peso" = Ajustar peso (peso + fator); "fator" = gravação de fatores em lote. */
+  tipo: TipoGravacaoFator;
+  incluidos: number;
+  alterados: number;
+  totalItens: number;
+  codigos: string | null;
+  mensagem: string | null;
+  usuarioNome: string;
+  criadoEm: string;
+}
+
+export interface ItemGravacaoFator {
+  ordem: number;
+  aba: string | null;
+  codigo: string;
+  unidEstoque: string | null;
+  pesoPlanilha: number | null;
+  pesoErp: number | null;
+  pesoNovo: number | null;
+  pesoBrtAntes: number | null;
+  pesoBrtNovo: number | null;
+  origemPeso: string;
+  taxaAntes: number | null;
+  taxaNova: number | null;
+  acao: string;
+  leitura: string | null;
+  mensagem: string | null;
+}
+
+const COLUNAS_GRAVACAO = `
+  CONVERT(VARCHAR(36), f.[id]) AS [id], f.[numero_projeto], f.[arquivo_planilha], f.[cod_empresa], f.[ambiente], f.[status],
+  f.[incluidos], f.[alterados], f.[mensagem], f.[usuario_nome], CONVERT(VARCHAR(33), f.[criado_em], 126) AS [criado_em],
+  CASE WHEN EXISTS (SELECT 1 FROM dbo.eng_versatil_fatores_itens AS p WHERE p.[fator_id] = f.[id] AND p.[acao] = 'peso_e_fator')
+       THEN 'peso' ELSE 'fator' END AS [tipo],
+  (SELECT COUNT(*) FROM dbo.eng_versatil_fatores_itens AS c WHERE c.[fator_id] = f.[id]) AS [total_itens],
+  (SELECT STRING_AGG(CAST(s.[codigo] AS NVARCHAR(MAX)), ', ') WITHIN GROUP (ORDER BY s.[ordem])
+     FROM (SELECT TOP 5 [codigo], [ordem] FROM dbo.eng_versatil_fatores_itens WHERE [fator_id] = f.[id] ORDER BY [ordem]) AS s) AS [codigos]`;
+
+type LinhaGravacao = {
+  id: string;
+  numero_projeto: string;
+  arquivo_planilha: string;
+  cod_empresa: number;
+  ambiente: "teste" | "producao";
+  status: "concluida" | "erro";
+  incluidos: number;
+  alterados: number;
+  mensagem: string | null;
+  usuario_nome: string;
+  criado_em: string;
+  tipo: TipoGravacaoFator;
+  total_itens: number;
+  codigos: string | null;
+};
+
+function paraGravacao(l: LinhaGravacao): GravacaoFator {
+  return {
+    id: l.id,
+    numeroProjeto: l.numero_projeto,
+    arquivoPlanilha: l.arquivo_planilha,
+    codEmpresa: l.cod_empresa,
+    ambiente: l.ambiente,
+    status: l.status,
+    tipo: l.tipo,
+    incluidos: l.incluidos,
+    alterados: l.alterados,
+    totalItens: l.total_itens,
+    codigos: l.codigos,
+    mensagem: l.mensagem,
+    usuarioNome: l.usuario_nome,
+    criadoEm: l.criado_em,
+  };
+}
+
+/* Gravações de fator e ajustes de peso, paginadas; filtros por projeto, código do item, usuário, ambiente e tipo. */
+export async function listarGravacoesFator(params: {
+  pagina: number;
+  porPagina: number;
+  projeto?: string | null;
+  codigo?: string | null;
+  usuario?: string | null;
+  ambiente?: "teste" | "producao" | null;
+  tipo?: TipoGravacaoFator | null;
+}): Promise<{ itens: GravacaoFator[]; total: number }> {
+  const pool = await getSqlServerPool();
+  const filtros: string[] = [];
+  if (params.projeto) filtros.push("f.[numero_projeto] LIKE '%' + @projeto + '%'");
+  if (params.usuario) filtros.push("f.[usuario_nome] LIKE '%' + @usuario + '%'");
+  if (params.ambiente) filtros.push("f.[ambiente] = @ambiente");
+  if (params.codigo) {
+    filtros.push("EXISTS (SELECT 1 FROM dbo.eng_versatil_fatores_itens AS ci WHERE ci.[fator_id] = f.[id] AND ci.[codigo] LIKE '%' + @codigo + '%')");
+  }
+  if (params.tipo) {
+    filtros.push(
+      `${params.tipo === "peso" ? "" : "NOT "}EXISTS (SELECT 1 FROM dbo.eng_versatil_fatores_itens AS ti WHERE ti.[fator_id] = f.[id] AND ti.[acao] = 'peso_e_fator')`
+    );
+  }
+  const where = filtros.length ? `WHERE ${filtros.join(" AND ")}` : "";
+  const comFiltros = () => {
+    const r = pool.request();
+    if (params.projeto) r.input("projeto", sql.NVarChar(30), params.projeto);
+    if (params.usuario) r.input("usuario", sql.NVarChar(200), params.usuario);
+    if (params.ambiente) r.input("ambiente", sql.VarChar(10), params.ambiente);
+    if (params.codigo) r.input("codigo", sql.NVarChar(50), params.codigo);
+    return r;
+  };
+
+  const [itens, total] = await Promise.all([
+    comFiltros()
+      .input("offset", sql.Int, (params.pagina - 1) * params.porPagina)
+      .input("porPagina", sql.Int, params.porPagina)
+      .query<LinhaGravacao>(`
+        SELECT ${COLUNAS_GRAVACAO} FROM dbo.eng_versatil_fatores AS f
+        ${where}
+        ORDER BY f.[criado_em] DESC OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
+      `),
+    comFiltros().query<{ total: number }>(`SELECT COUNT(*) AS [total] FROM dbo.eng_versatil_fatores AS f ${where};`),
+  ]);
+  return { itens: itens.recordset.map(paraGravacao), total: total.recordset[0]?.total ?? 0 };
+}
+
+export async function buscarGravacaoFator(id: string): Promise<{ gravacao: GravacaoFator; itens: ItemGravacaoFator[] } | null> {
+  const pool = await getSqlServerPool();
+  const cab = (
+    await pool.request().input("id", sql.UniqueIdentifier, id).query<LinhaGravacao>(`SELECT ${COLUNAS_GRAVACAO} FROM dbo.eng_versatil_fatores AS f WHERE f.[id] = @id;`)
+  ).recordset[0];
+  if (!cab) return null;
+
+  const itens = await pool.request().input("id", sql.UniqueIdentifier, id).query<{
+    ordem: number;
+    aba: string | null;
+    codigo: string;
+    unid_estoque: string | null;
+    peso_planilha: number | null;
+    peso_erp: number | null;
+    peso_novo: number | null;
+    peso_brt_antes: number | null;
+    peso_brt_novo: number | null;
+    origem_peso: string;
+    taxa_antes: number | null;
+    taxa_nova: number | null;
+    acao: string;
+    leitura: string | null;
+    mensagem: string | null;
+  }>(`
+    SELECT [ordem], [aba], [codigo], [unid_estoque], [peso_planilha], [peso_erp], [peso_novo], [peso_brt_antes], [peso_brt_novo],
+           [origem_peso], [taxa_antes], [taxa_nova], [acao], [leitura], [mensagem]
+    FROM dbo.eng_versatil_fatores_itens WHERE [fator_id] = @id ORDER BY [ordem];
+  `);
+
+  const num = (v: number | null) => (v === null ? null : Number(v));
+  return {
+    gravacao: paraGravacao(cab),
+    itens: itens.recordset.map((i) => ({
+      ordem: i.ordem,
+      aba: i.aba,
+      codigo: i.codigo,
+      unidEstoque: i.unid_estoque,
+      pesoPlanilha: num(i.peso_planilha),
+      pesoErp: num(i.peso_erp),
+      pesoNovo: num(i.peso_novo),
+      pesoBrtAntes: num(i.peso_brt_antes),
+      pesoBrtNovo: num(i.peso_brt_novo),
+      origemPeso: i.origem_peso,
+      taxaAntes: num(i.taxa_antes),
+      taxaNova: num(i.taxa_nova),
+      acao: i.acao,
+      leitura: i.leitura,
+      mensagem: i.mensagem,
+    })),
+  };
+}

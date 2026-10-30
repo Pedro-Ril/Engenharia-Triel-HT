@@ -58,7 +58,7 @@ function numero(valor: number | null, casas: number): string {
  * líquido). Peso divergente ou ERP sem peso: linha destacada e
  * desmarcada; marcando, o fator usa o peso da planilha.
  */
-export function FatoresConversaoCard({ planilha }: { planilha: File }) {
+export function FatoresConversaoCard({ planilha, onGravado }: { planilha: File; onGravado?: () => void }) {
   const [analise, setAnalise] = useState<AnaliseFatores | null>(null);
   const [conferindo, setConferindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -105,6 +105,7 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
             : `${d.incluidos} fator(es) incluído(s) e ${d.alterados} alterado(s). A lista já foi conferida de novo.`,
           retorno: { ambiente: d.ambiente, incluidos: d.incluidos, alterados: d.alterados, erro: d.erro, chamadas: d.chamadas },
         });
+        onGravado?.();
         await conferir();
       } else {
         setAviso({
@@ -383,6 +384,7 @@ export function FatoresConversaoCard({ planilha }: { planilha: File }) {
             setAviso(novoAviso);
             if (gravou) {
               setAjustando(null);
+              onGravado?.();
               void conferir();
             }
           }}

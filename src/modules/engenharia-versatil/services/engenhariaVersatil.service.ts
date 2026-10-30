@@ -93,8 +93,15 @@ export async function buscarSeparacao(id: string): Promise<ApiEnvelope<{ separac
   return parseResponse(response);
 }
 
-export async function listarSeparacoes(params: { pagina: number; porPagina: number }): Promise<ApiEnvelope<{ itens: Separacao[]; total: number }>> {
+export async function listarSeparacoes(params: {
+  pagina: number;
+  porPagina: number;
+  projeto?: string;
+  usuario?: string;
+}): Promise<ApiEnvelope<{ itens: Separacao[]; total: number }>> {
   const busca = new URLSearchParams({ pagina: String(params.pagina), porPagina: String(params.porPagina) });
+  if (params.projeto) busca.set("projeto", params.projeto);
+  if (params.usuario) busca.set("usuario", params.usuario);
   const response = await fetch(`/api/engenharia-versatil/separacao?${busca.toString()}`, { cache: "no-store" });
   return parseResponse(response);
 }
@@ -189,5 +196,67 @@ export async function ajustarPeso(planilha: File, codigo: string, peso: number):
   form.append("codigo", codigo);
   form.append("peso", String(peso));
   const response = await fetch("/api/engenharia-versatil/fatores/peso", { method: "POST", body: form });
+  return parseResponse(response);
+}
+
+/* ------------------------------------------------------------------ histórico de fatores e pesos */
+
+export type TipoGravacaoFator = "fator" | "peso";
+
+export interface GravacaoFator {
+  id: string;
+  numeroProjeto: string;
+  arquivoPlanilha: string;
+  codEmpresa: number;
+  ambiente: "teste" | "producao";
+  status: "concluida" | "erro";
+  tipo: TipoGravacaoFator;
+  incluidos: number;
+  alterados: number;
+  totalItens: number;
+  codigos: string | null;
+  mensagem: string | null;
+  usuarioNome: string;
+  criadoEm: string;
+}
+
+export interface ItemGravacaoFator {
+  ordem: number;
+  aba: string | null;
+  codigo: string;
+  unidEstoque: string | null;
+  pesoPlanilha: number | null;
+  pesoErp: number | null;
+  pesoNovo: number | null;
+  pesoBrtAntes: number | null;
+  pesoBrtNovo: number | null;
+  origemPeso: string;
+  taxaAntes: number | null;
+  taxaNova: number | null;
+  acao: string;
+  leitura: string | null;
+  mensagem: string | null;
+}
+
+export async function listarGravacoesFator(params: {
+  pagina: number;
+  porPagina: number;
+  projeto?: string;
+  codigo?: string;
+  usuario?: string;
+  ambiente?: "" | "teste" | "producao";
+  tipo?: "" | TipoGravacaoFator;
+}): Promise<ApiEnvelope<{ itens: GravacaoFator[]; total: number }>> {
+  const busca = new URLSearchParams({ pagina: String(params.pagina), porPagina: String(params.porPagina) });
+  for (const chave of ["projeto", "codigo", "usuario", "ambiente", "tipo"] as const) {
+    const valor = params[chave];
+    if (valor) busca.set(chave, valor);
+  }
+  const response = await fetch(`/api/engenharia-versatil/fatores?${busca.toString()}`, { cache: "no-store" });
+  return parseResponse(response);
+}
+
+export async function buscarGravacaoFator(id: string): Promise<ApiEnvelope<{ gravacao: GravacaoFator; itens: ItemGravacaoFator[] }>> {
+  const response = await fetch(`/api/engenharia-versatil/fatores/${id}`, { cache: "no-store" });
   return parseResponse(response);
 }
