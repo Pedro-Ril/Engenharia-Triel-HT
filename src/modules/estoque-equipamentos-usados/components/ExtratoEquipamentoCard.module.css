@@ -3,6 +3,10 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px 24px;
   margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border-soft);
 }
 
 .resumo dt {
@@ -18,7 +22,7 @@
 
 .suave {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .tabela {
@@ -29,11 +33,20 @@
   white-space: nowrap;
 }
 
-.removido {
+.cancelada {
   opacity: 0.6;
 }
 
-.removido td {
-  text-decoration: line-through;
-  text-decoration-color: var(--danger-text);
+.linkAnexo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+
+.linkAnexo:hover {
+  color: var(--primary);
+  text-decoration: underline;
 }

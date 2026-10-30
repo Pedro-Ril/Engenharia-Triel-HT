@@ -66,6 +66,8 @@ export function EstoqueEquipamentosUsadosConfigPainel({
   const [urlExtrato, setUrlExtrato] = useState("");
   const [urlExtratoTeste, setUrlExtratoTeste] = useState("");
   const [intervaloExtrato, setIntervaloExtrato] = useState("60");
+  const [pastaPdfNfSaida, setPastaPdfNfSaida] = useState("");
+  const [codEmpPdfNfSaida, setCodEmpPdfNfSaida] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [sincronizando, setSincronizando] = useState<"simular" | "aplicar" | null>(null);
   const [confirmandoSincronizar, setConfirmandoSincronizar] = useState(false);
@@ -96,6 +98,8 @@ export function EstoqueEquipamentosUsadosConfigPainel({
       setUrlExtrato(dados?.urlExtrato ?? "");
       setUrlExtratoTeste(dados?.urlExtratoTeste ?? "");
       setIntervaloExtrato(String(dados?.intervaloExtratoMinutos ?? 60));
+      setPastaPdfNfSaida(dados?.pastaPdfNfSaida ?? "");
+      setCodEmpPdfNfSaida(dados?.codEmpPdfNfSaida ? String(dados.codEmpPdfNfSaida) : "");
       setCarregando(false);
     }
 
@@ -122,6 +126,8 @@ export function EstoqueEquipamentosUsadosConfigPainel({
         urlExtrato: urlExtrato.trim() || null,
         urlExtratoTeste: urlExtratoTeste.trim() || null,
         intervaloExtratoMinutos: Number(intervaloExtrato) || 60,
+        pastaPdfNfSaida: pastaPdfNfSaida.trim() || null,
+        codEmpPdfNfSaida: codEmpPdfNfSaida.trim() ? Number(codEmpPdfNfSaida) : null,
       });
 
       if (resultado.ok && resultado.data) {
@@ -379,6 +385,30 @@ export function EstoqueEquipamentosUsadosConfigPainel({
             </Field>
           </FormGrid>
 
+          <FormGrid columns={3}>
+            <Field
+              label="Pasta dos PDFs das NFs de saída"
+              htmlFor="pastaPdfNfSaida"
+              hint="O PDF de cada saída nossa (remessa, venda) é procurado aqui e anexado ao extrato. Ex: \\SERVIDORGERAL\Triel\Financeiro\publico\NFE\Matriz"
+            >
+              <Input
+                id="pastaPdfNfSaida"
+                value={pastaPdfNfSaida}
+                onChange={(e) => setPastaPdfNfSaida(e.target.value)}
+                disabled={salvando}
+              />
+            </Field>
+            <Field label="Empresa da pasta (código no ERP)" htmlFor="codEmpPdfNfSaida" hint="Matriz = 2. Só NFs dessa empresa são procuradas nessa pasta.">
+              <NumberInput
+                id="codEmpPdfNfSaida"
+                min={1}
+                value={codEmpPdfNfSaida}
+                onChange={(e) => setCodEmpPdfNfSaida(e.target.value)}
+                disabled={salvando}
+              />
+            </Field>
+          </FormGrid>
+
           <Stack direction="row" justify="between" align="center" wrap>
             <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
               Última sincronização automática: {formatarData(config?.ultimaExecucaoExtratoEm ?? null)}
@@ -418,6 +448,7 @@ export function EstoqueEquipamentosUsadosConfigPainel({
                       <TableHeaderCell align="right">Lançadas</TableHeaderCell>
                       <TableHeaderCell align="right">Confirmadas</TableHeaderCell>
                       <TableHeaderCell align="right">Canceladas</TableHeaderCell>
+                      <TableHeaderCell align="right">PDFs de NF</TableHeaderCell>
                       <TableHeaderCell>Observação</TableHeaderCell>
                     </TableRow>
                   </TableHead>
@@ -437,6 +468,7 @@ export function EstoqueEquipamentosUsadosConfigPainel({
                         <TableCell align="right">{r.movimentacoesCriadas}</TableCell>
                         <TableCell align="right">{r.movimentacoesVinculadas}</TableCell>
                         <TableCell align="right">{r.movimentosErpRemovidos}</TableCell>
+                        <TableCell align="right">{r.pdfsAnexados}</TableCell>
                         <TableCell>{r.erro ?? (r.statusAntes !== r.statusDepois ? r.motivoStatus : "")}</TableCell>
                       </TableRow>
                     ))}

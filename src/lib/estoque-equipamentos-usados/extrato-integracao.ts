@@ -5,6 +5,8 @@ import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { registrarChamadaExternaSemFalhar } from "@/lib/monitoramento/chamadas-externas";
 
 import { buscarConfigErpEstoqueUsados } from "./erp-integracao";
+import { lerPdfNf, localizarPdfNfSaida } from "./nf-saida-pdf";
+import path from "node:path";
 import {
   LABEL_TIPO_ERP,
   TIPOS_IGNORADOS,
@@ -52,6 +54,7 @@ export interface ResultadoSincronizacao {
   movimentacoesCriadas: number;
   movimentacoesVinculadas: number;
   movimentacoesRemovidas: number;
+  pdfsAnexados: number;
   erro: string | null;
 }
 
@@ -281,7 +284,7 @@ async function aplicarExtrato(
   transacao: sql.Transaction,
   candidato: Candidato,
   equipamento: EquipamentoErp
-): Promise<Omit<ResultadoSincronizacao, "equipamentoId" | "numero" | "erro">> {
+): Promise<Omit<ResultadoSincronizacao, "equipamentoId" | "numero" | "erro" | "pdfsAnexados">> {
   const movimentos = ordenarMovimentos(equipamento.movimentacoes ?? []).filter((m) => m.idMovimentacao && m.data);
   const relevantes = movimentos.filter((m) => !TIPOS_IGNORADOS.has(m.tipo));
 
@@ -433,6 +436,87 @@ async function aplicarExtrato(
   };
 }
 
+/*
+ * Anexa o PDF das NFs de SAÍDA nossas (emitidas pela empresa da pasta
+ * configurada) às movimentações do extrato do Portal. Roda depois da
+ * transação, porque lê da rede. Não achou: tenta de novo no dia seguinte
+ * (ou na hora, quando alguém clicou). Falha de rede não derruba a sincronização.
+ */
+async function anexarPdfsNfSaida(params: {
+  equipamentoId: string;
+  numeroEquipamento: number;
+  pasta: string;
+  codEmp: number;
+  forcar: boolean;
+}): Promise<number> {
+  const pool = await getSqlServerPool();
+  const pendentes = await pool
+    .request()
+    .input("equip", sql.UniqueIdentifier, params.equipamentoId)
+    .input("codEmp", sql.Int, params.codEmp)
+    .input("forcar", sql.Bit, params.forcar)
+    .query<{ id: string; nf_numero: string; data_emissao: string; movimentacao_id: string }>(`
+      SELECT CONVERT(VARCHAR(36), em.[id]) AS [id], em.[nf_numero],
+             CONVERT(VARCHAR(10), ISNULL(em.[nf_data_emissao], em.[data_movimento]), 23) AS [data_emissao],
+             CONVERT(VARCHAR(36), mov.[id]) AS [movimentacao_id]
+      FROM dbo.com_estoque_equipamentos_usados_erp_movimentos em
+      JOIN dbo.com_estoque_equipamentos_usados_movimentacoes mov
+        ON mov.[equipamento_id] = em.[equipamento_id] AND mov.[erp_id_movimentacao] = em.[id_movimentacao]
+      WHERE em.[equipamento_id] = @equip
+        AND em.[removido_em] IS NULL
+        AND em.[sentido] = 'SAIDA'
+        AND em.[cod_emp] = @codEmp
+        AND em.[nf_numero] IS NOT NULL
+        AND JSON_VALUE(em.[dados], '$.documento.origem') = 'NF_SAIDA'
+        AND em.[nf_pdf_anexo_id] IS NULL
+        AND (@forcar = 1 OR em.[nf_pdf_procurado_em] IS NULL OR em.[nf_pdf_procurado_em] < DATEADD(DAY, -1, SYSDATETIME()));
+    `);
+
+  let anexados = 0;
+  for (const p of pendentes.recordset) {
+    try {
+      const caminho = await localizarPdfNfSaida({
+        pastaBase: params.pasta,
+        numeroNf: p.nf_numero,
+        dataEmissao: p.data_emissao,
+        numeroEquipamento: params.numeroEquipamento,
+      });
+      const conteudo = caminho ? await lerPdfNf(caminho) : null;
+
+      if (caminho && conteudo) {
+        await pool
+          .request()
+          .input("mov", sql.UniqueIdentifier, p.movimentacao_id)
+          .input("nome", sql.NVarChar(260), path.basename(caminho).slice(0, 260))
+          .input("tamanho", sql.Int, conteudo.length)
+          .input("conteudo", sql.VarBinary(sql.MAX), conteudo)
+          .input("nomeCriador", sql.NVarChar(150), NOME_INTEGRACAO)
+          .input("emId", sql.UniqueIdentifier, p.id)
+          .input("arquivo", sql.NVarChar(400), caminho.slice(0, 400))
+          .query(`
+            DECLARE @anexo TABLE ([id] UNIQUEIDENTIFIER);
+            INSERT INTO dbo.com_estoque_movimentacoes_anexos
+              ([movimentacao_id], [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo], [criado_por_usuario_id], [criado_por_nome])
+            OUTPUT INSERTED.[id] INTO @anexo
+            VALUES (@mov, @nome, 'application/pdf', @tamanho, @conteudo, NULL, @nomeCriador);
+            UPDATE dbo.com_estoque_equipamentos_usados_erp_movimentos
+            SET [nf_pdf_anexo_id] = (SELECT TOP 1 [id] FROM @anexo), [nf_pdf_arquivo] = @arquivo, [nf_pdf_procurado_em] = SYSDATETIME()
+            WHERE [id] = @emId;
+          `);
+        anexados += 1;
+      } else {
+        await pool
+          .request()
+          .input("emId", sql.UniqueIdentifier, p.id)
+          .query(`UPDATE dbo.com_estoque_equipamentos_usados_erp_movimentos SET [nf_pdf_procurado_em] = SYSDATETIME() WHERE [id] = @emId;`);
+      }
+    } catch (erro) {
+      console.error(`Erro ao anexar o PDF da NF ${p.nf_numero} (equipamento ${params.numeroEquipamento}):`, erro);
+    }
+  }
+  return anexados;
+}
+
 async function registrarLogExtrato(params: {
   equipamentoId: string;
   status: "sucesso" | "erro" | "nao_encontrado";
@@ -519,6 +603,7 @@ export async function sincronizarExtrato(params: {
     movimentacoesCriadas: 0,
     movimentacoesVinculadas: 0,
     movimentacoesRemovidas: 0,
+    pdfsAnexados: 0,
     erro,
   });
 
@@ -555,12 +640,29 @@ export async function sincronizarExtrato(params: {
           if (simular) await transacao.rollback();
           else await transacao.commit();
 
-          const resultado: ResultadoSincronizacao = { equipamentoId: candidato.id, numero: candidato.numero, erro: null, ...r };
+          const pdfsAnexados =
+            !simular && config.pastaPdfNfSaida && config.codEmpPdfNfSaida
+              ? await anexarPdfsNfSaida({
+                  equipamentoId: candidato.id,
+                  numeroEquipamento: candidato.numero,
+                  pasta: config.pastaPdfNfSaida,
+                  codEmp: config.codEmpPdfNfSaida,
+                  forcar: Boolean(params.disparadoPor),
+                })
+              : 0;
+
+          const resultado: ResultadoSincronizacao = {
+            equipamentoId: candidato.id,
+            numero: candidato.numero,
+            erro: null,
+            ...r,
+            pdfsAnexados,
+          };
           resultados.push(resultado);
 
           const mudou =
             r.statusAntes !== r.statusDepois ||
-            r.movimentacoesCriadas + r.movimentacoesVinculadas + r.movimentacoesRemovidas + r.movimentosErpNovos > 0;
+            r.movimentacoesCriadas + r.movimentacoesVinculadas + r.movimentacoesRemovidas + r.movimentosErpNovos + pdfsAnexados > 0;
           if (!simular && (mudou || params.disparadoPor)) {
             const partes = [
               r.statusAntes !== r.statusDepois ? `Status: ${r.statusAntes} → ${r.statusDepois}` : null,
@@ -568,6 +670,7 @@ export async function sincronizarExtrato(params: {
               r.movimentacoesCriadas ? `${r.movimentacoesCriadas} lançada(s) no extrato` : null,
               r.movimentacoesVinculadas ? `${r.movimentacoesVinculadas} confirmada(s) pela NF` : null,
               r.movimentosErpRemovidos ? `${r.movimentosErpRemovidos} cancelada(s) no ERP` : null,
+              pdfsAnexados ? `${pdfsAnexados} PDF(s) de NF anexado(s)` : null,
             ].filter(Boolean);
             await registrarLogExtrato({
               equipamentoId: candidato.id,
@@ -602,6 +705,7 @@ export interface MovimentoErpGravado {
   sentido: string;
   nfNumero: string | null;
   nfSerie: string | null;
+  nfDataEmissao: string | null;
   cfop: number | null;
   naturezaOperacao: string | null;
   contraparteNome: string | null;
@@ -633,7 +737,7 @@ export async function buscarSituacaoErp(equipamentoId: string): Promise<Situacao
     FROM dbo.com_estoque_equipamentos_usados WHERE [id] = @id;
 
     SELECT [id_movimentacao], CONVERT(VARCHAR(10), [data_movimento], 23) AS [data_movimento], [tipo], [sentido], [nf_numero],
-           [nf_serie], [cfop], [natureza_operacao], [contraparte_nome], [contraparte_cnpj], [valor_total_item], [custo_compra],
+           [nf_serie], CONVERT(VARCHAR(10), [nf_data_emissao], 23) AS [nf_data_emissao], [cfop], [natureza_operacao], [contraparte_nome], [contraparte_cnpj], [valor_total_item], [custo_compra],
            [local_depois], [venda_de_consignacao], CASE WHEN [removido_em] IS NULL THEN 0 ELSE 1 END AS [removido]
     FROM dbo.com_estoque_equipamentos_usados_erp_movimentos
     WHERE [equipamento_id] = @id
@@ -658,6 +762,7 @@ export async function buscarSituacaoErp(equipamentoId: string): Promise<Situacao
       sentido: m.sentido as string,
       nfNumero: (m.nf_numero as string | null) ?? null,
       nfSerie: (m.nf_serie as string | null) ?? null,
+      nfDataEmissao: (m.nf_data_emissao as string | null) ?? null,
       cfop: (m.cfop as number | null) ?? null,
       naturezaOperacao: (m.natureza_operacao as string | null) ?? null,
       contraparteNome: (m.contraparte_nome as string | null) ?? null,

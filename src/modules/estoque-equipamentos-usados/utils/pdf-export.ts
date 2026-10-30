@@ -7,9 +7,10 @@ import type {
   Equipamento,
   EquipamentoComEstrato,
   HistoricoAlteracaoDadosTecnicos,
+  SituacaoErpEquipamento,
   StatusEquipamento,
-  TipoAcaoMovimentacao,
 } from "../types/estoque.types";
+import { LOCAL_LABEL, ORIGEM, montarLinhas } from "./extrato-unificado";
 import {
   CHAVE_SISTEMA_CODIGO_EMPRESA,
   CHAVE_SISTEMA_DATA_ENTRADA_NF,
@@ -52,23 +53,18 @@ const STATUS_CORES: Record<StatusEquipamento, { bg: [number, number, number]; te
   baixado: { bg: [243, 244, 246], text: [75, 85, 99] },
 };
 
-const ACAO_LABELS: Record<TipoAcaoMovimentacao, string> = {
-  entrada: "Entrada",
-  emprestimo: "Empréstimo",
-  consignacao: "Consignação",
-  retorno: "Retorno ao estoque",
-  reforma: "Saída para reforma/conserto",
-  baixa: "Baixa",
-  transferencia: "Transferência entre empresas",
-  nf_vinculada: "NF de entrada vinculada",
-};
-
 const MARGEM = 14;
-const LARGURA_PAGINA = 210;
-const ALTURA_PAGINA = 297;
 const ALTURA_FAIXA = 30;
 const TOPO_CONTEUDO = ALTURA_FAIXA + 12;
-const RODAPE_Y = ALTURA_PAGINA - 12;
+
+/* Largura/altura do próprio documento: o extrato sai em paisagem, a entrada em retrato. */
+function larguraPagina(doc: jsPDF): number {
+  return doc.internal.pageSize.getWidth();
+}
+
+function rodapeY(doc: jsPDF): number {
+  return doc.internal.pageSize.getHeight() - 12;
+}
 
 function formatarData(data?: string | null): string {
   if (!data) return "-";
@@ -164,6 +160,7 @@ function espacar(texto: string): string {
 }
 
 function desenharFaixaCabecalho(doc: jsPDF, equipamento: Equipamento, tituloPagina: string): void {
+  const LARGURA_PAGINA = larguraPagina(doc);
   doc.setFillColor(...COR_PRIMARIA);
   doc.rect(0, 0, LARGURA_PAGINA, ALTURA_FAIXA, "F");
   doc.setFillColor(...COR_PRIMARIA_ESCURA);
@@ -246,6 +243,9 @@ function desenharTabelaChaveValor(
 
 function desenharRodapes(doc: jsPDF, geradoEm: Date): void {
   const totalPaginas = doc.getNumberOfPages();
+
+  const LARGURA_PAGINA = larguraPagina(doc);
+  const RODAPE_Y = rodapeY(doc);
 
   for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
     doc.setPage(pagina);
@@ -403,48 +403,87 @@ export function exportarPdfEntradaEquipamento(
 export function exportarPdfEstratoEquipamento(
   equipamento: EquipamentoComEstrato,
   anexosPorMovimentacao: Map<string, AnexoMovimentacao[]> = new Map(),
-  historicoDados: HistoricoAlteracaoDadosTecnicos[] = []
+  historicoDados: HistoricoAlteracaoDadosTecnicos[] = [],
+  situacaoErp: SituacaoErpEquipamento | null = null
 ): void {
-  const doc = new jsPDF("p", "mm", "a4");
+  const doc = new jsPDF("l", "mm", "a4");
   const geradoEm = new Date();
   const tituloPagina = "Extrato — Histórico Completo";
+  let cursorInicio = TOPO_CONTEUDO;
 
   desenharFaixaCabecalho(doc, equipamento, tituloPagina);
-  desenharTituloSecao(doc, "Movimentações", TOPO_CONTEUDO);
 
-  const linhas = equipamento.movimentacoes.map((movimentacao) => {
-    const anexos = anexosPorMovimentacao.get(movimentacao.id) ?? [];
+  /* Situação atual segundo o ERP (a mesma faixa do topo do card na tela). */
+  if (situacaoErp?.local) {
+    desenharTituloSecao(doc, "Situação no ERP", cursorInicio);
+    const local = LOCAL_LABEL[situacaoErp.local]?.texto ?? situacaoErp.local;
+    autoTable(doc, {
+      startY: cursorInicio + 4,
+      margin: { top: ALTURA_FAIXA + 6, left: MARGEM, right: MARGEM },
+      head: [["Situação", "Com quem", "Custo de compra", "Última conferência"]],
+      body: [
+        [
+          situacaoErp.desde ? `${local} desde ${formatarData(situacaoErp.desde)}` : local,
+          situacaoErp.local === "EM_TERCEIRO" || situacaoErp.local === "FORA_DA_EMPRESA" ? (situacaoErp.contraparte ?? "-") : "-",
+          formatarMoeda(situacaoErp.custoCompra),
+          situacaoErp.sincronizadoEm ? formatarDataHoraIso(situacaoErp.sincronizadoEm) : "-",
+        ],
+      ],
+      styles: { fontSize: 9, cellPadding: 2.5, textColor: COR_TEXTO, lineColor: COR_LINHA, lineWidth: 0.1 },
+      headStyles: { fillColor: COR_FUNDO_ALTERNADO, textColor: COR_TEXTO_SUAVE, fontStyle: "bold", fontSize: 8 },
+      didDrawPage: () => desenharFaixaCabecalho(doc, equipamento, tituloPagina),
+    });
+    cursorInicio = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+  }
 
-    return [
-      ACAO_LABELS[movimentacao.tipoAcao],
-      movimentacao.numeroNf ?? "-",
-      formatarMoeda(movimentacao.valor),
-      formatarData(movimentacao.dataEmissaoNf),
-      movimentacao.destinatarioNome ?? "-",
-      STATUS_LABELS[movimentacao.statusResultante],
-      anexos.length > 0 ? anexos.map((anexo) => anexo.nomeArquivo).join(", ") : "-",
-      movimentacao.criadoPorNome,
-      formatarData(movimentacao.dataAcao),
-    ];
-  });
+  desenharTituloSecao(doc, "Movimentações — Portal e ERP", cursorInicio);
+
+  const linhas = montarLinhas(equipamento.movimentacoes, situacaoErp?.movimentos ?? [], anexosPorMovimentacao).map((linha) => [
+    formatarData(linha.data),
+    linha.detalheErp ? `${linha.acao}\n${linha.detalheErp}` : linha.acao,
+    linha.nf ?? "-",
+    linha.cfop !== null ? String(linha.cfop) : "-",
+    formatarMoeda(linha.valor),
+    formatarData(linha.emissao),
+    linha.comQuem ?? "-",
+    linha.status?.texto ?? "-",
+    linha.anexos.length > 0 ? linha.anexos.map((anexo) => anexo.nomeArquivo).join(", ") : "-",
+    linha.responsavel,
+    ORIGEM[linha.origem].texto,
+  ]);
 
   autoTable(doc, {
-    startY: TOPO_CONTEUDO + 4,
+    startY: cursorInicio + 4,
     margin: { top: ALTURA_FAIXA + 6, left: MARGEM, right: MARGEM },
-    head: [["Ação", "NF", "Valor", "Emissão NF", "Destinatário", "Status resultante", "Anexos", "Responsável", "Data"]],
+    head: [["Data", "Movimentação", "NF", "CFOP", "Valor", "Emissão NF", "Com quem", "Status", "Anexos", "Responsável", "Origem"]],
     body: linhas,
     styles: {
       fontSize: 8.5,
-      cellPadding: 2.5,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
       textColor: COR_TEXTO,
       lineColor: COR_LINHA,
       lineWidth: 0.1,
+      valign: "middle",
     },
     headStyles: {
       fillColor: COR_PRIMARIA,
       textColor: [255, 255, 255],
       fontStyle: "bold",
       fontSize: 8.5,
+    },
+    columnStyles: {
+      /* Larguras fixas somam ~228 mm dos 269 úteis: o resto fica para "Com quem", a coluna de nomes longos. */
+      0: { cellWidth: 21 },
+      1: { cellWidth: 38 },
+      2: { cellWidth: 18 },
+      3: { cellWidth: 14 },
+      4: { cellWidth: 24, halign: "right" },
+      5: { cellWidth: 21 },
+      6: { cellWidth: "auto" },
+      7: { cellWidth: 23 },
+      8: { cellWidth: 25 },
+      9: { cellWidth: 26 },
+      10: { cellWidth: 18 },
     },
     alternateRowStyles: {
       fillColor: COR_FUNDO_ALTERNADO,

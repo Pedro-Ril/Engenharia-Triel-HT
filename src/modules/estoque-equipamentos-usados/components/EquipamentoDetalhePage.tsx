@@ -10,7 +10,6 @@ import {
   Home,
   PackageCheck,
   PackageX,
-  Paperclip,
   Pencil,
   PlugZap,
   RefreshCw,
@@ -63,9 +62,7 @@ import type {
   EvidenciaEquipamento,
   HistoricoAlteracaoDadosTecnicos,
   MotivoBaixa,
-  StatusEquipamento,
   TentativaIntegracaoNf,
-  TipoAcaoMovimentacao,
   TipoNfIntegracao,
 } from "../types/estoque.types";
 import { CampoDinamicoInput } from "./CampoDinamicoInput";
@@ -89,37 +86,11 @@ import {
   formatarMoeda,
   nfEntradaIntegradaComErp as calcularNfEntradaIntegradaComErp,
 } from "../constants";
+import { STATUS_BADGE, STATUS_LABELS } from "../utils/rotulos";
 import styles from "./EquipamentoDetalhePage.module.css";
-import { ErpExtratoCard } from "./ErpExtratoCard";
+import { ExtratoEquipamentoCard } from "./ExtratoEquipamentoCard";
 
 const ACEITA_EVIDENCIAS = "image/*,.pdf,.doc,.docx,.xls,.xlsx";
-
-const STATUS_LABELS: Record<StatusEquipamento, string> = {
-  em_estoque: "Em estoque",
-  emprestado: "Emprestado",
-  consignado: "Em consignação",
-  em_reforma: "Em reforma/conserto",
-  baixado: "Baixado",
-};
-
-const STATUS_BADGE: Record<StatusEquipamento, "success" | "warning" | "info" | "neutral"> = {
-  em_estoque: "success",
-  emprestado: "warning",
-  consignado: "info",
-  em_reforma: "warning",
-  baixado: "neutral",
-};
-
-const ACAO_LABELS: Record<TipoAcaoMovimentacao, string> = {
-  entrada: "Entrada",
-  emprestimo: "Empréstimo",
-  consignacao: "Consignação",
-  retorno: "Retorno ao estoque",
-  reforma: "Saída para reforma/conserto",
-  baixa: "Baixa",
-  transferencia: "Transferência entre empresas",
-  nf_vinculada: "NF de entrada vinculada",
-};
 
 const STATUS_TENTATIVA_LABEL: Record<TentativaIntegracaoNf["status"], string> = {
   sucesso: "Sucesso",
@@ -818,92 +789,13 @@ export function EquipamentoDetalhePage({
 
       {cardAcoes}
 
-      <Card
-        title="Extrato — histórico completo"
-        actions={
-          <Button
-            variant="secondary"
-            onClick={() => exportarPdfEstratoEquipamento(equipamento, anexosPorMovimentacao, historicoDados)}
-          >
-            <Download size={16} />
-            Exportar extrato
-          </Button>
-        }
-      >
-        <Table minWidth={1540}>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell style={{ width: 110 }}>Ação</TableHeaderCell>
-              <TableHeaderCell style={{ width: 110 }}>NF</TableHeaderCell>
-              <TableHeaderCell style={{ width: 130 }}>Valor</TableHeaderCell>
-              <TableHeaderCell style={{ width: 110 }}>Emissão NF</TableHeaderCell>
-              <TableHeaderCell style={{ width: 260 }}>Destinatário</TableHeaderCell>
-              <TableHeaderCell style={{ width: 140 }}>Status resultante</TableHeaderCell>
-              <TableHeaderCell style={{ width: 220 }}>Anexos</TableHeaderCell>
-              <TableHeaderCell style={{ width: 220 }}>Responsável</TableHeaderCell>
-              <TableHeaderCell style={{ width: 100 }}>Data</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {equipamento.movimentacoes.map((movimentacao) => {
-              const anexos = anexosPorMovimentacao.get(movimentacao.id) ?? [];
-
-              return (
-                <TableRow key={movimentacao.id}>
-                  <TableCell>
-                    {ACAO_LABELS[movimentacao.tipoAcao]}
-                    {movimentacao.origem === "erp" ? (
-                      <div>
-                        <Badge variant="info">Do ERP</Badge>
-                      </div>
-                    ) : movimentacao.confirmadaErp ? (
-                      <div className={styles.infoLabel}>Confirmada no ERP</div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{movimentacao.numeroNf ?? "-"}</TableCell>
-                  <TableCell>{formatarMoeda(movimentacao.valor)}</TableCell>
-                  <TableCell>
-                    {movimentacao.dataEmissaoNf ? formatarData(movimentacao.dataEmissaoNf) : "-"}
-                  </TableCell>
-                  <TableCell>{movimentacao.destinatarioNome ?? "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_BADGE[movimentacao.statusResultante]}>
-                      {STATUS_LABELS[movimentacao.statusResultante]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {anexos.length === 0 ? (
-                      "-"
-                    ) : (
-                      <Stack gap={4}>
-                        {anexos.map((anexo) => (
-                          <a
-                            key={anexo.id}
-                            href={`/api/estoque-equipamentos-usados/anexos/${anexo.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.linkAnexo}
-                          >
-                            <Paperclip size={13} />
-                            {anexo.nomeArquivo}
-                          </a>
-                        ))}
-                      </Stack>
-                    )}
-                  </TableCell>
-                  <TableCell>{movimentacao.criadoPorNome}</TableCell>
-                  <TableCell>{formatarData(movimentacao.dataAcao)}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Card>
-
-      <ErpExtratoCard
+      <ExtratoEquipamentoCard
         equipamentoId={equipamento.id}
         status={equipamento.status}
         identificadoNoErp={Boolean(equipamento.erpCodigoItem && equipamento.erpIdItem)}
+        movimentacoes={equipamento.movimentacoes}
+        anexosPorMovimentacao={anexosPorMovimentacao}
+        onExportar={(situacaoErp) => exportarPdfEstratoEquipamento(equipamento, anexosPorMovimentacao, historicoDados, situacaoErp)}
       />
 
       <Modal

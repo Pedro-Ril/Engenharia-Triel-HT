@@ -68,6 +68,8 @@ export interface MovimentacaoEquipamento {
   origem: "portal" | "erp";
   /* Já casada com uma movimentação do extrato do ERP (mesma NF). */
   confirmadaErp: boolean;
+  /* Id da movimentação do ERP que confirma esta (liga as duas no extrato unificado). */
+  erpIdMovimentacao: string | null;
 }
 
 export interface EquipamentoComEstrato extends Equipamento {
@@ -191,6 +193,7 @@ function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
     criadoEm: row.criado_em,
     origem: row.origem,
     confirmadaErp: Boolean(row.erp_id_movimentacao),
+    erpIdMovimentacao: row.erp_id_movimentacao,
   };
 }
 

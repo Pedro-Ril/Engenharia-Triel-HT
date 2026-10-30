@@ -873,6 +873,8 @@ export async function salvarConfigErpEstoqueUsados(dados: {
   urlExtrato: string | null;
   urlExtratoTeste: string | null;
   intervaloExtratoMinutos: number;
+  pastaPdfNfSaida: string | null;
+  codEmpPdfNfSaida: number | null;
 }): Promise<ApiEnvelope<ConfigErpEstoqueUsados>> {
   const response = await fetch("/api/admin/estoque-equipamentos-usados/config", {
     method: "PATCH",

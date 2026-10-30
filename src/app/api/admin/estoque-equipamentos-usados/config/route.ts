@@ -60,6 +60,8 @@ interface ConfigBody {
   urlExtrato?: unknown;
   urlExtratoTeste?: unknown;
   intervaloExtratoMinutos?: unknown;
+  pastaPdfNfSaida?: unknown;
+  codEmpPdfNfSaida?: unknown;
 }
 
 async function handlePATCH(request: Request) {
@@ -138,6 +140,12 @@ async function handlePATCH(request: Request) {
       throw new ValidationError("O intervalo do extrato deve ficar entre 15 e 1440 minutos.");
     }
 
+    const pastaPdfNfSaida = optionalText(body.pastaPdfNfSaida, "pasta dos PDFs das NFs de saída", 400);
+    if (pastaPdfNfSaida && !/^(\\\\[^\\]+\\[^\\]+|[A-Za-z]:\\)/.test(pastaPdfNfSaida)) {
+      throw new ValidationError("A pasta dos PDFs deve ser um caminho de rede (\\\\servidor\\pasta) ou de disco (C:\\...).");
+    }
+    const codEmpPdfNfSaida = optionalInteger(body.codEmpPdfNfSaida, "empresa da pasta de PDFs", 0) || null;
+
     const campoMascaraChave = optionalText(body.campoMascaraChave, "campo mapeado como mascara", 50);
     if (campoMascaraChave && !OPCOES_CAMPO_MASCARA_NF.some((opcao) => opcao.chave === campoMascaraChave)) {
       throw new ValidationError("Campo mapeado como mascara inválido.");
@@ -163,6 +171,8 @@ async function handlePATCH(request: Request) {
       urlExtrato,
       urlExtratoTeste,
       intervaloExtratoMinutos,
+      pastaPdfNfSaida,
+      codEmpPdfNfSaida,
       atualizadoPor: acesso.usuario.samAccountName,
     });
 

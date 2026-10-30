@@ -328,6 +328,8 @@ export interface ConfigErpEstoqueUsados {
   urlExtratoTeste: string | null;
   intervaloExtratoMinutos: number;
   ultimaExecucaoExtratoEm: string | null;
+  pastaPdfNfSaida: string | null;
+  codEmpPdfNfSaida: number | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }
@@ -343,6 +345,7 @@ export interface ResultadoSincronizacaoExtrato {
   movimentacoesCriadas: number;
   movimentacoesVinculadas: number;
   movimentacoesRemovidas: number;
+  pdfsAnexados: number;
   erro: string | null;
 }
 

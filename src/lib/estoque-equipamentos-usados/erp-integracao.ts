@@ -24,6 +24,9 @@ export interface ConfigErpEstoqueUsados {
   urlExtratoTeste: string | null;
   intervaloExtratoMinutos: number;
   ultimaExecucaoExtratoEm: string | null;
+  /* Pasta de rede com os PDFs das NFs de saída e a empresa do ERP a que ela se refere. */
+  pastaPdfNfSaida: string | null;
+  codEmpPdfNfSaida: number | null;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }
@@ -49,6 +52,8 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
     url_extrato_teste: string | null;
     intervalo_extrato_minutos: number | null;
     ultima_execucao_extrato_em: string | null;
+    pasta_pdf_nf_saida: string | null;
+    cod_emp_pdf_nf_saida: number | null;
     atualizado_em: string | null;
     atualizado_por: string | null;
   }>(`
@@ -70,6 +75,8 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
       [url_extrato_teste],
       [intervalo_extrato_minutos],
       CONVERT(VARCHAR(33), [ultima_execucao_extrato_em], 126) AS [ultima_execucao_extrato_em],
+      [pasta_pdf_nf_saida],
+      [cod_emp_pdf_nf_saida],
       CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em],
       [atualizado_por]
     FROM dbo.com_estoque_equipamentos_usados_config
@@ -96,6 +103,8 @@ export async function buscarConfigErpEstoqueUsados(): Promise<ConfigErpEstoqueUs
     urlExtratoTeste: row?.url_extrato_teste ?? null,
     intervaloExtratoMinutos: row?.intervalo_extrato_minutos || 60,
     ultimaExecucaoExtratoEm: row?.ultima_execucao_extrato_em ?? null,
+    pastaPdfNfSaida: row?.pasta_pdf_nf_saida ?? null,
+    codEmpPdfNfSaida: row?.cod_emp_pdf_nf_saida ?? null,
     atualizadoEm: row?.atualizado_em ?? null,
     atualizadoPor: row?.atualizado_por ?? null,
   };
@@ -117,6 +126,8 @@ export async function salvarConfigErpEstoqueUsados(params: {
   urlExtrato: string | null;
   urlExtratoTeste: string | null;
   intervaloExtratoMinutos: number;
+  pastaPdfNfSaida: string | null;
+  codEmpPdfNfSaida: number | null;
   atualizadoPor: string;
 }): Promise<ConfigErpEstoqueUsados> {
   const pool = await getSqlServerPool();
@@ -137,6 +148,8 @@ export async function salvarConfigErpEstoqueUsados(params: {
   request.input("urlExtrato", sql.NVarChar(300), params.urlExtrato);
   request.input("urlExtratoTeste", sql.NVarChar(300), params.urlExtratoTeste);
   request.input("intervaloExtratoMinutos", sql.Int, params.intervaloExtratoMinutos);
+  request.input("pastaPdfNfSaida", sql.NVarChar(400), params.pastaPdfNfSaida);
+  request.input("codEmpPdfNfSaida", sql.Int, params.codEmpPdfNfSaida);
   request.input("atualizadoPor", sql.NVarChar(150), params.atualizadoPor);
 
   await request.query(`
@@ -160,11 +173,13 @@ export async function salvarConfigErpEstoqueUsados(params: {
         [url_extrato] = @urlExtrato,
         [url_extrato_teste] = @urlExtratoTeste,
         [intervalo_extrato_minutos] = @intervaloExtratoMinutos,
+        [pasta_pdf_nf_saida] = @pastaPdfNfSaida,
+        [cod_emp_pdf_nf_saida] = @codEmpPdfNfSaida,
         [atualizado_em] = SYSDATETIME(),
         [atualizado_por] = @atualizadoPor
     WHEN NOT MATCHED THEN
-      INSERT ([id], [url_validar_item], [url_validar_item_teste], [url_clientes], [url_clientes_teste], [usar_ambiente_teste], [chave_api], [url_nf_entrada], [url_nf_entrada_teste], [url_nf_saida], [url_nf_saida_teste], [intervalo_verificacao_nf_minutos], [campo_mascara_chave], [url_extrato], [url_extrato_teste], [intervalo_extrato_minutos], [atualizado_em], [atualizado_por])
-      VALUES (1, @urlValidarItem, @urlValidarItemTeste, @urlClientes, @urlClientesTeste, @usarAmbienteTeste, @chaveApi, @urlNfEntrada, @urlNfEntradaTeste, @urlNfSaida, @urlNfSaidaTeste, @intervaloVerificacaoNfMinutos, @campoMascaraChave, @urlExtrato, @urlExtratoTeste, @intervaloExtratoMinutos, SYSDATETIME(), @atualizadoPor);
+      INSERT ([id], [url_validar_item], [url_validar_item_teste], [url_clientes], [url_clientes_teste], [usar_ambiente_teste], [chave_api], [url_nf_entrada], [url_nf_entrada_teste], [url_nf_saida], [url_nf_saida_teste], [intervalo_verificacao_nf_minutos], [campo_mascara_chave], [url_extrato], [url_extrato_teste], [intervalo_extrato_minutos], [pasta_pdf_nf_saida], [cod_emp_pdf_nf_saida], [atualizado_em], [atualizado_por])
+      VALUES (1, @urlValidarItem, @urlValidarItemTeste, @urlClientes, @urlClientesTeste, @usarAmbienteTeste, @chaveApi, @urlNfEntrada, @urlNfEntradaTeste, @urlNfSaida, @urlNfSaidaTeste, @intervaloVerificacaoNfMinutos, @campoMascaraChave, @urlExtrato, @urlExtratoTeste, @intervaloExtratoMinutos, @pastaPdfNfSaida, @codEmpPdfNfSaida, SYSDATETIME(), @atualizadoPor);
   `);
 
   return buscarConfigErpEstoqueUsados();

@@ -68,6 +68,8 @@ export interface MovimentacaoEquipamento {
   origem: "portal" | "erp";
   /* Já casada com uma movimentação do extrato do ERP (mesma NF). */
   confirmadaErp: boolean;
+  /* Id da movimentação do ERP que confirma esta (liga as duas no extrato unificado). */
+  erpIdMovimentacao: string | null;
 }
 
 export interface AnexoMovimentacao {
@@ -108,6 +110,7 @@ export interface MovimentoErpGravado {
   sentido: string;
   nfNumero: string | null;
   nfSerie: string | null;
+  nfDataEmissao: string | null;
   cfop: number | null;
   naturezaOperacao: string | null;
   contraparteNome: string | null;
@@ -140,6 +143,7 @@ export interface ResultadoSincronizacaoErp {
   movimentacoesCriadas: number;
   movimentacoesVinculadas: number;
   movimentacoesRemovidas: number;
+  pdfsAnexados: number;
   erro: string | null;
 }
 
