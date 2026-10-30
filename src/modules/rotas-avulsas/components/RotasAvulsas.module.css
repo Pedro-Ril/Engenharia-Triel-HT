@@ -1,0 +1,173 @@
+.cabecalhoRota {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cabecalhoRota h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cabecalhoRota p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  max-width: 70ch;
+}
+
+.endpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.endpoint {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.metodo {
+  display: inline-block;
+  min-width: 44px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.tabela {
+  overflow-x: auto;
+}
+
+.linhaClicavel {
+  cursor: pointer;
+}
+
+.linhaClicavel:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.semQuebra {
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.suave {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.acoes {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tokenRevelado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+.tokenRevelado code {
+  flex: 1;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.codigo {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface-muted);
+  color: var(--text);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.secao h3 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.secao p,
+.secao li {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.secao ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.secao code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.listaDefinicao {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.listaDefinicao dt {
+  color: var(--text-muted);
+}
+
+.listaDefinicao dd {
+  margin: 0;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.certificado {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.certificado > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.grupoImpressoras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}

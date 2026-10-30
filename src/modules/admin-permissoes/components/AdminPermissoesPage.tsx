@@ -15,6 +15,8 @@ import {
   Layers,
   Megaphone,
   PenTool,
+  Plug,
+  Printer,
   Send,
   Settings,
   TrafficCone,
@@ -85,6 +87,8 @@ import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
 import { TvCorporativaPainel } from "@/modules/tv-corporativa/components/TvCorporativaPainel";
+import { RotaAvulsaPainel } from "@/modules/rotas-avulsas/components/RotaAvulsaPainel";
+import { ROTAS_AVULSAS } from "@/lib/rotas-avulsas/catalogo";
 import { AssinaturasPainel } from "./AssinaturasPainel";
 
 const toastInicial: ToastState = {
@@ -93,6 +97,8 @@ const toastInicial: ToastState = {
   title: "",
   description: "",
 };
+
+const PREFIXO_ROTA_AVULSA = "rota-avulsa:";
 
 const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
   {
@@ -187,6 +193,15 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         icon: <TrendingUp size={16} />,
       },
     ],
+  },
+  /* Endpoints chamados por outros sistemas sem login (catálogo em src/lib/rotas-avulsas/catalogo.ts): um item por rota. */
+  {
+    titulo: "Rotas avulsas",
+    itens: ROTAS_AVULSAS.map((rota) => ({
+      valor: `${PREFIXO_ROTA_AVULSA}${rota.chave}`,
+      label: rota.nome,
+      icon: rota.chave === "impressao-pdf" ? <Printer size={16} /> : <Plug size={16} />,
+    })),
   },
 ];
 
@@ -491,6 +506,14 @@ export function AdminPermissoesPage() {
 
           {secao === "chamados" && (
             <AtendentesChamadosPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao.startsWith(PREFIXO_ROTA_AVULSA) && (
+            <RotaAvulsaPainel
+              key={secao}
+              chave={secao.slice(PREFIXO_ROTA_AVULSA.length)}
+              onFeedback={mostrarFeedback}
+            />
           )}
 
           {secao === "monitoramento" && (
