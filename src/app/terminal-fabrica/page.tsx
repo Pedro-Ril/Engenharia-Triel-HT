@@ -5,10 +5,6 @@ import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { podeImprimirDesenho } from "@/lib/terminal-fabrica/impressao";
 import TerminalFabrica from "./TerminalFabrica";
 
-export const metadata = {
-  title: "Terminal de Fábrica — Portal Grupo Triel-HT",
-};
-
 /*
  * Rota pública (ver src/lib/auth/rotas-publicas.ts) — não passa
  * por requireModuloAccess, então precisa registrar o acesso

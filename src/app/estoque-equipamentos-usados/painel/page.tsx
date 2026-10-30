@@ -4,10 +4,6 @@ import { registrarAcessoModuloSemFalhar } from "@/lib/auth/acesso-modulo";
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { PainelBiEstoquePage } from "@/modules/estoque-equipamentos-usados/components/PainelBiEstoquePage";
 
-export const metadata = {
-  title: "Painel de BI — Estoque de Equipamentos Usados",
-};
-
 /*
  * Rota pública (ver src/lib/auth/rotas-publicas.ts) — feita pra rodar
  * numa TV sem ninguém logado (aberta direto em modo kiosk, ou como

@@ -2,10 +2,6 @@ import { requireModuloAccess } from "@/lib/auth/autorizacao";
 import { resolverEmpresaDoUsuario } from "@/lib/empresas/empresas";
 import { ConferenciaDerivadosPage } from "@/modules/conferencia-derivados/components/ConferenciaDerivadosPage";
 
-export const metadata = {
-  title: "Conferência de Arquivos Derivados — Portal Grupo Triel-HT",
-};
-
 /*
  * requireModuloAccess já registra o acesso ao módulo (ver
  * src/lib/auth/autorizacao.ts), então não se chama
