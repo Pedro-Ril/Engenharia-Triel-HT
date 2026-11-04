@@ -170,6 +170,8 @@ export const DIAS_ESPERA_CONFIRMACAO_ERP = 15;
 export interface MovimentacaoManualPendente {
   tipoAcao: AcaoPortal;
   dataAcao: string;
+  /* Ajuste manual do administrador (ERP errado): não tem prazo. */
+  ajusteManual?: boolean;
 }
 
 /*
@@ -177,7 +179,8 @@ export interface MovimentacaoManualPendente {
  * exceção: quem registrou à mão uma saída/retorno DEPOIS do último
  * movimento do ERP e ainda dentro do prazo está esperando a NF sair --
  * aí o Portal não desfaz o que a pessoa fez. Passado o prazo sem a NF
- * aparecer, o ERP vence.
+ * aparecer, o ERP vence. O ajuste manual do administrador não tem prazo:
+ * vale até o ERP ter um movimento mais novo que ele.
  */
 export function decidirStatus(params: {
   statusPortal: StatusPortal;
@@ -192,6 +195,13 @@ export function decidirStatus(params: {
   if (statusErp === statusPortal) return { mudar: false, novoStatus: statusPortal, motivo: "Já está igual ao ERP." };
 
   if (manualPendente && (!dataMovimentoErp || manualPendente.dataAcao >= dataMovimentoErp)) {
+    if (manualPendente.ajusteManual) {
+      return {
+        mudar: false,
+        novoStatus: statusPortal,
+        motivo: `Ajuste manual do administrador em ${manualPendente.dataAcao}.`,
+      };
+    }
     const dias = (Date.parse(`${hoje}T00:00:00Z`) - Date.parse(`${manualPendente.dataAcao}T00:00:00Z`)) / 86_400_000;
     if (dias <= DIAS_ESPERA_CONFIRMACAO_ERP) {
       return {

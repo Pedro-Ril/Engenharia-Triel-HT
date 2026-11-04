@@ -4,11 +4,13 @@ import type {
   CampoPendenciaConfig,
   CampoTipoEquipamento,
   ClienteEstoqueItem,
+  DirecaoOrdenacao,
   EmpresaOpcao,
   Equipamento,
   EquipamentoComEstrato,
   HistoricoAlteracaoDadosTecnicos,
   MotivoBaixa,
+  OrdenacaoEquipamentos,
   PainelBiEstoque,
   PainelGerencialCompleto,
   ResultadoSincronizacaoErp,
@@ -49,6 +51,8 @@ export async function listarEquipamentos(filtros: {
   pendenciaChave?: string;
   pagina: number;
   porPagina: number;
+  ordenarPor?: OrdenacaoEquipamentos;
+  direcao?: DirecaoOrdenacao;
 }): Promise<{ itens: Equipamento[]; total: number } | null> {
   const params = new URLSearchParams();
   if (filtros.status) params.set("status", filtros.status);
@@ -57,6 +61,8 @@ export async function listarEquipamentos(filtros: {
   if (filtros.pendenciaChave) params.set("pendencia", filtros.pendenciaChave);
   params.set("pagina", String(filtros.pagina));
   params.set("porPagina", String(filtros.porPagina));
+  if (filtros.ordenarPor) params.set("ordenarPor", filtros.ordenarPor);
+  if (filtros.direcao) params.set("direcao", filtros.direcao);
 
   const response = await fetch(`/api/estoque-equipamentos-usados?${params.toString()}`);
   const body = await parseResponse<{ itens: Equipamento[]; total: number }>(response);
@@ -522,6 +528,38 @@ export async function buscarPainelGerencial(): Promise<ApiEnvelope<PainelGerenci
 }
 
 /* Troca o número do equipamento (admin). Volta o id do registro novo. */
+export async function corrigirNumeroSerieEquipamento(
+  id: string,
+  dados: { numeroSerie: string; motivo: string }
+): Promise<ApiEnvelope<{ numeroSerieAnterior: string | null; numeroSerie: string }>> {
+  try {
+    const response = await fetch(`/api/estoque-equipamentos-usados/${id}/numero-serie`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+    });
+    return await parseResponse<{ numeroSerieAnterior: string | null; numeroSerie: string }>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
+}
+
+export async function ajustarStatusEquipamento(
+  id: string,
+  dados: { status: StatusEquipamento; motivoBaixa: MotivoBaixa | null; comQuem: string | null; motivo: string }
+): Promise<ApiEnvelope<{ statusAnterior: StatusEquipamento; novoStatus: StatusEquipamento }>> {
+  try {
+    const response = await fetch(`/api/estoque-equipamentos-usados/${id}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+    });
+    return await parseResponse<{ statusAnterior: StatusEquipamento; novoStatus: StatusEquipamento }>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
+}
+
 export async function trocarNumeroEquipamento(
   id: string,
   dados: { novoNumero: number; trocarNumeroSerie: boolean; desfazerIntegracao: boolean; motivo: string }

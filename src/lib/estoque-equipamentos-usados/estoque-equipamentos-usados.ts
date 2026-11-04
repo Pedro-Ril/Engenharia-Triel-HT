@@ -13,6 +13,8 @@ import {
 import { buscarEmpresaPorCodigo } from "@/lib/empresas/empresas";
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "em_reforma" | "baixado";
+export type OrdenacaoEquipamentos = "numero" | "descricao" | "cliente" | "marcaModelo" | "status" | "criadoEm";
+export type DirecaoOrdenacao = "asc" | "desc";
 export type TipoAcaoMovimentacao =
   | "entrada"
   | "emprestimo"
@@ -70,6 +72,8 @@ export interface MovimentacaoEquipamento {
   confirmadaErp: boolean;
   /* Id da movimentação do ERP que confirma esta (liga as duas no extrato unificado). */
   erpIdMovimentacao: string | null;
+  /* Ajuste manual de status pelo administrador (ERP errado). */
+  ajusteManual: boolean;
 }
 
 export interface EquipamentoComEstrato extends Equipamento {
@@ -174,6 +178,7 @@ interface MovimentacaoRow {
   criado_em: string;
   origem: "portal" | "erp";
   erp_id_movimentacao: string | null;
+  ajuste_manual: boolean;
 }
 
 function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
@@ -193,6 +198,7 @@ function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
     criadoEm: row.criado_em,
     origem: row.origem,
     confirmadaErp: Boolean(row.erp_id_movimentacao),
+    ajusteManual: Boolean(row.ajuste_manual),
     erpIdMovimentacao: row.erp_id_movimentacao,
   };
 }
@@ -324,7 +330,8 @@ export async function buscarEquipamentoPorId(id: string): Promise<EquipamentoCom
           [criado_por_nome],
           CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
           [origem],
-          [erp_id_movimentacao]
+          [erp_id_movimentacao],
+          [ajuste_manual]
         FROM dbo.com_estoque_equipamentos_usados_movimentacoes
         WHERE [equipamento_id] = @id
         ORDER BY [data_acao] ASC, [criado_em] ASC;
@@ -615,6 +622,32 @@ export async function duplicarEquipamento(
   return duplicado;
 }
 
+/*
+ * ORDER BY de cada coluna ordenável da lista. Texto vazio vai sempre para
+ * o fim (nos dois sentidos); status segue a ordem do ciclo do equipamento,
+ * não a alfabética. Desempate pelo número, para a paginação não repetir
+ * nem pular linha entre páginas.
+ */
+function ordemSql(ordenarPor: OrdenacaoEquipamentos | undefined, direcao: DirecaoOrdenacao | undefined): string {
+  const dir = direcao === "asc" ? "ASC" : "DESC";
+  const texto = (coluna: string) => `CASE WHEN NULLIF(LTRIM([${coluna}]), '') IS NULL THEN 1 ELSE 0 END, [${coluna}] ${dir}`;
+  switch (ordenarPor) {
+    case "criadoEm":
+      return `[criado_em] ${dir}, [numero] ${dir}`;
+    case "descricao":
+      return `${texto("descricao")}, [numero] DESC`;
+    case "cliente":
+      return `${texto("nome_cliente")}, [numero] DESC`;
+    case "marcaModelo":
+      return `${texto("marca")}, ${texto("modelo")}, [numero] DESC`;
+    case "status":
+      return `CASE [status] WHEN 'em_estoque' THEN 1 WHEN 'emprestado' THEN 2 WHEN 'consignado' THEN 3 WHEN 'em_reforma' THEN 4 ELSE 5 END ${dir}, [numero] DESC`;
+    default:
+      /* Padrão (e "numero"): número do maior para o menor. */
+      return `[numero] ${dir}`;
+  }
+}
+
 export interface FiltrosEquipamentos {
   status?: StatusEquipamento;
   busca?: string;
@@ -622,6 +655,8 @@ export interface FiltrosEquipamentos {
   pendenciaChave?: string;
   pagina: number;
   porPagina: number;
+  ordenarPor?: OrdenacaoEquipamentos;
+  direcao?: DirecaoOrdenacao;
 }
 
 export async function listarEquipamentos(
@@ -689,7 +724,7 @@ export async function listarEquipamentos(
       SELECT ${colunasEquipamento}
       FROM dbo.com_estoque_equipamentos_usados
       ${whereClause}
-      ORDER BY [criado_em] DESC
+      ORDER BY ${ordemSql(filtros.ordenarPor, filtros.direcao)}
       OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY;
     `),
     requestTotal.query<{ total: number }>(

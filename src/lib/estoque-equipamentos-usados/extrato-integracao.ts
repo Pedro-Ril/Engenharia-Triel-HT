@@ -251,6 +251,7 @@ interface MovimentacaoPortal {
   origem: string;
   erpIdMovimentacao: string | null;
   dataAcao: string;
+  ajusteManual: boolean;
 }
 
 async function listarMovimentacoesPortal(transacao: sql.Transaction, equipamentoId: string): Promise<MovimentacaoPortal[]> {
@@ -261,9 +262,10 @@ async function listarMovimentacoesPortal(transacao: sql.Transaction, equipamento
     origem: string;
     erp_id_movimentacao: string | null;
     data_acao: string;
+    ajuste_manual: boolean;
   }>(`
     SELECT CONVERT(VARCHAR(36), [id]) AS [id], [tipo_acao], [numero_nf], [origem], [erp_id_movimentacao],
-           CONVERT(VARCHAR(10), [data_acao], 23) AS [data_acao]
+           CONVERT(VARCHAR(10), [data_acao], 23) AS [data_acao], [ajuste_manual]
     FROM dbo.com_estoque_equipamentos_usados_movimentacoes
     WHERE [equipamento_id] = @equip
     ORDER BY [data_acao], [criado_em];
@@ -275,6 +277,7 @@ async function listarMovimentacoesPortal(transacao: sql.Transaction, equipamento
     origem: r.origem,
     erpIdMovimentacao: r.erp_id_movimentacao,
     dataAcao: r.data_acao,
+    ajusteManual: Boolean(r.ajuste_manual),
   }));
 }
 
@@ -339,6 +342,7 @@ async function aplicarExtrato(
       (p) =>
         p.origem === "portal" &&
         !p.erpIdMovimentacao &&
+        !p.ajusteManual &&
         (p.tipoAcao === regra.acao || (regra.acao === "entrada" && p.tipoAcao === "nf_vinculada")) &&
         nf !== null &&
         normalizarNumeroNf(p.numeroNf) === nf
@@ -393,7 +397,9 @@ async function aplicarExtrato(
     statusPortal: candidato.status,
     statusErp,
     dataMovimentoErp: movimento?.data ?? null,
-    manualPendente: pendente ? { tipoAcao: pendente.tipoAcao as AcaoPortal, dataAcao: pendente.dataAcao } : null,
+    manualPendente: pendente
+      ? { tipoAcao: pendente.tipoAcao as AcaoPortal, dataAcao: pendente.dataAcao, ajusteManual: pendente.ajusteManual }
+      : null,
     hoje,
   });
 

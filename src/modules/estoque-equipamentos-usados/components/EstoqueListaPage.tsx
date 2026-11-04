@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, Hash, Home, MonitorPlay, Plus, Trash2, Warehouse } from "lucide-react";
+import { Copy, Eye, Hash, Home, MonitorPlay, Plus, RefreshCcw, ScanBarcode, Trash2, Warehouse } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -35,6 +35,8 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
+import { AjustarStatusModal, CorrigirNumeroSerieModal } from "./AjustesAdminModais";
+import { CabecalhoOrdenavel } from "./CabecalhoOrdenavel";
 import {
   buscarSequenciaEquipamentos,
   duplicarEquipamento,
@@ -43,7 +45,13 @@ import {
   listarCamposComPendencia,
   listarEquipamentos,
 } from "../services/estoque.service";
-import type { CampoPendenciaConfig, Equipamento, StatusEquipamento } from "../types/estoque.types";
+import type {
+  CampoPendenciaConfig,
+  DirecaoOrdenacao,
+  Equipamento,
+  OrdenacaoEquipamentos,
+  StatusEquipamento,
+} from "../types/estoque.types";
 import {
   campoSistemaEstaVazio,
   CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
@@ -103,6 +111,11 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
   const [status, setStatus] = useState("");
   const [pendenciaChave, setPendenciaChave] = useState("");
   const [pagina, setPagina] = useState(1);
+  /* Padrão: número do maior para o menor. */
+  const [ordenacao, setOrdenacao] = useState<{ coluna: OrdenacaoEquipamentos; direcao: DirecaoOrdenacao }>({
+    coluna: "numero",
+    direcao: "desc",
+  });
 
   const [itens, setItens] = useState<Equipamento[]>([]);
   const [total, setTotal] = useState(0);
@@ -119,6 +132,9 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
   const [novoNumeroDuplicar, setNovoNumeroDuplicar] = useState("");
   const [duplicando, setDuplicando] = useState(false);
   const [erroDuplicacao, setErroDuplicacao] = useState<string | null>(null);
+
+  const [equipamentoCorrigindoSerie, setEquipamentoCorrigindoSerie] = useState<Equipamento | null>(null);
+  const [equipamentoAjustandoStatus, setEquipamentoAjustandoStatus] = useState<Equipamento | null>(null);
 
   const [equipamentoTrocandoNumero, setEquipamentoTrocandoNumero] = useState<Equipamento | null>(null);
   const [novoNumeroTroca, setNovoNumeroTroca] = useState("");
@@ -178,6 +194,8 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       pendenciaChave: pendenciaChave || undefined,
       pagina,
       porPagina: POR_PAGINA,
+      ordenarPor: ordenacao.coluna,
+      direcao: ordenacao.direcao,
     }).then((resultado) => {
       if (resultado) {
         setItens(resultado.itens);
@@ -209,6 +227,8 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       pendenciaChave: pendenciaChave || undefined,
       pagina,
       porPagina: POR_PAGINA,
+      ordenarPor: ordenacao.coluna,
+      direcao: ordenacao.direcao,
     }).then((resultado) => {
       if (cancelado) return;
 
@@ -223,7 +243,17 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
     return () => {
       cancelado = true;
     };
-  }, [status, busca, pendenciaChave, pagina]);
+  }, [status, busca, pendenciaChave, pagina, ordenacao]);
+
+  /* Clicar na coluna já ativa inverte; outra coluna começa crescente (datas e número, do mais novo). */
+  function ordenarPor(coluna: OrdenacaoEquipamentos) {
+    setOrdenacao((atual) =>
+      atual.coluna === coluna
+        ? { coluna, direcao: atual.direcao === "asc" ? "desc" : "asc" }
+        : { coluna, direcao: coluna === "criadoEm" || coluna === "numero" ? "desc" : "asc" }
+    );
+    setPagina(1);
+  }
 
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
@@ -443,13 +473,13 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
               <Table minWidth={1080}>
                 <TableHead>
                   <TableRow>
-                    <TableHeaderCell>Nº</TableHeaderCell>
-                    <TableHeaderCell>Descrição</TableHeaderCell>
-                    <TableHeaderCell>Cliente</TableHeaderCell>
-                    <TableHeaderCell>Marca/Modelo</TableHeaderCell>
-                    <TableHeaderCell align="center">Status</TableHeaderCell>
+                    <CabecalhoOrdenavel coluna="numero" rotulo="Nº" ordenacao={ordenacao} onOrdenar={ordenarPor} />
+                    <CabecalhoOrdenavel coluna="descricao" rotulo="Descrição" ordenacao={ordenacao} onOrdenar={ordenarPor} />
+                    <CabecalhoOrdenavel coluna="cliente" rotulo="Cliente" ordenacao={ordenacao} onOrdenar={ordenarPor} />
+                    <CabecalhoOrdenavel coluna="marcaModelo" rotulo="Marca/Modelo" ordenacao={ordenacao} onOrdenar={ordenarPor} />
+                    <CabecalhoOrdenavel coluna="status" rotulo="Status" align="center" ordenacao={ordenacao} onOrdenar={ordenarPor} />
                     <TableHeaderCell>Pendências</TableHeaderCell>
-                    <TableHeaderCell>Cadastrado em</TableHeaderCell>
+                    <CabecalhoOrdenavel coluna="criadoEm" rotulo="Cadastrado em" ordenacao={ordenacao} onOrdenar={ordenarPor} />
                     <TableHeaderCell align="center"> </TableHeaderCell>
                   </TableRow>
                 </TableHead>
@@ -516,6 +546,18 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
                                       label: "Trocar número",
                                       icon: <Hash size={15} />,
                                       onSelect: () => abrirTrocaNumero(equipamento),
+                                    },
+                                    {
+                                      value: "corrigir-serie",
+                                      label: "Corrigir número de série",
+                                      icon: <ScanBarcode size={15} />,
+                                      onSelect: () => setEquipamentoCorrigindoSerie(equipamento),
+                                    },
+                                    {
+                                      value: "ajustar-status",
+                                      label: "Ajustar status",
+                                      icon: <RefreshCcw size={15} />,
+                                      onSelect: () => setEquipamentoAjustandoStatus(equipamento),
                                     },
                                     {
                                       value: "excluir",
@@ -670,6 +712,30 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
           </Stack>
         )}
       </Modal>
+
+      {equipamentoCorrigindoSerie && (
+        <CorrigirNumeroSerieModal
+          key={equipamentoCorrigindoSerie.id}
+          equipamento={equipamentoCorrigindoSerie}
+          onFechar={() => setEquipamentoCorrigindoSerie(null)}
+          onConcluido={() => {
+            setEquipamentoCorrigindoSerie(null);
+            carregarLista();
+          }}
+        />
+      )}
+
+      {equipamentoAjustandoStatus && (
+        <AjustarStatusModal
+          key={equipamentoAjustandoStatus.id}
+          equipamento={equipamentoAjustandoStatus}
+          onFechar={() => setEquipamentoAjustandoStatus(null)}
+          onConcluido={() => {
+            setEquipamentoAjustandoStatus(null);
+            carregarLista();
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmandoTroca}

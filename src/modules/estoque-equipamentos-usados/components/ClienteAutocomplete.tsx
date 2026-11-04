@@ -6,16 +6,17 @@ import { buscarClientesEstoque } from "../services/estoque.service";
 import type { ClienteEstoqueItem } from "../types/estoque.types";
 import styles from "./ClienteAutocomplete.module.css";
 
-/* Últimos 6 dígitos do CNPJ/CPF, para diferenciar clientes de mesmo nome (ex.: filiais). */
-function finalCnpj(item: ClienteEstoqueItem): string | null {
-  const digitos = (item.cnpj ?? "").replace(/\D/g, "");
-  /* Com o hífen do CNPJ antes dos 2 dígitos verificadores: "000128" vira "0001-28". */
-  return digitos.length >= 6 ? `${digitos.slice(-6, -2)}-${digitos.slice(-2)}` : null;
+/* CNPJ/CPF completo e formatado, para diferenciar clientes de mesmo nome (ex.: filiais). O ERP manda só dígitos. */
+function documentoFormatado(item: ClienteEstoqueItem): string | null {
+  const d = (item.cnpj ?? "").replace(/\D/g, "");
+  if (d.length === 14) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+  if (d.length === 11) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  return d || null;
 }
 
 function rotulo(item: ClienteEstoqueItem): string {
-  const final = finalCnpj(item);
-  return `${item.cod_cli} | ${item.descricao}${final ? ` (${final})` : ""}`;
+  const documento = documentoFormatado(item);
+  return `${item.cod_cli} | ${item.descricao}${documento ? ` (${documento})` : ""}`;
 }
 
 interface ClienteAutocompleteProps {

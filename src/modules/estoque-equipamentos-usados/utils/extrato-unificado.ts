@@ -12,12 +12,13 @@ export const LOCAL_LABEL: Record<string, { texto: string; variant: "success" | "
   SEM_MOVIMENTO: { texto: "Sem movimento", variant: "warning" },
 };
 
-export type Origem = "portal" | "erp" | "ambos";
+export type Origem = "portal" | "erp" | "ambos" | "ajuste";
 
-export const ORIGEM: Record<Origem, { texto: string; variant: "neutral" | "info" | "success" }> = {
+export const ORIGEM: Record<Origem, { texto: string; variant: "neutral" | "info" | "success" | "warning" }> = {
   portal: { texto: "Portal", variant: "neutral" },
   erp: { texto: "ERP", variant: "info" },
   ambos: { texto: "Portal + ERP", variant: "success" },
+  ajuste: { texto: "Ajuste manual", variant: "warning" },
 };
 
 /* Uma linha do extrato: movimentação do Portal, do ERP, ou as duas casadas pela NF. */
@@ -71,9 +72,9 @@ export function montarLinhas(
       chave: mov.id,
       data: erp?.data ?? mov.dataAcao,
       ordem: i,
-      acao: ACAO_LABELS[mov.tipoAcao],
+      acao: mov.ajusteManual ? "Ajuste de status" : ACAO_LABELS[mov.tipoAcao],
       detalheErp: erp && erp.tipoLabel !== ACAO_LABELS[mov.tipoAcao] ? erp.tipoLabel : null,
-      origem: mov.origem === "erp" ? "erp" : erp ? "ambos" : "portal",
+      origem: mov.ajusteManual ? "ajuste" : mov.origem === "erp" ? "erp" : erp ? "ambos" : "portal",
       nf: erp ? nfDoErp(erp) : mov.numeroNf,
       cfop: erp?.cfop ?? null,
       naturezaOperacao: erp?.naturezaOperacao ?? null,

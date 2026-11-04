@@ -13,6 +13,10 @@ export interface ClienteEstoqueItem {
 }
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "em_reforma" | "baixado";
+
+/* Colunas da lista que ordenam ao clicar no título (a ordenação é no servidor, por causa da paginação). */
+export type OrdenacaoEquipamentos = "numero" | "descricao" | "cliente" | "marcaModelo" | "status" | "criadoEm";
+export type DirecaoOrdenacao = "asc" | "desc";
 export type TipoAcaoMovimentacao =
   | "entrada"
   | "emprestimo"
@@ -70,6 +74,8 @@ export interface MovimentacaoEquipamento {
   confirmadaErp: boolean;
   /* Id da movimentação do ERP que confirma esta (liga as duas no extrato unificado). */
   erpIdMovimentacao: string | null;
+  /* Ajuste manual de status pelo administrador (ERP errado) -- vale até o ERP ter movimento mais novo. */
+  ajusteManual: boolean;
 }
 
 export interface AnexoMovimentacao {

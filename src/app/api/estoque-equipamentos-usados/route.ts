@@ -6,6 +6,8 @@ import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   criarEquipamento,
   listarEquipamentos,
+  type DirecaoOrdenacao,
+  type OrdenacaoEquipamentos,
   type StatusEquipamento,
 } from "@/lib/estoque-equipamentos-usados/estoque-equipamentos-usados";
 import { validarEquipamentoNoErp } from "@/lib/estoque-equipamentos-usados/erp-integracao";
@@ -32,6 +34,7 @@ export const dynamic = "force-dynamic";
 
 const MODULO_CHAVE = "estoque-equipamentos-usados";
 const STATUS_VALIDOS: StatusEquipamento[] = ["em_estoque", "emprestado", "consignado", "em_reforma", "baixado"];
+const ORDENACOES_VALIDAS: OrdenacaoEquipamentos[] = ["numero", "descricao", "cliente", "marcaModelo", "status", "criadoEm"];
 const uniqueIdentifierPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function hoje(): string {
@@ -71,6 +74,11 @@ async function handleGET(request: Request) {
   const pendenciaChave = searchParams.get("pendencia") || undefined;
   const pagina = Math.max(1, Number(searchParams.get("pagina")) || 1);
   const porPagina = Math.min(100, Math.max(1, Number(searchParams.get("porPagina")) || 25));
+  const ordenarParam = searchParams.get("ordenarPor");
+  const ordenarPor = ordenarParam && (ORDENACOES_VALIDAS as string[]).includes(ordenarParam)
+    ? (ordenarParam as OrdenacaoEquipamentos)
+    : undefined;
+  const direcao: DirecaoOrdenacao = searchParams.get("direcao") === "asc" ? "asc" : "desc";
 
   try {
     const resultado = await listarEquipamentos({
@@ -80,6 +88,8 @@ async function handleGET(request: Request) {
       pendenciaChave,
       pagina,
       porPagina,
+      ordenarPor,
+      direcao,
     });
     return NextResponse.json({ ok: true, data: resultado });
   } catch (error) {

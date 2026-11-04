@@ -117,6 +117,27 @@ describe("decidirStatus", () => {
     expect(r.mudar).toBe(false);
   });
 
+  it("ajuste manual do administrador segura o status sem prazo", () => {
+    const r = decidirStatus({
+      ...base,
+      statusPortal: "em_estoque",
+      statusErp: "emprestado",
+      manualPendente: { tipoAcao: "retorno", dataAcao: "2026-01-10", ajusteManual: true },
+    });
+    expect(r.mudar).toBe(false);
+  });
+
+  it("movimento do ERP mais novo que o ajuste manual volta a valer", () => {
+    const r = decidirStatus({
+      hoje: "2026-10-30",
+      dataMovimentoErp: "2026-03-01",
+      statusPortal: "em_estoque",
+      statusErp: "emprestado",
+      manualPendente: { tipoAcao: "retorno", dataAcao: "2026-01-10", ajusteManual: true },
+    });
+    expect(r).toMatchObject({ mudar: true, novoStatus: "emprestado" });
+  });
+
   it("passado o prazo, vale o ERP", () => {
     const r = decidirStatus({
       ...base,
