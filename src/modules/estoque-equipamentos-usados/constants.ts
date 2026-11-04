@@ -147,8 +147,8 @@ export function nfEntradaIntegradaComErp(
   equipamento: Pick<Equipamento, "numeroNfEntrada" | "erpCodigoItem" | "erpIdItem" | "erpDataEntrada"> &
     Partial<Pick<Equipamento, "condicao">>
 ): boolean {
-  /* O novo não tem NF de entrada (fabricação interna): o lastro é o código do item e o ID configurado. */
-  if (equipamento.condicao === "novo") return Boolean(equipamento.erpCodigoItem && equipamento.erpIdItem);
+  /* O novo não tem NF de entrada (fabricação interna) e código/ID do ERP são opcionais: não trava. */
+  if (equipamento.condicao === "novo") return true;
   return Boolean(
     equipamento.numeroNfEntrada &&
       equipamento.erpCodigoItem &&

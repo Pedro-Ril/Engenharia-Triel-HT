@@ -537,11 +537,9 @@ export async function duplicarEquipamento(
 
   await verificarNumeroDisponivel({ numero: novoNumero, condicao: original.condicao, tipoEquipamentoId: original.tipoEquipamentoId });
   const duplicandoNovo = original.condicao === "novo";
+  /* Novo: a cópia recebe o seu ID (opcional -- sem ele, o extrato do ERP não é consultado); nunca o do original. */
   const idErpDaCopia = duplicandoNovo ? novoIdErp?.trim() || null : null;
-  if (duplicandoNovo) {
-    if (!idErpDaCopia) throw new ValidationError("Informe o ID configurado do ERP do equipamento novo.");
-    await verificarIdErpDisponivel(idErpDaCopia);
-  }
+  if (idErpDaCopia) await verificarIdErpDisponivel(idErpDaCopia);
 
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
@@ -948,14 +946,14 @@ async function registrarMovimentacao(
      * fora sem o lastro documental real ter sido validado ainda.
      */
     const ehNovo = linhaAtual.condicao === "novo";
-    /* O novo não tem NF de entrada (fabricação interna): basta o código do item e o ID configurado. */
+    /* O novo não tem NF de entrada (fabricação interna) e código/ID do ERP são opcionais: não trava. */
     const lastroErp = ehNovo
-      ? Boolean(linhaAtual.erp_codigo_item && linhaAtual.erp_id_item)
+      ? true
       : Boolean(linhaAtual.numero_nf_entrada && linhaAtual.erp_codigo_item && linhaAtual.erp_id_item && linhaAtual.erp_data_entrada);
     if ((params.tipoAcao === "emprestimo" || params.tipoAcao === "consignacao") && !lastroErp) {
       throw new ValidationError(
         ehNovo
-          ? `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — falta o código do item ou o ID configurado do ERP neste equipamento.`
+          ? `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — falta o código do item do ERP neste equipamento.`
           : `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — a NF de entrada deste equipamento ainda não foi confirmada pela integração com o ERP.`
       );
     }

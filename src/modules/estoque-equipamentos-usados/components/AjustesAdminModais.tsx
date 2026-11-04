@@ -137,8 +137,6 @@ export function CorrigirDadosErpModal({ equipamento, onFechar, onConcluido }: Mo
   const [erro, setErro] = useState<string | null>(null);
 
   function validar(): string | null {
-    if (!codigo.trim()) return "Informe o código do item no ERP.";
-    if (!idErp.trim()) return "Informe o ID configurado.";
     if (codigo.trim() === (equipamento.erpCodigoItem ?? "").trim() && idErp.trim() === (equipamento.erpIdItem ?? "").trim()) {
       return "O código e o ID informados são iguais aos atuais.";
     }
@@ -190,14 +188,13 @@ export function CorrigirDadosErpModal({ equipamento, onFechar, onConcluido }: Mo
       >
         <Stack gap={16}>
           {erro && <Alert variant="danger">{erro}</Alert>}
-          <Field label="Código do item no ERP" htmlFor="corrigirErpCodigo" required hint={`Hoje: ${equipamento.erpCodigoItem || "vazio"}.`}>
+          <Field label="Código do item no ERP" htmlFor="corrigirErpCodigo" hint={`Hoje: ${equipamento.erpCodigoItem || "vazio"}. Opcional.`}>
             <Input id="corrigirErpCodigo" value={codigo} maxLength={50} onChange={(event) => setCodigo(event.target.value)} disabled={salvando} />
           </Field>
           <Field
             label="ID configurado"
             htmlFor="corrigirErpId"
-            required
-            hint={`Hoje: ${equipamento.erpIdItem || "vazio"}. Não se repete entre equipamentos.`}
+            hint={`Hoje: ${equipamento.erpIdItem || "vazio"}. Opcional: sem código e ID, o extrato do ERP não é consultado. Não se repete entre equipamentos.`}
           >
             <Input id="corrigirErpId" value={idErp} maxLength={50} onChange={(event) => setIdErp(event.target.value)} disabled={salvando} />
           </Field>

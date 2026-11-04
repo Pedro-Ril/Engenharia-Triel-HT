@@ -214,8 +214,9 @@ async function handlePOST(request: Request) {
     const observacoes = lerTextoSistema(CHAVE_SISTEMA_OBSERVACOES, "observacoes", 1000, "observações");
 
     const campoErp = sistemaPorChave.get(CHAVE_SISTEMA_ERP_CODIGO_ITEM);
+    /* No novo, código e ID são opcionais: o extrato do ERP só é consultado com os dois preenchidos. */
     const erpCodigoItemDigitado = ehNovo
-      ? requiredText(formData.get("erpCodigoItem"), "código do item no ERP", 50)
+      ? optionalText(formData.get("erpCodigoItem"), "código do item no ERP", 50)
       : campoErp
         ? optionalText(formData.get("erpCodigoItem"), campoErp.rotulo || "código do item no ERP", 50)
         : null;
@@ -247,9 +248,8 @@ async function handlePOST(request: Request) {
     );
 
     let erpCodigoItem = erpCodigoItemDigitado;
-    let erpIdItem = ehNovo
-      ? requiredText(formData.get("erpIdItem"), "ID configurado do ERP", 50)
-      : optionalText(formData.get("erpIdItem"), "ID do item no ERP", 50);
+    /* No novo o ID é opcional: sem ele, o extrato do ERP não é consultado (a sincronização exige código e ID). */
+    let erpIdItem = optionalText(formData.get("erpIdItem"), ehNovo ? "ID configurado do ERP" : "ID do item no ERP", 50);
     let erpDataEntrada = ehNovo ? null : optionalText(formData.get("erpDataEntrada"), "data de entrada no ERP", 10);
     let erpValidadoEm: string | null = null;
     let erpValidadoPor: string | null = null;

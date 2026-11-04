@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { isObject, requiredText, requiredUuidArray } from "@/lib/auth/validation";
+import { isObject, optionalText, requiredText, requiredUuidArray } from "@/lib/auth/validation";
 import { corrigirDadosErpNovo } from "@/lib/estoque-equipamentos-usados/ajustes-admin";
 import { sincronizarExtrato } from "@/lib/estoque-equipamentos-usados/extrato-integracao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -39,25 +39,31 @@ async function handlePOST(request: Request, context: RouteContext) {
 
     const resultado = await corrigirDadosErpNovo({
       id: equipamentoId,
-      erpCodigoItem: requiredText(corpo.erpCodigoItem, "código do item no ERP", 50),
-      erpIdItem: requiredText(corpo.erpIdItem, "ID configurado", 50),
+      erpCodigoItem: optionalText(corpo.erpCodigoItem, "código do item no ERP", 50) ?? "",
+      erpIdItem: optionalText(corpo.erpIdItem, "ID configurado", 50) ?? "",
       motivo: requiredText(corpo.motivo, "motivo", 500),
       usuarioNome: usuario.nomeExibicao,
     });
 
     let extratoAtualizado = false;
-    try {
-      const [sincronizado] = await sincronizarExtrato({ equipamentoIds: [equipamentoId], disparadoPor: usuario.nomeExibicao });
-      extratoAtualizado = Boolean(sincronizado && !sincronizado.erro);
-    } catch (erro) {
-      console.error("Dados do ERP corrigidos, mas o extrato não foi buscado agora:", erro);
+    /* Sem código e ID não há extrato para buscar. */
+    if (resultado.erpCodigoItem && resultado.erpIdItem) {
+      try {
+        const [sincronizado] = await sincronizarExtrato({ equipamentoIds: [equipamentoId], disparadoPor: usuario.nomeExibicao });
+        extratoAtualizado = Boolean(sincronizado && !sincronizado.erro);
+      } catch (erro) {
+        console.error("Dados do ERP corrigidos, mas o extrato não foi buscado agora:", erro);
+      }
     }
 
     return NextResponse.json({
       ok: true,
-      message: extratoAtualizado
-        ? "Código e ID corrigidos. O extrato do ERP foi buscado de novo."
-        : "Código e ID corrigidos. O extrato do ERP será buscado na próxima atualização automática.",
+      message:
+        !resultado.erpCodigoItem || !resultado.erpIdItem
+          ? "Código e ID corrigidos. Sem os dois preenchidos, o extrato do ERP não é consultado."
+          : extratoAtualizado
+            ? "Código e ID corrigidos. O extrato do ERP foi buscado de novo."
+            : "Código e ID corrigidos. O extrato do ERP será buscado na próxima atualização automática.",
       data: { ...resultado, extratoAtualizado },
     });
   } catch (error) {

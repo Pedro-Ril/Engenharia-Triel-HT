@@ -622,13 +622,6 @@ export function EquipamentoDetalhePage({
   const cardAcoes = (
     <Card title="Ações">
       <Stack gap={12}>
-        {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && ehNovo && (
-          <Alert variant="warning">
-            Empréstimo e consignação ficam bloqueados até este equipamento ter o código do item e o ID configurado do
-            ERP preenchidos.
-          </Alert>
-        )}
-
         {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && !ehNovo && (
           <Alert variant="warning">
             {equipamento.numeroNfEntrada ? (
@@ -780,8 +773,15 @@ export function EquipamentoDetalhePage({
       {ehNovo && (
         <Card title="Dados de Integração">
           <FormGrid columns={3}>
-            <InfoCampo label="Código do item no ERP" valor={equipamento.erpCodigoItem ?? "-"} />
-            <InfoCampo label="ID configurado" valor={equipamento.erpIdItem ?? "-"} />
+            <InfoCampo label="Código do item no ERP" valor={equipamento.erpCodigoItem ?? "Sem código"} />
+            <InfoCampo
+              label="ID configurado"
+              valor={
+                equipamento.erpIdItem && equipamento.erpCodigoItem
+                  ? equipamento.erpIdItem
+                  : `${equipamento.erpIdItem ?? "Sem ID"} — sem código e ID, o extrato do ERP não é consultado`
+              }
+            />
             <InfoCampo label="Origem" valor="Fabricação interna (sem NF de entrada)" />
           </FormGrid>
         </Card>
@@ -841,6 +841,7 @@ export function EquipamentoDetalhePage({
         equipamentoId={equipamento.id}
         status={equipamento.status}
         identificadoNoErp={Boolean(equipamento.erpCodigoItem && equipamento.erpIdItem)}
+        semIdNovo={ehNovo && !(equipamento.erpCodigoItem && equipamento.erpIdItem)}
         movimentacoes={equipamento.movimentacoes}
         anexosPorMovimentacao={anexosPorMovimentacao}
         onExportar={(situacaoErp) => exportarPdfEstratoEquipamento(equipamento, anexosPorMovimentacao, historicoDados, situacaoErp)}

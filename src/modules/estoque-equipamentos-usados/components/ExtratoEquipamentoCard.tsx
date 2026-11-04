@@ -45,6 +45,7 @@ export function ExtratoEquipamentoCard({
   equipamentoId,
   status,
   identificadoNoErp,
+  semIdNovo = false,
   movimentacoes,
   anexosPorMovimentacao,
   onExportar,
@@ -52,6 +53,8 @@ export function ExtratoEquipamentoCard({
   equipamentoId: string;
   status: StatusEquipamento;
   identificadoNoErp: boolean;
+  /* Equipamento novo sem código do item ou ID configurado: o extrato do ERP não é consultado. */
+  semIdNovo?: boolean;
   movimentacoes: MovimentacaoEquipamento[];
   anexosPorMovimentacao: Map<string, AnexoMovimentacao[]>;
   onExportar: (situacaoErp: SituacaoErpEquipamento | null) => void;
@@ -107,7 +110,9 @@ export function ExtratoEquipamentoCard({
       title="Extrato — histórico completo"
       description={
         !identificadoNoErp
-          ? "Movimentações registradas no Portal. As do ERP aparecem aqui assim que a NF de entrada for encontrada."
+          ? semIdNovo
+            ? "Movimentações registradas no Portal. Sem código do item e ID configurado, o extrato do ERP não é consultado."
+            : "Movimentações registradas no Portal. As do ERP aparecem aqui assim que a NF de entrada for encontrada."
           : status === "baixado"
             ? "Portal e ERP juntos. Equipamento baixado: não é mais conferido com o ERP."
             : "Portal e ERP juntos, em ordem de data. O status segue o ERP, conferido a cada hora."

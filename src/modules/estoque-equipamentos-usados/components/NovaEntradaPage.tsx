@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Factory, Home, Recycle, Save, Warehouse } from "lucide-react";
 
@@ -57,6 +57,16 @@ import {
   CHAVE_SISTEMA_VALOR,
   CHAVES_SISTEMA_LARGURA_TOTAL,
 } from "../constants";
+
+/*
+ * Colunas da grade de campos curtos: até 4 campos, um por coluna (1 campo
+ * ocupa a linha inteira); acima disso, 3 colunas -- ou 4 quando 3 deixaria
+ * um campo sozinho na última linha.
+ */
+function colunasDaGrade(quantidade: number): 1 | 2 | 3 | 4 {
+  if (quantidade <= 4) return Math.max(1, quantidade) as 1 | 2 | 3 | 4;
+  return quantidade % 3 === 1 ? 4 : 3;
+}
 
 const ACEITA_EVIDENCIAS = "image/*,.pdf,.doc,.docx,.xls,.xlsx";
 
@@ -515,38 +525,30 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
   }
 
   /*
-   * Empacota os campos do bloco fixo numa grade de 3 colunas (em vez de
-   * um por linha) pra reduzir a rolagem — só "Descrição" e "Observações
-   * livres" (texto longo/textarea) ficam sozinhas em linha de largura
-   * total, o resto (inclusive campo dinâmico que o admin adicionar ali)
-   * entra na grade, na ordem cadastrada.
+   * Monta o bloco fixo de um jeito que se ajusta a quantos campos ele tem
+   * (o admin liga/desliga campos e alguns não valem para usado/novo):
+   * "Descrição" no topo, os campos curtos juntos numa grade só (na ordem
+   * cadastrada, inclusive campo dinâmico que o admin adicionar ali) e os
+   * de texto longo ("Observações livres") no fim. A grade escolhe o número
+   * de colunas pela quantidade de campos, para não sobrar um campo sozinho
+   * ocupando um terço da linha.
    */
   function renderCamposDoBlocoFixoAgrupados(campos: CampoTipoEquipamento[]) {
-    const segmentos: ReactNode[] = [];
-    let grupoAtual: CampoTipoEquipamento[] = [];
+    const visiveis = campos.filter((campo) => !campoForaDoBlocoFixoNoNovo(campo));
+    const largos = visiveis.filter((campo) => campo.ehSistema && CHAVES_SISTEMA_LARGURA_TOTAL.includes(campo.chave));
+    const topo = largos.filter((campo) => campo.chave === CHAVE_SISTEMA_DESCRICAO);
+    const fim = largos.filter((campo) => campo.chave !== CHAVE_SISTEMA_DESCRICAO);
+    const curtos = visiveis.filter((campo) => !largos.includes(campo));
 
-    function flush() {
-      if (grupoAtual.length === 0) return;
-      segmentos.push(
-        <FormGrid key={`grade-${segmentos.length}`} columns={3}>
-          {grupoAtual.map((campo) => renderCampoDoBlocoFixo(campo))}
+    return [
+      ...topo.map((campo) => renderCampoDoBlocoFixo(campo)),
+      curtos.length > 0 && (
+        <FormGrid key="grade-curtos" columns={colunasDaGrade(curtos.length)}>
+          {curtos.map((campo) => renderCampoDoBlocoFixo(campo))}
         </FormGrid>
-      );
-      grupoAtual = [];
-    }
-
-    for (const campo of campos) {
-      if (campoForaDoBlocoFixoNoNovo(campo)) continue;
-      if (campo.ehSistema && CHAVES_SISTEMA_LARGURA_TOTAL.includes(campo.chave)) {
-        flush();
-        segmentos.push(renderCampoDoBlocoFixo(campo));
-      } else {
-        grupoAtual.push(campo);
-      }
-    }
-
-    flush();
-    return segmentos;
+      ),
+      ...fim.map((campo) => renderCampoDoBlocoFixo(campo)),
+    ];
   }
 
   function evidenciasDoBloco(blocoId: string): File[] {
@@ -626,11 +628,7 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
       const numero = Number(numeroNovo);
       const faltando = !Number.isInteger(numero) || numero <= 0
         ? "Informe o número do equipamento novo."
-        : !form.erpCodigoItem.trim()
-          ? "Informe o código do item no ERP."
-          : !form.erpIdItem.trim()
-            ? "Informe o ID configurado do ERP."
-            : null;
+        : null;
       if (faltando) {
         setErroNovo(faltando);
         document.getElementById("card-equipamento-novo")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -819,7 +817,7 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
                     onChange={(event) => setNumeroNovo(event.target.value)}
                   />
                 </Field>
-                <Field label="Código do item no ERP" htmlFor="erpCodigoItemNovo" required>
+                <Field label="Código do item no ERP" htmlFor="erpCodigoItemNovo" hint="Opcional.">
                   <Input
                     id="erpCodigoItemNovo"
                     value={form.erpCodigoItem}
@@ -829,8 +827,7 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
                 <Field
                   label="ID configurado"
                   htmlFor="erpIdItemNovo"
-                  required
-                  hint="Não se repete entre equipamentos. O extrato do ERP é consultado por ele."
+                  hint="Opcional. Sem código e ID, o extrato do ERP não é consultado. O ID não se repete entre equipamentos."
                 >
                   <Input
                     id="erpIdItemNovo"

@@ -204,9 +204,8 @@ export async function corrigirDadosErpNovo(params: {
   usuarioNome: string;
 }): Promise<{ erpCodigoItem: string; erpIdItem: string }> {
   const codigo = params.erpCodigoItem.trim();
+  /* Código e ID opcionais: sem os dois, o extrato do ERP não é consultado. */
   const idErp = params.erpIdItem.trim();
-  if (!codigo) throw new ValidationError("Informe o código do item no ERP.");
-  if (!idErp) throw new ValidationError("Informe o ID configurado do ERP.");
   validarMotivo(params.motivo);
 
   const pool = await getSqlServerPool();
@@ -226,11 +225,13 @@ export async function corrigirDadosErpNovo(params: {
   const codigoAntes = equipamento.erp_codigo_item?.trim() || "";
   const idAntes = equipamento.erp_id_item?.trim() || "";
   if (codigoAntes === codigo && idAntes === idErp) throw new ValidationError("O código e o ID informados são iguais aos atuais.");
-  if (idAntes !== idErp) await verificarIdErpDisponivel(idErp, params.id);
+  if (idErp && idAntes !== idErp) await verificarIdErpDisponivel(idErp, params.id);
 
   const alteracoes = [
-    ...(codigoAntes !== codigo ? [{ campo: "erpCodigoItem", rotulo: "Código do item no ERP", de: codigoAntes, para: codigo }] : []),
-    ...(idAntes !== idErp ? [{ campo: "erpIdItem", rotulo: "ID configurado", de: idAntes, para: idErp }] : []),
+    ...(codigoAntes !== codigo
+      ? [{ campo: "erpCodigoItem", rotulo: "Código do item no ERP", de: codigoAntes, para: codigo || "vazio" }]
+      : []),
+    ...(idAntes !== idErp ? [{ campo: "erpIdItem", rotulo: "ID configurado", de: idAntes, para: idErp || "vazio" }] : []),
   ];
   const detalhes = JSON.stringify({
     equipamentoId: params.id,
@@ -246,8 +247,8 @@ export async function corrigirDadosErpNovo(params: {
     .input("id", sql.UniqueIdentifier, params.id)
     .input("codigoAntes", sql.NVarChar(50), equipamento.erp_codigo_item)
     .input("idAntes", sql.NVarChar(50), equipamento.erp_id_item)
-    .input("codigo", sql.NVarChar(50), codigo)
-    .input("idErp", sql.NVarChar(50), idErp)
+    .input("codigo", sql.NVarChar(50), codigo || null)
+    .input("idErp", sql.NVarChar(50), idErp || null)
     .input("mensagem", sql.NVarChar(2000), mensagem.slice(0, 2000))
     .input("detalhes", sql.NVarChar(sql.MAX), detalhes)
     .query<{ linhas: number }>(`

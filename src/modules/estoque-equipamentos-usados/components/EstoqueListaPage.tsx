@@ -413,10 +413,6 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       return;
     }
     const duplicandoNovo = equipamentoDuplicando.condicao === "novo";
-    if (duplicandoNovo && !novoIdErpDuplicar.trim()) {
-      setErroDuplicacao("Informe o ID configurado do ERP do equipamento novo.");
-      return;
-    }
 
     setErroDuplicacao(null);
     setDuplicando(true);
@@ -425,7 +421,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       const resultado = await duplicarEquipamento(
         equipamentoDuplicando.id,
         novoNumero,
-        duplicandoNovo ? novoIdErpDuplicar.trim() : null
+        duplicandoNovo ? novoIdErpDuplicar.trim() || null : null
       );
 
       if (resultado.ok && resultado.data) {
@@ -711,8 +707,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
             <Field
               label="ID configurado do ERP"
               htmlFor="novoIdErpDuplicar"
-              required
-              hint="Cada equipamento novo tem o seu; não se repete. O código do item é copiado."
+              hint="Opcional; sem ele, o extrato do ERP não é consultado. Cada novo tem o seu (não se repete). O código do item é copiado."
             >
               <Input
                 id="novoIdErpDuplicar"
