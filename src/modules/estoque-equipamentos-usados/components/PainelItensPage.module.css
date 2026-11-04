@@ -53,11 +53,22 @@
   border: 1px solid var(--border-soft);
 }
 
+/* Tamanho natural da tabela (sem quebrar linha), encolhido por escala para caber (ver TabelaItensPainel). */
+.tabelaAjuste {
+  width: max-content;
+  min-width: 100%;
+  transform-origin: top left;
+}
+
 .tabela {
   width: 100%;
   border-collapse: collapse;
   font-size: 1.05rem;
   color: var(--text);
+}
+
+.tabela td {
+  white-space: nowrap;
 }
 
 .tabela th {
@@ -115,10 +126,15 @@
   flex-shrink: 0;
 }
 
+/* Uma linha só: nome longo é cortado com reticências, para a linha da tabela não crescer. */
 .comQuem {
   display: block;
+  max-width: 340px;
   margin-top: 2px;
   padding-left: 18px;
+  overflow: hidden;
   font-size: 0.85rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

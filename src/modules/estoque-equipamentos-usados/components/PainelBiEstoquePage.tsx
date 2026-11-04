@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { buscarPainelBiEstoque, buscarPainelItens } from "../services/estoque.service";
@@ -13,11 +13,12 @@ import {
   usePainelDados,
   usePainelTv,
 } from "./PainelBiPartes";
+import { PalcoRodizio, useRodizio } from "./RodizioPaginas";
 import { paginarItens, TabelaItensPainel, type PaginaTabelaItens } from "./TabelaItensPainel";
 import styles from "./PainelBiEstoquePage.module.css";
 
 const TEMPO_PADRAO_S = 60;
-const LINHAS_PADRAO = 12;
+const LINHAS_PADRAO = 10;
 const ROTULO_CONDICAO: Record<CondicaoEquipamento, string> = { usado: "Usados", novo: "Novos" };
 
 interface DadosBi {
@@ -46,7 +47,7 @@ export function PainelBiEstoquePage() {
     () => (condicaoUrl === "novo" ? ["novo"] : condicaoUrl === "usado" ? ["usado"] : ["usado", "novo"]),
     [condicaoUrl]
   );
-  const rodizio = searchParams.get("rodizio") !== "0";
+  const comTabelas = searchParams.get("rodizio") !== "0";
   const tempoUrl = Number(searchParams.get("tempo"));
   const tempoS = Number.isFinite(tempoUrl) && tempoUrl >= 10 && tempoUrl <= 900 ? tempoUrl : TEMPO_PADRAO_S;
   const linhasUrl = Number(searchParams.get("linhas"));
@@ -59,7 +60,7 @@ export function PainelBiEstoquePage() {
         condicoes.map(async (condicao) => {
           const [resumo, itens] = await Promise.all([
             buscarPainelBiEstoque(condicao),
-            rodizio ? buscarPainelItens(condicao) : Promise.resolve(null),
+            comTabelas ? buscarPainelItens(condicao) : Promise.resolve(null),
           ]);
           return { condicao, resumo, itens };
         })
@@ -77,7 +78,7 @@ export function PainelBiEstoquePage() {
     } catch {
       return { ok: false, message: "Sem conexão com o Portal." };
     }
-  }, [condicoes, rodizio]);
+  }, [condicoes, comTabelas]);
   const { dados, erro } = usePainelDados(buscar);
 
   const paginas = useMemo<Pagina[]>(() => {
@@ -87,23 +88,18 @@ export function PainelBiEstoquePage() {
       if (!resumo) return [];
       /* Sem nenhum novo cadastrado, a parte dos novos não entra (a não ser que a URL peça só os novos). */
       if (condicao === "novo" && condicoes.length > 1 && resumo.totalEquipamentos === 0) return [];
-      const tabelas: Pagina[] = rodizio
+      const tabelas: Pagina[] = comTabelas
         ? paginarItens(dados.itens[condicao], linhasPorPagina).map((pagina) => ({ tipo: "itens", condicao, pagina }))
         : [];
       return [{ tipo: "resumo", condicao, dados: resumo } as Pagina, ...tabelas];
     });
-  }, [dados, condicoes, rodizio, linhasPorPagina]);
+  }, [dados, condicoes, comTabelas, linhasPorPagina]);
 
-  const [contador, setContador] = useState(0);
-  useEffect(() => {
-    if (paginas.length <= 1) return;
-    const intervalo = setInterval(() => setContador((atual) => atual + 1), tempoS * 1000);
-    return () => clearInterval(intervalo);
-  }, [paginas.length, tempoS]);
+  const rodizio = useRodizio(paginas.length, tempoS);
 
   if (!dados || paginas.length === 0) return <EstadoPainel erro={erro} />;
 
-  const indice = contador % paginas.length;
+  const { indice, contador } = rodizio;
   const pagina = paginas[indice];
   const tituloPagina = pagina.tipo === "resumo" ? "Resumo" : pagina.pagina.tipo.tipoNome;
 
@@ -130,7 +126,13 @@ export function PainelBiEstoquePage() {
           subtitulo={`Estoque de Equipamentos ${ROTULO_CONDICAO[pagina.condicao]}`}
           extra={indicador}
         />
-        {pagina.tipo === "resumo" ? <PaginaQuantidade dados={pagina.dados} /> : <TabelaItensPainel pagina={pagina.pagina} />}
+        <PalcoRodizio
+          rodizio={rodizio}
+          renderPagina={(i) => {
+            const p = paginas[i];
+            return p.tipo === "resumo" ? <PaginaQuantidade dados={p.dados} /> : <TabelaItensPainel pagina={p.pagina} />;
+          }}
+        />
       </div>
     </MolduraEscalavel>
   );

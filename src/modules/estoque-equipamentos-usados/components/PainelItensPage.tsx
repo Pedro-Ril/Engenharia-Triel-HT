@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { buscarPainelItens } from "../services/estoque.service";
 import type { CondicaoEquipamento } from "../types/estoque.types";
 import { CabecalhoPainel, EstadoPainel, MolduraEscalavel, usePainelDados, usePainelTv } from "./PainelBiPartes";
+import { PalcoRodizio, useRodizio } from "./RodizioPaginas";
 import { paginarItens, TabelaItensPainel } from "./TabelaItensPainel";
 import estilosBi from "./PainelBiEstoquePage.module.css";
 
 const TEMPO_PADRAO_S = 20;
-const LINHAS_PADRAO = 12;
+const LINHAS_PADRAO = 10;
 
 /*
  * BI de itens para TV: só as tabelas de itens (ver TabelaItensPainel), de
@@ -31,17 +32,12 @@ export function PainelItensPage({ condicao }: { condicao: CondicaoEquipamento })
 
   const paginas = useMemo(() => paginarItens(dados, linhasPorPagina), [dados, linhasPorPagina]);
 
-  const [contador, setContador] = useState(0);
-  useEffect(() => {
-    if (paginas.length <= 1) return;
-    const intervalo = setInterval(() => setContador((atual) => atual + 1), tempoS * 1000);
-    return () => clearInterval(intervalo);
-  }, [paginas.length, tempoS]);
+  const rodizio = useRodizio(paginas.length, tempoS);
 
   if (!dados) return <EstadoPainel erro={erro} />;
 
   const titulo = condicao === "novo" ? "Equipamentos Novos · Itens" : "Equipamentos Usados · Itens";
-  const indice = paginas.length ? contador % paginas.length : 0;
+  const { indice, contador } = rodizio;
   const pagina = paginas[indice];
 
   const indicador = paginas.length > 1 && (
@@ -62,7 +58,7 @@ export function PainelItensPage({ condicao }: { condicao: CondicaoEquipamento })
       <div className={estilosBi.painel}>
         <CabecalhoPainel tv={tv} subtitulo={titulo} extra={indicador} />
         {pagina ? (
-          <TabelaItensPainel pagina={pagina} />
+          <PalcoRodizio rodizio={rodizio} renderPagina={(i) => <TabelaItensPainel pagina={paginas[i]} />} />
         ) : (
           <div className={estilosBi.estadoVazio}>
             <p>Nenhum equipamento {condicao === "novo" ? "novo" : "usado"} no estoque agora.</p>

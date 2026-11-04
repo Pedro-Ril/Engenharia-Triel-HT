@@ -1,0 +1,154 @@
+/*
+ * Troca de página do BI (TV). Linha do tempo de uma troca (~1,1 s):
+ *   0–650 ms   a página que sai vai para a esquerda, encolhe e desfoca;
+ *   0–1100 ms  a cortina (gradiente da marca) atravessa a tela;
+ *   450 ms+    a nova entra pela direita, e os blocos dela em cascata.
+ */
+
+.palco {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+/* Cada página ocupa o palco inteiro, no mesmo layout de coluna do painel. */
+.camada {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  will-change: transform, opacity, filter;
+}
+
+.saindo {
+  pointer-events: none;
+  animation: paginaSai 650ms cubic-bezier(0.55, 0, 0.75, 0.3) forwards;
+}
+
+.entrando {
+  animation: paginaEntra 850ms cubic-bezier(0.16, 1, 0.3, 1) 450ms both;
+}
+
+@keyframes paginaSai {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-9%) scale(0.93);
+    filter: blur(10px);
+  }
+}
+
+@keyframes paginaEntra {
+  from {
+    opacity: 0;
+    transform: translateX(9%) scale(0.95);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Cortina: faixa inclinada com o vermelho da marca, com brilho na borda, que cruza da esquerda para a direita. */
+.cortina {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: 0;
+  width: 70%;
+  pointer-events: none;
+  background: var(--sidebar-gradient);
+  box-shadow:
+    0 0 60px rgba(183, 28, 28, 0.45),
+    inset -14px 0 0 rgba(255, 255, 255, 0.18);
+  transform: translateX(-130%) skewX(-16deg);
+  animation: cortinaPassa 1100ms cubic-bezier(0.7, 0, 0.3, 1) forwards;
+  z-index: 2;
+}
+
+@keyframes cortinaPassa {
+  from {
+    transform: translateX(-130%) skewX(-16deg);
+  }
+  to {
+    transform: translateX(260%) skewX(-16deg);
+  }
+}
+
+/* Cascata: blocos da página (indicadores, cards do resumo; topo e tabela do cartão de itens). */
+.entrando > * > * {
+  animation: blocoSobe 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 600ms;
+}
+
+.entrando > * > *:nth-child(2) { animation-delay: 660ms; }
+.entrando > * > *:nth-child(3) { animation-delay: 720ms; }
+.entrando > * > *:nth-child(4) { animation-delay: 780ms; }
+.entrando > * > *:nth-child(5) { animation-delay: 840ms; }
+.entrando > * > *:nth-child(6) { animation-delay: 900ms; }
+.entrando > * > *:nth-child(7) { animation-delay: 960ms; }
+.entrando > * > *:nth-child(8) { animation-delay: 1020ms; }
+.entrando > * > *:nth-child(9) { animation-delay: 1080ms; }
+.entrando > * > *:nth-child(n + 10) { animation-delay: 1140ms; }
+
+@keyframes blocoSobe {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Linhas da tabela de itens entram uma a uma, da direita. */
+.entrando tbody tr {
+  animation: linhaEntra 550ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 850ms;
+}
+
+.entrando tbody tr:nth-child(2) { animation-delay: 905ms; }
+.entrando tbody tr:nth-child(3) { animation-delay: 960ms; }
+.entrando tbody tr:nth-child(4) { animation-delay: 1015ms; }
+.entrando tbody tr:nth-child(5) { animation-delay: 1070ms; }
+.entrando tbody tr:nth-child(6) { animation-delay: 1125ms; }
+.entrando tbody tr:nth-child(7) { animation-delay: 1180ms; }
+.entrando tbody tr:nth-child(8) { animation-delay: 1235ms; }
+.entrando tbody tr:nth-child(9) { animation-delay: 1290ms; }
+.entrando tbody tr:nth-child(10) { animation-delay: 1345ms; }
+.entrando tbody tr:nth-child(11) { animation-delay: 1400ms; }
+.entrando tbody tr:nth-child(n + 12) { animation-delay: 1455ms; }
+
+@keyframes linhaEntra {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saindo,
+  .cortina {
+    display: none;
+  }
+
+  .entrando,
+  .entrando > * > *,
+  .entrando tbody tr {
+    animation: none;
+  }
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 import type { PainelItens } from "../types/estoque.types";
 import { STATUS_LABELS } from "../utils/rotulos";
 import { STATUS_COR } from "./PainelBiPartes";
@@ -38,6 +40,28 @@ export function paginarItens(dados: PainelItens | null | undefined, linhasPorPag
 export function TabelaItensPainel({ pagina }: { pagina: PaginaTabelaItens }) {
   const { tipo } = pagina;
 
+  /*
+   * A tabela fica no tamanho natural (uma linha por célula) e encolhe só o
+   * necessário para caber na área -- com muitas colunas marcadas no admin
+   * ela diminui em vez de ser cortada. Medido com offsetWidth/Height, que
+   * não mudam com as transformações das animações nem da moldura da TV.
+   */
+  const areaRef = useRef<HTMLDivElement>(null);
+  const ajusteRef = useRef<HTMLDivElement>(null);
+  const [escala, setEscala] = useState(1);
+  useEffect(() => {
+    const area = areaRef.current;
+    const ajuste = ajusteRef.current;
+    if (!area || !ajuste) return;
+    const observador = new ResizeObserver(() => {
+      const fator = Math.min(1, area.clientWidth / ajuste.offsetWidth, area.clientHeight / ajuste.offsetHeight);
+      setEscala(Number.isFinite(fator) && fator > 0 ? fator : 1);
+    });
+    observador.observe(area);
+    observador.observe(ajuste);
+    return () => observador.disconnect();
+  }, []);
+
   return (
     <section className={styles.cartao}>
       <header className={styles.cartaoTopo}>
@@ -55,37 +79,43 @@ export function TabelaItensPainel({ pagina }: { pagina: PaginaTabelaItens }) {
         </p>
       )}
 
-      <div className={styles.tabelaArea}>
-        <table className={styles.tabela}>
-          <thead>
-            <tr>
-              <th className={styles.colNumero}>Nº</th>
-              <th>Descrição</th>
-              <th>Status</th>
-              {tipo.colunas.map((coluna) => (
-                <th key={coluna.chave}>{coluna.rotulo}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {pagina.linhas.map((linha) => (
-              <tr key={linha.id}>
-                <td className={styles.colNumero}>#{linha.numero}</td>
-                <td className={styles.descricao}>{linha.descricao}</td>
-                <td>
-                  <span className={styles.status}>
-                    <span className={styles.statusPonto} style={{ background: STATUS_COR[linha.status] }} />
-                    {STATUS_LABELS[linha.status]}
-                  </span>
-                  {linha.comQuem && <span className={styles.comQuem}>{linha.comQuem}</span>}
-                </td>
+      <div ref={areaRef} className={styles.tabelaArea}>
+        <div ref={ajusteRef} className={styles.tabelaAjuste} style={{ transform: `scale(${escala})` }}>
+          <table className={styles.tabela}>
+            <thead>
+              <tr>
+                <th className={styles.colNumero}>Nº</th>
+                <th>Descrição</th>
+                <th>Status</th>
                 {tipo.colunas.map((coluna) => (
-                  <td key={coluna.chave}>{linha.valores[coluna.chave] ?? "—"}</td>
+                  <th key={coluna.chave}>{coluna.rotulo}</th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pagina.linhas.map((linha) => (
+                <tr key={linha.id}>
+                  <td className={styles.colNumero}>#{linha.numero}</td>
+                  <td className={styles.descricao}>{linha.descricao}</td>
+                  <td>
+                    <span className={styles.status}>
+                      <span className={styles.statusPonto} style={{ background: STATUS_COR[linha.status] }} />
+                      {STATUS_LABELS[linha.status]}
+                    </span>
+                    {linha.comQuem && (
+                      <span className={styles.comQuem} title={linha.comQuem}>
+                        {linha.comQuem}
+                      </span>
+                    )}
+                  </td>
+                  {tipo.colunas.map((coluna) => (
+                    <td key={coluna.chave}>{linha.valores[coluna.chave] ?? "—"}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );
