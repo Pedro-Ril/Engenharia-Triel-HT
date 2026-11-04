@@ -7,12 +7,17 @@ import { ValidationError } from "@/lib/auth/errors";
 import type { PortalUsuario } from "@/lib/auth/usuarios";
 import {
   CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+  CHAVE_SISTEMA_DATA_ENTRADA_NF,
+  CHAVE_SISTEMA_NUMERO_NF_ENTRADA,
   COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA,
   listarCamposComPendencia,
 } from "./tipos-equipamento";
 import { buscarEmpresaPorCodigo } from "@/lib/empresas/empresas";
+import { campoValeParaCondicao } from "@/modules/estoque-equipamentos-usados/utils/campos-condicao";
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "em_reforma" | "baixado";
+/* Usado (entra por NF de compra, número automático) ou novo (fabricação interna, número digitado por tipo). */
+export type CondicaoEquipamento = "usado" | "novo";
 export type OrdenacaoEquipamentos = "numero" | "descricao" | "cliente" | "marcaModelo" | "status" | "criadoEm";
 export type DirecaoOrdenacao = "asc" | "desc";
 export type TipoAcaoMovimentacao =
@@ -29,6 +34,7 @@ export type MotivoBaixa = "venda" | "descarte" | "perda" | "outro";
 export interface Equipamento {
   id: string;
   numero: number;
+  condicao: CondicaoEquipamento;
   tipoEquipamentoId: string | null;
   nomeCliente: string | null;
   codigoCliente: string | null;
@@ -83,6 +89,7 @@ export interface EquipamentoComEstrato extends Equipamento {
 const colunasEquipamento = `
   CONVERT(VARCHAR(36), [id]) AS [id],
   [numero],
+  [condicao],
   CONVERT(VARCHAR(36), [tipo_equipamento_id]) AS [tipo_equipamento_id],
   [nome_cliente],
   [codigo_cliente],
@@ -109,6 +116,7 @@ const colunasEquipamento = `
 interface EquipamentoRow {
   id: string;
   numero: number;
+  condicao: CondicaoEquipamento;
   tipo_equipamento_id: string | null;
   nome_cliente: string | null;
   codigo_cliente: string | null;
@@ -136,6 +144,7 @@ function mapEquipamentoRow(row: EquipamentoRow): Equipamento {
   return {
     id: row.id,
     numero: row.numero,
+    condicao: row.condicao,
     tipoEquipamentoId: row.tipo_equipamento_id,
     nomeCliente: row.nome_cliente,
     codigoCliente: row.codigo_cliente,
@@ -203,7 +212,94 @@ function mapMovimentacaoRow(row: MovimentacaoRow): MovimentacaoEquipamento {
   };
 }
 
+/*
+ * Numeração: o usado tem o número automático (IDENTITY); o novo tem
+ * numeração própria por tipo, digitada (pode repetir a de um usado). Os
+ * índices únicos filtrados da migração 0152 garantem isso no banco; esta
+ * checagem só dá a mensagem certa antes.
+ */
+export async function verificarNumeroDisponivel(params: {
+  numero: number;
+  condicao: CondicaoEquipamento;
+  tipoEquipamentoId: string | null;
+  excetoId?: string;
+}): Promise<void> {
+  const pool = await getSqlServerPool();
+  const r = await pool
+    .request()
+    .input("numero", sql.Int, params.numero)
+    .input("condicao", sql.VarChar(10), params.condicao)
+    .input("tipo", sql.UniqueIdentifier, params.tipoEquipamentoId)
+    .input("exceto", sql.UniqueIdentifier, params.excetoId ?? null)
+    .query<{ total: number }>(`
+      SELECT COUNT(*) AS [total] FROM dbo.com_estoque_equipamentos_usados
+      WHERE [numero] = @numero AND [condicao] = @condicao
+        AND (@condicao = 'usado' OR [tipo_equipamento_id] = @tipo)
+        AND (@exceto IS NULL OR [id] <> @exceto);
+    `);
+  if ((r.recordset[0]?.total ?? 0) > 0) {
+    throw new ValidationError(
+      params.condicao === "novo"
+        ? `Já existe um equipamento novo deste tipo com o número ${params.numero}.`
+        : `Já existe um equipamento usado com o número ${params.numero}.`
+    );
+  }
+}
+
+/* O ID configurado do ERP nunca se repete entre equipamentos (novos ou usados). */
+export async function verificarIdErpDisponivel(erpIdItem: string, excetoId?: string): Promise<void> {
+  const pool = await getSqlServerPool();
+  const r = await pool
+    .request()
+    .input("idErp", sql.NVarChar(50), erpIdItem.trim())
+    .input("exceto", sql.UniqueIdentifier, excetoId ?? null)
+    .query<{ numero: number; condicao: CondicaoEquipamento }>(`
+      SELECT TOP 1 [numero], [condicao] FROM dbo.com_estoque_equipamentos_usados
+      WHERE LTRIM(RTRIM([erp_id_item])) = @idErp AND (@exceto IS NULL OR [id] <> @exceto);
+    `);
+  const outro = r.recordset[0];
+  if (outro) {
+    throw new ValidationError(
+      `O ID configurado ${erpIdItem.trim()} já está no equipamento ${outro.condicao === "novo" ? "novo" : "usado"} #${outro.numero}.`
+    );
+  }
+}
+
+/*
+ * Insere com o número explícito (IDENTITY_INSERT). Com manterNumeracaoUsados
+ * (equipamento novo), não mexe na numeração automática dos usados: trava a
+ * tabela (nenhum usado é criado no meio) e devolve o IDENTITY ao valor de
+ * antes, que o INSERT explícito pode ter empurrado. Tudo no MESMO batch (o
+ * IDENTITY_INSERT é da conexão e o driver não garante que valha entre
+ * requests). Precisa rodar dentro de uma transação, para a trava valer até
+ * o fim.
+ */
+export function sqlComNumeroExplicito(insertSql: string, manterNumeracaoUsados: boolean): string {
+  return `
+    DECLARE @identAntes NUMERIC(38, 0) = IDENT_CURRENT('dbo.com_estoque_equipamentos_usados');
+    DECLARE @travaTabela INT;
+    ${
+      /* Atribuição, não SELECT de linhas: não devolve resultado antes do OUTPUT do INSERT. */
+      manterNumeracaoUsados
+        ? "SELECT @travaTabela = COUNT(*) FROM dbo.com_estoque_equipamentos_usados WITH (TABLOCKX, HOLDLOCK);"
+        : ""
+    }
+    SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados ON;
+    ${insertSql}
+    SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados OFF;
+    ${
+      manterNumeracaoUsados
+        ? `IF IDENT_CURRENT('dbo.com_estoque_equipamentos_usados') <> @identAntes
+      DBCC CHECKIDENT ('dbo.com_estoque_equipamentos_usados', RESEED, @identAntes) WITH NO_INFOMSGS;`
+        : ""
+    }
+  `;
+}
+
 export interface CriarEquipamentoParams {
+  condicao: CondicaoEquipamento;
+  /* Só para o novo (digitado); o usado recebe o automático. */
+  numero: number | null;
   tipoEquipamentoId: string;
   nomeCliente: string | null;
   codigoCliente: string | null;
@@ -237,7 +333,29 @@ export async function criarEquipamento(params: CriarEquipamentoParams): Promise<
   await transaction.begin();
 
   try {
+    const novo = params.condicao === "novo";
+    if (novo && (!params.numero || !Number.isInteger(params.numero) || params.numero <= 0)) {
+      throw new ValidationError("Informe o número do equipamento novo.");
+    }
+    const colunas = `[tipo_equipamento_id], [nome_cliente], [codigo_cliente], [valor], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
+           [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
+           [numero_nf_entrada], [observacoes], [campos_valores], [criado_por_usuario_id], [criado_por_nome]`;
+    const valores = `@tipoEquipamentoId, @nomeCliente, @codigoCliente, @valor, @descricao, @marca, @modelo, @numeroSerie, @codigoEmpresa,
+           @erpCodigoItem, @erpIdItem, @erpDataEntrada, @erpValidadoEm, @erpValidadoPor,
+           @numeroNfEntrada, @observacoes, @camposValores, @criadoPorUsuarioId, @criadoPorNome`;
+    const insertSql = novo
+      ? sqlComNumeroExplicito(
+          `INSERT INTO dbo.com_estoque_equipamentos_usados ([numero], [condicao], ${colunas})
+           OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
+           VALUES (@numero, 'novo', ${valores});`,
+          true
+        )
+      : `INSERT INTO dbo.com_estoque_equipamentos_usados (${colunas})
+         OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
+         VALUES (${valores});`;
+
     const resultadoInsert = await new sql.Request(transaction)
+      .input("numero", sql.Int, novo ? params.numero : null)
       .input("tipoEquipamentoId", sql.UniqueIdentifier, params.tipoEquipamentoId)
       .input("nomeCliente", sql.NVarChar(200), params.nomeCliente)
       .input("codigoCliente", sql.NVarChar(30), params.codigoCliente)
@@ -257,17 +375,7 @@ export async function criarEquipamento(params: CriarEquipamentoParams): Promise<
       .input("camposValores", sql.NVarChar(sql.MAX), params.camposValoresJson)
       .input("criadoPorUsuarioId", sql.UniqueIdentifier, params.criadoPorUsuarioId)
       .input("criadoPorNome", sql.NVarChar(150), params.criadoPorNome)
-      .query(`
-        INSERT INTO dbo.com_estoque_equipamentos_usados
-          ([tipo_equipamento_id], [nome_cliente], [codigo_cliente], [valor], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
-           [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
-           [numero_nf_entrada], [observacoes], [campos_valores], [criado_por_usuario_id], [criado_por_nome])
-        OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
-        VALUES
-          (@tipoEquipamentoId, @nomeCliente, @codigoCliente, @valor, @descricao, @marca, @modelo, @numeroSerie, @codigoEmpresa,
-           @erpCodigoItem, @erpIdItem, @erpDataEntrada, @erpValidadoEm, @erpValidadoPor,
-           @numeroNfEntrada, @observacoes, @camposValores, @criadoPorUsuarioId, @criadoPorNome);
-      `);
+      .query(insertSql);
 
     const equipamentoId = resultadoInsert.recordset[0].id as string;
 
@@ -408,7 +516,9 @@ export async function excluirEquipamento(
 export async function duplicarEquipamento(
   id: string,
   novoNumero: number,
-  usuario: Pick<PortalUsuario, "id" | "nomeExibicao" | "ehAdministrador">
+  usuario: Pick<PortalUsuario, "id" | "nomeExibicao" | "ehAdministrador">,
+  /* Novo: o ID configurado do ERP é de cada equipamento e nunca se repete -- a cópia recebe o seu. */
+  novoIdErp: string | null = null
 ): Promise<Equipamento> {
   if (!usuario.ehAdministrador) {
     throw new ValidationError("Apenas administradores podem duplicar equipamentos.");
@@ -425,15 +535,12 @@ export async function duplicarEquipamento(
 
   const pool = await getSqlServerPool();
 
-  const existenteResult = await pool
-    .request()
-    .input("numero", sql.Int, novoNumero)
-    .query<{ total: number }>(
-      `SELECT COUNT(*) AS [total] FROM dbo.com_estoque_equipamentos_usados WHERE [numero] = @numero;`
-    );
-
-  if ((existenteResult.recordset[0]?.total ?? 0) > 0) {
-    throw new ValidationError(`Já existe um equipamento com o número ${novoNumero}.`);
+  await verificarNumeroDisponivel({ numero: novoNumero, condicao: original.condicao, tipoEquipamentoId: original.tipoEquipamentoId });
+  const duplicandoNovo = original.condicao === "novo";
+  const idErpDaCopia = duplicandoNovo ? novoIdErp?.trim() || null : null;
+  if (duplicandoNovo) {
+    if (!idErpDaCopia) throw new ValidationError("Informe o ID configurado do ERP do equipamento novo.");
+    await verificarIdErpDisponivel(idErpDaCopia);
   }
 
   const transaction = new sql.Transaction(pool);
@@ -453,29 +560,26 @@ export async function duplicarEquipamento(
     const novoEquipamentoResult = await new sql.Request(transaction)
       .input("idOriginal", sql.UniqueIdentifier, id)
       .input("novoNumero", sql.Int, novoNumero)
+      .input("idErpDaCopia", sql.NVarChar(50), idErpDaCopia)
       .input("criadoPorUsuarioId", sql.UniqueIdentifier, usuario.id)
       .input("criadoPorNome", sql.NVarChar(150), usuario.nomeExibicao)
-      .query<{ id: string }>(`
-        SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados ON;
-
+      .query<{ id: string }>(sqlComNumeroExplicito(`
         INSERT INTO dbo.com_estoque_equipamentos_usados
-          ([id], [numero], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
+          ([id], [numero], [condicao], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
            [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
            [status], [numero_nf_entrada], [observacoes], [criado_por_usuario_id], [criado_por_nome],
            [criado_em], [atualizado_em], [tipo_equipamento_id], [nome_cliente], [valor], [campos_valores],
            [codigo_cliente], [nf_entrada_confirmada_em])
         OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
         SELECT
-          NEWID(), @novoNumero, [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
-          [erp_codigo_item], [erp_id_item], [erp_data_entrada], [erp_validado_em], [erp_validado_por],
+          NEWID(), @novoNumero, [condicao], [descricao], [marca], [modelo], [numero_serie], [codigo_empresa],
+          [erp_codigo_item], CASE WHEN [condicao] = 'novo' THEN @idErpDaCopia ELSE [erp_id_item] END, [erp_data_entrada], [erp_validado_em], [erp_validado_por],
           [status], [numero_nf_entrada], [observacoes], @criadoPorUsuarioId, @criadoPorNome,
           SYSDATETIME(), SYSDATETIME(), [tipo_equipamento_id], [nome_cliente], [valor], [campos_valores],
           [codigo_cliente], [nf_entrada_confirmada_em]
         FROM dbo.com_estoque_equipamentos_usados
         WHERE [id] = @idOriginal;
-
-        SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados OFF;
-      `);
+      `, duplicandoNovo));
 
     novoEquipamentoId = novoEquipamentoResult.recordset[0]?.id ?? null;
 
@@ -608,12 +712,15 @@ export async function duplicarEquipamento(
     throw error;
   }
 
-  const maxResult = await pool
-    .request()
-    .query<{ maximo: number | null }>(
-      `SELECT MAX([numero]) AS [maximo] FROM dbo.com_estoque_equipamentos_usados;`
-    );
-  await definirUltimoNumeroGerado(maxResult.recordset[0]?.maximo ?? novoNumero);
+  /* Só o usado reancora a numeração automática; o novo não mexe nela (sqlComNumeroExplicito). */
+  if (!duplicandoNovo) {
+    const maxResult = await pool
+      .request()
+      .query<{ maximo: number | null }>(
+        `SELECT MAX([numero]) AS [maximo] FROM dbo.com_estoque_equipamentos_usados WHERE [condicao] = 'usado';`
+      );
+    await definirUltimoNumeroGerado(maxResult.recordset[0]?.maximo ?? novoNumero);
+  }
 
   const duplicado = await buscarEquipamentoPorId(novoEquipamentoId);
   if (!duplicado) {
@@ -649,6 +756,7 @@ function ordemSql(ordenarPor: OrdenacaoEquipamentos | undefined, direcao: Direca
 }
 
 export interface FiltrosEquipamentos {
+  condicao?: CondicaoEquipamento;
   status?: StatusEquipamento;
   busca?: string;
   codigoEmpresa?: string;
@@ -666,6 +774,11 @@ export async function listarEquipamentos(
 
   function montarFiltros(request: SqlRequest): string {
     const condicoes: string[] = [];
+
+    if (filtros.condicao) {
+      request.input("condicao", sql.VarChar(10), filtros.condicao);
+      condicoes.push("[condicao] = @condicao");
+    }
 
     if (filtros.status) {
       request.input("status", sql.VarChar(20), filtros.status);
@@ -694,10 +807,23 @@ export async function listarEquipamentos(
     if (filtros.pendenciaChave === CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO) {
       /* NF digitada, mas ainda faltando pelo menos um dos 3 campos que só a integração com o ERP preenche. */
       condicoes.push(`(
-        [numero_nf_entrada] IS NOT NULL AND [numero_nf_entrada] <> ''
+        [condicao] = 'usado'
+        AND [numero_nf_entrada] IS NOT NULL AND [numero_nf_entrada] <> ''
         AND ([erp_codigo_item] IS NULL OR [erp_id_item] IS NULL OR [erp_data_entrada] IS NULL)
       )`);
     } else if (filtros.pendenciaChave) {
+      /* NF de entrada e data de entrada não existem para o novo (fabricação interna). */
+      if (filtros.pendenciaChave === CHAVE_SISTEMA_NUMERO_NF_ENTRADA || filtros.pendenciaChave === CHAVE_SISTEMA_DATA_ENTRADA_NF) {
+        condicoes.push("[condicao] = 'usado'");
+      }
+      /* Campo que não aparece para a condição do equipamento (ex.: Cliente no novo) não é pendência dele. */
+      request.input("pendenciaChave", sql.NVarChar(100), filtros.pendenciaChave);
+      condicoes.push(`NOT EXISTS (
+        SELECT 1 FROM dbo.com_estoque_tipos_equipamento_campos AS cp
+        WHERE cp.[tipo_equipamento_id] = dbo.com_estoque_equipamentos_usados.[tipo_equipamento_id]
+          AND cp.[chave] = @pendenciaChave AND cp.[condicao] <> 'ambos'
+          AND cp.[condicao] <> dbo.com_estoque_equipamentos_usados.[condicao]
+      )`);
       const coluna = COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA[filtros.pendenciaChave];
       if (coluna === "valor") {
         condicoes.push("[valor] IS NULL");
@@ -784,6 +910,7 @@ async function registrarMovimentacao(
       .input("id", sql.UniqueIdentifier, params.equipamentoId)
       .query<{
         status: StatusEquipamento;
+        condicao: CondicaoEquipamento;
         numero_nf_entrada: string | null;
         erp_codigo_item: string | null;
         erp_id_item: string | null;
@@ -791,7 +918,7 @@ async function registrarMovimentacao(
         tipo_equipamento_id: string | null;
         codigo_empresa: string | null;
       }>(`
-        SELECT [status], [numero_nf_entrada], [erp_codigo_item], [erp_id_item],
+        SELECT [status], [condicao], [numero_nf_entrada], [erp_codigo_item], [erp_id_item],
           CONVERT(VARCHAR(10), [erp_data_entrada], 23) AS [erp_data_entrada],
           [codigo_empresa],
           CONVERT(VARCHAR(36), [tipo_equipamento_id]) AS [tipo_equipamento_id]
@@ -820,15 +947,16 @@ async function registrarMovimentacao(
      * número digitado não basta, senão o equipamento pode circular pra
      * fora sem o lastro documental real ter sido validado ainda.
      */
-    if (
-      (params.tipoAcao === "emprestimo" || params.tipoAcao === "consignacao") &&
-      (!linhaAtual.numero_nf_entrada ||
-        !linhaAtual.erp_codigo_item ||
-        !linhaAtual.erp_id_item ||
-        !linhaAtual.erp_data_entrada)
-    ) {
+    const ehNovo = linhaAtual.condicao === "novo";
+    /* O novo não tem NF de entrada (fabricação interna): basta o código do item e o ID configurado. */
+    const lastroErp = ehNovo
+      ? Boolean(linhaAtual.erp_codigo_item && linhaAtual.erp_id_item)
+      : Boolean(linhaAtual.numero_nf_entrada && linhaAtual.erp_codigo_item && linhaAtual.erp_id_item && linhaAtual.erp_data_entrada);
+    if ((params.tipoAcao === "emprestimo" || params.tipoAcao === "consignacao") && !lastroErp) {
       throw new ValidationError(
-        `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — a NF de entrada deste equipamento ainda não foi confirmada pela integração com o ERP.`
+        ehNovo
+          ? `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — falta o código do item ou o ID configurado do ERP neste equipamento.`
+          : `Não é possível registrar ${params.tipoAcao === "emprestimo" ? "o empréstimo" : "a consignação"} — a NF de entrada deste equipamento ainda não foi confirmada pela integração com o ERP.`
       );
     }
 
@@ -842,7 +970,11 @@ async function registrarMovimentacao(
     if (linhaAtual.tipo_equipamento_id) {
       const camposPendencia = await listarCamposComPendencia();
       const pendenciasBloqueantes = camposPendencia.filter(
-        (campo) => campo.travaMovimentacao && campo.tipoEquipamentoId === linhaAtual.tipo_equipamento_id
+        (campo) =>
+          campo.travaMovimentacao &&
+          campo.tipoEquipamentoId === linhaAtual.tipo_equipamento_id &&
+          campoValeParaCondicao(campo, linhaAtual.condicao) &&
+          !(ehNovo && (campo.chave === CHAVE_SISTEMA_NUMERO_NF_ENTRADA || campo.chave === CHAVE_SISTEMA_DATA_ENTRADA_NF))
       );
 
       if (pendenciasBloqueantes.length > 0) {
@@ -1106,13 +1238,15 @@ export async function definirUltimoNumeroGerado(novoValor: number): Promise<void
 
   const maxResult = await pool
     .request()
-    .query<{ maximo: number | null }>(`SELECT MAX([numero]) AS [maximo] FROM dbo.com_estoque_equipamentos_usados;`);
+    .query<{ maximo: number | null }>(
+      `SELECT MAX([numero]) AS [maximo] FROM dbo.com_estoque_equipamentos_usados WHERE [condicao] = 'usado';`
+    );
 
   const maximoAtual = maxResult.recordset[0]?.maximo ?? 0;
 
   if (novoValor < maximoAtual) {
     throw new ValidationError(
-      `Já existe um equipamento com número ${maximoAtual} — defina um valor igual ou maior, senão o próximo cadastro pode gerar um número duplicado.`
+      `Já existe um equipamento usado com número ${maximoAtual} — defina um valor igual ou maior, senão o próximo cadastro pode gerar um número duplicado.`
     );
   }
 

@@ -14,9 +14,11 @@ export const dynamic = "force-dynamic";
  * números agregados são expostos aqui, nada de dado sensível por
  * cliente/equipamento individual além do que já aparece no extrato.
  */
-async function handleGET() {
+async function handleGET(request: Request) {
   try {
-    const dados = await obterDadosPainelBi();
+    /* ?condicao=novo mostra o painel dos equipamentos novos; sem parâmetro, o dos usados (como sempre foi). */
+    const condicao = new URL(request.url).searchParams.get("condicao") === "novo" ? "novo" : "usado";
+    const dados = await obterDadosPainelBi(condicao);
     return NextResponse.json({ ok: true, data: dados });
   } catch (error) {
     console.error("Erro ao montar o painel de BI de equipamentos usados:", error);

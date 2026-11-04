@@ -12,7 +12,11 @@ import { Modal } from "@/components/ui/Modal";
 import { Stack } from "@/components/ui/Stack";
 import { Textarea } from "@/components/ui/Textarea";
 
-import { ajustarStatusEquipamento, corrigirNumeroSerieEquipamento } from "../services/estoque.service";
+import {
+  ajustarStatusEquipamento,
+  corrigirDadosErpEquipamento,
+  corrigirNumeroSerieEquipamento,
+} from "../services/estoque.service";
 import type { Equipamento, MotivoBaixa, StatusEquipamento } from "../types/estoque.types";
 import { STATUS_LABELS } from "../utils/rotulos";
 
@@ -112,6 +116,102 @@ export function CorrigirNumeroSerieModal({ equipamento, onFechar, onConcluido }:
         title={`Corrigir o número de série do #${equipamento.numero}?`}
         variant="warning"
         message={`De "${equipamento.numeroSerie || "vazio"}" para "${numeroSerie.trim()}".`}
+        confirmLabel="Corrigir"
+        loading={salvando}
+        onConfirm={salvar}
+        onClose={() => {
+          if (!salvando) setConfirmando(false);
+        }}
+      />
+    </>
+  );
+}
+
+/* Equipamento novo: código do item e ID configurado foram digitados na entrada. */
+export function CorrigirDadosErpModal({ equipamento, onFechar, onConcluido }: ModalAjusteProps) {
+  const [codigo, setCodigo] = useState(equipamento.erpCodigoItem ?? "");
+  const [idErp, setIdErp] = useState(equipamento.erpIdItem ?? "");
+  const [motivo, setMotivo] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function validar(): string | null {
+    if (!codigo.trim()) return "Informe o código do item no ERP.";
+    if (!idErp.trim()) return "Informe o ID configurado.";
+    if (codigo.trim() === (equipamento.erpCodigoItem ?? "").trim() && idErp.trim() === (equipamento.erpIdItem ?? "").trim()) {
+      return "O código e o ID informados são iguais aos atuais.";
+    }
+    if (motivo.trim().length < 5) return "Explique o motivo da correção (pelo menos 5 caracteres).";
+    return null;
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const resultado = await corrigirDadosErpEquipamento(equipamento.id, {
+        erpCodigoItem: codigo.trim(),
+        erpIdItem: idErp.trim(),
+        motivo: motivo.trim(),
+      });
+      setConfirmando(false);
+      if (resultado.ok) onConcluido();
+      else setErro(resultado.message ?? "Não foi possível corrigir os dados do ERP.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <>
+      <Modal
+        open={!confirmando}
+        title={`Corrigir código e ID do ERP do equipamento #${equipamento.numero}`}
+        description="O extrato do ERP é buscado por esses dois dados. Ao corrigir, o que veio do ERP com os valores antigos é apagado e o extrato é buscado de novo."
+        onClose={() => {
+          if (!salvando) onFechar();
+        }}
+        footer={
+          <Stack direction="row" gap={8} justify="end">
+            <Button variant="secondary" onClick={onFechar} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const mensagem = validar();
+                setErro(mensagem);
+                if (!mensagem) setConfirmando(true);
+              }}
+            >
+              Corrigir
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack gap={16}>
+          {erro && <Alert variant="danger">{erro}</Alert>}
+          <Field label="Código do item no ERP" htmlFor="corrigirErpCodigo" required hint={`Hoje: ${equipamento.erpCodigoItem || "vazio"}.`}>
+            <Input id="corrigirErpCodigo" value={codigo} maxLength={50} onChange={(event) => setCodigo(event.target.value)} disabled={salvando} />
+          </Field>
+          <Field
+            label="ID configurado"
+            htmlFor="corrigirErpId"
+            required
+            hint={`Hoje: ${equipamento.erpIdItem || "vazio"}. Não se repete entre equipamentos.`}
+          >
+            <Input id="corrigirErpId" value={idErp} maxLength={50} onChange={(event) => setIdErp(event.target.value)} disabled={salvando} />
+          </Field>
+          <Field label="Motivo" htmlFor="motivoCorrecaoErp" required hint="Fica registrado no histórico do equipamento.">
+            <Textarea id="motivoCorrecaoErp" rows={3} value={motivo} onChange={(event) => setMotivo(event.target.value)} disabled={salvando} />
+          </Field>
+        </Stack>
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmando}
+        title={`Corrigir os dados do ERP do #${equipamento.numero}?`}
+        variant="warning"
+        message="Os movimentos que vieram do ERP com o código e o ID antigos são apagados, o status volta ao do último movimento do Portal e o extrato é buscado de novo."
         confirmLabel="Corrigir"
         loading={salvando}
         onConfirm={salvar}

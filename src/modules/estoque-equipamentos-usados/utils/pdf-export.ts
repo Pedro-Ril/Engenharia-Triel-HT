@@ -169,13 +169,13 @@ function desenharFaixaCabecalho(doc: jsPDF, equipamento: Equipamento, tituloPagi
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...COR_FAIXA_CLARA);
-  doc.text(espacar("Portal Triel-HT · Estoque de Equipamentos Usados"), MARGEM, 10);
+  doc.text(espacar("Portal Triel-HT · Estoque de Equipamentos"), MARGEM, 10);
 
   doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
   doc.text(tituloPagina, MARGEM, 21);
 
-  const rotuloNumero = `Nº ${equipamento.numero}`;
+  const rotuloNumero = `Nº ${equipamento.numero}${equipamento.condicao === "novo" ? " · Novo" : ""}`;
   doc.setFontSize(13);
   const larguraChip = doc.getTextWidth(rotuloNumero) + 12;
   const xChip = LARGURA_PAGINA - MARGEM - larguraChip;
@@ -257,7 +257,7 @@ function desenharRodapes(doc: jsPDF, geradoEm: Date): void {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...COR_TEXTO_SUAVE);
-    doc.text("Portal Triel-HT · Estoque de Equipamentos Usados", MARGEM, RODAPE_Y);
+    doc.text("Portal Triel-HT · Estoque de Equipamentos", MARGEM, RODAPE_Y);
     doc.text(
       `Página ${pagina} de ${totalPaginas}  ·  Gerado em ${formatarDataHora(geradoEm)}`,
       LARGURA_PAGINA - MARGEM,
@@ -391,7 +391,7 @@ export function exportarPdfEntradaEquipamento(
 
   desenharRodapes(doc, geradoEm);
 
-  doc.save(`entrada-equipamento-${equipamento.numero}.pdf`);
+  doc.save(`entrada-equipamento-${equipamento.condicao === "novo" ? "novo-" : ""}${equipamento.numero}.pdf`);
 }
 
 /*
@@ -534,5 +534,5 @@ export function exportarPdfEstratoEquipamento(
 
   desenharRodapes(doc, geradoEm);
 
-  doc.save(`extrato-equipamento-${equipamento.numero}.pdf`);
+  doc.save(`extrato-equipamento-${equipamento.condicao === "novo" ? "novo-" : ""}${equipamento.numero}.pdf`);
 }

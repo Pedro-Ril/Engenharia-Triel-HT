@@ -55,6 +55,7 @@ import {
   listarTiposEquipamentoAdmin,
   restaurarCampoSistemaEquipamento,
 } from "@/modules/estoque-equipamentos-usados/services/estoque.service";
+import type { CondicaoBloco } from "@/modules/estoque-equipamentos-usados/types/estoque.types";
 import type {
   BlocoTipoEquipamento,
   CampoTipoEquipamento,
@@ -99,12 +100,21 @@ function formCampoInicial() {
     geraPendencia: false,
     travaMovimentacao: false,
     vemDeIntegracao: false,
+    mostrarBiItens: false,
+    condicao: "ambos" as CondicaoBloco,
+    obrigatorioNovo: false,
   };
 }
 
 interface TiposEquipamentoPainelProps {
   onFeedback: FeedbackHandler;
 }
+
+const ROTULO_CONDICAO_BLOCO: Record<CondicaoBloco, string> = {
+  ambos: "Usados e novos",
+  usado: "Só usados",
+  novo: "Só novos",
+};
 
 export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelProps) {
   const [carregando, setCarregando] = useState(true);
@@ -131,7 +141,11 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
 
   const [modalBlocoAberto, setModalBlocoAberto] = useState(false);
   const [blocoEditando, setBlocoEditando] = useState<BlocoTipoEquipamento | null>(null);
-  const [formBloco, setFormBloco] = useState({ nome: "", ordem: "0" });
+  const [formBloco, setFormBloco] = useState<{ nome: string; ordem: string; condicao: CondicaoBloco }>({
+    nome: "",
+    ordem: "0",
+    condicao: "ambos",
+  });
   const [salvandoBloco, setSalvandoBloco] = useState(false);
   const [erroBlocoModal, setErroBlocoModal] = useState<string | null>(null);
 
@@ -252,7 +266,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
 
   function abrirEdicaoBloco(bloco: BlocoTipoEquipamento) {
     setBlocoEditando(bloco);
-    setFormBloco({ nome: bloco.nome, ordem: String(bloco.ordem) });
+    setFormBloco({ nome: bloco.nome, ordem: String(bloco.ordem), condicao: bloco.condicao });
     setErroBlocoModal(null);
     setModalBlocoAberto(true);
   }
@@ -271,15 +285,18 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
     try {
       const novoNome = formBloco.nome;
       const novaOrdem = Number(formBloco.ordem) || 0;
+      /* O bloco fixo (Recebimento) vale sempre para os dois. */
+      const novaCondicao: CondicaoBloco = blocoEditando.ehFixo ? "ambos" : formBloco.condicao;
       const resultado = await atualizarBlocoTipoEquipamento(tipoSelecionadoId, blocoEditando.id, {
         nome: novoNome,
         ordem: novaOrdem,
+        condicao: novaCondicao,
       });
 
       if (resultado.ok) {
         setBlocosDoTipo((atual) =>
           atual.map((item) =>
-            item.id === blocoEditando.id ? { ...item, nome: novoNome, ordem: novaOrdem } : item
+            item.id === blocoEditando.id ? { ...item, nome: novoNome, ordem: novaOrdem, condicao: novaCondicao } : item
           )
         );
         fecharModalBloco();
@@ -357,6 +374,9 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
       geraPendencia: campo.geraPendencia,
       travaMovimentacao: campo.travaMovimentacao,
       vemDeIntegracao: campo.vemDeIntegracao,
+      mostrarBiItens: campo.mostrarBiItens,
+      condicao: campo.condicao,
+      obrigatorioNovo: campo.obrigatorioNovo,
     });
     setErroCampo(null);
     setModalCampoAberto(true);
@@ -389,6 +409,9 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
           obrigatorio: formCampo.obrigatorio,
           ordem: Number(formCampo.ordem) || 0,
           vemDeIntegracao: formCampo.vemDeIntegracao,
+          mostrarBiItens: formCampo.mostrarBiItens,
+          condicao: formCampo.condicao,
+          obrigatorioNovo: formCampo.vemDeIntegracao ? false : formCampo.obrigatorioNovo,
           /*
            * tipoDado/opcoes nunca podem ser enviados pra um campo de
            * sistema — o backend recusa a requisição inteira só de ver
@@ -420,6 +443,9 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                       ? formCampo.travaMovimentacao
                       : item.travaMovimentacao,
                     vemDeIntegracao: formCampo.vemDeIntegracao,
+                    mostrarBiItens: formCampo.mostrarBiItens,
+                    condicao: formCampo.condicao,
+                    obrigatorioNovo: formCampo.vemDeIntegracao ? false : formCampo.obrigatorioNovo,
                   }
                 : item
             )
@@ -675,6 +701,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Nome</TableHeaderCell>
+                    <TableHeaderCell>Vale para</TableHeaderCell>
                     <TableHeaderCell align="center">Ordem</TableHeaderCell>
                     <TableHeaderCell align="center">Ativo</TableHeaderCell>
                     <TableHeaderCell align="center"> </TableHeaderCell>
@@ -689,6 +716,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                           {bloco.ehFixo && <Badge variant="info">Fixo</Badge>}
                         </Stack>
                       </TableCell>
+                      <TableCell>{ROTULO_CONDICAO_BLOCO[bloco.ehFixo ? "ambos" : bloco.condicao]}</TableCell>
                       <TableCell align="center">{bloco.ordem}</TableCell>
                       <TableCell align="center">
                         <div className={styles.checkboxCentro}>
@@ -823,6 +851,25 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
               />
             </Field>
           </FormGrid>
+
+          <Field
+            label="Vale para"
+            hint={
+              blocoEditando?.ehFixo
+                ? "O bloco fixo aparece sempre, para equipamentos usados e novos."
+                : "Em quais equipamentos o bloco aparece na entrada e no detalhe. Ex.: Estado de conservação só para usados."
+            }
+          >
+            <Dropdown
+              value={blocoEditando?.ehFixo ? "ambos" : formBloco.condicao}
+              options={(Object.keys(ROTULO_CONDICAO_BLOCO) as CondicaoBloco[]).map((valor) => ({
+                value: valor,
+                label: ROTULO_CONDICAO_BLOCO[valor],
+              }))}
+              onValueChange={(valor) => setFormBloco((atual) => ({ ...atual, condicao: valor as CondicaoBloco }))}
+              disabled={Boolean(blocoEditando?.ehFixo)}
+            />
+          </Field>
 
           {erroBlocoModal && <Alert variant="danger">{erroBlocoModal}</Alert>}
         </Stack>
@@ -973,23 +1020,56 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
             }
           />
 
-          <Checkbox
-            label="Obrigatório"
-            checked={formCampo.obrigatorio}
-            disabled={
-              formCampo.vemDeIntegracao ||
-              (campoEditando !== null &&
-                campoEditando.ehSistema &&
-                CHAVES_SISTEMA_SEMPRE_OBRIGATORIAS.includes(campoEditando.chave))
-            }
-            onChange={(event) =>
-              setFormCampo((atual) => ({
-                ...atual,
-                obrigatorio: event.target.checked,
-                geraPendencia: event.target.checked ? false : atual.geraPendencia,
-              }))
-            }
-          />
+          {campoEditando && (
+            <Field
+              label="Aparece para"
+              hint="Em quais equipamentos o campo aparece na entrada, na edição e no detalhe. Ex.: Cliente só para usados."
+            >
+              <Dropdown
+                value={formCampo.condicao}
+                options={[
+                  { value: "ambos", label: "Usados e novos" },
+                  { value: "usado", label: "Só usados" },
+                  { value: "novo", label: "Só novos" },
+                ]}
+                onValueChange={(valor) => setFormCampo((atual) => ({ ...atual, condicao: valor as CondicaoBloco }))}
+                disabled={campoEditando.ehSistema && CHAVES_SISTEMA_SEMPRE_OBRIGATORIAS.includes(campoEditando.chave)}
+              />
+            </Field>
+          )}
+
+          {/* Campo só de novos: o obrigatório que vale é o "no novo" (abaixo). */}
+          {formCampo.condicao !== "novo" && (
+            <Checkbox
+              label={campoEditando && formCampo.condicao === "ambos" ? "Obrigatório no usado" : "Obrigatório"}
+              checked={formCampo.obrigatorio}
+              disabled={
+                formCampo.vemDeIntegracao ||
+                (campoEditando !== null &&
+                  campoEditando.ehSistema &&
+                  CHAVES_SISTEMA_SEMPRE_OBRIGATORIAS.includes(campoEditando.chave))
+              }
+              onChange={(event) =>
+                setFormCampo((atual) => ({
+                  ...atual,
+                  obrigatorio: event.target.checked,
+                  geraPendencia: event.target.checked ? false : atual.geraPendencia,
+                }))
+              }
+            />
+          )}
+
+          {campoEditando && formCampo.condicao !== "usado" && (
+            <Checkbox
+              label="Obrigatório no novo"
+              checked={formCampo.obrigatorioNovo}
+              disabled={
+                formCampo.vemDeIntegracao ||
+                (campoEditando.ehSistema && CHAVES_SISTEMA_SEMPRE_OBRIGATORIAS.includes(campoEditando.chave))
+              }
+              onChange={(event) => setFormCampo((atual) => ({ ...atual, obrigatorioNovo: event.target.checked }))}
+            />
+          )}
 
           {formCampo.vemDeIntegracao && (
             <Alert variant="info">
@@ -1020,6 +1100,14 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
               onChange={(event) =>
                 setFormCampo((atual) => ({ ...atual, travaMovimentacao: event.target.checked }))
               }
+            />
+          )}
+
+          {campoEditando && (
+            <Checkbox
+              label="Mostrar no BI de itens (vira coluna na tabela da TV de usados e de novos)"
+              checked={formCampo.mostrarBiItens}
+              onChange={(event) => setFormCampo((atual) => ({ ...atual, mostrarBiItens: event.target.checked }))}
             />
           )}
 

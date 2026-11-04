@@ -2,6 +2,7 @@ import "server-only";
 
 import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
+import { verificarIdErpDisponivel } from "@/lib/estoque-equipamentos-usados/estoque-equipamentos-usados";
 import { STATUS_LABELS } from "@/modules/estoque-equipamentos-usados/utils/rotulos";
 import type { MotivoBaixa, StatusEquipamento, TipoAcaoMovimentacao } from "@/modules/estoque-equipamentos-usados/types/estoque.types";
 
@@ -185,4 +186,102 @@ export async function ajustarStatusEquipamento(params: {
     throw new ValidationError("O status do equipamento mudou enquanto o ajuste era preparado. Abra de novo e tente outra vez.");
   }
   return { statusAnterior: equipamento.status, novoStatus };
+}
+
+/*
+ * Corrige o código do item e o ID configurado do ERP de um equipamento NOVO
+ * (digitados na entrada -- no usado quem preenche é a integração pela NF).
+ * O extrato do ERP é buscado por eles: com o valor errado, a cópia do
+ * extrato e os movimentos que vieram do ERP são de outro item. Por isso,
+ * mudando qualquer um dos dois, isso é apagado e o status volta ao do
+ * último movimento do Portal; a rota busca o extrato de novo em seguida.
+ */
+export async function corrigirDadosErpNovo(params: {
+  id: string;
+  erpCodigoItem: string;
+  erpIdItem: string;
+  motivo: string;
+  usuarioNome: string;
+}): Promise<{ erpCodigoItem: string; erpIdItem: string }> {
+  const codigo = params.erpCodigoItem.trim();
+  const idErp = params.erpIdItem.trim();
+  if (!codigo) throw new ValidationError("Informe o código do item no ERP.");
+  if (!idErp) throw new ValidationError("Informe o ID configurado do ERP.");
+  validarMotivo(params.motivo);
+
+  const pool = await getSqlServerPool();
+  const atual = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, params.id)
+    .query<{ numero: number; descricao: string; condicao: string; erp_codigo_item: string | null; erp_id_item: string | null }>(`
+      SELECT [numero], [descricao], [condicao], [erp_codigo_item], [erp_id_item]
+      FROM dbo.com_estoque_equipamentos_usados WHERE [id] = @id;
+    `);
+  const equipamento = atual.recordset[0];
+  if (!equipamento) throw new ValidationError("Equipamento não encontrado.");
+  if (equipamento.condicao !== "novo") {
+    throw new ValidationError("Só o equipamento novo tem o código e o ID digitados; no usado eles vêm da integração pela NF de entrada.");
+  }
+
+  const codigoAntes = equipamento.erp_codigo_item?.trim() || "";
+  const idAntes = equipamento.erp_id_item?.trim() || "";
+  if (codigoAntes === codigo && idAntes === idErp) throw new ValidationError("O código e o ID informados são iguais aos atuais.");
+  if (idAntes !== idErp) await verificarIdErpDisponivel(idErp, params.id);
+
+  const alteracoes = [
+    ...(codigoAntes !== codigo ? [{ campo: "erpCodigoItem", rotulo: "Código do item no ERP", de: codigoAntes, para: codigo }] : []),
+    ...(idAntes !== idErp ? [{ campo: "erpIdItem", rotulo: "ID configurado", de: idAntes, para: idErp }] : []),
+  ];
+  const detalhes = JSON.stringify({
+    equipamentoId: params.id,
+    numero: equipamento.numero,
+    descricao: equipamento.descricao,
+    alteracoes,
+    motivo: params.motivo.trim(),
+  });
+  const mensagem = `${params.usuarioNome} corrigiu ${alteracoes.map((a) => a.rotulo.toLowerCase()).join(" e ")} do equipamento novo #${equipamento.numero} (${equipamento.descricao}); o extrato do ERP será buscado de novo.`;
+
+  const r = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, params.id)
+    .input("codigoAntes", sql.NVarChar(50), equipamento.erp_codigo_item)
+    .input("idAntes", sql.NVarChar(50), equipamento.erp_id_item)
+    .input("codigo", sql.NVarChar(50), codigo)
+    .input("idErp", sql.NVarChar(50), idErp)
+    .input("mensagem", sql.NVarChar(2000), mensagem.slice(0, 2000))
+    .input("detalhes", sql.NVarChar(sql.MAX), detalhes)
+    .query<{ linhas: number }>(`
+      SET XACT_ABORT ON;
+      BEGIN TRANSACTION;
+      UPDATE dbo.com_estoque_equipamentos_usados
+      SET [erp_codigo_item] = @codigo, [erp_id_item] = @idErp,
+          [erp_local] = NULL, [erp_local_desde] = NULL, [erp_cod_emp_atual] = NULL, [erp_contraparte_atual] = NULL,
+          [erp_custo_compra] = NULL, [erp_extrato_em] = NULL, [erp_extrato_erro] = NULL,
+          [atualizado_em] = SYSDATETIME()
+      WHERE [id] = @id AND [condicao] = 'novo'
+        AND ISNULL([erp_codigo_item], N'') = ISNULL(@codigoAntes, N'')
+        AND ISNULL([erp_id_item], N'') = ISNULL(@idAntes, N'');
+      DECLARE @linhas INT = @@ROWCOUNT;
+      IF @linhas = 1
+      BEGIN
+        /* O que veio do ERP com o código/ID antigo é de outro item: sai, e o extrato é buscado de novo. */
+        DELETE FROM dbo.com_estoque_equipamentos_usados_movimentacoes WHERE [equipamento_id] = @id AND [origem] = 'erp';
+        UPDATE dbo.com_estoque_equipamentos_usados_movimentacoes SET [erp_id_movimentacao] = NULL WHERE [equipamento_id] = @id;
+        DELETE FROM dbo.com_estoque_equipamentos_usados_erp_movimentos WHERE [equipamento_id] = @id;
+        UPDATE dbo.com_estoque_equipamentos_usados
+        SET [status] = ISNULL((
+              SELECT TOP 1 m.[status_resultante] FROM dbo.com_estoque_equipamentos_usados_movimentacoes m
+              WHERE m.[equipamento_id] = @id ORDER BY m.[data_acao] DESC, m.[criado_em] DESC
+            ), 'em_estoque')
+        WHERE [id] = @id;
+        INSERT INTO dbo.portal_logs ([nivel], [origem], [mensagem], [detalhes])
+        VALUES ('aviso', '${ORIGEM_HISTORICO}', @mensagem, @detalhes);
+      END;
+      COMMIT TRANSACTION;
+      SELECT @linhas AS [linhas];
+    `);
+  if (r.recordset[0]?.linhas !== 1) {
+    throw new ValidationError("O equipamento mudou enquanto a correção era preparada. Abra de novo e tente outra vez.");
+  }
+  return { erpCodigoItem: codigo, erpIdItem: idErp };
 }

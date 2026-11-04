@@ -173,7 +173,7 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
       },
       {
         valor: "estoque-tipos-equipamento",
-        label: "Equipamentos Usados",
+        label: "Estoque de Equipamentos",
         icon: <Warehouse size={16} />,
       },
       {

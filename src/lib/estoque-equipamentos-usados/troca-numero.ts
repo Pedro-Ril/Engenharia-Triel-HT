@@ -43,14 +43,27 @@ export async function trocarNumeroEquipamento(params: {
   const atual = await pool
     .request()
     .input("id", sql.UniqueIdentifier, id)
-    .query<{ numero: number; numero_serie: string | null; numero_nf_entrada: string | null; integrado: number }>(`
-      SELECT [numero], [numero_serie], [numero_nf_entrada],
+    .query<{
+      numero: number;
+      numero_serie: string | null;
+      numero_nf_entrada: string | null;
+      integrado: number;
+      condicao: "usado" | "novo";
+      tipo_equipamento_id: string | null;
+    }>(`
+      SELECT [numero], [numero_serie], [numero_nf_entrada], [condicao],
+             CONVERT(VARCHAR(36), [tipo_equipamento_id]) AS [tipo_equipamento_id],
              CASE WHEN [nf_entrada_confirmada_em] IS NOT NULL OR [erp_id_item] IS NOT NULL THEN 1 ELSE 0 END AS [integrado]
       FROM dbo.com_estoque_equipamentos_usados WHERE [id] = @id;
     `);
   const equipamento = atual.recordset[0];
   if (!equipamento) throw new ValidationError("Equipamento não encontrado.");
   if (equipamento.numero === novoNumero) throw new ValidationError("O número novo é igual ao atual.");
+  const ehNovo = equipamento.condicao === "novo";
+  /* O novo não tem NF de entrada: não há integração de entrada a desfazer. */
+  if (ehNovo && params.desfazerIntegracao) {
+    throw new ValidationError("Equipamento novo não tem integração de NF de entrada para desfazer.");
+  }
 
   /*
    * NF que a pessoa digitou na entrada: se a integração trocou por outra
@@ -105,6 +118,8 @@ export async function trocarNumeroEquipamento(params: {
       .input("novoNumero", sql.Int, novoNumero)
       .input("trocarSerie", sql.Bit, serieAcompanha)
       .input("desfazer", sql.Bit, params.desfazerIntegracao)
+      .input("ehNovo", sql.Bit, ehNovo)
+      .input("tipo", sql.UniqueIdentifier, equipamento.tipo_equipamento_id)
       .input("nfDigitada", sql.NVarChar(30), nfDigitada)
       .input("mensagem", sql.NVarChar(2000), mensagem.slice(0, 2000))
       .input("detalhes", sql.NVarChar(sql.MAX), detalhes)
@@ -117,9 +132,15 @@ export async function trocarNumeroEquipamento(params: {
 
         IF NOT EXISTS (SELECT 1 FROM dbo.com_estoque_equipamentos_usados WITH (UPDLOCK, HOLDLOCK) WHERE [id] = @antigo AND [numero] = @numeroAntigo)
           THROW 50001, N'O equipamento mudou enquanto a troca era preparada. Abra de novo e tente outra vez.', 1;
-        IF EXISTS (SELECT 1 FROM dbo.com_estoque_equipamentos_usados WITH (UPDLOCK, HOLDLOCK) WHERE [numero] = @novoNumero)
+        /* Usado: número único entre os usados. Novo: único entre os novos do mesmo tipo. */
+        IF EXISTS (
+          SELECT 1 FROM dbo.com_estoque_equipamentos_usados WITH (UPDLOCK, HOLDLOCK)
+          WHERE [numero] = @novoNumero
+            AND [condicao] = CASE WHEN @ehNovo = 1 THEN 'novo' ELSE 'usado' END
+            AND (@ehNovo = 0 OR [tipo_equipamento_id] = @tipo)
+        )
         BEGIN
-          SET @msg = CONCAT(N'Já existe um equipamento com o número ', @novoNumero, N'.');
+          SET @msg = CONCAT(N'Já existe um equipamento ', CASE WHEN @ehNovo = 1 THEN N'novo deste tipo' ELSE N'usado' END, N' com o número ', @novoNumero, N'.');
           THROW 50002, @msg, 1;
         END;
 
@@ -137,6 +158,11 @@ export async function trocarNumeroEquipamento(params: {
           FROM sys.columns
           WHERE [object_id] = OBJECT_ID(N'dbo.com_estoque_equipamentos_usados') AND [name] NOT IN ('id', 'numero')
         );
+        /* O novo tem numeração própria: a cópia não pode empurrar a numeração automática dos usados. */
+        DECLARE @identAntes NUMERIC(38, 0) = IDENT_CURRENT('dbo.com_estoque_equipamentos_usados');
+        DECLARE @travaTabela INT;
+        IF @ehNovo = 1
+          SELECT @travaTabela = COUNT(*) FROM dbo.com_estoque_equipamentos_usados WITH (TABLOCKX, HOLDLOCK);
         DECLARE @copia NVARCHAR(MAX) = N'
           SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados ON;
           INSERT INTO dbo.com_estoque_equipamentos_usados ([id], [numero], ' + @colunas + N')
@@ -144,6 +170,8 @@ export async function trocarNumeroEquipamento(params: {
           SET IDENTITY_INSERT dbo.com_estoque_equipamentos_usados OFF;';
         EXEC sp_executesql @copia, N'@novo UNIQUEIDENTIFIER, @antigo UNIQUEIDENTIFIER, @novoNumero INT',
           @novo = @novo, @antigo = @antigo, @novoNumero = @novoNumero;
+        IF @ehNovo = 1 AND IDENT_CURRENT('dbo.com_estoque_equipamentos_usados') <> @identAntes
+          DBCC CHECKIDENT ('dbo.com_estoque_equipamentos_usados', RESEED, @identAntes) WITH NO_INFOMSGS;
 
         UPDATE dbo.com_estoque_equipamentos_usados_movimentacoes SET [equipamento_id] = @novo WHERE [equipamento_id] = @antigo;
         UPDATE dbo.com_estoque_equipamentos_usados_evidencias SET [equipamento_id] = @novo WHERE [equipamento_id] = @antigo;

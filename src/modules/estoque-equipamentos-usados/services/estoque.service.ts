@@ -4,6 +4,8 @@ import type {
   CampoPendenciaConfig,
   CampoTipoEquipamento,
   ClienteEstoqueItem,
+  CondicaoBloco,
+  CondicaoEquipamento,
   DirecaoOrdenacao,
   EmpresaOpcao,
   Equipamento,
@@ -12,7 +14,7 @@ import type {
   MotivoBaixa,
   OrdenacaoEquipamentos,
   PainelBiEstoque,
-  PainelGerencialCompleto,
+  PainelItens,
   ResultadoSincronizacaoErp,
   SituacaoErpEquipamento,
   StatusEquipamento,
@@ -45,6 +47,7 @@ export async function buscarClientesEstoque(): Promise<ClienteEstoqueItem[]> {
 }
 
 export async function listarEquipamentos(filtros: {
+  condicao?: CondicaoEquipamento;
   status?: StatusEquipamento;
   busca?: string;
   codigoEmpresa?: string;
@@ -55,6 +58,7 @@ export async function listarEquipamentos(filtros: {
   direcao?: DirecaoOrdenacao;
 }): Promise<{ itens: Equipamento[]; total: number } | null> {
   const params = new URLSearchParams();
+  if (filtros.condicao) params.set("condicao", filtros.condicao);
   if (filtros.status) params.set("status", filtros.status);
   if (filtros.busca) params.set("busca", filtros.busca);
   if (filtros.codigoEmpresa) params.set("codigoEmpresa", filtros.codigoEmpresa);
@@ -120,12 +124,13 @@ export async function excluirEquipamento(id: string): Promise<ApiEnvelope<null>>
 
 export async function duplicarEquipamento(
   id: string,
-  novoNumero: number
+  novoNumero: number,
+  novoIdErp: string | null = null
 ): Promise<ApiEnvelope<Equipamento>> {
   const response = await fetch(`/api/estoque-equipamentos-usados/${id}/duplicar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ novoNumero }),
+    body: JSON.stringify({ novoNumero, novoIdErp }),
   });
   return parseResponse(response);
 }
@@ -236,7 +241,7 @@ export async function criarBlocoTipoEquipamento(
 export async function atualizarBlocoTipoEquipamento(
   tipoEquipamentoId: string,
   blocoId: string,
-  dados: Partial<{ nome: string; ordem: number; ativo: boolean }>
+  dados: Partial<{ nome: string; ordem: number; ativo: boolean; condicao: CondicaoBloco }>
 ): Promise<ApiEnvelope<null>> {
   const response = await fetch(
     `/api/admin/estoque-equipamentos-usados/tipos/${tipoEquipamentoId}/blocos/${blocoId}`,
@@ -302,6 +307,9 @@ export async function atualizarCampoTipoEquipamento(
     geraPendencia: boolean;
     travaMovimentacao: boolean;
     vemDeIntegracao: boolean;
+    mostrarBiItens: boolean;
+    condicao: CondicaoBloco;
+    obrigatorioNovo: boolean;
   }>
 ): Promise<ApiEnvelope<null>> {
   const response = await fetch(
@@ -495,9 +503,19 @@ export async function validarEquipamentoNoErp(
  * src/lib/auth/rotas-publicas.ts) — usa fetch puro sem depender de
  * cookie de login.
  */
-export async function buscarPainelBiEstoque(): Promise<ApiEnvelope<PainelBiEstoque>> {
-  const response = await fetch("/api/estoque-equipamentos-usados/painel", { cache: "no-store" });
+export async function buscarPainelBiEstoque(condicao: CondicaoEquipamento = "usado"): Promise<ApiEnvelope<PainelBiEstoque>> {
+  const response = await fetch(`/api/estoque-equipamentos-usados/painel?condicao=${condicao}`, { cache: "no-store" });
   return parseResponse<PainelBiEstoque>(response);
+}
+
+/* BI de itens (TV, sem sessão): tabela de itens com as informações técnicas. */
+export async function buscarPainelItens(condicao: CondicaoEquipamento): Promise<ApiEnvelope<PainelItens>> {
+  try {
+    const response = await fetch(`/api/estoque-equipamentos-usados/painel/itens?condicao=${condicao}`, { cache: "no-store" });
+    return await parseResponse<PainelItens>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal." };
+  }
 }
 
 /* ---------- integração pelo extrato do ERP ---------- */
@@ -517,16 +535,6 @@ export async function atualizarDoErp(id: string): Promise<ApiEnvelope<ResultadoS
   }
 }
 
-/* Painel gerencial (TV, sem sessão): as duas páginas numa chamada. */
-export async function buscarPainelGerencial(): Promise<ApiEnvelope<PainelGerencialCompleto>> {
-  try {
-    const response = await fetch("/api/estoque-equipamentos-usados/painel/gerencial", { cache: "no-store" });
-    return await parseResponse<PainelGerencialCompleto>(response);
-  } catch {
-    return { ok: false, message: "Sem conexão com o Portal." };
-  }
-}
-
 /* Troca o número do equipamento (admin). Volta o id do registro novo. */
 export async function corrigirNumeroSerieEquipamento(
   id: string,
@@ -539,6 +547,22 @@ export async function corrigirNumeroSerieEquipamento(
       body: JSON.stringify(dados),
     });
     return await parseResponse<{ numeroSerieAnterior: string | null; numeroSerie: string }>(response);
+  } catch {
+    return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
+  }
+}
+
+export async function corrigirDadosErpEquipamento(
+  id: string,
+  dados: { erpCodigoItem: string; erpIdItem: string; motivo: string }
+): Promise<ApiEnvelope<{ erpCodigoItem: string; erpIdItem: string; extratoAtualizado: boolean }>> {
+  try {
+    const response = await fetch(`/api/estoque-equipamentos-usados/${id}/dados-erp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+    });
+    return await parseResponse<{ erpCodigoItem: string; erpIdItem: string; extratoAtualizado: boolean }>(response);
   } catch {
     return { ok: false, message: "Sem conexão com o Portal. Tente de novo." };
   }

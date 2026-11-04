@@ -169,7 +169,7 @@ export function EstoqueEquipamentosUsadosConfigPainel({
 
   return (
     <Card
-      title="Estoque de Equipamentos Usados"
+      title="Estoque de Equipamentos"
       description="Endpoints do ERP usados nesse módulo."
     >
       <Stack gap={20}>

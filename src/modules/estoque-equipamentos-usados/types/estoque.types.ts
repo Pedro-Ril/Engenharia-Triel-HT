@@ -14,6 +14,11 @@ export interface ClienteEstoqueItem {
 
 export type StatusEquipamento = "em_estoque" | "emprestado" | "consignado" | "em_reforma" | "baixado";
 
+/* Usado (entra por NF de compra, número automático) ou novo (fabricação interna, número digitado por tipo). */
+export type CondicaoEquipamento = "usado" | "novo";
+/* Para quais equipamentos um bloco do tipo vale. */
+export type CondicaoBloco = "ambos" | "usado" | "novo";
+
 /* Colunas da lista que ordenam ao clicar no título (a ordenação é no servidor, por causa da paginação). */
 export type OrdenacaoEquipamentos = "numero" | "descricao" | "cliente" | "marcaModelo" | "status" | "criadoEm";
 export type DirecaoOrdenacao = "asc" | "desc";
@@ -31,6 +36,7 @@ export type MotivoBaixa = "venda" | "descarte" | "perda" | "outro";
 export interface Equipamento {
   id: string;
   numero: number;
+  condicao: CondicaoEquipamento;
   tipoEquipamentoId: string | null;
   nomeCliente: string | null;
   codigoCliente: string | null;
@@ -193,6 +199,7 @@ export interface BlocoTipoEquipamento {
   ehFixo: boolean;
   ordem: number;
   ativo: boolean;
+  condicao: CondicaoBloco;
 }
 
 export interface CampoTipoEquipamento {
@@ -212,6 +219,11 @@ export interface CampoTipoEquipamento {
   geraPendencia: boolean;
   travaMovimentacao: boolean;
   vemDeIntegracao: boolean;
+  /* Vira coluna na tabela do BI de itens (TV). */
+  mostrarBiItens: boolean;
+  /* Para quais equipamentos o campo aparece; obrigatorioNovo = obrigatório no novo (obrigatorio vale para o usado). */
+  condicao: CondicaoBloco;
+  obrigatorioNovo: boolean;
 }
 
 export interface CampoPendenciaConfig {
@@ -219,6 +231,8 @@ export interface CampoPendenciaConfig {
   chave: string;
   rotulo: string;
   travaMovimentacao: boolean;
+  /* Para quais equipamentos o campo aparece: pendência só conta onde ele existe. */
+  condicao: CondicaoBloco;
 }
 
 export interface EvidenciaEquipamento {
@@ -268,6 +282,26 @@ export interface PainelBiCliente {
   quantidadeConsignado: number;
 }
 
+/* Espelho de src/lib/estoque-equipamentos-usados/painel-itens.ts (BI de itens, TV). */
+export interface PainelItens {
+  condicao: CondicaoEquipamento;
+  totalItens: number;
+  tipos: {
+    tipoId: string;
+    tipoNome: string;
+    colunas: { chave: string; rotulo: string }[];
+    linhas: {
+      id: string;
+      numero: number;
+      descricao: string;
+      status: StatusEquipamento;
+      comQuem: string | null;
+      valores: Record<string, string>;
+    }[];
+  }[];
+  atualizadoEm: string;
+}
+
 export interface PainelBiEstoque {
   totalEquipamentos: number;
   valorTotalEmEstoque: number;
@@ -280,33 +314,4 @@ export interface PainelBiEstoque {
   movimentacoesRecentes: PainelBiMovimentacao[];
   clientesComEquipamentoFora: PainelBiCliente[];
   atualizadoEm: string;
-}
-
-/* Espelho de src/lib/estoque-equipamentos-usados/painel-gerencial-regras.ts. */
-export interface PainelGerencial {
-  valorAtivo: number;
-  valorPorStatus: { status: StatusEquipamento; quantidade: number; valorTotal: number }[];
-  quantidadeFora: number;
-  valorFora: number;
-  percentualForaValor: number | null;
-  prazoMedioForaDias: number | null;
-  acima180: { quantidade: number; valor: number };
-  maiorPrazo: { numero: number; dias: number; cliente: string | null } | null;
-  aging: { faixa: string; emprestado: number; consignado: number; em_reforma: number; quantidade: number }[];
-  valorForaPorTipo: { tipoNome: string; valorTotal: number; quantidade: number }[];
-  fluxoPorMes: { mes: string; saidas: number; retornos: number; vendas: number }[];
-  consignacoes: {
-    viraramVenda: number;
-    voltaram: number;
-    emAberto: number;
-    diasMedioAteVenda: number | null;
-    diasMedioAteRetorno: number | null;
-  };
-  clientesFora: { nomeCliente: string; valorTotal: number; quantidade: number; prazoMedioDias: number }[];
-  atualizadoEm: string;
-}
-
-export interface PainelGerencialCompleto {
-  quantidade: PainelBiEstoque;
-  gerencial: PainelGerencial;
 }

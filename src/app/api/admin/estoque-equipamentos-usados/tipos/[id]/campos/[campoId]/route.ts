@@ -43,6 +43,12 @@ function optionalOpcoes(value: unknown): string[] | null | undefined {
   return value.map((item) => item.trim());
 }
 
+function lerCondicaoCampo(valor: unknown): "ambos" | "usado" | "novo" | undefined {
+  if (valor === undefined) return undefined;
+  if (valor === "ambos" || valor === "usado" || valor === "novo") return valor;
+  throw new ValidationError("Condição do campo inválida.");
+}
+
 async function handlePATCH(request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
   if (acesso.negado) return acesso.negado;
@@ -78,6 +84,15 @@ async function handlePATCH(request: Request, context: RouteContext) {
         parsedBody.vemDeIntegracao === undefined
           ? undefined
           : optionalBoolean(parsedBody.vemDeIntegracao, "vem de integração", false),
+      mostrarBiItens:
+        parsedBody.mostrarBiItens === undefined
+          ? undefined
+          : optionalBoolean(parsedBody.mostrarBiItens, "mostrar no BI de itens", false),
+      condicao: lerCondicaoCampo(parsedBody.condicao),
+      obrigatorioNovo:
+        parsedBody.obrigatorioNovo === undefined
+          ? undefined
+          : optionalBoolean(parsedBody.obrigatorioNovo, "obrigatório no novo", false),
     });
 
     return NextResponse.json({ ok: true, message: "Campo atualizado." });

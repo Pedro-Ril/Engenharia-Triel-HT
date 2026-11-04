@@ -5,6 +5,7 @@ import { ValidationError } from "@/lib/auth/errors";
 import { isObject, optionalBoolean, optionalInteger, optionalText } from "@/lib/auth/validation";
 import {
   atualizarBlocoTipo,
+  type CondicaoBloco,
   excluirBlocoTipo,
 } from "@/lib/estoque-equipamentos-usados/tipos-equipamento";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
@@ -14,6 +15,12 @@ export const dynamic = "force-dynamic";
 
 interface RouteContext {
   params: Promise<{ id: string; blocoId: string }>;
+}
+
+function lerCondicaoBloco(valor: unknown): CondicaoBloco | undefined {
+  if (valor === undefined) return undefined;
+  if (valor === "ambos" || valor === "usado" || valor === "novo") return valor;
+  throw new ValidationError("Condição do bloco inválida.");
 }
 
 async function handlePATCH(request: Request, context: RouteContext) {
@@ -32,6 +39,7 @@ async function handlePATCH(request: Request, context: RouteContext) {
       nome: optionalText(parsedBody.nome, "nome", 100) ?? undefined,
       ordem: parsedBody.ordem === undefined ? undefined : optionalInteger(parsedBody.ordem, "ordem", 0),
       ativo: parsedBody.ativo === undefined ? undefined : optionalBoolean(parsedBody.ativo, "ativo", true),
+      condicao: lerCondicaoBloco(parsedBody.condicao),
     });
 
     return NextResponse.json({ ok: true, message: "Bloco atualizado." });

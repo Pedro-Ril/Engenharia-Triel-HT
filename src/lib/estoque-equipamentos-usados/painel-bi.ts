@@ -2,8 +2,9 @@ import "server-only";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
-import type { StatusEquipamento, TipoAcaoMovimentacao } from "./estoque-equipamentos-usados";
+import type { CondicaoEquipamento, StatusEquipamento, TipoAcaoMovimentacao } from "./estoque-equipamentos-usados";
 import { COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA, listarCamposComPendencia } from "./tipos-equipamento";
+import { campoValeParaCondicao } from "@/modules/estoque-equipamentos-usados/utils/campos-condicao";
 
 export interface PainelBiContagemStatus {
   status: StatusEquipamento;
@@ -65,7 +66,8 @@ export interface PainelBiEstoque {
  * algo acionável.
  */
 async function contarEquipamentosComPendencia(
-  pool: Awaited<ReturnType<typeof getSqlServerPool>>
+  pool: Awaited<ReturnType<typeof getSqlServerPool>>,
+  condicao: CondicaoEquipamento
 ): Promise<number> {
   const camposPendencia = await listarCamposComPendencia();
 
@@ -73,6 +75,10 @@ async function contarEquipamentosComPendencia(
   for (const campo of camposPendencia) {
     const coluna = COLUNA_EQUIPAMENTO_POR_CHAVE_SISTEMA[campo.chave];
     if (!coluna) continue;
+    /* NF de entrada e data de entrada não existem para o novo (fabricação interna). */
+    if (condicao === "novo" && (coluna === "numero_nf_entrada" || coluna === "erp_data_entrada")) continue;
+    /* Campo que não aparece para a condição (ex.: Cliente no novo) não é pendência. */
+    if (!campoValeParaCondicao(campo, condicao)) continue;
     const colunas = colunasPorTipo.get(campo.tipoEquipamentoId) ?? new Set<string>();
     colunas.add(coluna);
     colunasPorTipo.set(campo.tipoEquipamentoId, colunas);
@@ -80,7 +86,7 @@ async function contarEquipamentosComPendencia(
 
   if (colunasPorTipo.size === 0) return 0;
 
-  const request = pool.request();
+  const request = pool.request().input("condicao", sql.VarChar(10), condicao);
   const condicoesPorTipo: string[] = [];
   let indice = 0;
 
@@ -113,14 +119,16 @@ async function contarEquipamentosComPendencia(
 
   const result = await request.query<{ total: number }>(`
     SELECT COUNT(*) AS [total] FROM dbo.com_estoque_equipamentos_usados
-    WHERE [status] <> 'baixado' AND (${condicoesPorTipo.join(" OR ")});
+    WHERE [status] <> 'baixado' AND [condicao] = @condicao AND (${condicoesPorTipo.join(" OR ")});
   `);
 
   return result.recordset[0]?.total ?? 0;
 }
 
-export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
+/* condicao: o painel é dos usados ou dos novos (o padrão continua sendo o dos usados). */
+export async function obterDadosPainelBi(condicao: CondicaoEquipamento = "usado"): Promise<PainelBiEstoque> {
   const pool = await getSqlServerPool();
+  const req = () => pool.request().input("condicao", sql.VarChar(10), condicao);
 
   const [
     totaisResult,
@@ -141,7 +149,7 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
      * gera_pendencia marcado — NF de entrada é importante o bastante pra
      * não depender de configuração de admin.
      */
-    pool.request().query<{
+    req().query<{
       total: number;
       valorTotalEmEstoque: number | null;
       semNfEntrada: number;
@@ -150,32 +158,34 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
       SELECT
         COUNT(*) AS [total],
         SUM(CASE WHEN [status] = 'em_estoque' THEN [valor] ELSE 0 END) AS [valorTotalEmEstoque],
-        SUM(CASE WHEN [status] = 'em_estoque' AND [numero_nf_entrada] IS NULL THEN 1 ELSE 0 END) AS [semNfEntrada],
+        SUM(CASE WHEN [status] = 'em_estoque' AND [condicao] = 'usado' AND [numero_nf_entrada] IS NULL THEN 1 ELSE 0 END) AS [semNfEntrada],
         SUM(CASE
-          WHEN [status] = 'em_estoque'
+          WHEN [status] = 'em_estoque' AND [condicao] = 'usado'
             AND [numero_nf_entrada] IS NOT NULL AND [numero_nf_entrada] <> ''
             AND ([erp_codigo_item] IS NULL OR [erp_id_item] IS NULL OR [erp_data_entrada] IS NULL)
           THEN 1 ELSE 0
         END) AS [nfAguardandoValidacao]
-      FROM dbo.com_estoque_equipamentos_usados;
+      FROM dbo.com_estoque_equipamentos_usados
+      WHERE [condicao] = @condicao;
     `),
-    pool.request().query<{ status: StatusEquipamento; quantidade: number; valorTotal: number | null }>(`
+    req().query<{ status: StatusEquipamento; quantidade: number; valorTotal: number | null }>(`
       SELECT [status], COUNT(*) AS [quantidade], SUM(ISNULL([valor], 0)) AS [valorTotal]
       FROM dbo.com_estoque_equipamentos_usados
+      WHERE [condicao] = @condicao
       GROUP BY [status];
     `),
-    pool.request().query<{ tipoId: string; tipoNome: string; quantidade: number; valorTotal: number | null }>(`
+    req().query<{ tipoId: string; tipoNome: string; quantidade: number; valorTotal: number | null }>(`
       SELECT TOP (8)
         CONVERT(VARCHAR(36), t.[id]) AS [tipoId],
         t.[nome] AS [tipoNome],
         COUNT(e.[id]) AS [quantidade],
         SUM(ISNULL(e.[valor], 0)) AS [valorTotal]
       FROM dbo.com_estoque_tipos_equipamento AS t
-      INNER JOIN dbo.com_estoque_equipamentos_usados AS e ON e.[tipo_equipamento_id] = t.[id]
+      INNER JOIN dbo.com_estoque_equipamentos_usados AS e ON e.[tipo_equipamento_id] = t.[id] AND e.[condicao] = @condicao
       GROUP BY t.[id], t.[nome]
       ORDER BY COUNT(e.[id]) DESC;
     `),
-    pool.request().query<{ mes: string; quantidade: number }>(`
+    req().query<{ mes: string; quantidade: number }>(`
       ;WITH Meses AS (
         SELECT DATEFROMPARTS(
           YEAR(DATEADD(MONTH, -n.n, SYSDATETIME())),
@@ -192,10 +202,14 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
         ON m.[tipo_acao] = 'entrada'
         AND m.[data_acao] >= Meses.[mesInicio]
         AND m.[data_acao] < DATEADD(MONTH, 1, Meses.[mesInicio])
+        AND EXISTS (
+          SELECT 1 FROM dbo.com_estoque_equipamentos_usados AS eq
+          WHERE eq.[id] = m.[equipamento_id] AND eq.[condicao] = @condicao
+        )
       GROUP BY Meses.[mesInicio]
       ORDER BY Meses.[mesInicio] ASC;
     `),
-    pool.request().query<{
+    req().query<{
       equipamento_id: string;
       equipamento_numero: number;
       equipamento_descricao: string;
@@ -216,9 +230,10 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
         m.[criado_por_nome]
       FROM dbo.com_estoque_equipamentos_usados_movimentacoes AS m
       INNER JOIN dbo.com_estoque_equipamentos_usados AS e ON e.[id] = m.[equipamento_id]
+      WHERE e.[condicao] = @condicao
       ORDER BY m.[criado_em] DESC;
     `),
-    pool.request().query<{
+    req().query<{
       nomeCliente: string;
       quantidadeEmprestado: number;
       quantidadeConsignado: number;
@@ -236,12 +251,12 @@ export async function obterDadosPainelBi(): Promise<PainelBiEstoque> {
           WHERE m.[equipamento_id] = e.[id] AND m.[tipo_acao] IN ('emprestimo', 'consignacao')
           ORDER BY m.[data_acao] DESC, m.[criado_em] DESC
         ) AS dest
-        WHERE e.[status] IN ('emprestado', 'consignado') AND dest.[destinatario_nome] IS NOT NULL
+        WHERE e.[status] IN ('emprestado', 'consignado') AND e.[condicao] = @condicao AND dest.[destinatario_nome] IS NOT NULL
       ) AS x
       GROUP BY x.[nomeCliente]
       ORDER BY COUNT(*) DESC;
     `),
-    contarEquipamentosComPendencia(pool),
+    contarEquipamentosComPendencia(pool, condicao),
   ]);
 
   const totais = totaisResult.recordset[0];

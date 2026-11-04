@@ -385,7 +385,7 @@ export function deduplicarClientesErp(clientes: ClienteErpEstoqueUsados[]): Clie
 /*
  * Lista de clientes pro autocomplete do campo "Cliente" — mesmo serviço
  * externo já usado em Liberação de Projeto, só que agora com a URL
- * configurável em Administração → Equipamentos Usados → Integração ERP
+ * configurável em Administração → Estoque de Equipamentos → Integração ERP
  * (antes vinha hardcoded em estoque.service.ts) e chamado a partir do
  * servidor (rota /api/estoque-equipamentos-usados/clientes), não direto
  * do navegador.
@@ -675,7 +675,7 @@ export async function consultarNfEntradaNoErp(
   if (!url) {
     const rotulo = config.usarAmbienteTeste ? "de teste" : "de produção";
     throw new ValidationError(
-      `Configure o endpoint ${rotulo} de consulta de NF de entrada em Administração → Equipamentos Usados → Integração ERP.`
+      `Configure o endpoint ${rotulo} de consulta de NF de entrada em Administração → Estoque de Equipamentos → Integração ERP.`
     );
   }
 
@@ -819,7 +819,7 @@ export async function consultarNfSaidaNoErp(
   if (!url) {
     const rotulo = config.usarAmbienteTeste ? "de teste" : "de produção";
     throw new ValidationError(
-      `Configure o endpoint ${rotulo} de consulta de NF de saída em Administração → Equipamentos Usados → Integração ERP.`
+      `Configure o endpoint ${rotulo} de consulta de NF de saída em Administração → Estoque de Equipamentos → Integração ERP.`
     );
   }
 

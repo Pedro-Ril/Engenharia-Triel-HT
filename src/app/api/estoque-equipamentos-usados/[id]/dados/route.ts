@@ -9,6 +9,7 @@ import {
   buscarEquipamentoPorId,
 } from "@/lib/estoque-equipamentos-usados/estoque-equipamentos-usados";
 import {
+  blocoValeParaCondicao,
   listarBlocosDoTipo,
   listarCamposDoTipo,
   validarValoresCamposDinamicos,
@@ -20,6 +21,7 @@ import {
   salvarEvidencias,
 } from "@/lib/estoque-equipamentos-usados/evidencias";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
+import { camposParaCondicao } from "@/modules/estoque-equipamentos-usados/utils/campos-condicao";
 import { registrarLog } from "@/lib/monitoramento/logs";
 import type { CampoTipoEquipamento } from "@/modules/estoque-equipamentos-usados/types/estoque.types";
 
@@ -154,7 +156,7 @@ async function handlePATCH(request: Request, context: RouteContext) {
     /* Obrigatório em toda edição de dados técnicos — fica registrado junto com o histórico de alterações. */
     const motivo = requiredText(formData.get("motivo"), "motivo da alteração", 500);
 
-    const camposDoTipo = await listarCamposDoTipo(equipamento.tipoEquipamentoId, true);
+    const camposDoTipo = camposParaCondicao(await listarCamposDoTipo(equipamento.tipoEquipamentoId, true), equipamento.condicao);
 
     const valoresBrutosTexto = formData.get("camposValores");
     let valoresBrutos: unknown = {};
@@ -166,10 +168,15 @@ async function handlePATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const camposDinamicos = camposDoTipo.filter((campo) => !campo.ehSistema);
+    /* Só os blocos que valem para a condição do equipamento (ex.: "Estado de conservação" não vale para o novo). */
+    const blocosDoTipo = (await listarBlocosDoTipo(equipamento.tipoEquipamentoId, true)).filter((bloco) =>
+      blocoValeParaCondicao(bloco, equipamento.condicao)
+    );
+    const blocosValidos = new Set(blocosDoTipo.map((bloco) => bloco.id));
+
+    const camposDinamicos = camposDoTipo.filter((campo) => !campo.ehSistema && blocosValidos.has(campo.blocoId));
     const camposValoresJson = validarValoresCamposDinamicos(camposDinamicos, valoresBrutos);
 
-    const blocosDoTipo = await listarBlocosDoTipo(equipamento.tipoEquipamentoId, true);
     const evidenciasPorBloco = await Promise.all(
       blocosDoTipo.map((bloco) => parseEvidenciasFormData(formData, bloco.id))
     );

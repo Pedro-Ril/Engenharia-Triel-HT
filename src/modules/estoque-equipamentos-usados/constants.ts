@@ -144,8 +144,11 @@ export function campoSistemaEstaVazio(equipamento: Equipamento, chave: string): 
  * entrada) também estão preenchidos, não só o número digitado.
  */
 export function nfEntradaIntegradaComErp(
-  equipamento: Pick<Equipamento, "numeroNfEntrada" | "erpCodigoItem" | "erpIdItem" | "erpDataEntrada">
+  equipamento: Pick<Equipamento, "numeroNfEntrada" | "erpCodigoItem" | "erpIdItem" | "erpDataEntrada"> &
+    Partial<Pick<Equipamento, "condicao">>
 ): boolean {
+  /* O novo não tem NF de entrada (fabricação interna): o lastro é o código do item e o ID configurado. */
+  if (equipamento.condicao === "novo") return Boolean(equipamento.erpCodigoItem && equipamento.erpIdItem);
   return Boolean(
     equipamento.numeroNfEntrada &&
       equipamento.erpCodigoItem &&

@@ -6,6 +6,8 @@ import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import {
   criarEquipamento,
   listarEquipamentos,
+  verificarIdErpDisponivel,
+  verificarNumeroDisponivel,
   type DirecaoOrdenacao,
   type OrdenacaoEquipamentos,
   type StatusEquipamento,
@@ -22,11 +24,13 @@ import {
   CHAVE_SISTEMA_NUMERO_SERIE,
   CHAVE_SISTEMA_OBSERVACOES,
   CHAVE_SISTEMA_VALOR,
+  blocoValeParaCondicao,
   listarBlocosDoTipo,
   listarCamposDoTipo,
   validarValoresCamposDinamicos,
 } from "@/lib/estoque-equipamentos-usados/tipos-equipamento";
 import { parseEvidenciasFormData, salvarEvidencias } from "@/lib/estoque-equipamentos-usados/evidencias";
+import { camposParaCondicao } from "@/modules/estoque-equipamentos-usados/utils/campos-condicao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -69,6 +73,8 @@ async function handleGET(request: Request) {
       ? (statusParam as StatusEquipamento)
       : undefined;
 
+  const condicaoParam = searchParams.get("condicao");
+  const condicao = condicaoParam === "novo" || condicaoParam === "usado" ? condicaoParam : undefined;
   const busca = searchParams.get("busca") || undefined;
   const codigoEmpresa = searchParams.get("codigoEmpresa") || undefined;
   const pendenciaChave = searchParams.get("pendencia") || undefined;
@@ -82,6 +88,7 @@ async function handleGET(request: Request) {
 
   try {
     const resultado = await listarEquipamentos({
+      condicao,
       status,
       busca,
       codigoEmpresa,
@@ -123,6 +130,22 @@ async function handlePOST(request: Request) {
     const tipoEquipamentoId = requiredUuid(formData.get("tipoEquipamentoId"), "tipo de equipamento");
 
     /*
+     * Novo (fabricação interna): número, código do item e ID configurado
+     * são digitados; não tem NF de entrada nem busca no ERP pela NF. O
+     * usado segue como sempre (número automático, NF de entrada).
+     */
+    const condicao = formData.get("condicao") === "novo" ? "novo" : "usado";
+    const ehNovo = condicao === "novo";
+    let numeroNovo: number | null = null;
+    if (ehNovo) {
+      numeroNovo = Number(formData.get("numero"));
+      if (!Number.isInteger(numeroNovo) || numeroNovo <= 0) {
+        throw new ValidationError("Informe o número do equipamento novo (inteiro maior que zero).");
+      }
+      await verificarNumeroDisponivel({ numero: numeroNovo, condicao, tipoEquipamentoId });
+    }
+
+    /*
      * Os 10 campos fixos do sistema (cliente, valor, descrição...) agora
      * têm rótulo/obrigatório configuráveis pelo admin (ver TiposEquipamentoPainel
      * e migrações 0076/0077) — só "Descrição" continua sempre obrigatória
@@ -130,7 +153,8 @@ async function handlePOST(request: Request) {
      * desde a 0077) seguem a config de cada tipo. Um campo ausente do
      * mapa (desativado) tem o valor enviado ignorado.
      */
-    const camposDoTipo = await listarCamposDoTipo(tipoEquipamentoId, true);
+    /* Campos como valem para a condição: no novo, sem o Cliente e com o obrigatório do novo (ver campos-condicao.ts). */
+    const camposDoTipo = camposParaCondicao(await listarCamposDoTipo(tipoEquipamentoId, true), condicao);
     const sistemaPorChave = new Map(
       camposDoTipo.filter((campo) => campo.ehSistema).map((campo) => [campo.chave, campo] as const)
     );
@@ -176,19 +200,18 @@ async function handlePOST(request: Request) {
       throw new ValidationError(`O campo "${campoEmpresa.rotulo}" é obrigatório.`);
     }
 
-    const numeroNfEntrada = lerTextoSistema(
-      CHAVE_SISTEMA_NUMERO_NF_ENTRADA,
-      "numeroNfEntrada",
-      30,
-      "número da NF de entrada"
-    );
+    const numeroNfEntrada = ehNovo
+      ? null
+      : lerTextoSistema(CHAVE_SISTEMA_NUMERO_NF_ENTRADA, "numeroNfEntrada", 30, "número da NF de entrada");
     const observacoes = lerTextoSistema(CHAVE_SISTEMA_OBSERVACOES, "observacoes", 1000, "observações");
 
     const campoErp = sistemaPorChave.get(CHAVE_SISTEMA_ERP_CODIGO_ITEM);
-    const erpCodigoItemDigitado = campoErp
-      ? optionalText(formData.get("erpCodigoItem"), campoErp.rotulo || "código do item no ERP", 50)
-      : null;
-    if (campoErp?.obrigatorio && !erpCodigoItemDigitado) {
+    const erpCodigoItemDigitado = ehNovo
+      ? requiredText(formData.get("erpCodigoItem"), "código do item no ERP", 50)
+      : campoErp
+        ? optionalText(formData.get("erpCodigoItem"), campoErp.rotulo || "código do item no ERP", 50)
+        : null;
+    if (!ehNovo && campoErp?.obrigatorio && !erpCodigoItemDigitado) {
       throw new ValidationError(`O campo "${campoErp.rotulo}" é obrigatório.`);
     }
 
@@ -202,21 +225,30 @@ async function handlePOST(request: Request) {
       }
     }
 
-    const camposDinamicos = camposDoTipo.filter((campo) => !campo.ehSistema);
+    /* Só os blocos que valem para a condição (ex.: "Estado de conservação" não vale para o novo). */
+    const blocosDoTipo = (await listarBlocosDoTipo(tipoEquipamentoId, true)).filter((bloco) =>
+      blocoValeParaCondicao(bloco, condicao)
+    );
+    const blocosValidos = new Set(blocosDoTipo.map((bloco) => bloco.id));
+
+    const camposDinamicos = camposDoTipo.filter((campo) => !campo.ehSistema && blocosValidos.has(campo.blocoId));
     const camposValoresJson = validarValoresCamposDinamicos(camposDinamicos, valoresBrutos);
 
-    const blocosDoTipo = await listarBlocosDoTipo(tipoEquipamentoId, true);
     const evidenciasPorBloco = await Promise.all(
       blocosDoTipo.map((bloco) => parseEvidenciasFormData(formData, bloco.id))
     );
 
     let erpCodigoItem = erpCodigoItemDigitado;
-    let erpIdItem = optionalText(formData.get("erpIdItem"), "ID do item no ERP", 50);
-    let erpDataEntrada = optionalText(formData.get("erpDataEntrada"), "data de entrada no ERP", 10);
+    let erpIdItem = ehNovo
+      ? requiredText(formData.get("erpIdItem"), "ID configurado do ERP", 50)
+      : optionalText(formData.get("erpIdItem"), "ID do item no ERP", 50);
+    let erpDataEntrada = ehNovo ? null : optionalText(formData.get("erpDataEntrada"), "data de entrada no ERP", 10);
     let erpValidadoEm: string | null = null;
     let erpValidadoPor: string | null = null;
 
-    if (erpCodigoItemDigitado) {
+    if (ehNovo && erpIdItem) await verificarIdErpDisponivel(erpIdItem);
+
+    if (erpCodigoItemDigitado && !ehNovo) {
       try {
         const validado = await validarEquipamentoNoErp(erpCodigoItemDigitado, codigoEmpresa);
         if (validado) {
@@ -232,6 +264,8 @@ async function handlePOST(request: Request) {
     }
 
     const equipamento = await criarEquipamento({
+      condicao,
+      numero: numeroNovo,
       tipoEquipamentoId,
       nomeCliente,
       codigoCliente,

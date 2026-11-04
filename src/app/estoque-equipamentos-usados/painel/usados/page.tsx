@@ -2,13 +2,12 @@ import { Suspense } from "react";
 
 import { registrarAcessoModuloSemFalhar } from "@/lib/auth/acesso-modulo";
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
-import { PainelGerencialPage } from "@/modules/estoque-equipamentos-usados/components/PainelGerencialPage";
+import { PainelItensPage } from "@/modules/estoque-equipamentos-usados/components/PainelItensPage";
 
 /*
- * Painel gerencial de Equipamentos Usados: duas páginas que se revezam na
- * TV ("onde está o estoque" e "quanto vale e há quanto tempo"). Pública
- * como /painel (mesmo prefixo em rotas-publicas.ts), registra o acesso só
- * quando há sessão.
+ * BI de itens dos equipamentos usados (TV): tabela por tipo com as
+ * informações técnicas, em rodízio. Pública como /painel (mesmo prefixo
+ * em rotas-publicas.ts); registra o acesso só quando há sessão.
  */
 export default async function Page() {
   const usuario = await getUsuarioAutenticado();
@@ -19,7 +18,7 @@ export default async function Page() {
 
   return (
     <Suspense fallback={null}>
-      <PainelGerencialPage />
+      <PainelItensPage condicao="usado" />
     </Suspense>
   );
 }

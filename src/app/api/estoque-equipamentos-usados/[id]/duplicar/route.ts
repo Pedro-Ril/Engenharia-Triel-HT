@@ -67,7 +67,8 @@ async function handlePOST(request: Request, context: RouteContext) {
       return NextResponse.json({ ok: false, message: "Equipamento não encontrado." }, { status: 404 });
     }
 
-    const duplicado = await duplicarEquipamento(id, novoNumero, usuario);
+    const novoIdErp = typeof body.novoIdErp === "string" ? body.novoIdErp.trim().slice(0, 50) : null;
+    const duplicado = await duplicarEquipamento(id, novoNumero, usuario, novoIdErp);
 
     await registrarLog({
       nivel: "info",

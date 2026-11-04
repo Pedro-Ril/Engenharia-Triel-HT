@@ -96,6 +96,8 @@ export async function listarEquipamentosPendentesNf(): Promise<EquipamentoPenden
       [nome_cliente]
     FROM dbo.com_estoque_equipamentos_usados
     WHERE [nf_entrada_confirmada_em] IS NULL
+      /* O novo é de fabricação interna: não tem NF de entrada para buscar. */
+      AND [condicao] = 'usado'
       AND [codigo_empresa] IS NOT NULL AND [codigo_empresa] <> ''
       AND [codigo_cliente] IS NOT NULL AND [codigo_cliente] <> ''
       ${exigirNaoVazio ? `AND ${selectExpr} IS NOT NULL AND ${selectExpr} <> ''` : ""};
@@ -143,6 +145,7 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
       codigo_cliente: string | null;
       valor_mascara: string | null;
       nome_cliente: string | null;
+      condicao: "usado" | "novo";
     }>(`
       SELECT
         CONVERT(VARCHAR(36), [id]) AS [id],
@@ -154,6 +157,7 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
         [codigo_empresa],
         [codigo_cliente],
         [nome_cliente],
+        [condicao],
         ${selectExpr} AS [valor_mascara]
       FROM dbo.com_estoque_equipamentos_usados
       WHERE [id] = @id;
@@ -162,6 +166,10 @@ export async function buscarEquipamentoPendenteNfParaTentativa(
   const row = result.recordset[0];
   if (!row) {
     throw new ValidationError("Equipamento não encontrado.");
+  }
+
+  if (row.condicao === "novo") {
+    throw new ValidationError("Equipamento novo não tem NF de entrada para buscar (fabricação interna).");
   }
 
   if (row.nf_entrada_confirmada_em) {

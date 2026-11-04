@@ -67,6 +67,7 @@ import type {
 } from "../types/estoque.types";
 import { CampoDinamicoInput } from "./CampoDinamicoInput";
 import { ClienteAutocomplete } from "./ClienteAutocomplete";
+import { camposParaCondicao } from "../utils/campos-condicao";
 import { EvidenciasGaleria } from "./EvidenciasGaleria";
 import { exportarPdfEntradaEquipamento, exportarPdfEstratoEquipamento } from "../utils/pdf-export";
 import {
@@ -218,6 +219,14 @@ function valorCampoSistemaExibicao(
 
 type ModalAberto = "emprestimo" | "consignacao" | "retorno" | "baixa" | null;
 
+/* No novo, NF/data de entrada não existem e código/ID aparecem no card "Dados de Integração". */
+const CHAVES_SO_DO_ERP_NO_NOVO = [
+  CHAVE_SISTEMA_NUMERO_NF_ENTRADA,
+  CHAVE_SISTEMA_DATA_ENTRADA_NF,
+  CHAVE_SISTEMA_ERP_CODIGO_ITEM,
+  CHAVE_SISTEMA_ID_CONFIGURADO,
+];
+
 interface EquipamentoDetalhePageProps {
   equipamento: EquipamentoComEstrato;
   blocosDoTipo: BlocoTipoEquipamento[];
@@ -231,7 +240,7 @@ interface EquipamentoDetalhePageProps {
 export function EquipamentoDetalhePage({
   equipamento,
   blocosDoTipo,
-  camposDoTipo,
+  camposDoTipo: camposTodosDoTipo,
   evidencias,
   anexosMovimentacoes,
   historicoDados,
@@ -289,8 +298,21 @@ export function EquipamentoDetalhePage({
   const [salvandoDados, setSalvandoDados] = useState(false);
   const [erroDados, setErroDados] = useState<string | null>(null);
 
+  /* Novo (fabricação interna): sem NF de entrada; só os blocos que valem para ele (ex.: sem Estado de conservação). */
+  const ehNovo = equipamento.condicao === "novo";
+  /* Campos como valem para a condição do equipamento: no novo, sem o Cliente e com o obrigatório do novo. */
+  const camposDoTipo = useMemo(
+    () => camposParaCondicao(camposTodosDoTipo, equipamento.condicao),
+    [camposTodosDoTipo, equipamento.condicao]
+  );
   const blocoFixo = useMemo(() => blocosDoTipo.find((bloco) => bloco.ehFixo) ?? null, [blocosDoTipo]);
-  const blocosNormais = useMemo(() => blocosDoTipo.filter((bloco) => !bloco.ehFixo), [blocosDoTipo]);
+  const blocosNormais = useMemo(
+    () =>
+      blocosDoTipo.filter(
+        (bloco) => !bloco.ehFixo && (bloco.condicao === "ambos" || bloco.condicao === equipamento.condicao)
+      ),
+    [blocosDoTipo, equipamento.condicao]
+  );
 
   const camposPorBloco = useMemo(() => {
     const mapa = new Map<string, CampoTipoEquipamento[]>();
@@ -332,13 +354,15 @@ export function EquipamentoDetalhePage({
     if (!blocoFixo) return [];
     return (camposPorBloco.get(blocoFixo.id) ?? [])
       .filter((campo) => campo.chave !== CHAVE_SISTEMA_DESCRICAO)
-      .filter((campo) => !campo.vemDeIntegracao);
-  }, [blocoFixo, camposPorBloco]);
+      .filter((campo) => !campo.vemDeIntegracao)
+      .filter((campo) => !(ehNovo && campo.ehSistema && CHAVES_SO_DO_ERP_NO_NOVO.includes(campo.chave)));
+  }, [blocoFixo, camposPorBloco, ehNovo]);
 
+  /* No novo, o card de integração mostra só o código do item e o ID (digitados na entrada), sem NF. */
   const camposIntegracao = useMemo(() => {
-    if (!blocoFixo) return [];
+    if (!blocoFixo || ehNovo) return [];
     return (camposPorBloco.get(blocoFixo.id) ?? []).filter((campo) => campo.vemDeIntegracao);
-  }, [blocoFixo, camposPorBloco]);
+  }, [blocoFixo, camposPorBloco, ehNovo]);
 
   const evidenciasPorBloco = useMemo(() => {
     const mapa = new Map<string, EvidenciaEquipamento[]>();
@@ -598,7 +622,14 @@ export function EquipamentoDetalhePage({
   const cardAcoes = (
     <Card title="Ações">
       <Stack gap={12}>
-        {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && (
+        {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && ehNovo && (
+          <Alert variant="warning">
+            Empréstimo e consignação ficam bloqueados até este equipamento ter o código do item e o ID configurado do
+            ERP preenchidos.
+          </Alert>
+        )}
+
+        {equipamento.status === "em_estoque" && !nfEntradaIntegradaComErp && !ehNovo && (
           <Alert variant="warning">
             {equipamento.numeroNfEntrada ? (
               <>
@@ -637,10 +668,12 @@ export function EquipamentoDetalhePage({
             </Button>
           )}
 
-          <Button variant="secondary" onClick={abrirTentativasNf}>
-            <PlugZap size={16} />
-            Tentativas de integração NF
-          </Button>
+          {!ehNovo && (
+            <Button variant="secondary" onClick={abrirTentativasNf}>
+              <PlugZap size={16} />
+              Tentativas de integração NF
+            </Button>
+          )}
 
           {podeEmprestar && (
             <Button onClick={() => setModalAberto("emprestimo")}>
@@ -679,14 +712,19 @@ export function EquipamentoDetalhePage({
       <PageHeader
         title={equipamento.descricao}
         description={`Nº ${equipamento.numero}${equipamento.marca ? ` · ${equipamento.marca}` : ""}${equipamento.modelo ? ` ${equipamento.modelo}` : ""}`}
-        actions={<Badge variant={STATUS_BADGE[equipamento.status]}>{STATUS_LABELS[equipamento.status]}</Badge>}
+        actions={
+          <Stack direction="row" gap={8} align="center">
+            <Badge variant={ehNovo ? "info" : "neutral"}>{ehNovo ? "Novo" : "Usado"}</Badge>
+            <Badge variant={STATUS_BADGE[equipamento.status]}>{STATUS_LABELS[equipamento.status]}</Badge>
+          </Stack>
+        }
       />
 
       <Breadcrumb
         items={[
           { label: "Início", href: "/", icon: <Home size={14} /> },
           {
-            label: "Estoque de Equipamentos Usados",
+            label: "Estoque de Equipamentos",
             href: "/estoque-equipamentos-usados",
             icon: <Warehouse size={14} />,
           },
@@ -738,6 +776,16 @@ export function EquipamentoDetalhePage({
           )}
         </Stack>
       </Card>
+
+      {ehNovo && (
+        <Card title="Dados de Integração">
+          <FormGrid columns={3}>
+            <InfoCampo label="Código do item no ERP" valor={equipamento.erpCodigoItem ?? "-"} />
+            <InfoCampo label="ID configurado" valor={equipamento.erpIdItem ?? "-"} />
+            <InfoCampo label="Origem" valor="Fabricação interna (sem NF de entrada)" />
+          </FormGrid>
+        </Card>
+      )}
 
       {camposIntegracao.length > 0 && (
         <Card title="Dados de Integração">
@@ -1184,19 +1232,21 @@ export function EquipamentoDetalhePage({
       >
         <Stack gap={20}>
           <FormGrid columns={2}>
-            <Field
-              label={sistemaPorChave.get(CHAVE_SISTEMA_NOME_CLIENTE)?.rotulo ?? "Cliente"}
-              required={sistemaPorChave.get(CHAVE_SISTEMA_NOME_CLIENTE)?.obrigatorio}
-            >
-              <ClienteAutocomplete
-                value={nomeClienteEdit}
-                onChange={(valor) => {
-                  setNomeClienteEdit(valor);
-                  if (!valor) setCodigoClienteEdit("");
-                }}
-                onSelecionarItem={(item) => setCodigoClienteEdit(item.cod_cli)}
-              />
-            </Field>
+            {(!ehNovo || sistemaPorChave.has(CHAVE_SISTEMA_NOME_CLIENTE)) && (
+              <Field
+                label={sistemaPorChave.get(CHAVE_SISTEMA_NOME_CLIENTE)?.rotulo ?? "Cliente"}
+                required={sistemaPorChave.get(CHAVE_SISTEMA_NOME_CLIENTE)?.obrigatorio}
+              >
+                <ClienteAutocomplete
+                  value={nomeClienteEdit}
+                  onChange={(valor) => {
+                    setNomeClienteEdit(valor);
+                    if (!valor) setCodigoClienteEdit("");
+                  }}
+                  onSelecionarItem={(item) => setCodigoClienteEdit(item.cod_cli)}
+                />
+              </Field>
+            )}
             <Field
               label={sistemaPorChave.get(CHAVE_SISTEMA_VALOR)?.rotulo ?? "Valor"}
               required={sistemaPorChave.get(CHAVE_SISTEMA_VALOR)?.obrigatorio}

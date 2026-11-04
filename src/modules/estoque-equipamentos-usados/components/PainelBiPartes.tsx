@@ -1,10 +1,9 @@
 "use client";
 
 /*
- * Peças comuns dos painéis de BI de Equipamentos Usados (o painel de
- * quantidade e o painel gerencial com rodízio de páginas): moldura que
- * escala para a tela, cabeçalho com relógio e tela cheia, e a página de
- * quantidade ("onde está o estoque"), igual nos dois.
+ * Peças do painel de BI do estoque de equipamentos: moldura que escala
+ * para a tela, cabeçalho com relógio e tela cheia, e a página de
+ * quantidade ("onde está o estoque").
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";

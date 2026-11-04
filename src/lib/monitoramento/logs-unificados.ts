@@ -38,7 +38,7 @@ const ORIGENS_POR_MODULO: { prefixo: string; chave: string; nome: string }[] = [
   {
     prefixo: "estoque-equipamentos-usados",
     chave: "estoque-equipamentos-usados",
-    nome: "Estoque de Equipamentos Usados",
+    nome: "Estoque de Equipamentos",
   },
   {
     prefixo: "transferencia-arquivos",
@@ -401,7 +401,7 @@ const TODAS_AS_FONTES_SQL = `
   SELECT
     'nf_integracao:' + CONVERT(VARCHAR(36), [id]),
     'estoque-equipamentos-usados',
-    N'Estoque de Equipamentos Usados',
+    N'Estoque de Equipamentos',
     N'Tentativa de integração NF (' + ISNULL([tipo_nf], N'-') + N')',
     CASE [status]
       WHEN 'sucesso' THEN 'info'

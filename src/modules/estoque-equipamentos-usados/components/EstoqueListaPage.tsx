@@ -3,7 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, Hash, Home, MonitorPlay, Plus, RefreshCcw, ScanBarcode, Trash2, Warehouse } from "lucide-react";
+import {
+  Copy,
+  DatabaseZap,
+  Eye,
+  Factory,
+  Hash,
+  Home,
+  MonitorPlay,
+  Plus,
+  Recycle,
+  RefreshCcw,
+  TableProperties,
+  ScanBarcode,
+  Trash2,
+  Warehouse,
+} from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -24,6 +39,7 @@ import { NumberInput } from "@/components/ui/NumberInput";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Pagination } from "@/components/ui/Pagination";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Stack } from "@/components/ui/Stack";
 import { Textarea } from "@/components/ui/Textarea";
 import {
@@ -35,8 +51,9 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
-import { AjustarStatusModal, CorrigirNumeroSerieModal } from "./AjustesAdminModais";
+import { AjustarStatusModal, CorrigirDadosErpModal, CorrigirNumeroSerieModal } from "./AjustesAdminModais";
 import { CabecalhoOrdenavel } from "./CabecalhoOrdenavel";
+import { campoValeParaCondicao } from "../utils/campos-condicao";
 import {
   buscarSequenciaEquipamentos,
   duplicarEquipamento,
@@ -47,6 +64,7 @@ import {
 } from "../services/estoque.service";
 import type {
   CampoPendenciaConfig,
+  CondicaoEquipamento,
   DirecaoOrdenacao,
   Equipamento,
   OrdenacaoEquipamentos,
@@ -55,6 +73,7 @@ import type {
 import {
   campoSistemaEstaVazio,
   CHAVE_PENDENCIA_NF_AGUARDANDO_VALIDACAO,
+  CHAVE_SISTEMA_DATA_ENTRADA_NF,
   CHAVE_SISTEMA_NUMERO_NF_ENTRADA,
   nfEntradaIntegradaComErp,
 } from "../constants";
@@ -108,6 +127,8 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
 
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [busca, setBusca] = useState("");
+  /* Aba: equipamentos usados ou novos (fabricação interna) -- mesma lista, filtros e ações. */
+  const [condicao, setCondicao] = useState<CondicaoEquipamento>("usado");
   const [status, setStatus] = useState("");
   const [pendenciaChave, setPendenciaChave] = useState("");
   const [pagina, setPagina] = useState(1);
@@ -130,11 +151,13 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
 
   const [equipamentoDuplicando, setEquipamentoDuplicando] = useState<Equipamento | null>(null);
   const [novoNumeroDuplicar, setNovoNumeroDuplicar] = useState("");
+  const [novoIdErpDuplicar, setNovoIdErpDuplicar] = useState("");
   const [duplicando, setDuplicando] = useState(false);
   const [erroDuplicacao, setErroDuplicacao] = useState<string | null>(null);
 
   const [equipamentoCorrigindoSerie, setEquipamentoCorrigindoSerie] = useState<Equipamento | null>(null);
   const [equipamentoAjustandoStatus, setEquipamentoAjustandoStatus] = useState<Equipamento | null>(null);
+  const [equipamentoCorrigindoErp, setEquipamentoCorrigindoErp] = useState<Equipamento | null>(null);
 
   const [equipamentoTrocandoNumero, setEquipamentoTrocandoNumero] = useState<Equipamento | null>(null);
   const [novoNumeroTroca, setNovoNumeroTroca] = useState("");
@@ -189,6 +212,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCarregando(true);
     listarEquipamentos({
+      condicao,
       status: (status as StatusEquipamento) || undefined,
       busca: busca || undefined,
       pendenciaChave: pendenciaChave || undefined,
@@ -222,6 +246,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCarregando(true);
     listarEquipamentos({
+      condicao,
       status: (status as StatusEquipamento) || undefined,
       busca: busca || undefined,
       pendenciaChave: pendenciaChave || undefined,
@@ -243,7 +268,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
     return () => {
       cancelado = true;
     };
-  }, [status, busca, pendenciaChave, pagina, ordenacao]);
+  }, [condicao, status, busca, pendenciaChave, pagina, ordenacao]);
 
   /* Clicar na coluna já ativa inverte; outra coluna começa crescente (datas e número, do mais novo). */
   function ordenarPor(coluna: OrdenacaoEquipamentos) {
@@ -273,6 +298,15 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
 
     for (const campo of pendenciasConfig) {
       if (campo.tipoEquipamentoId !== equipamento.tipoEquipamentoId) continue;
+      if (!campoValeParaCondicao(campo, equipamento.condicao)) continue;
+
+      /* O novo é de fabricação interna: não tem NF de entrada nem data de entrada. */
+      if (
+        equipamento.condicao === "novo" &&
+        (campo.chave === CHAVE_SISTEMA_NUMERO_NF_ENTRADA || campo.chave === CHAVE_SISTEMA_DATA_ENTRADA_NF)
+      ) {
+        continue;
+      }
 
       if (campo.chave === CHAVE_SISTEMA_NUMERO_NF_ENTRADA) {
         if (!equipamento.numeroNfEntrada) {
@@ -361,7 +395,10 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
     setErroDuplicacao(null);
     setEquipamentoDuplicando(equipamento);
     setNovoNumeroDuplicar("");
+    setNovoIdErpDuplicar("");
 
+    /* O novo tem numeração própria por tipo (digitada); só o usado sugere o próximo da sequência. */
+    if (equipamento.condicao === "novo") return;
     const sequencia = await buscarSequenciaEquipamentos();
     if (sequencia) {
       setNovoNumeroDuplicar(String(sequencia.ultimoNumero + 1));
@@ -376,12 +413,21 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       setErroDuplicacao("Informe um número inteiro válido.");
       return;
     }
+    const duplicandoNovo = equipamentoDuplicando.condicao === "novo";
+    if (duplicandoNovo && !novoIdErpDuplicar.trim()) {
+      setErroDuplicacao("Informe o ID configurado do ERP do equipamento novo.");
+      return;
+    }
 
     setErroDuplicacao(null);
     setDuplicando(true);
 
     try {
-      const resultado = await duplicarEquipamento(equipamentoDuplicando.id, novoNumero);
+      const resultado = await duplicarEquipamento(
+        equipamentoDuplicando.id,
+        novoNumero,
+        duplicandoNovo ? novoIdErpDuplicar.trim() : null
+      );
 
       if (resultado.ok && resultado.data) {
         setEquipamentoDuplicando(null);
@@ -397,14 +443,28 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Estoque de Equipamentos Usados"
-        description="Controle de entrada, empréstimo, consignação e baixa de equipamentos usados."
+        title="Estoque de Equipamentos"
+        description="Controle de entrada, empréstimo, consignação e baixa de equipamentos usados e novos."
         actions={
           <Stack direction="row" gap={8}>
-            <Link href="/estoque-equipamentos-usados/painel" target="_blank" rel="noopener noreferrer">
+            <Link
+              href={`/estoque-equipamentos-usados/painel${condicao === "novo" ? "?condicao=novo" : ""}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Button variant="secondary">
                 <MonitorPlay size={16} />
                 Painel de BI
+              </Button>
+            </Link>
+            <Link
+              href={`/estoque-equipamentos-usados/painel/${condicao === "novo" ? "novos" : "usados"}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="secondary">
+                <TableProperties size={16} />
+                BI de itens
               </Button>
             </Link>
             <Link href="/estoque-equipamentos-usados/nova">
@@ -420,8 +480,20 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
       <Breadcrumb
         items={[
           { label: "Início", href: "/", icon: <Home size={14} /> },
-          { label: "Estoque de Equipamentos Usados", current: true, icon: <Warehouse size={14} /> },
+          { label: "Estoque de Equipamentos", current: true, icon: <Warehouse size={14} /> },
         ]}
+      />
+
+      <SegmentedTabs<CondicaoEquipamento>
+        itens={[
+          { valor: "usado", label: "Usados", icon: <Recycle size={15} /> },
+          { valor: "novo", label: "Novos", icon: <Factory size={15} /> },
+        ]}
+        ativo={condicao}
+        onSelecionar={(valor) => {
+          setCondicao(valor);
+          setPagina(1);
+        }}
       />
 
       <Card>
@@ -553,6 +625,16 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
                                       icon: <ScanBarcode size={15} />,
                                       onSelect: () => setEquipamentoCorrigindoSerie(equipamento),
                                     },
+                                    ...(equipamento.condicao === "novo"
+                                      ? [
+                                          {
+                                            value: "corrigir-erp",
+                                            label: "Corrigir código e ID do ERP",
+                                            icon: <DatabaseZap size={15} />,
+                                            onSelect: () => setEquipamentoCorrigindoErp(equipamento),
+                                          },
+                                        ]
+                                      : []),
                                     {
                                       value: "ajustar-status",
                                       label: "Ajustar status",
@@ -639,6 +721,22 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
               disabled={duplicando}
             />
           </Field>
+
+          {equipamentoDuplicando?.condicao === "novo" && (
+            <Field
+              label="ID configurado do ERP"
+              htmlFor="novoIdErpDuplicar"
+              required
+              hint="Cada equipamento novo tem o seu; não se repete. O código do item é copiado."
+            >
+              <Input
+                id="novoIdErpDuplicar"
+                value={novoIdErpDuplicar}
+                onChange={(event) => setNovoIdErpDuplicar(event.target.value)}
+                disabled={duplicando}
+              />
+            </Field>
+          )}
         </Stack>
       </Modal>
 
@@ -691,6 +789,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
               disabled={trocandoNumero}
             />
 
+            {equipamentoTrocandoNumero.condicao !== "novo" && (
             <Checkbox
               id="desfazerIntegracao"
               label="Desfazer a integração com o ERP e buscar a NF de entrada de novo"
@@ -699,6 +798,7 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
               onChange={(event) => setDesfazerIntegracao(event.target.checked)}
               disabled={trocandoNumero}
             />
+            )}
 
             <Field label="Motivo" htmlFor="motivoTroca" required hint="Fica registrado no histórico do equipamento.">
               <Textarea
@@ -720,6 +820,18 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
           onFechar={() => setEquipamentoCorrigindoSerie(null)}
           onConcluido={() => {
             setEquipamentoCorrigindoSerie(null);
+            carregarLista();
+          }}
+        />
+      )}
+
+      {equipamentoCorrigindoErp && (
+        <CorrigirDadosErpModal
+          key={equipamentoCorrigindoErp.id}
+          equipamento={equipamentoCorrigindoErp}
+          onFechar={() => setEquipamentoCorrigindoErp(null)}
+          onConcluido={() => {
+            setEquipamentoCorrigindoErp(null);
             carregarLista();
           }}
         />

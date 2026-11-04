@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Home, Save, Warehouse } from "lucide-react";
+import { Download, Factory, Home, Recycle, Save, Warehouse } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
@@ -16,8 +16,10 @@ import { FileUpload } from "@/components/ui/FileUpload";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Stack } from "@/components/ui/Stack";
 import { Textarea } from "@/components/ui/Textarea";
 
@@ -31,11 +33,13 @@ import {
 import type {
   BlocoTipoEquipamento,
   CampoTipoEquipamento,
+  CondicaoEquipamento,
   EmpresaOpcao,
   Equipamento,
   TipoEquipamento,
 } from "../types/estoque.types";
 import { CampoDinamicoInput } from "./CampoDinamicoInput";
+import { camposParaCondicao } from "../utils/campos-condicao";
 import { ClienteAutocomplete } from "./ClienteAutocomplete";
 import { exportarPdfEntradaEquipamento } from "../utils/pdf-export";
 import {
@@ -82,9 +86,19 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
   const router = useRouter();
 
   const [tipos, setTipos] = useState<TipoEquipamento[]>([]);
+  /*
+   * Usado: número automático, NF de entrada (a integração busca no ERP).
+   * Novo (fabricação interna): número, código do item e ID configurado
+   * digitados; sem NF de entrada. Os blocos do tipo seguem o "vale para"
+   * configurado (ex.: Estado de conservação só para usados).
+   */
+  const [condicao, setCondicao] = useState<CondicaoEquipamento>("usado");
+  const ehNovo = condicao === "novo";
+  const [numeroNovo, setNumeroNovo] = useState("");
+  const [erroNovo, setErroNovo] = useState<string | null>(null);
   const [tipoEquipamentoId, setTipoEquipamentoId] = useState("");
   const [blocosDoTipo, setBlocosDoTipo] = useState<BlocoTipoEquipamento[]>([]);
-  const [camposDoTipo, setCamposDoTipo] = useState<CampoTipoEquipamento[]>([]);
+  const [camposTodosDoTipo, setCamposDoTipo] = useState<CampoTipoEquipamento[]>([]);
   const [carregandoBlocos, setCarregandoBlocos] = useState(false);
   const [valoresCampos, setValoresCampos] = useState<Record<string, unknown>>({});
   /*
@@ -155,8 +169,13 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
     });
   }, [tipoEquipamentoId]);
 
+  /* Campos como valem para a condição escolhida: no novo, sem o Cliente e com o obrigatório do novo. */
+  const camposDoTipo = useMemo(() => camposParaCondicao(camposTodosDoTipo, condicao), [camposTodosDoTipo, condicao]);
   const blocoFixo = useMemo(() => blocosDoTipo.find((bloco) => bloco.ehFixo) ?? null, [blocosDoTipo]);
-  const blocosNormais = useMemo(() => blocosDoTipo.filter((bloco) => !bloco.ehFixo), [blocosDoTipo]);
+  const blocosNormais = useMemo(
+    () => blocosDoTipo.filter((bloco) => !bloco.ehFixo && (bloco.condicao === "ambos" || bloco.condicao === condicao)),
+    [blocosDoTipo, condicao]
+  );
 
   const camposPorBloco = useMemo(() => {
     const mapa = new Map<string, CampoTipoEquipamento[]>();
@@ -466,6 +485,20 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
     }
   }
 
+  /* No novo, NF de entrada e data de entrada não existem; código do item e ID ficam no card do novo. */
+  function campoForaDoBlocoFixoNoNovo(campo: CampoTipoEquipamento): boolean {
+    return (
+      ehNovo &&
+      campo.ehSistema &&
+      [
+        CHAVE_SISTEMA_NUMERO_NF_ENTRADA,
+        CHAVE_SISTEMA_DATA_ENTRADA_NF,
+        CHAVE_SISTEMA_ERP_CODIGO_ITEM,
+        CHAVE_SISTEMA_ID_CONFIGURADO,
+      ].includes(campo.chave)
+    );
+  }
+
   function renderCampoDoBlocoFixo(campo: CampoTipoEquipamento) {
     return campo.ehSistema ? (
       renderCampoSistema(campo)
@@ -503,6 +536,7 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
     }
 
     for (const campo of campos) {
+      if (campoForaDoBlocoFixoNoNovo(campo)) continue;
       if (campo.ehSistema && CHAVES_SISTEMA_LARGURA_TOTAL.includes(campo.chave)) {
         flush();
         segmentos.push(renderCampoDoBlocoFixo(campo));
@@ -568,6 +602,7 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
 
     for (const campo of todosOrdenados) {
       if (!campo.obrigatorio) continue;
+      if (campoForaDoBlocoFixoNoNovo(campo)) continue;
 
       if (campo.ehSistema) {
         if (!valorAtualDoCampoSistema(campo.chave).trim()) return campo;
@@ -585,6 +620,23 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
 
   async function handleSalvar() {
     setErro(null);
+    setErroNovo(null);
+
+    if (ehNovo) {
+      const numero = Number(numeroNovo);
+      const faltando = !Number.isInteger(numero) || numero <= 0
+        ? "Informe o número do equipamento novo."
+        : !form.erpCodigoItem.trim()
+          ? "Informe o código do item no ERP."
+          : !form.erpIdItem.trim()
+            ? "Informe o ID configurado do ERP."
+            : null;
+      if (faltando) {
+        setErroNovo(faltando);
+        document.getElementById("card-equipamento-novo")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
 
     const campoInvalido = encontrarPrimeiroCampoInvalido();
     if (campoInvalido) {
@@ -601,6 +653,8 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
 
     try {
       const formData = new FormData();
+      formData.set("condicao", condicao);
+      if (ehNovo) formData.set("numero", numeroNovo);
       formData.set("tipoEquipamentoId", tipoEquipamentoId);
       formData.set("nomeCliente", form.nomeCliente);
       formData.set("codigoCliente", form.codigoCliente);
@@ -610,11 +664,11 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
       formData.set("modelo", form.modelo);
       formData.set("numeroSerie", form.numeroSerie);
       formData.set("codigoEmpresa", form.codigoEmpresa);
-      formData.set("numeroNfEntrada", form.numeroNfEntrada);
+      formData.set("numeroNfEntrada", ehNovo ? "" : form.numeroNfEntrada);
       formData.set("observacoes", form.observacoes);
       formData.set("erpCodigoItem", form.erpCodigoItem);
       formData.set("erpIdItem", form.erpIdItem);
-      formData.set("erpDataEntrada", form.erpDataEntrada);
+      formData.set("erpDataEntrada", ehNovo ? "" : form.erpDataEntrada);
       /*
        * Qualquer campo de sistema desconhecido (ver renderCampoSistema,
        * caso "default") vai com a própria chave como nome — o backend
@@ -627,7 +681,9 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
       }
       formData.set("camposValores", JSON.stringify(valoresCampos));
 
+      const blocosVisiveis = new Set([blocoFixo?.id, ...blocosNormais.map((bloco) => bloco.id)]);
       for (const [blocoId, arquivos] of Object.entries(evidencias)) {
+        if (!blocosVisiveis.has(blocoId)) continue;
         for (const arquivo of arquivos) {
           formData.append(`evidencias_${blocoId}`, arquivo);
         }
@@ -656,9 +712,9 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
         <Card>
           <Stack gap={16}>
             <Alert variant="success">
-              Entrada registrada com sucesso. Assim que a NF de entrada for lançada no ERP, a integração
-              automática preenche NF, código do item, ID configurado e data de entrada — sem precisar de
-              ação manual.
+              {equipamentoCriado.condicao === "novo"
+                ? "Entrada registrada com sucesso. O extrato do item é consultado no ERP automaticamente pelo código e pelo ID configurado informados."
+                : "Entrada registrada com sucesso. Assim que a NF de entrada for lançada no ERP, a integração automática preenche NF, código do item, ID configurado e data de entrada — sem precisar de ação manual."}
             </Alert>
 
             <Stack direction="row" gap={10}>
@@ -691,14 +747,14 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
     <PageContainer>
       <PageHeader
         title="Nova entrada"
-        description="Cadastro de um equipamento usado no estoque."
+        description="Cadastro de um equipamento usado ou novo no estoque."
       />
 
       <Breadcrumb
         items={[
           { label: "Início", href: "/", icon: <Home size={14} /> },
           {
-            label: "Estoque de Equipamentos Usados",
+            label: "Estoque de Equipamentos",
             href: "/estoque-equipamentos-usados",
             icon: <Warehouse size={14} />,
           },
@@ -709,21 +765,79 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
       {erro && <Alert variant="danger">{erro}</Alert>}
 
       <Card title="Tipo de equipamento">
-        <Field
-          label="Tipo de equipamento"
-          required
-          hint="Define quais blocos e campos aparecem abaixo — gerenciado em Administração"
-        >
-          <Dropdown
-            value={tipoEquipamentoId}
-            options={[
-              { value: "", label: "Selecione o tipo" },
-              ...tipos.map((tipo) => ({ value: tipo.id, label: tipo.nome })),
+        <Stack gap={16}>
+          <SegmentedTabs<CondicaoEquipamento>
+            itens={[
+              { valor: "usado", label: "Usado", icon: <Recycle size={15} /> },
+              { valor: "novo", label: "Novo (fabricação interna)", icon: <Factory size={15} /> },
             ]}
-            onValueChange={setTipoEquipamentoId}
+            ativo={condicao}
+            onSelecionar={(valor) => {
+              setCondicao(valor);
+              setErroNovo(null);
+            }}
           />
-        </Field>
+          <Field
+            label="Tipo de equipamento"
+            required
+            hint="Define quais blocos e campos aparecem abaixo — gerenciado em Administração"
+          >
+            <Dropdown
+              value={tipoEquipamentoId}
+              options={[
+                { value: "", label: "Selecione o tipo" },
+                ...tipos.map((tipo) => ({ value: tipo.id, label: tipo.nome })),
+              ]}
+              onValueChange={setTipoEquipamentoId}
+            />
+          </Field>
+        </Stack>
       </Card>
+
+      {ehNovo && (
+        <div id="card-equipamento-novo">
+          <Card title="Equipamento novo">
+            <Stack gap={16}>
+              {erroNovo && <Alert variant="danger">{erroNovo}</Alert>}
+              <FormGrid columns={3}>
+                <Field
+                  label="Número do equipamento"
+                  htmlFor="numeroNovo"
+                  required
+                  hint="Numeração própria dos novos, por tipo de equipamento."
+                >
+                  <NumberInput
+                    id="numeroNovo"
+                    prefix="#"
+                    min={1}
+                    value={numeroNovo}
+                    onChange={(event) => setNumeroNovo(event.target.value)}
+                  />
+                </Field>
+                <Field label="Código do item no ERP" htmlFor="erpCodigoItemNovo" required>
+                  <Input
+                    id="erpCodigoItemNovo"
+                    value={form.erpCodigoItem}
+                    onChange={(event) => atualizarCampo("erpCodigoItem", event.target.value)}
+                  />
+                </Field>
+                <Field
+                  label="ID configurado"
+                  htmlFor="erpIdItemNovo"
+                  required
+                  hint="Não se repete entre equipamentos. O extrato do ERP é consultado por ele."
+                >
+                  <Input
+                    id="erpIdItemNovo"
+                    value={form.erpIdItem}
+                    onChange={(event) => atualizarCampo("erpIdItem", event.target.value)}
+                  />
+                </Field>
+              </FormGrid>
+            </Stack>
+          </Card>
+        </div>
+      )}
 
       {tipoEquipamentoId && carregandoBlocos && <Loader label="Carregando formulário do tipo..." />}
 

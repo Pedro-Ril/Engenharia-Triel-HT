@@ -588,7 +588,7 @@ export async function sincronizarExtrato(params: {
   const url = config.usarAmbienteTeste ? config.urlExtratoTeste : config.urlExtrato;
   if (!url) {
     throw new ValidationError(
-      `Configure a URL ${config.usarAmbienteTeste ? "de teste" : "de produção"} do extrato do item em Administração → Equipamentos Usados → Integração ERP.`
+      `Configure a URL ${config.usarAmbienteTeste ? "de teste" : "de produção"} do extrato do item em Administração → Estoque de Equipamentos → Integração ERP.`
     );
   }
 

@@ -3,6 +3,10 @@ import "server-only";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { ValidationError } from "@/lib/auth/errors";
 
+import type { CondicaoCampo } from "@/modules/estoque-equipamentos-usados/utils/campos-condicao";
+
+export type { CondicaoCampo };
+
 export type TipoDadoCampoEquipamento =
   | "texto"
   | "numero"
@@ -19,6 +23,9 @@ export interface TipoEquipamento {
   atualizadoEm: string;
 }
 
+/* Para quais equipamentos o bloco vale (ex.: "Estado de conservação" só para usados). */
+export type CondicaoBloco = "ambos" | "usado" | "novo";
+
 export interface BlocoTipoEquipamento {
   id: string;
   tipoEquipamentoId: string;
@@ -26,6 +33,12 @@ export interface BlocoTipoEquipamento {
   ehFixo: boolean;
   ordem: number;
   ativo: boolean;
+  condicao: CondicaoBloco;
+}
+
+/* O bloco fixo vale sempre; os demais conforme a condição configurada. */
+export function blocoValeParaCondicao(bloco: Pick<BlocoTipoEquipamento, "ehFixo" | "condicao">, condicao: "usado" | "novo"): boolean {
+  return bloco.ehFixo || bloco.condicao === "ambos" || bloco.condicao === condicao;
 }
 
 export interface CampoTipoEquipamento {
@@ -45,6 +58,11 @@ export interface CampoTipoEquipamento {
   geraPendencia: boolean;
   travaMovimentacao: boolean;
   vemDeIntegracao: boolean;
+  /* Vira coluna na tabela do BI de itens (TV). */
+  mostrarBiItens: boolean;
+  /* Para quais equipamentos o campo aparece; obrigatorioNovo = obrigatório no novo (obrigatorio vale para o usado). */
+  condicao: CondicaoCampo;
+  obrigatorioNovo: boolean;
 }
 
 /*
@@ -369,6 +387,7 @@ interface BlocoRow {
   eh_fixo: boolean;
   ordem: number;
   ativo: boolean;
+  condicao: CondicaoBloco;
 }
 
 function mapBlocoRow(row: BlocoRow): BlocoTipoEquipamento {
@@ -379,6 +398,7 @@ function mapBlocoRow(row: BlocoRow): BlocoTipoEquipamento {
     ehFixo: row.eh_fixo,
     ordem: row.ordem,
     ativo: row.ativo,
+    condicao: row.condicao,
   };
 }
 
@@ -398,7 +418,8 @@ export async function listarBlocosDoTipo(
         [nome],
         [eh_fixo],
         [ordem],
-        [ativo]
+        [ativo],
+        [condicao]
       FROM dbo.com_estoque_tipos_equipamento_blocos
       WHERE [tipo_equipamento_id] = @tipoEquipamentoId
       ${somenteAtivos ? "AND [ativo] = 1" : ""}
@@ -421,7 +442,8 @@ export async function buscarBlocoPorId(blocoId: string): Promise<BlocoTipoEquipa
         [nome],
         [eh_fixo],
         [ordem],
-        [ativo]
+        [ativo],
+        [condicao]
       FROM dbo.com_estoque_tipos_equipamento_blocos
       WHERE [id] = @id;
     `);
@@ -501,7 +523,7 @@ export async function criarBlocoTipo(
 
 export async function atualizarBlocoTipo(
   blocoId: string,
-  dados: { nome?: string; ordem?: number; ativo?: boolean }
+  dados: { nome?: string; ordem?: number; ativo?: boolean; condicao?: CondicaoBloco }
 ): Promise<void> {
   const pool = await getSqlServerPool();
   const request = pool.request();
@@ -522,6 +544,12 @@ export async function atualizarBlocoTipo(
   if (dados.ativo !== undefined) {
     request.input("ativo", sql.Bit, dados.ativo);
     sets.push("[ativo] = @ativo");
+  }
+
+  if (dados.condicao !== undefined) {
+    /* O bloco fixo (Recebimento) vale sempre para os dois. */
+    request.input("condicao", sql.VarChar(10), dados.condicao);
+    sets.push("[condicao] = CASE WHEN [eh_fixo] = 1 THEN 'ambos' ELSE @condicao END");
   }
 
   if (sets.length === 0) return;
@@ -594,6 +622,9 @@ interface CampoRow {
   gera_pendencia: boolean;
   trava_movimentacao: boolean;
   vem_de_integracao: boolean;
+  mostrar_bi_itens: boolean;
+  condicao: CondicaoCampo;
+  obrigatorio_novo: boolean | null;
 }
 
 function mapCampoRow(row: CampoRow): CampoTipoEquipamento {
@@ -614,6 +645,10 @@ function mapCampoRow(row: CampoRow): CampoTipoEquipamento {
     geraPendencia: row.gera_pendencia,
     travaMovimentacao: row.trava_movimentacao,
     vemDeIntegracao: row.vem_de_integracao,
+    mostrarBiItens: row.mostrar_bi_itens,
+    condicao: row.condicao,
+    /* NULL = igual ao obrigatório do usado. */
+    obrigatorioNovo: row.obrigatorio_novo ?? row.obrigatorio,
   };
 }
 
@@ -643,7 +678,10 @@ export async function listarCamposDoTipo(
         c.[eh_sistema],
         c.[gera_pendencia],
         c.[trava_movimentacao],
-        c.[vem_de_integracao]
+        c.[vem_de_integracao],
+        c.[mostrar_bi_itens],
+        c.[condicao],
+        c.[obrigatorio_novo]
       FROM dbo.com_estoque_tipos_equipamento_campos AS c
       INNER JOIN dbo.com_estoque_tipos_equipamento_blocos AS b ON b.[id] = c.[bloco_id]
       WHERE c.[tipo_equipamento_id] = @tipoEquipamentoId
@@ -758,6 +796,9 @@ export async function atualizarCampoTipo(
     geraPendencia?: boolean;
     travaMovimentacao?: boolean;
     vemDeIntegracao?: boolean;
+    mostrarBiItens?: boolean;
+    condicao?: CondicaoCampo;
+    obrigatorioNovo?: boolean;
   }
 ): Promise<void> {
   const pool = await getSqlServerPool();
@@ -791,6 +832,18 @@ export async function atualizarCampoTipo(
     (dados.obrigatorio === false || dados.ativo === false)
   ) {
     throw new ValidationError('O campo "Descrição" é sempre obrigatório e não pode ser desativado.');
+  }
+
+  if (
+    atual.eh_sistema &&
+    CHAVES_SISTEMA_SEMPRE_OBRIGATORIAS.includes(atual.chave) &&
+    ((dados.condicao !== undefined && dados.condicao !== "ambos") || dados.obrigatorioNovo === false)
+  ) {
+    throw new ValidationError('O campo "Descrição" é sempre obrigatório, nos equipamentos usados e nos novos.');
+  }
+
+  if (dados.vemDeIntegracao === true && dados.obrigatorioNovo === true) {
+    throw new ValidationError('Um campo que vem de integração não pode ser obrigatório — desmarque "Obrigatório no novo" primeiro.');
   }
 
   if (dados.geraPendencia !== undefined && !atual.eh_sistema) {
@@ -878,6 +931,21 @@ export async function atualizarCampoTipo(
   if (dados.vemDeIntegracao !== undefined) {
     request.input("vemDeIntegracao", sql.Bit, dados.vemDeIntegracao);
     sets.push("[vem_de_integracao] = @vemDeIntegracao");
+  }
+
+  if (dados.mostrarBiItens !== undefined) {
+    request.input("mostrarBiItens", sql.Bit, dados.mostrarBiItens);
+    sets.push("[mostrar_bi_itens] = @mostrarBiItens");
+  }
+
+  if (dados.condicao !== undefined) {
+    request.input("condicaoCampo", sql.VarChar(10), dados.condicao);
+    sets.push("[condicao] = @condicaoCampo");
+  }
+
+  if (dados.obrigatorioNovo !== undefined) {
+    request.input("obrigatorioNovo", sql.Bit, dados.obrigatorioNovo);
+    sets.push("[obrigatorio_novo] = @obrigatorioNovo");
   }
 
   if (dados.ordem !== undefined) {
@@ -1042,6 +1110,8 @@ export interface CampoPendenciaConfig {
   chave: string;
   rotulo: string;
   travaMovimentacao: boolean;
+  /* Para quais equipamentos o campo aparece: pendência só conta onde ele existe. */
+  condicao: CondicaoCampo;
 }
 
 /*
@@ -1064,12 +1134,14 @@ export async function listarCamposComPendencia(): Promise<CampoPendenciaConfig[]
     chave: string;
     rotulo: string;
     trava_movimentacao: boolean;
+    condicao: CondicaoCampo;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), c.[tipo_equipamento_id]) AS [tipo_equipamento_id],
       c.[chave],
       c.[rotulo],
-      c.[trava_movimentacao]
+      c.[trava_movimentacao],
+      c.[condicao]
     FROM dbo.com_estoque_tipos_equipamento_campos AS c
     WHERE c.[eh_sistema] = 1 AND c.[gera_pendencia] = 1 AND c.[ativo] = 1;
   `);
@@ -1079,6 +1151,7 @@ export async function listarCamposComPendencia(): Promise<CampoPendenciaConfig[]
     chave: row.chave,
     rotulo: row.rotulo,
     travaMovimentacao: row.trava_movimentacao,
+    condicao: row.condicao,
   }));
 }
 

@@ -71,6 +71,9 @@ export function CampoTipoEquipamentoRow({
           {campo.vemDeIntegracao && <Badge variant="primary">Integração</Badge>}
           {campo.geraPendencia && <Badge variant="neutral">Vira status</Badge>}
           {campo.geraPendencia && campo.travaMovimentacao && <Badge variant="danger">Trava movimentações</Badge>}
+          {campo.condicao === "usado" && <Badge variant="neutral">Só usados</Badge>}
+          {campo.condicao === "novo" && <Badge variant="neutral">Só novos</Badge>}
+          {campo.mostrarBiItens && <Badge variant="success">BI de itens</Badge>}
         </Stack>
       </TableCell>
 
@@ -78,7 +81,16 @@ export function CampoTipoEquipamentoRow({
       <TableCell>{campo.unidade ?? "-"}</TableCell>
 
       <TableCell align="center">
-        {campo.obrigatorio ? <Badge variant="warning">Obrigatório</Badge> : "-"}
+        {/* Obrigatório no usado e no novo podem ser diferentes (ex.: Valor só no usado). */}
+        {campo.obrigatorio && (campo.obrigatorioNovo || campo.condicao === "usado") ? (
+          <Badge variant="warning">Obrigatório</Badge>
+        ) : campo.obrigatorio && campo.condicao !== "novo" ? (
+          <Badge variant="warning">Obrigatório no usado</Badge>
+        ) : campo.obrigatorioNovo && campo.condicao !== "usado" ? (
+          <Badge variant="warning">Obrigatório no novo</Badge>
+        ) : (
+          "-"
+        )}
       </TableCell>
 
       <TableCell align="center">
