@@ -775,6 +775,9 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
             onSelecionar={(valor) => {
               setCondicao(valor);
               setErroNovo(null);
+              /* Tipo escolhido que não vale para a nova condição sai da seleção. */
+              const tipoAtual = tipos.find((tipo) => tipo.id === tipoEquipamentoId);
+              if (tipoAtual && tipoAtual.condicao !== "ambos" && tipoAtual.condicao !== valor) setTipoEquipamentoId("");
             }}
           />
           <Field
@@ -786,7 +789,9 @@ export function NovaEntradaPage({ codigoEmpresaUsuario }: NovaEntradaPageProps) 
               value={tipoEquipamentoId}
               options={[
                 { value: "", label: "Selecione o tipo" },
-                ...tipos.map((tipo) => ({ value: tipo.id, label: tipo.nome })),
+                ...tipos
+                .filter((tipo) => tipo.condicao === "ambos" || tipo.condicao === condicao)
+                .map((tipo) => ({ value: tipo.id, label: tipo.nome })),
               ]}
               onValueChange={setTipoEquipamentoId}
             />

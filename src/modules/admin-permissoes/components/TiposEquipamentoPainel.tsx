@@ -225,6 +225,16 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
     }
   }
 
+  async function alterarCondicaoTipo(tipo: TipoEquipamento, condicao: CondicaoBloco) {
+    const resultado = await atualizarTipoEquipamento(tipo.id, { condicao });
+
+    if (resultado.ok && resultado.data) {
+      setTipos((atual) => atual.map((item) => (item.id === tipo.id ? (resultado.data as TipoEquipamento) : item)));
+    } else {
+      onFeedback("danger", "Não foi possível atualizar", resultado.message ?? "Tente novamente em instantes.");
+    }
+  }
+
   async function handleConfirmarExclusaoTipo() {
     if (!tipoExcluindo) return;
 
@@ -600,7 +610,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
     <Stack gap={20}>
       <Card
         title="Tipos de equipamento"
-        description="Cada tipo define os blocos e campos técnicos que aparecem na entrada de um equipamento usado desse tipo (ex: Silo Graneleiro)."
+        description='Cada tipo define os blocos e campos técnicos que aparecem na entrada de um equipamento desse tipo (ex: Silo Graneleiro). "Vale para" escolhe se o tipo aparece na entrada de usados, de novos ou dos dois.'
       >
         <Stack gap={16}>
           <Stack direction="row" gap={12} align="end">
@@ -624,6 +634,7 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Nome</TableHeaderCell>
+                  <TableHeaderCell>Vale para</TableHeaderCell>
                   <TableHeaderCell align="center">Ativo</TableHeaderCell>
                   <TableHeaderCell align="center"> </TableHeaderCell>
                 </TableRow>
@@ -639,6 +650,18 @@ export function TiposEquipamentoPainel({ onFeedback }: TiposEquipamentoPainelPro
                     onClick={() => setTipoSelecionadoId(tipo.id)}
                   >
                     <TableCell>{tipo.nome}</TableCell>
+                    <TableCell>
+                      <div onClick={(event) => event.stopPropagation()} style={{ maxWidth: 220 }}>
+                        <Dropdown
+                          value={tipo.condicao}
+                          options={(Object.keys(ROTULO_CONDICAO_BLOCO) as CondicaoBloco[]).map((valor) => ({
+                            value: valor,
+                            label: ROTULO_CONDICAO_BLOCO[valor],
+                          }))}
+                          onValueChange={(valor) => alterarCondicaoTipo(tipo, valor as CondicaoBloco)}
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell align="center">
                       <div className={styles.checkboxCentro}>
                         <Switch

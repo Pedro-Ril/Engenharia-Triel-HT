@@ -203,7 +203,7 @@ export async function criarTipoEquipamento(nome: string): Promise<ApiEnvelope<Ti
 
 export async function atualizarTipoEquipamento(
   id: string,
-  dados: { nome?: string; ativo?: boolean }
+  dados: { nome?: string; ativo?: boolean; condicao?: CondicaoBloco }
 ): Promise<ApiEnvelope<TipoEquipamento>> {
   const response = await fetch(`/api/admin/estoque-equipamentos-usados/tipos/${id}`, {
     method: "PATCH",

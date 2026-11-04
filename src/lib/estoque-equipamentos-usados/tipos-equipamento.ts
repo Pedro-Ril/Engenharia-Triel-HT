@@ -19,6 +19,8 @@ export interface TipoEquipamento {
   id: string;
   nome: string;
   ativo: boolean;
+  /* Em quais entradas o tipo aparece (usados, novos ou os dois). */
+  condicao: CondicaoCampo;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -171,6 +173,7 @@ interface TipoEquipamentoRow {
   id: string;
   nome: string;
   ativo: boolean;
+  condicao: CondicaoCampo;
   criado_em: string;
   atualizado_em: string;
 }
@@ -180,6 +183,7 @@ function mapTipoRow(row: TipoEquipamentoRow): TipoEquipamento {
     id: row.id,
     nome: row.nome,
     ativo: row.ativo,
+    condicao: row.condicao,
     criadoEm: row.criado_em,
     atualizadoEm: row.atualizado_em,
   };
@@ -193,6 +197,7 @@ export async function listarTiposEquipamento(somenteAtivos = false): Promise<Tip
       CONVERT(VARCHAR(36), [id]) AS [id],
       [nome],
       [ativo],
+      [condicao],
       CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
       CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em]
     FROM dbo.com_estoque_tipos_equipamento
@@ -214,6 +219,7 @@ export async function buscarTipoEquipamentoPorId(id: string): Promise<TipoEquipa
         CONVERT(VARCHAR(36), [id]) AS [id],
         [nome],
         [ativo],
+        [condicao],
         CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
         CONVERT(VARCHAR(33), [atualizado_em], 126) AS [atualizado_em]
       FROM dbo.com_estoque_tipos_equipamento
@@ -305,7 +311,7 @@ export async function criarTipoEquipamento(nome: string): Promise<TipoEquipament
 
 export async function atualizarTipoEquipamento(
   id: string,
-  dados: { nome?: string; ativo?: boolean }
+  dados: { nome?: string; ativo?: boolean; condicao?: CondicaoCampo }
 ): Promise<TipoEquipamento> {
   const pool = await getSqlServerPool();
   const request = pool.request();
@@ -321,6 +327,11 @@ export async function atualizarTipoEquipamento(
   if (dados.ativo !== undefined) {
     request.input("ativo", sql.Bit, dados.ativo);
     sets.push("[ativo] = @ativo");
+  }
+
+  if (dados.condicao !== undefined) {
+    request.input("condicao", sql.VarChar(10), dados.condicao);
+    sets.push("[condicao] = @condicao");
   }
 
   if (sets.length === 0) {

@@ -25,6 +25,7 @@ import {
   CHAVE_SISTEMA_OBSERVACOES,
   CHAVE_SISTEMA_VALOR,
   blocoValeParaCondicao,
+  buscarTipoEquipamentoPorId,
   listarBlocosDoTipo,
   listarCamposDoTipo,
   validarValoresCamposDinamicos,
@@ -136,6 +137,13 @@ async function handlePOST(request: Request) {
      */
     const condicao = formData.get("condicao") === "novo" ? "novo" : "usado";
     const ehNovo = condicao === "novo";
+    const tipoEscolhido = await buscarTipoEquipamentoPorId(tipoEquipamentoId);
+    if (!tipoEscolhido || !tipoEscolhido.ativo) throw new ValidationError("Tipo de equipamento inválido.");
+    if (tipoEscolhido.condicao !== "ambos" && tipoEscolhido.condicao !== condicao) {
+      throw new ValidationError(
+        `O tipo "${tipoEscolhido.nome}" é só para equipamentos ${tipoEscolhido.condicao === "novo" ? "novos" : "usados"}.`
+      );
+    }
     let numeroNovo: number | null = null;
     if (ehNovo) {
       numeroNovo = Number(formData.get("numero"));

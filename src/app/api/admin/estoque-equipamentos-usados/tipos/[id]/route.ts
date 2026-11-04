@@ -32,7 +32,13 @@ async function handlePATCH(request: Request, context: RouteContext) {
     const ativo =
       parsedBody.ativo === undefined ? undefined : optionalBoolean(parsedBody.ativo, "ativo", true);
 
-    const tipo = await atualizarTipoEquipamento(id, { nome, ativo });
+    const condicaoBruta = parsedBody.condicao;
+    if (condicaoBruta !== undefined && condicaoBruta !== "ambos" && condicaoBruta !== "usado" && condicaoBruta !== "novo") {
+      throw new ValidationError("Condição do tipo inválida.");
+    }
+    const condicao = condicaoBruta as "ambos" | "usado" | "novo" | undefined;
+
+    const tipo = await atualizarTipoEquipamento(id, { nome, ativo, condicao });
 
     return NextResponse.json({ ok: true, message: "Tipo de equipamento atualizado.", data: tipo });
   } catch (error) {

@@ -188,6 +188,8 @@ export interface TipoEquipamento {
   id: string;
   nome: string;
   ativo: boolean;
+  /* Em quais entradas o tipo aparece (usados, novos ou os dois). */
+  condicao: CondicaoBloco;
   criadoEm: string;
   atualizadoEm: string;
 }
