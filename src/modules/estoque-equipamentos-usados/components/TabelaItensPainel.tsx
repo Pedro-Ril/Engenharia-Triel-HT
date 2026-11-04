@@ -5,13 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import type { PainelItens } from "../types/estoque.types";
 import { STATUS_LABELS } from "../utils/rotulos";
 import { STATUS_COR } from "./PainelBiPartes";
-import styles from "./PainelItensPage.module.css";
+import styles from "./TabelaItensPainel.module.css";
 
 /*
  * Tabela de itens do BI (TV): um tipo de equipamento, uma página de
  * linhas, com status, com quem está e as informações técnicas marcadas em
- * Administração → Tipos ("Mostrar no BI de itens"). Usada pelo BI padrão
- * (rodízio com o resumo) e pelas páginas /painel/usados e /painel/novos.
+ * Administração → Tipos ("Mostrar no BI de itens"). Entra no rodízio do
+ * BI padrão, depois do resumo de cada condição (usados/novos).
  */
 
 export type TipoPainelItens = PainelItens["tipos"][number];

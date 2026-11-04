@@ -14,7 +14,6 @@ import {
   Plus,
   Recycle,
   RefreshCcw,
-  TableProperties,
   ScanBarcode,
   Trash2,
   Warehouse,
@@ -447,24 +446,10 @@ export function EstoqueListaPage({ ehAdministrador }: EstoqueListaPageProps) {
         description="Controle de entrada, empréstimo, consignação e baixa de equipamentos usados e novos."
         actions={
           <Stack direction="row" gap={8}>
-            <Link
-              href={`/estoque-equipamentos-usados/painel${condicao === "novo" ? "?condicao=novo" : ""}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <Link href="/estoque-equipamentos-usados/painel" target="_blank" rel="noopener noreferrer">
               <Button variant="secondary">
                 <MonitorPlay size={16} />
                 Painel de BI
-              </Button>
-            </Link>
-            <Link
-              href={`/estoque-equipamentos-usados/painel/${condicao === "novo" ? "novos" : "usados"}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="secondary">
-                <TableProperties size={16} />
-                BI de itens
               </Button>
             </Link>
             <Link href="/estoque-equipamentos-usados/nova">
