@@ -11,7 +11,7 @@ import { paginarItens, TabelaItensPainel } from "./TabelaItensPainel";
 import estilosBi from "./PainelBiEstoquePage.module.css";
 
 const TEMPO_PADRAO_S = 20;
-const LINHAS_PADRAO = 10;
+const LINHAS_PADRAO = 15;
 
 /*
  * BI de itens para TV: só as tabelas de itens (ver TabelaItensPainel), de

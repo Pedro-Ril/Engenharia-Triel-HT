@@ -18,7 +18,7 @@ import { paginarItens, TabelaItensPainel, type PaginaTabelaItens } from "./Tabel
 import styles from "./PainelBiEstoquePage.module.css";
 
 const TEMPO_PADRAO_S = 60;
-const LINHAS_PADRAO = 10;
+const LINHAS_PADRAO = 15;
 const ROTULO_CONDICAO: Record<CondicaoEquipamento, string> = { usado: "Usados", novo: "Novos" };
 
 interface DadosBi {

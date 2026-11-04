@@ -57,6 +57,7 @@ interface ItemRow {
   campos_valores: string | null;
   com_quem: string | null;
   empresa_nome: string | null;
+  marca: string | null;
   [coluna: string]: unknown;
 }
 
@@ -99,6 +100,31 @@ function formatarCampo(campo: CampoTipoEquipamento, item: ItemRow, camposValores
   return String(valor);
 }
 
+/* Marca para comparar: sem acento, sem pontuação, maiúsculas ("Triel-HT" → "TRIELHT"). */
+function normalizarMarca(marca: unknown): string {
+  return String(marca ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase();
+}
+
+/*
+ * Ordem da tabela: Triel sempre primeiro (qualquer grafia: TRIELHT,
+ * TRIEL-HT...), depois as outras marcas em ordem alfabética (sem marca no
+ * fim), e dentro da marca pelo número.
+ */
+export function compararPorMarca(a: { marca: unknown; numero: number }, b: { marca: unknown; numero: number }): number {
+  const marcaA = normalizarMarca(a.marca);
+  const marcaB = normalizarMarca(b.marca);
+  const grupo = (marca: string) => (marca.startsWith("TRIEL") ? 0 : marca ? 1 : 2);
+  return (
+    grupo(marcaA) - grupo(marcaB) ||
+    (grupo(marcaA) === 1 ? marcaA.localeCompare(marcaB, "pt-BR") : 0) ||
+    a.numero - b.numero
+  );
+}
+
 export async function obterPainelItens(condicao: CondicaoEquipamento): Promise<PainelItens> {
   const pool = await getSqlServerPool();
 
@@ -131,7 +157,7 @@ export async function obterPainelItens(condicao: CondicaoEquipamento): Promise<P
   ]);
 
   const itensPorTipo = new Map<string, ItemRow[]>();
-  for (const item of itensResult.recordset) {
+  for (const item of [...itensResult.recordset].sort(compararPorMarca)) {
     const chave = item.tipo_equipamento_id ?? "";
     itensPorTipo.set(chave, [...(itensPorTipo.get(chave) ?? []), item]);
   }
