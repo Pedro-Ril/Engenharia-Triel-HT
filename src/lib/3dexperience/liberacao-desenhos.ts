@@ -61,6 +61,8 @@ export interface Rodada {
   totalErros: number | null;
   mensagem: string | null;
   usuarioNome: string;
+  /* Usuário com que o 3DX executou a liberação real (null: simulação, ou liberação antiga feita com o admin). */
+  executadoComo: string | null;
   criadoEm: string;
   finalizadoEm: string | null;
   /* Se já existe uma liberação real feita a partir desta simulação. */
@@ -68,6 +70,17 @@ export interface Rodada {
 }
 
 /* ------------------------------------------------------------------ API 3DX */
+
+/* Erro devolvido pela API do 3DX, com o status HTTP e o código ("credenciais_invalidas", etc.). */
+class Erro3dx extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly codigo: string | null
+  ) {
+    super(message);
+  }
+}
 
 async function chamar3dx<T>(caminho: string, init?: RequestInit, timeoutMs = 600_000): Promise<T> {
   const resposta = await fetch(`${API_3DX}${caminho}`, {
@@ -78,7 +91,11 @@ async function chamar3dx<T>(caminho: string, init?: RequestInit, timeoutMs = 600
   });
   const json = (await resposta.json().catch(() => null)) as (T & { message?: string; error?: string }) | null;
   if (!resposta.ok || !json) {
-    throw new Error(json?.message || json?.error || `A API do 3DX respondeu ${resposta.status} em ${caminho}.`);
+    throw new Erro3dx(
+      json?.message || json?.error || `A API do 3DX respondeu ${resposta.status} em ${caminho}.`,
+      resposta.status,
+      json?.error ?? null
+    );
   }
   return json;
 }
@@ -121,16 +138,84 @@ interface ResultadoJob {
   message?: string;
 }
 
-async function iniciarJobLiberacao(desenhos: Desenho3DX[], dryRun: boolean): Promise<string> {
-  const json = await chamar3dx<{ jobId?: string }>("/desenhos/liberar/lote", {
-    method: "POST",
-    body: JSON.stringify({
-      dryRun,
-      desenhos: desenhos.map(({ physicalId, titulo, tipo, revisao, policy }) => ({ physicalId, titulo, tipo, revisao, policy })),
-    }),
-  });
+/*
+ * Liberação REAL:
+ * - usuário comum: vai com o usuário e a senha dele (a mesma do Portal/AD);
+ *   a API do 3DX abre uma sessão só dele, valida o login antes de criar o
+ *   job, libera em nome dele e fecha a sessão. A senha só passa por aqui
+ *   (nunca vai para banco nem log);
+ * - administrador do Portal: com as credenciais do admin da plataforma
+ *   (API_3DX_ADMIN_USUARIO / API_3DX_ADMIN_SENHA, só no .env do servidor);
+ *   a API reconhece o admin e usa a sessão admin que já tem aberta.
+ * Nos dois casos vai `solicitadoPor` (login de quem pediu no Portal).
+ * A sessão admin que atende as consultas não é tocada no caso do usuário.
+ * Simulação continua com o admin, sem credenciais.
+ */
+type AutenticacaoLiberacao = { usuario: string; senha: string; solicitadoPor: string };
+
+/* Usuário admin da plataforma no 3DX (padrão: admin_platform). */
+function usuarioAdminPlataforma(): string {
+  return process.env.API_3DX_ADMIN_USUARIO?.trim() || "admin_platform";
+}
+
+function credenciaisAdminPlataforma(solicitadoPor: string): AutenticacaoLiberacao {
+  const senha = process.env.API_3DX_ADMIN_SENHA;
+  if (!senha) {
+    throw new ValidationError(
+      "A liberação com o admin da plataforma não está configurada neste servidor (API_3DX_ADMIN_SENHA). Avise o suporte."
+    );
+  }
+  return { usuario: usuarioAdminPlataforma(), senha, solicitadoPor };
+}
+
+async function iniciarJobLiberacao(
+  desenhos: Desenho3DX[],
+  dryRun: boolean,
+  autenticacao: AutenticacaoLiberacao | null = null
+): Promise<{ jobId: string; executadoComo: string | null }> {
+  const json = await chamar3dx<{ jobId?: string; executadoComo?: string | null }>(
+    "/desenhos/liberar/lote",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        dryRun,
+        desenhos: desenhos.map(({ physicalId, titulo, tipo, revisao, policy }) => ({ physicalId, titulo, tipo, revisao, policy })),
+        ...(autenticacao
+          ? {
+              credenciais: { usuario: autenticacao.usuario, senha: autenticacao.senha },
+              solicitadoPor: autenticacao.solicitadoPor,
+            }
+          : {}),
+      }),
+    },
+    /* Com credenciais, o login no 3DPassport acontece nesta chamada (uns segundos). */
+    autenticacao ? 60_000 : 600_000
+  );
   if (!json.jobId) throw new Error("A API do 3DX não devolveu o job da liberação.");
-  return json.jobId;
+  return { jobId: json.jobId, executadoComo: json.executadoComo ?? null };
+}
+
+/* Erros do login viram mensagem para a tela (a simulação continua disponível para tentar de novo). */
+function mensagemErroLogin3dx(erro: unknown, comoAdmin: boolean): string | null {
+  if (!(erro instanceof Erro3dx)) return null;
+  switch (erro.codigo) {
+    case "credenciais_invalidas":
+      return comoAdmin
+        ? "A API do 3DX recusou a senha do admin da plataforma configurada no Portal. Avise o suporte."
+        : `O 3DEXPERIENCE recusou o login: senha incorreta? (${erro.message})`;
+    case "sem_permissao":
+      return `Seu usuário não tem permissão para liberar desenhos no 3DEXPERIENCE. ${erro.message}`.trim();
+    case "sessao_em_andamento":
+      return "Você já tem uma liberação em andamento no 3DEXPERIENCE. Aguarde ela terminar.";
+    case "limite_sessoes":
+      return "O 3DEXPERIENCE está atendendo o máximo de liberações ao mesmo tempo. Tente de novo em alguns minutos.";
+    case "passport_indisponivel":
+      return "O login do 3DEXPERIENCE não respondeu agora. Tente de novo em alguns minutos.";
+    case "credenciais_obrigatorias":
+      return "Informe sua senha para liberar os desenhos.";
+    default:
+      return erro.status === 401 || erro.status === 403 || erro.status === 429 ? erro.message : null;
+  }
 }
 
 async function consultarJob(jobId: string): Promise<ResultadoJob> {
@@ -282,7 +367,7 @@ export async function executarSimulacao(rodadaId: string, codigoPai: string) {
       return;
     }
 
-    const jobId = await iniciarJobLiberacao(paraLiberar.map((f) => f.desenho), true);
+    const { jobId } = await iniciarJobLiberacao(paraLiberar.map((f) => f.desenho), true);
     await atualizarRodada(rodadaId, { status: "processando", job_id: jobId });
   } catch (erro) {
     await falhar(rodadaId, erro);
@@ -297,8 +382,12 @@ export async function executarSimulacao(rodadaId: string, codigoPai: string) {
 export async function iniciarLiberacao(
   simulacaoId: string,
   desenhosEscolhidos: string[],
-  usuario: { id: string; nomeExibicao: string }
+  usuario: { id: string; nomeExibicao: string; samAccountName: string; ehAdministrador: boolean },
+  senha: string | null
 ) {
+  /* Administrador do Portal libera com o admin da plataforma; os demais, em nome próprio (com a senha). */
+  const comoAdmin = usuario.ehAdministrador;
+  if (!comoAdmin && !senha) throw new ValidationError("Digite sua senha para liberar em seu nome no 3DEXPERIENCE.");
   const simulacao = await buscarRodada(simulacaoId);
   if (!simulacao || !simulacao.rodada.dryRun) throw new ValidationError("Simulação não encontrada.");
   if (simulacao.rodada.status !== "concluida") throw new ValidationError("A simulação ainda não terminou.");
@@ -315,6 +404,38 @@ export async function iniciarLiberacao(
   const alvo = liberaveis.filter((d) => escolhidos.has(d.desenhoPhysicalId));
 
   await garantirNenhumaEmAndamento();
+
+  /*
+   * Primeiro o 3DX (login do usuário + criação do job): senha errada ou
+   * falta de permissão voltam para a tela sem deixar rodada com erro no
+   * registro -- a pessoa corrige e tenta de novo a partir da mesma simulação.
+   */
+  let job: { jobId: string; executadoComo: string | null };
+  try {
+    job = await iniciarJobLiberacao(
+      alvo.map((d) => ({ physicalId: d.desenhoPhysicalId, titulo: d.desenhoTitulo, revisao: d.desenhoRevisao })),
+      false,
+      comoAdmin
+        ? credenciaisAdminPlataforma(usuario.samAccountName)
+        : { usuario: usuario.samAccountName, senha: senha ?? "", solicitadoPor: usuario.samAccountName }
+    );
+  } catch (erro) {
+    const mensagem = mensagemErroLogin3dx(erro, comoAdmin);
+    if (mensagem) throw new ValidationError(mensagem);
+    throw erro;
+  }
+  /*
+   * A API já recusa se não bater; conferido de novo aqui. Usuário comum: tem
+   * que ser ele mesmo (nunca aceitar liberação feita com o admin no lugar
+   * dele). Administrador: o admin da plataforma.
+   */
+  const esperado = comoAdmin ? usuarioAdminPlataforma() : usuario.samAccountName;
+  if (!job.executadoComo || job.executadoComo.trim().toLowerCase() !== esperado.trim().toLowerCase()) {
+    throw new Error(
+      `A API do 3DX iniciou a liberação como "${job.executadoComo ?? "?"}", e não como ${esperado}. Avise o suporte antes de liberar de novo.`
+    );
+  }
+
   const rodadaId = await criarRodada({
     codigoPai: simulacao.rodada.codigoPai,
     dryRun: false,
@@ -322,6 +443,7 @@ export async function iniciarLiberacao(
     status: "processando",
     usuario,
   });
+  await atualizarRodada(rodadaId, { job_id: job.jobId, executado_como: job.executadoComo });
 
   await gravarDesenhos(
     rodadaId,
@@ -336,16 +458,6 @@ export async function iniciarLiberacao(
     }))
   );
   await atualizarRodada(rodadaId, { total_itens: simulacao.rodada.totalItens, total_desenhos: alvo.length, total_em_trabalho: alvo.length });
-
-  try {
-    const jobId = await iniciarJobLiberacao(
-      alvo.map((d) => ({ physicalId: d.desenhoPhysicalId, titulo: d.desenhoTitulo, revisao: d.desenhoRevisao })),
-      false
-    );
-    await atualizarRodada(rodadaId, { job_id: jobId });
-  } catch (erro) {
-    await falhar(rodadaId, erro);
-  }
 
   return rodadaId;
 }
@@ -423,7 +535,7 @@ async function acompanharJob(rodadaId: string, jobId: string) {
 const COLUNAS_RODADA = `
   CONVERT(VARCHAR(36), r.[id]) AS [id], r.[codigo_pai], r.[dry_run], CONVERT(VARCHAR(36), r.[simulacao_id]) AS [simulacao_id],
   r.[status], r.[job_id], r.[total_itens], r.[total_desenhos], r.[total_em_trabalho], r.[total_liberados], r.[total_erros],
-  r.[mensagem], r.[usuario_nome], CONVERT(VARCHAR(33), r.[criado_em], 126) AS [criado_em],
+  r.[mensagem], r.[usuario_nome], r.[executado_como], CONVERT(VARCHAR(33), r.[criado_em], 126) AS [criado_em],
   CONVERT(VARCHAR(33), r.[finalizado_em], 126) AS [finalizado_em],
   (SELECT TOP 1 CONVERT(VARCHAR(36), l.[id]) FROM dbo.portal_3dx_liberacoes AS l WHERE l.[simulacao_id] = r.[id]) AS [liberacao_id]`;
 
@@ -441,6 +553,7 @@ interface LinhaRodada {
   total_erros: number | null;
   mensagem: string | null;
   usuario_nome: string;
+  executado_como: string | null;
   criado_em: string;
   finalizado_em: string | null;
   liberacao_id: string | null;
@@ -460,6 +573,7 @@ function paraRodada(l: LinhaRodada): Rodada {
     totalErros: l.total_erros,
     mensagem: l.mensagem,
     usuarioNome: l.usuario_nome,
+    executadoComo: l.executado_como,
     criadoEm: l.criado_em,
     finalizadoEm: l.finalizado_em,
     liberacaoId: l.liberacao_id,

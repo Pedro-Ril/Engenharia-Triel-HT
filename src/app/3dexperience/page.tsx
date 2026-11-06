@@ -12,5 +12,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
   const abaInicial = ABAS.find((valor) => valor === aba) ?? "ultima-revisao";
   const codigoInicial = (codigo ?? "").trim().slice(0, 50);
 
-  return <TresDExperiencePage abaInicial={abaInicial} codigoInicial={codigoInicial} />;
+  return (
+    <TresDExperiencePage
+      abaInicial={abaInicial}
+      codigoInicial={codigoInicial}
+      liberaComoAdminPlataforma={usuario.ehAdministrador}
+    />
+  );
 }

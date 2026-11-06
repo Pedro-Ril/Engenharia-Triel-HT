@@ -16,6 +16,8 @@ export interface Rodada {
   totalErros: number | null;
   mensagem: string | null;
   usuarioNome: string;
+  /* Usuário com que o 3DX executou a liberação real (null: simulação, ou liberação antiga feita com o admin). */
+  executadoComo: string | null;
   criadoEm: string;
   finalizadoEm: string | null;
   liberacaoId: string | null;
@@ -61,11 +63,11 @@ export async function buscarRodada(id: string): Promise<ApiEnvelope<{ rodada: Ro
   return parseResponse(response);
 }
 
-export async function liberarSimulacao(id: string, desenhos: string[]): Promise<ApiEnvelope<{ id: string }>> {
+export async function liberarSimulacao(id: string, desenhos: string[], senha: string | null): Promise<ApiEnvelope<{ id: string }>> {
   const response = await fetch(`/api/3dexperience/liberacao/${id}/liberar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ desenhos }),
+    body: JSON.stringify({ desenhos, senha }),
   });
   return parseResponse(response);
 }

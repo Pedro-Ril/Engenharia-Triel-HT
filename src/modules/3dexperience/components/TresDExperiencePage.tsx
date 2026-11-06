@@ -17,6 +17,8 @@ export type AbaTresDExperience = "ultima-revisao" | "liberar-desenhos";
 interface TresDExperiencePageProps {
   abaInicial: AbaTresDExperience;
   codigoInicial: string;
+  /* Administrador do Portal libera com o admin da plataforma (sem pedir senha); o servidor decide de novo. */
+  liberaComoAdminPlataforma?: boolean;
 }
 
 /*
@@ -35,7 +37,11 @@ interface TresDExperiencePageProps {
  * simulação). Abrir a URL com &codigo= só preenche o campo, senão cada
  * F5 viraria uma simulação nova no histórico.
  */
-export function TresDExperiencePage({ abaInicial, codigoInicial }: TresDExperiencePageProps) {
+export function TresDExperiencePage({
+  abaInicial,
+  codigoInicial,
+  liberaComoAdminPlataforma = false,
+}: TresDExperiencePageProps) {
   const [aba, setAba] = useState<AbaTresDExperience>(abaInicial);
   const [codigo, setCodigo] = useState(codigoInicial);
   /* Simulação disparada na troca de aba: a aba de liberação abre já acompanhando ela (ou com o erro). */
@@ -116,6 +122,7 @@ export function TresDExperiencePage({ abaInicial, codigoInicial }: TresDExperien
                 erroInicial={simulacaoAutomatica?.erro ?? null}
                 onCodigoChange={setCodigo}
                 onIrParaConsulta={() => void trocarAba("ultima-revisao")}
+                liberaComoAdminPlataforma={liberaComoAdminPlataforma}
               />
             ),
           },

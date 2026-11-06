@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
+import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
@@ -96,6 +96,8 @@ interface LiberacaoDesenhosTabProps {
   erroInicial?: string | null;
   /* Mostra o atalho para a Consulta última revisão (levando o código). */
   onIrParaConsulta?: () => void;
+  /* Administrador do Portal: libera com o admin da plataforma, sem pedir senha (o servidor decide de novo). */
+  liberaComoAdminPlataforma?: boolean;
 }
 
 export function LiberacaoDesenhosTab({
@@ -104,6 +106,7 @@ export function LiberacaoDesenhosTab({
   rodadaInicialId = null,
   erroInicial = null,
   onIrParaConsulta,
+  liberaComoAdminPlataforma = false,
 }: LiberacaoDesenhosTabProps = {}) {
   const [codigo, setCodigo] = useState(codigoInicial);
   const [erro, setErro] = useState<string | null>(erroInicial);
@@ -118,6 +121,9 @@ export function LiberacaoDesenhosTab({
   const [tipoHistorico, setTipoHistorico] = useState<TipoRodada>("todas");
   const [confirmando, setConfirmando] = useState(false);
   const [liberando, setLiberando] = useState(false);
+  /* A liberação é feita em nome de quem pede: a senha (a mesma do Portal) vai só nesta chamada e não fica guardada. */
+  const [senha, setSenha] = useState("");
+  const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
   /* physicalIds dos desenhos marcados para liberar (ver marcadosPorPadrao). */
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
 
@@ -211,22 +217,34 @@ export function LiberacaoDesenhosTab({
     }
   }
 
+  function fecharConfirmacao() {
+    setConfirmando(false);
+    setSenha("");
+    setErroConfirmacao(null);
+  }
+
   async function liberar() {
     if (!dados) return;
+    if (!liberaComoAdminPlataforma && !senha) {
+      setErroConfirmacao("Digite sua senha para liberar em seu nome no 3DEXPERIENCE.");
+      return;
+    }
     setLiberando(true);
+    setErroConfirmacao(null);
     try {
       const escolhidos = dados.desenhos
         .filter((d) => d.acao === "seria_liberado" && marcados.has(d.desenhoPhysicalId))
         .map((d) => d.desenhoPhysicalId);
-      const resultado = await liberarSimulacao(dados.rodada.id, escolhidos);
+      const resultado = await liberarSimulacao(dados.rodada.id, escolhidos, liberaComoAdminPlataforma ? null : senha);
       if (resultado.ok && resultado.data) {
-        setConfirmando(false);
+        fecharConfirmacao();
         setDados(null);
         abrirRodada(resultado.data.id);
         setRecargaHistorico((n) => n + 1);
       } else {
-        setConfirmando(false);
-        setErro(resultado.message ?? "Não foi possível iniciar a liberação.");
+        /* Senha errada, sem permissão, 3DX fora: fica na confirmação para tentar de novo (a simulação continua valendo). */
+        setSenha("");
+        setErroConfirmacao(resultado.message ?? "Não foi possível iniciar a liberação.");
       }
     } finally {
       setLiberando(false);
@@ -297,7 +315,11 @@ export function LiberacaoDesenhosTab({
               ? `${rodada.dryRun ? "Simulação" : "Liberação"} · ${rodada.codigoPai}`
               : "Carregando a rodada…"
           }
-          description={rodada ? `${rodada.usuarioNome} · ${formatarData(rodada.criadoEm)}` : undefined}
+          description={
+            rodada
+              ? `${rodada.usuarioNome} · ${formatarData(rodada.criadoEm)}${rodada.executadoComo ? ` · liberado no 3DX como ${rodada.executadoComo}` : ""}`
+              : undefined
+          }
         >
           {!rodada ? (
             <Loader label="Carregando…" />
@@ -520,18 +542,59 @@ export function LiberacaoDesenhosTab({
         </Stack>
       </Card>
 
-      <ConfirmDialog
+      <Modal
         open={confirmando}
         title={`Liberar ${aLiberar} desenho(s) no 3DX?`}
-        variant="danger"
-        confirmLabel="Sim, liberar no 3DX"
-        loading={liberando}
-        message={`Os ${aLiberar} desenho(s) marcados da estrutura de ${rodada?.codigoPai ?? ""} passam para RELEASED no 3DEXPERIENCE de produção, de baixo para cima. Não há desfazer simples: voltar exige um administrador do 3DX. Tudo fica registrado no histórico.`}
-        onConfirm={liberar}
+        size="small"
+        closeOnOverlay={!liberando}
         onClose={() => {
-          if (!liberando) setConfirmando(false);
+          if (!liberando) fecharConfirmacao();
         }}
-      />
+        footer={
+          <Stack direction="row" gap={10} justify="end" wrap>
+            <Button variant="secondary" disabled={liberando} onClick={fecharConfirmacao}>
+              Cancelar
+            </Button>
+            <Button variant="danger" disabled={liberando} onClick={liberar}>
+              {liberando ? "Liberando..." : "Sim, liberar no 3DX"}
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack gap={14}>
+          <Alert variant="danger">
+            Os {aLiberar} desenho(s) marcados da estrutura de {rodada?.codigoPai ?? ""} passam para RELEASED no
+            3DEXPERIENCE de produção, de baixo para cima,{" "}
+            {liberaComoAdminPlataforma ? (
+              <>
+                com o <strong>usuário administrador da plataforma</strong> (você é administrador do Portal; seu nome fica
+                registrado como quem pediu)
+              </>
+            ) : (
+              <>
+                <strong>em seu nome</strong> (com o seu usuário do 3DX)
+              </>
+            )}
+            . Não há desfazer simples: voltar exige um administrador do 3DX. Tudo fica registrado no histórico.
+          </Alert>
+          {!liberaComoAdminPlataforma && (
+          <Field label="Sua senha (a mesma do Portal)" htmlFor="senhaLiberacao3dx" required>
+            <Input
+              id="senhaLiberacao3dx"
+              type="password"
+              autoComplete="current-password"
+              value={senha}
+              onChange={(event) => setSenha(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !liberando) void liberar();
+              }}
+              disabled={liberando}
+            />
+          </Field>
+          )}
+          {erroConfirmacao && <Alert variant="danger">{erroConfirmacao}</Alert>}
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

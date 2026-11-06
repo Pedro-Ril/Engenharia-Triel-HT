@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { isObject, requiredUuidArray } from "@/lib/auth/validation";
+import { isObject, requiredText, requiredUuidArray } from "@/lib/auth/validation";
 import { iniciarLiberacao } from "@/lib/3dexperience/liberacao-desenhos";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
@@ -25,8 +25,11 @@ function desenhosEscolhidos(body: unknown): string[] {
 
 /*
  * LIBERA de verdade no 3DX (produção) os desenhos marcados (body
- * `{ desenhos: physicalId[] }`), dentre os que a simulação {id} apontou.
- * Sem desfazer simples: a tela confirma antes de chamar.
+ * `{ desenhos: physicalId[], senha }`), dentre os que a simulação {id}
+ * apontou, EM NOME de quem pediu: a senha (a mesma do Portal/AD) vai para
+ * a API do 3DX abrir uma sessão do próprio usuário. Nunca é gravada nem
+ * logada. Administrador do Portal não manda senha: vai com o admin da
+ * plataforma. Sem desfazer simples: a tela confirma antes de chamar.
  */
 async function handlePOST(request: Request, context: RouteContext) {
   const acesso = await verificarAcessoModuloApi("3dexperience");
@@ -35,13 +38,20 @@ async function handlePOST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const simulacaoId = requiredUuidArray([id], "simulação")[0];
-    const desenhos = desenhosEscolhidos(await request.json().catch(() => null));
-    const liberacaoId = await iniciarLiberacao(simulacaoId, desenhos, acesso.usuario);
+    const corpo: unknown = await request.json().catch(() => null);
+    const desenhos = desenhosEscolhidos(corpo);
+    /* Administrador do Portal libera com o admin da plataforma (sem senha); os demais, em nome próprio. */
+    const senha = acesso.usuario.ehAdministrador
+      ? null
+      : requiredText(isObject(corpo) ? corpo.senha : undefined, "senha", 200);
+    const liberacaoId = await iniciarLiberacao(simulacaoId, desenhos, acesso.usuario, senha);
 
     await registrarLog({
       nivel: "info",
       origem: "3dexperience/liberacao",
-      mensagem: `${acesso.usuario.nomeExibicao} iniciou a liberação real de ${desenhos.length} desenho(s) (simulação ${simulacaoId}).`,
+      mensagem: `${acesso.usuario.nomeExibicao} iniciou a liberação real de ${desenhos.length} desenho(s) ${
+        acesso.usuario.ehAdministrador ? "com o admin da plataforma" : "em seu nome"
+      } no 3DX (simulação ${simulacaoId}).`,
       metodo: "POST",
       caminho: new URL(request.url).pathname,
     });
