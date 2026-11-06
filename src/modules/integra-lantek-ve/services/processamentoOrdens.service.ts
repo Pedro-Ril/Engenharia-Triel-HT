@@ -17,6 +17,7 @@ export async function buscarOrdens(
     body: JSON.stringify({
       tipo,
       valor,
+      modulo: "ve",
     }),
   });
 
@@ -33,14 +34,16 @@ export async function validarDxf(
   itens: Array<{
     codigo: string;
     codDesenho?: string | null;
-  }>
+  }>,
+  /* Para os Registros: em que momento a busca de DXF rodou. */
+  etapa: "pesquisa" | "confirmacao"
 ) {
   const response = await fetch("/api/integra-lantek/validar-dxf", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ itens }),
+    body: JSON.stringify({ itens, modulo: "ve", etapa }),
   });
 
   const data = await response.json();

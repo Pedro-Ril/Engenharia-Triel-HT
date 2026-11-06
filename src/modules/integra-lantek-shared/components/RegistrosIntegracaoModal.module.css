@@ -1,0 +1,51 @@
+/* Registros da Integra Lantek (modal). Cores só por tokens (modo claro/escuro). */
+
+.tabelaRolagem {
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.linhaClicavel {
+  cursor: pointer;
+}
+
+.linhaClicavel:hover td {
+  background: var(--bg-hover-neutral);
+}
+
+.linhaAlerta td {
+  background: var(--warning-bg);
+}
+
+.linhaDestaque td {
+  background: var(--info-bg);
+}
+
+.semQuebra {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.resumo {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.alerta {
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+.candidatos {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.legenda {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}

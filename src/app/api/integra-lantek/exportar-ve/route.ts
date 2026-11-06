@@ -6,6 +6,7 @@ import path from "path";
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { obterConfigParaRotas } from "@/lib/integra-lantek/integra-lantek-config";
+import { registrarExportacaoLantek, type LinhaExportadaLantek } from "@/lib/integra-lantek/log-exportacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,13 +69,30 @@ function formatarEspessura(valor: string | number | null | undefined) {
   return Number(numero.toString());
 }
 
+/* Linhas como foram (ou iriam) para a planilha -- para o registro da exportação (log-exportacao). */
+function linhasParaRegistro(rows: TabelaProcessamentoRow[], pastaDxf: string): LinhaExportadaLantek[] {
+  return rows.map((row) => ({
+    numOrdem: String(row.numOrdem ?? ""),
+    numLote: String(row.numLote ?? ""),
+    codItem: String(row.codItem ?? ""),
+    codDesenho: String(row.codDesenho ?? ""),
+    qtde: String(row.qtde ?? ""),
+    dxfExportado: resolverCaminhoDxf(row, resolverCodigoCaminho(row), pastaDxf),
+    veioDaTela: Boolean(String(row.dxfCaminho ?? "").trim()),
+  }));
+}
+
 export async function POST(request: NextRequest) {
   const acesso = await verificarAcessoModuloApi("integra-lantek-ve");
   if (acesso.negado) return acesso.negado;
+  const { usuario } = acesso;
+
+  let rows: TabelaProcessamentoRow[] = [];
+  let pastaDxf: string | null = null;
 
   try {
     const body = await request.json();
-    const rows = Array.isArray(body?.rows)
+    rows = Array.isArray(body?.rows)
       ? (body.rows as TabelaProcessamentoRow[])
       : [];
 
@@ -96,6 +114,7 @@ export async function POST(request: NextRequest) {
     }
 
     const destinoPasta = config.pastaExportacaoVe;
+    pastaDxf = config.pastaDxf;
 
     const cabecalho = [
       "Código/ Nome do item",
@@ -189,6 +208,16 @@ export async function POST(request: NextRequest) {
     await fs.mkdir(destinoPasta, { recursive: true });
     await fs.writeFile(caminhoCompleto, buffer);
 
+    await registrarExportacaoLantek({
+      modulo: "ve",
+      status: "sucesso",
+      arquivo: caminhoCompleto,
+      pastaDxf: config.pastaDxf,
+      linhas: linhasParaRegistro(rows, config.pastaDxf),
+      usuarioId: usuario.id,
+      usuarioNome: usuario.nomeExibicao,
+    });
+
     return NextResponse.json({
       success: true,
       message: "Arquivo exportado com sucesso.",
@@ -198,6 +227,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erro ao exportar XLS:", error);
+
+    await registrarExportacaoLantek({
+      modulo: "ve",
+      status: "erro",
+      arquivo: null,
+      pastaDxf,
+      linhas: pastaDxf ? linhasParaRegistro(rows, pastaDxf) : [],
+      mensagemErro: error instanceof Error ? error.message : String(error),
+      usuarioId: usuario.id,
+      usuarioNome: usuario.nomeExibicao,
+    });
 
     return NextResponse.json(
       {

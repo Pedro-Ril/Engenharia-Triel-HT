@@ -6,6 +6,7 @@ import ExcelGrid from "@/modules/integra-lantek-ve/components/ExcelGrid";
 import ValidationModal from "@/modules/integra-lantek-ve/components/ValidationModal";
 import FeedbackModal from "@/modules/integra-lantek-ve/components/FeedbackModal";
 import InfoPesquisaModal from "@/modules/integra-lantek-ve/components/InfoPesquisaModal";
+import { RegistrosIntegracaoModal } from "@/modules/integra-lantek-shared/components/RegistrosIntegracaoModal";
 import {
   buscarOrdens,
   exportarPlanilha,
@@ -165,6 +166,7 @@ export default function ProcessamentoOrdensPage() {
   const [feedbackResumoOrdens, setFeedbackResumoOrdens] = useState<
     ResumoOrdensAgrupado[]
   >([]);
+  const [registrosOpen, setRegistrosOpen] = useState(false);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
 
   const totalItensVisiveis = useMemo(() => visibleRows.length, [visibleRows]);
@@ -262,7 +264,7 @@ export default function ProcessamentoOrdensPage() {
         }))
         .filter((item) => item.codigo || item.codDesenho);
 
-      const validacao = await validarDxf(itensParaValidar);
+      const validacao = await validarDxf(itensParaValidar, "pesquisa");
 
       setDxfMap(montarDxfMap(validacao.resultados));
       setResultadoApi(items);
@@ -292,15 +294,26 @@ export default function ProcessamentoOrdensPage() {
       setErro("");
 
       const novasLinhas = items.map(mapApiItemToRow);
-      const itensParaValidar = novasLinhas
+
+      /*
+       * Reaproveita a busca de DXF feita na pesquisa -- a mesma que a
+       * conferência mostrou --, para a planilha levar exatamente aquele DXF.
+       * Antes buscava tudo de novo aqui (varrendo a pasta inteira outra vez).
+       * Só busca agora o que a pesquisa não cobriu, se houver.
+       */
+      const itensSemBusca = novasLinhas
+        .filter((row) => !dxfMap[String(row.codItem).trim()])
         .map((row) => ({
           codigo: String(row.codItem ?? "").trim(),
           codDesenho: String(row.codDesenho ?? "").trim(),
         }))
         .filter((item) => item.codigo || item.codDesenho);
 
-      const validacao = await validarDxf(itensParaValidar);
-      const mapaDxf = montarDxfMap(validacao.resultados);
+      let mapaDxf = dxfMap;
+      if (itensSemBusca.length > 0) {
+        const validacao = await validarDxf(itensSemBusca, "confirmacao");
+        mapaDxf = { ...dxfMap, ...montarDxfMap(validacao.resultados) };
+      }
 
       const linhasComDxf = novasLinhas.map((row) => {
         const info = mapaDxf[String(row.codItem).trim()];
@@ -390,14 +403,24 @@ export default function ProcessamentoOrdensPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              className={styles.infoBadge}
-              onClick={() => setInfoModalOpen(true)}
-              title="Clique aqui para visualizar algumas regras de integração"
-            >
-              Integração ativa
-            </button>
+            <div className={styles.headerAcoes}>
+              <button
+                type="button"
+                className={styles.infoBadge}
+                onClick={() => setRegistrosOpen(true)}
+                title="Pesquisas no ERP, buscas de DXF e exportações, com o detalhe por peça"
+              >
+                Registros
+              </button>
+              <button
+                type="button"
+                className={styles.infoBadge}
+                onClick={() => setInfoModalOpen(true)}
+                title="Clique aqui para visualizar algumas regras de integração"
+              >
+                Integração ativa
+              </button>
+            </div>
           </div>
 
           <div className={styles.formGrid}>
@@ -543,6 +566,7 @@ export default function ProcessamentoOrdensPage() {
         open={infoModalOpen}
         onClose={() => setInfoModalOpen(false)}
       />
+      <RegistrosIntegracaoModal open={registrosOpen} modulo="ve" onClose={() => setRegistrosOpen(false)} />
     </main>
   );
 }

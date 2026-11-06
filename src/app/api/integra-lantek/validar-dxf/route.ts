@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
 
 import { ValidationError } from "@/lib/auth/errors";
 import { verificarAcessoIntegraLantekApi } from "@/lib/integra-lantek/autorizacao-integra-lantek";
+import { escolherDxf, listarDxfRecursivo } from "@/lib/integra-lantek/dxf-indice";
+import { lerModuloLantek, registrarEventoLantek } from "@/lib/integra-lantek/eventos";
 import { obterConfigParaRotas } from "@/lib/integra-lantek/integra-lantek-config";
 
 export const runtime = "nodejs";
@@ -16,81 +16,21 @@ type ItemValidacao = {
 
 type RequestBody = {
   itens: ItemValidacao[];
+  modulo?: unknown;
+  /* "pesquisa" (ao buscar ordem/lote) ou "confirmacao" (ao colocar as linhas na grade). */
+  etapa?: unknown;
 };
-
-type ArquivoEncontrado = {
-  caminho: string;
-  arquivo: string;
-};
-
-async function listarDxfRecursivo(
-  pastaBase: string
-): Promise<Map<string, ArquivoEncontrado[]>> {
-  const indice = new Map<string, ArquivoEncontrado[]>();
-
-  async function percorrer(pasta: string) {
-    let entradas;
-
-    try {
-      entradas = await fs.readdir(pasta, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    const subPastas: string[] = [];
-
-    for (const entrada of entradas) {
-      const caminhoCompleto = path.join(pasta, entrada.name);
-
-      if (entrada.isDirectory()) {
-        subPastas.push(caminhoCompleto);
-        continue;
-      }
-
-      if (!entrada.isFile()) continue;
-      if (path.extname(entrada.name).toLowerCase() !== ".dxf") continue;
-
-      const chave = path
-        .basename(entrada.name, path.extname(entrada.name))
-        .trim()
-        .toLowerCase();
-
-      const encontrado: ArquivoEncontrado = {
-        caminho: caminhoCompleto,
-        arquivo: entrada.name,
-      };
-
-      const lista = indice.get(chave);
-      if (lista) {
-        lista.push(encontrado);
-      } else {
-        indice.set(chave, [encontrado]);
-      }
-    }
-
-    await Promise.all(subPastas.map((sub) => percorrer(sub)));
-  }
-
-  await percorrer(pastaBase);
-
-  return indice;
-}
-
-function buscarNoIndice(
-  indice: Map<string, ArquivoEncontrado[]>,
-  codigo: string
-): ArquivoEncontrado[] {
-  const chave = codigo.trim().toLowerCase();
-  if (!chave) return [];
-  return indice.get(chave) ?? [];
-}
 
 export async function POST(request: NextRequest) {
   const acesso = await verificarAcessoIntegraLantekApi();
   if (acesso.negado) return acesso.negado;
+  const { usuario } = acesso;
+  const inicio = performance.now();
 
   try {
     const body = (await request.json()) as RequestBody;
+    const modulo = lerModuloLantek(body?.modulo);
+    const etapa = body?.etapa === "pesquisa" || body?.etapa === "confirmacao" ? body.etapa : null;
     const itens = Array.isArray(body?.itens) ? body.itens : [];
 
     if (!itens.length) {
@@ -127,23 +67,7 @@ export async function POST(request: NextRequest) {
     const indice = await listarDxfRecursivo(config.pastaDxf);
 
     const resultados = itensNormalizados.map(({ codigo, codDesenho }) => {
-      let encontrados = codigo ? buscarNoIndice(indice, codigo) : [];
-      let codigoUsado = "";
-      let origem: "codigo" | "cod_desenho" | "" = "";
-
-      if (encontrados.length > 0) {
-        codigoUsado = codigo;
-        origem = "codigo";
-      } else if (codDesenho) {
-        encontrados = buscarNoIndice(indice, codDesenho);
-
-        if (encontrados.length > 0) {
-          codigoUsado = codDesenho;
-          origem = "cod_desenho";
-        }
-      }
-
-      const principal = encontrados[0];
+      const { encontrados, codigoUsado, origem, principal } = escolherDxf(indice, codigo, codDesenho);
 
       return {
         codigo,
@@ -156,6 +80,29 @@ export async function POST(request: NextRequest) {
         arquivo: principal?.arquivo ?? "",
         caminhos: encontrados.map((item) => item.caminho),
       };
+    });
+
+    const semDxf = resultados.filter((r) => !r.existe).length;
+    const repetidos = resultados.filter((r) => r.duplicado).length;
+    const peloDesenho = resultados.filter((r) => r.origem === "cod_desenho").length;
+    await registrarEventoLantek({
+      modulo,
+      tipo: "validacao_dxf",
+      sucesso: true,
+      resumo: `Busca de DXF${etapa === "confirmacao" ? " (ao confirmar)" : etapa === "pesquisa" ? " (na pesquisa)" : ""}: ${resultados.length} item(ns) · ${semDxf} sem DXF · ${repetidos} com mais de um DXF · ${peloDesenho} pelo código do desenho`,
+      parametros: { etapa, pastaDxf: config.pastaDxf, totalItens: itensNormalizados.length },
+      resultado: resultados.map((r) => ({
+        codigo: r.codigo,
+        codDesenho: r.codDesenho,
+        origem: r.origem,
+        caminho: r.caminho,
+        duplicado: r.duplicado,
+        caminhos: r.caminhos,
+      })),
+      total: resultados.length,
+      duracaoMs: performance.now() - inicio,
+      usuarioId: usuario.id,
+      usuarioNome: usuario.nomeExibicao,
     });
 
     return NextResponse.json({

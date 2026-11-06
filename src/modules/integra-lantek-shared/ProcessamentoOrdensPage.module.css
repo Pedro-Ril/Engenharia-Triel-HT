@@ -92,6 +92,14 @@
   line-height: 1.6;
 }
 
+/* Botões ao lado do título do painel de consulta (Registros, Integração ativa). */
+.headerAcoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .infoBadge {
   min-height: 40px;
   padding: 0 14px;
