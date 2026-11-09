@@ -1,0 +1,221 @@
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.secaoTitulo {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.secaoDica {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.texto {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.textoFraco {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.acoes {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.barra {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+/* Tabelas editáveis (linhas de corte, tempos por chapa, matriz) */
+.rolagem {
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.grade {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.grade th {
+  position: sticky;
+  top: 0;
+  padding: 8px 6px;
+  background: var(--bg-surface-soft);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.grade td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+}
+
+.grade tr:last-child td {
+  border-bottom: none;
+}
+
+.celula {
+  width: 100%;
+  min-width: 64px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.celula:hover {
+  border-color: var(--border-input-hover);
+}
+
+.celula:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.celulaEstreita {
+  min-width: 56px;
+  max-width: 84px;
+}
+
+.celulaMatriz {
+  min-width: 58px;
+  max-width: 70px;
+  height: 28px;
+  padding: 0 6px;
+  text-align: right;
+}
+
+.rotuloLinha {
+  color: var(--text-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.faixa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+}
+
+/* Resultado do cálculo */
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tempoTotal {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tempoNumero {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.tempoUnidade {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.referencias {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.referencia {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface-soft);
+}
+
+.referencia dt {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.referencia dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.parcelaBarra {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  overflow: hidden;
+}
+
+.parcelaBarraValor {
+  height: 100%;
+  background: var(--primary);
+}
+
+.lista {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.simulador {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .simulador {
+    grid-template-columns: 1fr;
+  }
+}

@@ -20,6 +20,7 @@ import {
   Send,
   Settings,
   TrafficCone,
+  Timer,
   TrendingUp,
   Tv,
   Users,
@@ -83,6 +84,7 @@ import { SetoresModulosPainel } from "./SetoresModulosPainel";
 import { TerminalFabricaPainel } from "./TerminalFabricaPainel";
 import { DesenhoAprovacaoTemplatesPainel } from "./DesenhoAprovacaoTemplatesPainel";
 import { EstoqueEquipamentosUsadosPainel } from "./EstoqueEquipamentosUsadosPainel";
+import { TemposMaquinaPainel } from "./TemposMaquinaPainel";
 import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
@@ -175,6 +177,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "estoque-tipos-equipamento",
         label: "Estoque de Equipamentos",
         icon: <Warehouse size={16} />,
+      },
+      {
+        valor: "tempos-maquina",
+        label: "Tempos de Máquina",
+        icon: <Timer size={16} />,
       },
       {
         valor: "semaforo-config",
@@ -568,6 +575,8 @@ export function AdminPermissoesPage() {
           {secao === "estoque-tipos-equipamento" && (
             <EstoqueEquipamentosUsadosPainel onFeedback={mostrarFeedback} />
           )}
+
+          {secao === "tempos-maquina" && <TemposMaquinaPainel onFeedback={mostrarFeedback} />}
 
           {secao === "semaforo-config" && (
             <SemaforoConfigPainel onFeedback={mostrarFeedback} />
