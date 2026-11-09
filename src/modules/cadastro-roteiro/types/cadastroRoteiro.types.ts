@@ -51,6 +51,8 @@ export type Estrutura3DXNode = {
   codigoDesenho?: string;
   tipo?: string;
   tipoint?: string;
+  /* Peso do item no 3DX (texto com vírgula, ex.: "0,59"); o cálculo de tempo confere a área do DXF com ele. */
+  peso?: string | null;
   physicalId?: string;
   codigo?: string;
   id3DX?: string;

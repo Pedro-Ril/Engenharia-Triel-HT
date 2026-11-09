@@ -2,6 +2,8 @@ import { ValidationError } from "@/lib/auth/errors";
 import { isObject } from "@/lib/auth/validation";
 
 import type {
+  ContornoInterno,
+  DadosPeca,
   FaixaTabelaDimensao,
   LinhaCorteCnc,
   PerfilCorteCnc,
@@ -204,4 +206,61 @@ export function validarParametrosPerfil(metodo: unknown, parametros: unknown): P
   if (metodo === "corte_cnc") return validarCorteCnc(p);
   if (metodo === "tabela_dimensao") return validarTabelaDimensao(p);
   throw new ValidationError("Método de cálculo inválido.");
+}
+
+/* Contornos internos são poucos; acima disto é erro de quem mandou. */
+const MAXIMO_CONTORNOS = 5000;
+
+/*
+ * Dados da peça como chegam do Roteiro (para recalcular no servidor):
+ * só números finitos, só os tipos de contorno conhecidos.
+ */
+export function validarDadosPeca(valor: unknown): DadosPeca {
+  const d = objeto(valor, "Dados da peça");
+  const g = objeto(d.geometria, "A geometria da peça");
+
+  const contornos = lista(g.contornosInternos ?? [], "os contornos internos", 0);
+  if (contornos.length > MAXIMO_CONTORNOS) throw new ValidationError("Contornos internos demais.");
+
+  const contornosInternos: ContornoInterno[] = contornos.map((c, i) => {
+    const o = objeto(c, `o contorno interno ${i + 1}`);
+    if (o.tipo === "furo") return { tipo: "furo", diametroMm: numero(o.diametroMm, "o diâmetro do furo", { maiorQueZero: true }) };
+    if (o.tipo === "oblongo") {
+      return {
+        tipo: "oblongo",
+        larguraMm: numero(o.larguraMm, "a largura do oblongo", { maiorQueZero: true }),
+        comprimentoMm: numero(o.comprimentoMm, "o comprimento do oblongo", { maiorQueZero: true }),
+        retangular: o.retangular === true,
+      };
+    }
+    if (o.tipo === "recorte") {
+      return {
+        tipo: "recorte",
+        perimetroMm: numero(o.perimetroMm, "o perímetro do recorte", { min: 0 }),
+        menorDimensaoMm: numeroOuNulo(o.menorDimensaoMm, "a menor medida do recorte", { min: 0 }),
+      };
+    }
+    throw new ValidationError(`Contorno interno ${i + 1} inválido.`);
+  });
+
+  const dobra = d.dobra === null || d.dobra === undefined ? null : objeto(d.dobra, "A dobra");
+
+  return {
+    espessuraMm: numero(d.espessuraMm, "a espessura", { maiorQueZero: true }),
+    variante: typeof d.variante === "string" && d.variante.trim() ? d.variante.trim().slice(0, 30) : null,
+    dobra: dobra
+      ? {
+          fator: typeof dobra.fator === "string" && dobra.fator.trim() ? dobra.fator.trim().slice(0, 40) : null,
+          quantidade: numeroOuNulo(dobra.quantidade, "o número de dobras", { min: 0 }),
+        }
+      : null,
+    geometria: {
+      perimetroExternoMm: numeroOuNulo(g.perimetroExternoMm, "o perímetro externo", { min: 0 }),
+      larguraMm: numeroOuNulo(g.larguraMm, "a largura", { min: 0 }),
+      comprimentoMm: numeroOuNulo(g.comprimentoMm, "o comprimento", { min: 0 }),
+      areaMm2: numeroOuNulo(g.areaMm2, "a área", { min: 0 }),
+      contornosInternos,
+      entradasAdicionais: numero(g.entradasAdicionais ?? 0, "as entradas adicionais", { inteiro: true, min: 0 }),
+    },
+  };
 }

@@ -41,3 +41,11 @@ export const ROTULO_METODO: Record<MetodoTempo, string> = {
   corte_cnc: "Corte CNC (laser/plasma)",
   tabela_dimensao: "Tabela por dimensão (guilhotina/dobra)",
 };
+
+/* O que o Roteiro de Fabricação recebe (GET /api/cadastro-roteiro/tempos): só o que está ativo. */
+export type ConfigTemposRoteiro = {
+  perfis: { id: string; nome: string; parametros: PerfilTempo }[];
+  /* COD_RECURSO (maiúsculo) -> perfil ativo. */
+  maquinas: { codRecurso: string; perfilId: string }[];
+  materiais: Omit<MaterialTempo, "id">[];
+};

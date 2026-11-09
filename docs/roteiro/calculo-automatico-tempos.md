@@ -263,11 +263,43 @@ chapa no ERP):
   - Teste temporário no banco real (criar, editar, ligar, impedir exclusão), limpo depois, com as contagens conferidas.
   - Tela testada com Playwright nos temas claro e escuro, sem erro de console. O simulador dá 0,7968 min no caso da planilha.
 
-**Próximo:** fase 4, no Roteiro. Interruptor "Calcular tempo
-automaticamente" na operação, para máquina com perfil ativo, com
-geometria do DXF do item e espessura e material da matéria-prima, mais o
-alerta de espessura 3DX × ERP e o registro de cada cálculo. Nenhum
-perfil está ativo, então o Roteiro ainda não muda.
+**09/11/2026: fase 4 (Roteiro de Fabricação).**
+
+- **Botão "Calcular"** ao lado do campo Tempo, no cadastro e na edição de
+  operação. Ele abre uma janela com:
+  - a máquina da operação que tem perfil **ativo** (a preferencial primeiro);
+  - a matéria-prima da estrutura do ERP (a chapa), com a espessura lida da
+    descrição e o material reconhecido pelo cadastro de Materiais;
+  - a geometria do **DXF do item**, procurado pelo nome na pasta de DXF da
+    Triel-HT (raiz e CIBER), ou medidas digitadas quando não há DXF;
+  - o resultado detalhado e "Consultar tempos", que mostra a tabela da
+    máquina só para leitura.
+- **Aviso de espessura:** compara a área do DXF com o peso do 3DX ÷
+  (densidade × espessura). Acima de 10% de diferença, avisa que a
+  espessura ou o material do 3DX e do ERP não batem.
+- **"Usar este tempo":** o servidor recalcula com o perfil ativo, grava em
+  `eng_tempos_calculos` (migração 0161: item, revisão, operação, máquina,
+  perfil, tempo, origem da geometria, dados e resultado, quem) e devolve o
+  tempo para o campo. Abaixo do campo aparece "Calculado: máquina · perfil".
+- **Sem o botão:** o tempo continua digitado como antes. Máquina sem perfil
+  ativo mostra quais máquinas têm cálculo.
+- **Código:**
+  - `src/lib/tempos-maquina/roteiro.ts`;
+  - rotas `src/app/api/cadastro-roteiro/tempos/**` (acesso ao módulo
+    cadastro-roteiro);
+  - `src/modules/cadastro-roteiro/components/CalculoTempoModal.tsx`.
+- **Verificado:**
+  - 37 testes passam.
+  - Teste no banco e na pasta reais: o DXF do 304981 é lido; perfil
+    inativo é recusado; com perfil ativo, recalcula e registra. Os dados
+    de teste foram apagados e as contagens conferidas.
+  - Tela testada com Playwright no item 303464 (LASERVE, inox 6 mm),
+    sem gravar no ERP.
+  - Com o perfil BYSPEED da planilha o cálculo deu 0,3355 min; o tempo
+    hoje no ERP é 0,32 min.
+
+**Para entrar em uso:** Processos atualiza os perfis; o admin liga cada
+máquina ao seu perfil e ativa.
 
 ## Anexo: tabelas das planilhas
 

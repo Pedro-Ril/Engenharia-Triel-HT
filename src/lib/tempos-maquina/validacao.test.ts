@@ -5,7 +5,7 @@ import { corteCncParaForm, formParaCorteCnc, formParaTabela, tabelaParaForm } fr
 import { identificarMaterial } from "./materiais";
 import { PERFIS_REFERENCIA_PLANILHAS as REF } from "./referencia-planilhas";
 import type { PerfilTempo } from "./tipos";
-import { validarParametrosPerfil } from "./validacao";
+import { validarDadosPeca, validarParametrosPerfil } from "./validacao";
 
 const copia = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -87,5 +87,38 @@ describe("identificarMaterial", () => {
   it("não reconhece pedaço no meio da palavra nem material inativo", () => {
     expect(identificarMaterial("CHAPA POLYSTONE P COPOLYMER", materiais)).toBeNull();
     expect(identificarMaterial("TRIACO", materiais)).toBeNull();
+  });
+});
+
+describe("validarDadosPeca", () => {
+  const base = {
+    espessuraMm: 4.75,
+    variante: "padrao",
+    dobra: null,
+    geometria: {
+      perimetroExternoMm: 1600,
+      larguraMm: 300,
+      comprimentoMm: 500,
+      areaMm2: 150000,
+      contornosInternos: [{ tipo: "furo", diametroMm: 20 }, { tipo: "oblongo", larguraMm: 20, comprimentoMm: 60 }],
+      entradasAdicionais: 0,
+    },
+  };
+
+  it("aceita o que o Roteiro manda e descarta campo desconhecido", () => {
+    const d = validarDadosPeca({ ...base, extra: "x", geometria: { ...base.geometria, lixo: 1 } });
+
+    expect(d.geometria.contornosInternos).toEqual([
+      { tipo: "furo", diametroMm: 20 },
+      { tipo: "oblongo", larguraMm: 20, comprimentoMm: 60, retangular: false },
+    ]);
+    expect(d).not.toHaveProperty("extra");
+    expect(d.geometria).not.toHaveProperty("lixo");
+  });
+
+  it("recusa contorno desconhecido, espessura zero e número que não é número", () => {
+    expect(() => validarDadosPeca({ ...base, geometria: { ...base.geometria, contornosInternos: [{ tipo: "estrela" }] } })).toThrow("inválido");
+    expect(() => validarDadosPeca({ ...base, espessuraMm: 0 })).toThrow("maior que zero");
+    expect(() => validarDadosPeca({ ...base, geometria: { ...base.geometria, areaMm2: "muito" } })).toThrow("Informe a área");
   });
 });

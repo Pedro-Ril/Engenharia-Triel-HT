@@ -28,6 +28,7 @@ import { RecursosConsumosOperacao } from "./RecursosConsumosOperacao";
 import { PaisNoErp } from "./PaisNoErp";
 import { OutrosPaisMenu } from "./OutrosPaisMenu";
 import AbrirPdfItemButton from "./AbrirPdfItemButton";
+import { CalculoTempoModal } from "./CalculoTempoModal";
 import Abrir3DPlayButton from "./Abrir3DPlayButton";
 import { formatarTempo, mascararTempo, tempoParaNumero } from "../utils/tempo";
 import { codigoDoPdf } from "../utils/codigo-pdf";
@@ -659,6 +660,9 @@ export default function CadastroOperacaoModal({
     const [obrigatorio, setObrigatorio] = useState("Não");
     const [unidadeMedida, setUnidadeMedida] = useState("");
     const [tempo, setTempo] = useState("");
+    /* Cálculo automático de tempo: a janela, e de onde veio o tempo que está no campo. */
+    const [calculoAberto, setCalculoAberto] = useState(false);
+    const [tempoCalculado, setTempoCalculado] = useState<{ valor: string; perfilNome: string; codRecurso: string } | null>(null);
     const [observacao, setObservacao] = useState("");
     const [recursos, setRecursos] = useState<RecursoForm[]>([]);
     const [consumos, setConsumos] = useState<ConsumoForm[]>([]);
@@ -2167,9 +2171,20 @@ export default function CadastroOperacaoModal({
 
                                 <div className={styles.formGrid}>
                                     <div className={styles.formField}>
-                                        <label className={styles.formLabel} htmlFor={`${idTitulo}-tempo`}>
-                                            Tempo
-                                        </label>
+                                        <div className={styles.legendaComAcao} style={{ justifyContent: "space-between" }}>
+                                            <label className={styles.formLabel} htmlFor={`${idTitulo}-tempo`}>
+                                                Tempo
+                                            </label>
+                                            <button
+                                                type="button"
+                                                className={styles.botaoCompacto}
+                                                title="Calcular o tempo pela máquina da operação, pela matéria-prima e pelo DXF do item"
+                                                disabled={ocupado || !item}
+                                                onClick={() => setCalculoAberto(true)}
+                                            >
+                                                Calcular
+                                            </button>
+                                        </div>
                                         <input
                                             id={`${idTitulo}-tempo`}
                                             ref={tempoInputRef}
@@ -2182,6 +2197,11 @@ export default function CadastroOperacaoModal({
                                             value={tempo}
                                             onChange={(e) => alterou(setTempo)(mascararTempo(e.target.value))}
                                         />
+                                        {tempoCalculado && tempoCalculado.valor === tempo && (
+                                            <span className={styles.formHint}>
+                                                Calculado: {tempoCalculado.codRecurso} · {tempoCalculado.perfilNome}
+                                            </span>
+                                        )}
                                     </div>
 
                                     <SearchSelect
@@ -2362,6 +2382,24 @@ export default function CadastroOperacaoModal({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {calculoAberto && item && (
+                <CalculoTempoModal
+                    item={item}
+                    recursos={recursos}
+                    componentes={erp?.estado === "ok" ? erp.componentes : []}
+                    alternativo={alternativoParaNumero(roteiroPadrao)}
+                    seq={Number(seq) || null}
+                    unidade={extrairCodigo(unidadeMedida)}
+                    onClose={() => setCalculoAberto(false)}
+                    onUsar={(tempoMin, info) => {
+                        const valor = formatarTempo(Number(tempoMin.toFixed(6)));
+                        alterou(setTempo)(valor);
+                        setTempoCalculado({ valor, ...info });
+                        setCalculoAberto(false);
+                    }}
+                />
             )}
 
             {/* Fora do conteúdo do modal: o Esc destes diálogos não pode
