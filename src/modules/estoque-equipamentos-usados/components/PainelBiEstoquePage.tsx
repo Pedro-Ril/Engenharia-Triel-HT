@@ -130,7 +130,7 @@ export function PainelBiEstoquePage() {
           rodizio={rodizio}
           renderPagina={(i) => {
             const p = paginas[i];
-            return p.tipo === "resumo" ? <PaginaQuantidade dados={p.dados} /> : <TabelaItensPainel pagina={p.pagina} />;
+            return p.tipo === "resumo" ? <PaginaQuantidade dados={p.dados} /> : <TabelaItensPainel pagina={p.pagina} rotuloCondicao={ROTULO_CONDICAO[p.condicao]} />;
           }}
         />
       </div>

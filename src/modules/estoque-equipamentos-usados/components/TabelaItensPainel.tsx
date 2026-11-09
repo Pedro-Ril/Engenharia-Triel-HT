@@ -37,7 +37,7 @@ export function paginarItens(dados: PainelItens | null | undefined, linhasPorPag
   });
 }
 
-export function TabelaItensPainel({ pagina }: { pagina: PaginaTabelaItens }) {
+export function TabelaItensPainel({ pagina, rotuloCondicao }: { pagina: PaginaTabelaItens; rotuloCondicao: string }) {
   const { tipo } = pagina;
 
   /*
@@ -65,7 +65,9 @@ export function TabelaItensPainel({ pagina }: { pagina: PaginaTabelaItens }) {
   return (
     <section className={styles.cartao}>
       <header className={styles.cartaoTopo}>
-        <h2 className={styles.tipoNome}>{tipo.tipoNome}</h2>
+        <h2 className={styles.tipoNome}>
+          {tipo.tipoNome} ({rotuloCondicao})
+        </h2>
         <span className={styles.tipoResumo}>
           {tipo.linhas.length} {tipo.linhas.length === 1 ? "equipamento" : "equipamentos"}
           {pagina.paginasDoTipo > 1 && ` · página ${pagina.paginaDoTipo} de ${pagina.paginasDoTipo}`}
