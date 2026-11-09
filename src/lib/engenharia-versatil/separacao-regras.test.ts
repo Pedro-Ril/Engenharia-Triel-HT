@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   arquivosDoCodigo,
+  codigoPodeSerDaTriel,
   lerAba,
   montarPlano,
   nomeDaLista,
@@ -110,6 +111,43 @@ describe("montarPlano", () => {
     arquivosPdf: ["100.pdf", "101.pdf", "101_1.pdf", "200.pdf", "201.pdf"],
     arquivosDxf: ["100.dxf"],
     existentesNoDestino: new Map([["CHAPARIA", new Set(["100.pdf"])]]),
+  });
+
+  describe("segunda origem: pasta da Triel-HT", () => {
+    const abasTriel = [
+      lerAba("CHAPARIA", [["Nº DO ITEM", "Nº DA PEÇA"], ["1", 300], ["2", 301], ["3", 20000000], ["4", 19999999]]),
+    ];
+    const noTriel = (codigo: string, ...nomes: string[]) =>
+      [codigo, nomes.map((arquivo) => ({ arquivo, caminho: `T/${arquivo}` }))] as const;
+    const planoTriel = montarPlano({
+      abas: abasTriel,
+      blacklist: [],
+      abasComDxf: [],
+      arquivosPdf: ["301.pdf"],
+      arquivosDxf: [],
+      trielPdf: new Map([noTriel("300", "300.PDF", "300_1.PDF"), noTriel("301", "301.PDF"), noTriel("20000000", "20000000.pdf")]),
+      existentesNoDestino: new Map(),
+    });
+    const resumo = planoTriel.itens.map((i) => `${i.codigo}:${i.arquivo}:${i.situacao}:${i.origemTriel}`);
+
+    it("código abaixo de 20000000 sem arquivo na Versátil vem da Triel-HT, com as folhas", () => {
+      expect(resumo).toContain("300:300.PDF:copiar:T/300.PDF");
+      expect(resumo).toContain("300:300_1.PDF:copiar:T/300_1.PDF");
+    });
+
+    it("achou na Versátil: não usa a Triel-HT", () => {
+      expect(resumo).toContain("301:301.pdf:copiar:null");
+    });
+
+    it("a partir de 20000000 não procura na Triel-HT; abaixo e sem arquivo continua não encontrado", () => {
+      expect(resumo).toContain("20000000:null:nao_encontrado:null");
+      expect(resumo).toContain("19999999:null:nao_encontrado:null");
+    });
+
+    it("código com letra não é da Triel-HT", () => {
+      expect(codigoPodeSerDaTriel("WX3385856")).toBe(false);
+      expect(codigoPodeSerDaTriel("000191")).toBe(true);
+    });
   });
 
   it("blacklist e aba sem arquivo ficam de fora (e sem pasta)", () => {

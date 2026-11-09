@@ -142,6 +142,7 @@ export function EngenhariaVersatilPage() {
     arquivo: i.arquivo,
     situacao: i.situacao,
     ...SITUACAO[i.situacao],
+    mensagem: i.origemTriel ? "Da pasta da Triel-HT." : null,
   }));
 
   const linhasResultado: LinhaArquivo[] = (aberta?.itens ?? []).map((i) => ({
@@ -152,7 +153,7 @@ export function EngenhariaVersatilPage() {
     arquivo: i.arquivo,
     situacao: i.acao,
     ...ACAO[i.acao],
-    mensagem: i.acao === "erro" ? i.mensagem : null,
+    mensagem: i.acao === "erro" || i.acao === "copiado" ? i.mensagem : null,
   }));
 
   const temTrabalho = Boolean(previa && (previa.totais.copiar > 0 || previa.totais.pastasCriar > 0));

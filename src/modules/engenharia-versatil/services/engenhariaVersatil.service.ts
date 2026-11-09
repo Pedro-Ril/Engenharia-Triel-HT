@@ -12,6 +12,8 @@ export interface ItemPlano {
   tipo: TipoArquivo;
   arquivo: string | null;
   situacao: SituacaoItem;
+  /* Caminho na pasta da Triel-HT, quando o arquivo vem de lá. */
+  origemTriel: string | null;
 }
 
 export interface PastaPlano {

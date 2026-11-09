@@ -39,6 +39,8 @@ export interface ItemPlano {
   /* Nome do arquivo na origem (null quando não foi achado). */
   arquivo: string | null;
   situacao: SituacaoItem;
+  /* Caminho completo na pasta da Triel-HT, quando o arquivo veio de lá (null: pasta da Versátil, ou não achado). */
+  origemTriel: string | null;
 }
 
 export interface PastaPlano {
@@ -195,10 +197,35 @@ export function arquivosDoCodigo(nomesNaOrigem: string[], codigo: string, tipo: 
   return [...achados.slice(0, 1), ...folhas];
 }
 
+/* Abaixo disso, o código numérico pode ser de item da Triel-HT. */
+const LIMITE_CODIGO_TRIEL = 20_000_000;
+
+export function codigoPodeSerDaTriel(codigo: string): boolean {
+  return /^[0-9]+$/.test(codigo) && Number(codigo) < LIMITE_CODIGO_TRIEL;
+}
+
+export interface ArquivoTriel {
+  arquivo: string;
+  caminho: string;
+}
+
+/* Arquivos da Triel-HT por código (minúsculo, sem o "_1" da folha). */
+export type IndiceTriel = Map<string, ArquivoTriel[]>;
+
+/* Só para código que pode ser da Triel-HT; mesma regra de nome da origem da Versátil. */
+function arquivosNaTriel(indice: IndiceTriel | undefined, codigo: string, tipo: TipoArquivo): ArquivoTriel[] {
+  if (!indice || !codigoPodeSerDaTriel(codigo)) return [];
+  const candidatos = indice.get(codigo.toLowerCase()) ?? [];
+  return arquivosDoCodigo(candidatos.map((c) => c.arquivo), codigo, tipo).map(
+    (nome) => candidatos.find((c) => c.arquivo === nome)!
+  );
+}
+
 /*
  * O plano da separação. `existentesNoDestino` traz, por pasta relativa
  * (normalizada), os nomes de arquivo que já existem lá; pasta ausente
- * do mapa = pasta que não existe.
+ * do mapa = pasta que não existe. O que não está na origem da Versátil
+ * e tem código abaixo de 20000000 é procurado na pasta da Triel-HT.
  */
 export function montarPlano(params: {
   abas: AbaLida[];
@@ -206,6 +233,8 @@ export function montarPlano(params: {
   abasComDxf: string[];
   arquivosPdf: string[];
   arquivosDxf: string[];
+  trielPdf?: IndiceTriel;
+  trielDxf?: IndiceTriel;
   existentesNoDestino: Map<string, Set<string>>;
 }): Plano {
   const bloqueadas = new Set(params.blacklist.map(normalizarNome));
@@ -243,15 +272,22 @@ export function montarPlano(params: {
 
       for (const codigo of lista.codigos) {
         for (const tipo of tipos) {
-          const nomes = arquivosDoCodigo(tipo === "pdf" ? params.arquivosPdf : params.arquivosDxf, codigo, tipo);
-          if (nomes.length === 0) {
-            itensDaAba.push({ aba: aba.aba, pastaDestino: caminho, codigo, tipo, arquivo: null, situacao: "nao_encontrado" });
+          const naVersatil = arquivosDoCodigo(tipo === "pdf" ? params.arquivosPdf : params.arquivosDxf, codigo, tipo);
+          const achados: { arquivo: string; origemTriel: string | null }[] =
+            naVersatil.length > 0
+              ? naVersatil.map((arquivo) => ({ arquivo, origemTriel: null }))
+              : arquivosNaTriel(tipo === "pdf" ? params.trielPdf : params.trielDxf, codigo, tipo).map((a) => ({
+                  arquivo: a.arquivo,
+                  origemTriel: a.caminho,
+                }));
+          if (achados.length === 0) {
+            itensDaAba.push({ aba: aba.aba, pastaDestino: caminho, codigo, tipo, arquivo: null, situacao: "nao_encontrado", origemTriel: null });
             continue;
           }
           temArquivo = true;
-          for (const arquivo of nomes) {
+          for (const { arquivo, origemTriel } of achados) {
             const jaExiste = existentes?.has(arquivo.toLowerCase()) ?? false;
-            itensDaAba.push({ aba: aba.aba, pastaDestino: caminho, codigo, tipo, arquivo, situacao: jaExiste ? "ja_existe" : "copiar" });
+            itensDaAba.push({ aba: aba.aba, pastaDestino: caminho, codigo, tipo, arquivo, situacao: jaExiste ? "ja_existe" : "copiar", origemTriel });
           }
         }
       }

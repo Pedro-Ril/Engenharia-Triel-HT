@@ -6,14 +6,19 @@ import path from "path";
 import * as XLSX from "xlsx";
 
 import { ValidationError } from "@/lib/auth/errors";
+import { listarPastasPorEmpresa } from "@/lib/conferencia-derivados/config";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
+import { listarArquivosRecursivo } from "@/lib/integra-lantek/dxf-indice";
 
 import {
+  codigoPodeSerDaTriel,
   lerAba,
   montarPlano,
   normalizarNome,
   numeroDoProjeto,
   pastasDoProjeto,
+  type AbaLida,
+  type IndiceTriel,
   type ItemPlano,
   type Plano,
 } from "./separacao-regras";
@@ -31,6 +36,8 @@ import {
 
 const win = path.win32;
 const CONCORRENCIA_COPIA = 4;
+/* Empresa cujas pastas (Administração > Configurações > Arquivos Derivados) servem de segunda origem. */
+const CODIGO_EMPRESA_TRIEL = "2";
 
 /* ------------------------------------------------------------------ configuração */
 
@@ -184,6 +191,41 @@ export function lerPlanilha(conteudo: Buffer) {
   );
 }
 
+/* A varredura engole pasta inacessível; vazio aqui seria "não encontrado" falso em todos os itens. */
+async function indexarTriel(pasta: string | null, extensao: ".pdf" | ".dxf"): Promise<IndiceTriel> {
+  const rotulo = extensao === ".pdf" ? "PDF" : "DXF";
+  if (!pasta) {
+    throw new ValidationError(
+      `A pasta de ${rotulo} da Triel-HT não está configurada. Peça a um administrador para preencher em Administração > Configurações > Arquivos Derivados.`
+    );
+  }
+  const arquivos = await listarArquivosRecursivo(pasta, extensao);
+  if (arquivos.size === 0) throw new ValidationError(`Não foi possível ler a pasta de ${rotulo} da Triel-HT (${pasta}).`);
+
+  const indice: IndiceTriel = new Map();
+  for (const [chave, lista] of arquivos) {
+    const codigo = chave.split("_")[0];
+    if (!codigoPodeSerDaTriel(codigo)) continue;
+    /* Nome repetido em subpastas: lista[0] é o mais recente. */
+    const escolhido = { arquivo: lista[0].arquivo, caminho: lista[0].caminho };
+    const doCodigo = indice.get(codigo);
+    if (doCodigo) doCodigo.push(escolhido);
+    else indice.set(codigo, [escolhido]);
+  }
+  return indice;
+}
+
+/* Só lê as pastas da Triel-HT (são grandes) se a planilha tem código que pode ser de lá. */
+async function lerOrigemTriel(abas: AbaLida[], comDxf: boolean): Promise<{ trielPdf?: IndiceTriel; trielDxf?: IndiceTriel }> {
+  if (!abas.some((a) => a.listas.some((l) => l.codigos.some(codigoPodeSerDaTriel)))) return {};
+  const triel = (await listarPastasPorEmpresa()).find((e) => e.empresaCodigo?.trim() === CODIGO_EMPRESA_TRIEL);
+  const [trielPdf, trielDxf] = await Promise.all([
+    indexarTriel(triel?.pastaPdf ?? null, ".pdf"),
+    comDxf ? indexarTriel(triel?.pastaDxf ?? null, ".dxf") : Promise.resolve(undefined),
+  ]);
+  return { trielPdf, trielDxf };
+}
+
 export async function analisarPlanilha(conteudo: Buffer, nomeArquivo: string): Promise<PreviaSeparacao> {
   const numeroProjeto = numeroDoProjeto(nomeArquivo);
   if (!numeroProjeto) {
@@ -212,12 +254,13 @@ export async function analisarPlanilha(conteudo: Buffer, nomeArquivo: string): P
   }
   const pastaProjeto = win.join(config.pastaProjetos, candidatas[0]);
 
-  const [arquivosPdf, arquivosDxf] = await Promise.all([
+  const [arquivosPdf, arquivosDxf, origemTriel] = await Promise.all([
     nomesNaPasta(config.pastaPdf, "arquivos", "pasta de PDF"),
     config.pastaDxf ? nomesNaPasta(config.pastaDxf, "arquivos", "pasta de DXF") : Promise.resolve([]),
+    lerOrigemTriel(abas, config.abasComDxf.length > 0),
   ]);
 
-  const base = { abas, blacklist: config.abasBlacklist, abasComDxf: config.abasComDxf, arquivosPdf, arquivosDxf };
+  const base = { abas, blacklist: config.abasBlacklist, abasComDxf: config.abasComDxf, arquivosPdf, arquivosDxf, ...origemTriel };
   /* Primeira passada só para saber quais pastas de destino olhar; a segunda já sabe o que existe lá. */
   const rascunho = montarPlano({ ...base, existentesNoDestino: new Map() });
   const existentes = await lerDestino(pastaProjeto, rascunho.pastas.map((p) => p.caminho));
@@ -306,12 +349,12 @@ export async function executarSeparacao(
         porItem.set(item, { ...item, acao: "ja_existia", mensagem: null });
         return;
       }
-      const origem = win.join(item.tipo === "pdf" ? config.pastaPdf! : config.pastaDxf!, item.arquivo!);
+      const origem = item.origemTriel ?? win.join(item.tipo === "pdf" ? config.pastaPdf! : config.pastaDxf!, item.arquivo!);
       const destino = win.join(previa.pastaProjeto, item.pastaDestino, item.arquivo!);
       try {
         if (!dentroDe(previa.pastaProjeto, destino)) throw new Error("Destino fora da pasta do projeto.");
         await fs.copyFile(origem, destino, fsConstants.COPYFILE_EXCL);
-        porItem.set(item, { ...item, acao: "copiado", mensagem: null });
+        porItem.set(item, { ...item, acao: "copiado", mensagem: item.origemTriel ? "Da pasta da Triel-HT." : null });
       } catch (erro) {
         const codigo = (erro as NodeJS.ErrnoException).code;
         porItem.set(

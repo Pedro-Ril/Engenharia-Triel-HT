@@ -15,7 +15,12 @@ export type ArquivoDxf = {
   arquivo: string;
 };
 
-export async function listarDxfRecursivo(pastaBase: string): Promise<Map<string, ArquivoDxf[]>> {
+export function listarDxfRecursivo(pastaBase: string): Promise<Map<string, ArquivoDxf[]>> {
+  return listarArquivosRecursivo(pastaBase, ".dxf");
+}
+
+/* Mesma varredura para outra extensão (com o ponto, minúscula). */
+export async function listarArquivosRecursivo(pastaBase: string, extensao: string): Promise<Map<string, ArquivoDxf[]>> {
   const indice = new Map<string, ArquivoDxf[]>();
 
   async function percorrer(pasta: string) {
@@ -38,7 +43,7 @@ export async function listarDxfRecursivo(pastaBase: string): Promise<Map<string,
       }
 
       if (!entrada.isFile()) continue;
-      if (path.extname(entrada.name).toLowerCase() !== ".dxf") continue;
+      if (path.extname(entrada.name).toLowerCase() !== extensao) continue;
 
       const chave = path.basename(entrada.name, path.extname(entrada.name)).trim().toLowerCase();
 
