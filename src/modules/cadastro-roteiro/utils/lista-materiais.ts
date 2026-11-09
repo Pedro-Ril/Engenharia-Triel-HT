@@ -1,6 +1,8 @@
 /*
  * Na estrutura do 3DX, cada filho vem com o "kind" da ligação com o pai
- * (instancia.kind). Ligação "SynchroEBOMExt" quer dizer que o item NÃO
+ * (instancia.kind), que pode trazer mais de um tipo separado por vírgula
+ * ("SynchroEBOMExt,XCADGenericInstExtension"). Ter "SynchroEBOMExt" entre
+ * eles, sozinho ou não, quer dizer que o item NÃO
  * está na lista de materiais do pai: ele não faz parte da estrutura e
  * não deve aparecer no Roteiro de Fabricação -- nem ele, nem o que
  * estiver abaixo dele por essa ligação.
@@ -17,7 +19,7 @@ type NoComLigacao<T> = {
 };
 
 export function estaForaDaListaDeMateriais(no: NoComLigacao<unknown>): boolean {
-  return no.instancia?.kind === KIND_FORA_DA_LISTA_DE_MATERIAIS;
+  return (no.instancia?.kind ?? "").split(",").some((kind) => kind.trim() === KIND_FORA_DA_LISTA_DE_MATERIAIS);
 }
 
 /* A mesma árvore, sem os filhos fora da lista de materiais (nem os netos deles). */
