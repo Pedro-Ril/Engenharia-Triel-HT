@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, FileCheck2, GitCompare, History, PlayCircle } from "lucide-react";
+import { AlertTriangle, FileCheck2, GitCompare, History, PlayCircle, Timer } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -18,9 +18,12 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
+import { tituloDiferenteDoItem } from "@/lib/3dexperience/liberacao-regras";
 
 import {
+  agendarLiberacao,
   buscarRodada,
+  cancelarAgendamento,
   iniciarSimulacao,
   liberarSimulacao,
   listarRodadas,
@@ -40,15 +43,34 @@ const OPCOES_TIPO: { value: TipoRodada; label: string }[] = [
   { value: "liberacao", label: "Liberações" },
 ];
 
-const EM_ANDAMENTO: StatusRodada[] = ["explodindo", "buscando_desenhos", "processando"];
+/* Espera da liberação agendada (o servidor manda o valor de verdade; este é só o texto do botão). */
+const MINUTOS_AGENDAMENTO = 4;
+
+const EM_ANDAMENTO: StatusRodada[] = ["agendada", "explodindo", "buscando_desenhos", "processando"];
 
 const ETAPA: Record<StatusRodada, string> = {
+  agendada: "Agendada",
   explodindo: "Explodindo a estrutura no 3DX…",
   buscando_desenhos: "Buscando os desenhos de todos os itens…",
   processando: "Processando os desenhos no 3DX…",
   concluida: "Concluída",
   erro: "Erro",
+  cancelada: "Cancelada",
 };
+
+/* Simulação agendada que terminou e espera o agendador mandar a liberação (ou parar e avisar). */
+function aguardandoLiberacaoAutomatica(r: Rodada): boolean {
+  return r.automatica && r.dryRun && r.status === "concluida" && !r.liberacaoId && !r.notificadoEm;
+}
+
+function nomeDoTipo(r: Rodada): string {
+  return `${r.dryRun ? "Simulação" : "Liberação"}${r.automatica ? " agendada" : ""}`;
+}
+
+function formatarContagem(segundos: number): string {
+  const s = Math.max(0, Math.round(segundos));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
 const ACAO: Record<AcaoDesenho, { label: string; variant: "success" | "warning" | "danger" | "neutral" | "info" }> = {
   pendente: { label: "Aguardando", variant: "neutral" },
@@ -58,13 +80,6 @@ const ACAO: Record<AcaoDesenho, { label: string; variant: "success" | "warning" 
   ignorado: { label: "Ignorado", variant: "warning" },
   erro: { label: "Erro", variant: "danger" },
 };
-
-/* O título do desenho deveria ser o código do item; diferente disso, a linha alerta (ex.: "F0298804_novo" no 307748). */
-function tituloDiferenteDoItem(d: DesenhoDaRodada): boolean {
-  const titulo = (d.desenhoTitulo ?? "").trim().toUpperCase();
-  const item = (d.itemCodigo ?? "").trim().toUpperCase();
-  return Boolean(titulo && item && titulo !== item);
-}
 
 /* Ao terminar a simulação, já vem marcado tudo o que dá para liberar, menos o que tem título diferente do item. */
 function marcadosPorPadrao(desenhos: DesenhoDaRodada[]): Set<string> {
@@ -126,6 +141,16 @@ export function LiberacaoDesenhosTab({
   const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
   /* physicalIds dos desenhos marcados para liberar (ver marcadosPorPadrao). */
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  /* Liberação agendada: a janela de confirmação, a senha (só até o servidor receber) e o aviso depois de agendar. */
+  const [agendando, setAgendando] = useState(false);
+  const [enviandoAgendamento, setEnviandoAgendamento] = useState(false);
+  const [senhaAgendamento, setSenhaAgendamento] = useState("");
+  const [erroAgendamento, setErroAgendamento] = useState<string | null>(null);
+  const [avisoAgendamento, setAvisoAgendamento] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState(false);
+  /* Contagem regressiva da agendada: quando começa (no relógio deste navegador) e o "agora", que anda de 1 em 1 s. */
+  const [comecaEm, setComecaEm] = useState<number | null>(null);
+  const [agora, setAgora] = useState(0);
 
   /* Busca no histórico com debounce de 400 ms: só consulta quando a pessoa para de digitar. */
   useEffect(() => {
@@ -151,18 +176,41 @@ export function LiberacaoDesenhosTab({
     };
   }, [recargaHistorico, paginaHistorico, buscaAplicada, tipoHistorico]);
 
-  /* Acompanha a rodada aberta: em andamento, pergunta de novo a cada 3 s. */
+  /*
+   * Acompanha a rodada aberta: em andamento (ou agendada, ou simulação
+   * agendada esperando a liberação sair), pergunta de novo a cada 3 s.
+   * Quando a liberação agendada sai da simulação que está aberta, passa
+   * a acompanhar a liberação.
+   */
   useEffect(() => {
     if (!rodadaId) return;
     let ativo = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let esperandoLiberacaoAutomatica = false;
 
     async function atualizar() {
       const resultado = await buscarRodada(rodadaId!);
       if (!ativo) return;
       if (resultado.ok && resultado.data) {
+        const { rodada } = resultado.data;
+        if (esperandoLiberacaoAutomatica && rodada.liberacaoId) {
+          setDados(null);
+          setRodadaId(rodada.liberacaoId);
+          setRecargaHistorico((n) => n + 1);
+          return;
+        }
+        esperandoLiberacaoAutomatica = aguardandoLiberacaoAutomatica(rodada) || (rodada.automatica && EM_ANDAMENTO.includes(rodada.status));
         setDados(resultado.data);
-        if (EM_ANDAMENTO.includes(resultado.data.rodada.status)) {
+        /* Aberta pelo link do e-mail (ou pelo histórico) com o campo vazio: preenche com o pai da rodada. */
+        setCodigo((atual) => atual || rodada.codigoPai);
+        if (rodada.status === "agendada" && rodada.segundosParaInicio !== null) {
+          const agoraLocal = Date.now();
+          setAgora(agoraLocal);
+          setComecaEm(agoraLocal + rodada.segundosParaInicio * 1000);
+        } else {
+          setComecaEm(null);
+        }
+        if (EM_ANDAMENTO.includes(rodada.status) || aguardandoLiberacaoAutomatica(rodada)) {
           timer = setTimeout(atualizar, 3000);
         } else {
           setMarcados(marcadosPorPadrao(resultado.data.desenhos));
@@ -179,6 +227,13 @@ export function LiberacaoDesenhosTab({
       if (timer) clearTimeout(timer);
     };
   }, [rodadaId]);
+
+  /* Contagem regressiva: só anda enquanto houver uma agendada aberta. */
+  useEffect(() => {
+    if (comecaEm === null) return;
+    const intervalo = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(intervalo);
+  }, [comecaEm]);
 
   function abrirRodada(id: string | null) {
     if (id === rodadaId) return;
@@ -202,6 +257,7 @@ export function LiberacaoDesenhosTab({
       return;
     }
     setErro(null);
+    setAvisoAgendamento(null);
     setIniciando(true);
     try {
       const resultado = await iniciarSimulacao(codigoLimpo);
@@ -214,6 +270,70 @@ export function LiberacaoDesenhosTab({
       }
     } finally {
       setIniciando(false);
+    }
+  }
+
+  function abrirAgendamento() {
+    if (!codigo.trim()) {
+      setErro("Informe o código do item pai.");
+      return;
+    }
+    setErro(null);
+    setErroAgendamento(null);
+    setAgendando(true);
+  }
+
+  function fecharAgendamento() {
+    setAgendando(false);
+    setSenhaAgendamento("");
+    setErroAgendamento(null);
+  }
+
+  async function agendar() {
+    const codigoLimpo = codigo.trim();
+    if (!liberaComoAdminPlataforma && !senhaAgendamento) {
+      setErroAgendamento("Digite sua senha para liberar em seu nome no 3DEXPERIENCE.");
+      return;
+    }
+    setEnviandoAgendamento(true);
+    setErroAgendamento(null);
+    try {
+      const resultado = await agendarLiberacao(codigoLimpo, liberaComoAdminPlataforma ? null : senhaAgendamento);
+      if (resultado.ok && resultado.data) {
+        fecharAgendamento();
+        setAvisoAgendamento(
+          resultado.data.semEmail
+            ? `Liberação de ${codigoLimpo} agendada. Seu usuário não tem e-mail cadastrado no AD: acompanhe o resultado por aqui ou pelo histórico.`
+            : `Liberação de ${codigoLimpo} agendada. Você recebe um e-mail quando terminar e pode fechar esta página.`
+        );
+        setDados(null);
+        abrirRodada(resultado.data.id);
+        setRecargaHistorico((n) => n + 1);
+      } else {
+        setSenhaAgendamento("");
+        setErroAgendamento(resultado.message ?? "Não foi possível agendar a liberação.");
+      }
+    } finally {
+      setEnviandoAgendamento(false);
+    }
+  }
+
+  async function cancelar() {
+    if (!dados) return;
+    setCancelando(true);
+    try {
+      const resultado = await cancelarAgendamento(dados.rodada.id);
+      if (resultado.ok) {
+        setAvisoAgendamento(null);
+        const atualizada = await buscarRodada(dados.rodada.id);
+        if (atualizada.ok && atualizada.data) setDados(atualizada.data);
+        setComecaEm(null);
+        setRecargaHistorico((n) => n + 1);
+      } else {
+        setErro(resultado.message ?? "Não foi possível cancelar.");
+      }
+    } finally {
+      setCancelando(false);
     }
   }
 
@@ -254,11 +374,19 @@ export function LiberacaoDesenhosTab({
   const rodada = dados?.rodada ?? null;
   const todos = dados?.desenhos ?? [];
   const emAndamento = rodada ? EM_ANDAMENTO.includes(rodada.status) : rodadaId !== null;
+  const agendada = rodada?.status === "agendada";
+  const esperandoAutomatica = rodada ? aguardandoLiberacaoAutomatica(rodada) : false;
+  const segundosRestantes = comecaEm !== null ? (comecaEm - agora) / 1000 : null;
   /* Na simulação, só o que dá para liberar; na liberação, tudo o que foi enviado (com o resultado). */
   const desenhos = rodada?.dryRun ? todos.filter((d) => d.acao === "seria_liberado") : todos;
   const foraDaLista = todos.length - desenhos.length;
+  /* Simulação agendada: quem libera é o agendador; pela tela, só se ele parou sem liberar (e avisou). */
   const podeLiberar = Boolean(
-    rodada?.dryRun && rodada.status === "concluida" && !rodada.liberacaoId && desenhos.length > 0
+    rodada?.dryRun &&
+      rodada.status === "concluida" &&
+      !rodada.liberacaoId &&
+      desenhos.length > 0 &&
+      !(rodada.automatica && !rodada.notificadoEm)
   );
   const aLiberar = desenhos.filter((d) => marcados.has(d.desenhoPhysicalId)).length;
   const todosMarcados = desenhos.length > 0 && aLiberar === desenhos.length;
@@ -274,8 +402,10 @@ export function LiberacaoDesenhosTab({
       >
         <Stack gap={16}>
           <Alert variant="info">
-            Primeiro o Portal <strong>simula</strong>: mostra o que seria liberado sem mudar nada no 3DX. A liberação de
-            verdade só acontece quando você confirmar. O 3DX atende uma rodada por vez.
+            <strong>Simular</strong> mostra na hora o que seria liberado, sem mudar nada no 3DX; a liberação de verdade só
+            acontece quando você confirmar. <strong>Liberar em {MINUTOS_AGENDAMENTO} min</strong> espera o 3DX indexar
+            a estrutura (use logo depois de mexer nela), simula e libera sozinho tudo o que estiver em trabalho, e avisa
+            por e-mail. O 3DX atende uma rodada por vez.
           </Alert>
           <Stack direction="row" gap={12} align="end" wrap>
             <Field label="Código do item pai" htmlFor="liberacaoCodigo">
@@ -297,6 +427,10 @@ export function LiberacaoDesenhosTab({
               <PlayCircle size={16} />
               Simular
             </Button>
+            <Button variant="danger" onClick={abrirAgendamento} disabled={iniciando || emAndamento}>
+              <Timer size={16} />
+              Liberar em {MINUTOS_AGENDAMENTO} min
+            </Button>
             {onIrParaConsulta && (
               <Button variant="secondary" onClick={onIrParaConsulta}>
                 <GitCompare size={16} />
@@ -305,6 +439,7 @@ export function LiberacaoDesenhosTab({
             )}
           </Stack>
           {erro && <Alert variant="danger">{erro}</Alert>}
+          {avisoAgendamento && <Alert variant="success">{avisoAgendamento}</Alert>}
         </Stack>
       </Card>
 
@@ -312,7 +447,7 @@ export function LiberacaoDesenhosTab({
         <Card
           title={
             rodada
-              ? `${rodada.dryRun ? "Simulação" : "Liberação"} · ${rodada.codigoPai}`
+              ? `${nomeDoTipo(rodada)} · ${rodada.codigoPai}`
               : "Carregando a rodada…"
           }
           description={
@@ -325,21 +460,49 @@ export function LiberacaoDesenhosTab({
             <Loader label="Carregando…" />
           ) : (
             <Stack gap={16}>
-              {emAndamento && <Loader label={ETAPA[rodada.status]} />}
+              {agendada ? (
+                <Stack direction="row" justify="between" align="center" gap={12} wrap>
+                  <Loader
+                    label={
+                      segundosRestantes !== null && segundosRestantes > 0
+                        ? `Começa em ${formatarContagem(segundosRestantes)}: esperando o 3DX indexar a estrutura…`
+                        : "Começando assim que o 3DX estiver livre…"
+                    }
+                  />
+                  <Button variant="secondary" loading={cancelando} onClick={() => void cancelar()}>
+                    Cancelar agendamento
+                  </Button>
+                </Stack>
+              ) : (
+                emAndamento && <Loader label={ETAPA[rodada.status]} />
+              )}
+              {esperandoAutomatica && <Loader label="Simulação pronta. Mandando a liberação para o 3DX…" />}
+              {rodada.automatica && (agendada || (emAndamento && rodada.dryRun)) && (
+                <span className={styles.secundario}>
+                  Depois da espera, o Portal simula e libera sozinho,{" "}
+                  {liberaComoAdminPlataforma ? "com o admin da plataforma" : "em seu nome"}, tudo o que estiver em
+                  trabalho (menos desenho com título diferente do item). Se a simulação der erro, nada é liberado. Você
+                  recebe um e-mail no fim e pode fechar esta página.
+                </span>
+              )}
               {rodada.status === "erro" && <Alert variant="danger">{rodada.mensagem ?? "A rodada falhou."}</Alert>}
-              {rodada.status !== "erro" && rodada.mensagem && <Alert variant="warning">{rodada.mensagem}</Alert>}
+              {rodada.status !== "erro" && rodada.mensagem && (
+                <Alert variant={rodada.status === "cancelada" ? "info" : "warning"}>{rodada.mensagem}</Alert>
+              )}
 
-              <div className={styles.totais}>
-                <StatCard label="Itens na estrutura" value={rodada.totalItens ?? "-"} />
-                <StatCard label="Desenhos" value={rodada.totalDesenhos ?? "-"} />
-                <StatCard label="Em trabalho" value={rodada.totalEmTrabalho ?? "-"} variant="warning" />
-                <StatCard
-                  label={rodada.dryRun ? "Seriam liberados" : "Liberados"}
-                  value={rodada.totalLiberados ?? "-"}
-                  variant="success"
-                />
-                <StatCard label="Erros" value={rodada.totalErros ?? "-"} variant="danger" />
-              </div>
+              {!agendada && rodada.status !== "cancelada" && (
+                <div className={styles.totais}>
+                  <StatCard label="Itens na estrutura" value={rodada.totalItens ?? "-"} />
+                  <StatCard label="Desenhos" value={rodada.totalDesenhos ?? "-"} />
+                  <StatCard label="Em trabalho" value={rodada.totalEmTrabalho ?? "-"} variant="warning" />
+                  <StatCard
+                    label={rodada.dryRun ? "Seriam liberados" : "Liberados"}
+                    value={rodada.totalLiberados ?? "-"}
+                    variant="success"
+                  />
+                  <StatCard label="Erros" value={rodada.totalErros ?? "-"} variant="danger" />
+                </div>
+              )}
 
               {podeLiberar && (
                 <Stack direction="row" justify="between" align="center" gap={12} wrap>
@@ -376,7 +539,7 @@ export function LiberacaoDesenhosTab({
               )}
 
               {desenhos.length === 0 ? (
-                !emAndamento && (
+                !emAndamento && !esperandoAutomatica && rodada.status !== "cancelada" && (
                   <span className={styles.secundario}>
                     {rodada.dryRun ? "Nenhum desenho para liberar nesta estrutura." : "Nenhum desenho nesta rodada."}
                   </span>
@@ -516,7 +679,7 @@ export function LiberacaoDesenhosTab({
                       <strong>{r.codigoPai}</strong>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={r.dryRun ? "info" : "success"}>{r.dryRun ? "Simulação" : "Liberação"}</Badge>
+                      <Badge variant={r.dryRun ? "info" : "success"}>{nomeDoTipo(r)}</Badge>
                     </TableCell>
                     <TableCell>{ETAPA[r.status]}</TableCell>
                     <TableCell align="right">{r.totalEmTrabalho ?? "-"}</TableCell>
@@ -593,6 +756,68 @@ export function LiberacaoDesenhosTab({
           </Field>
           )}
           {erroConfirmacao && <Alert variant="danger">{erroConfirmacao}</Alert>}
+        </Stack>
+      </Modal>
+
+      <Modal
+        open={agendando}
+        title={`Liberar ${codigo.trim()} daqui a ${MINUTOS_AGENDAMENTO} minutos?`}
+        size="small"
+        closeOnOverlay={!enviandoAgendamento}
+        onClose={() => {
+          if (!enviandoAgendamento) fecharAgendamento();
+        }}
+        footer={
+          <Stack direction="row" gap={10} justify="end" wrap>
+            <Button variant="secondary" disabled={enviandoAgendamento} onClick={fecharAgendamento}>
+              Cancelar
+            </Button>
+            <Button variant="danger" disabled={enviandoAgendamento} onClick={() => void agendar()}>
+              {enviandoAgendamento ? "Agendando..." : "Agendar liberação"}
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack gap={14}>
+          <Alert variant="danger">
+            Daqui a {MINUTOS_AGENDAMENTO} minutos (tempo de o 3DX indexar a estrutura), o Portal simula e{" "}
+            <strong>libera sem pedir confirmação</strong> todos os desenhos em trabalho da estrutura de{" "}
+            {codigo.trim()}, de baixo para cima, no 3DEXPERIENCE de produção,{" "}
+            {liberaComoAdminPlataforma ? (
+              <>
+                com o <strong>usuário administrador da plataforma</strong> (seu nome fica registrado como quem pediu)
+              </>
+            ) : (
+              <>
+                <strong>em seu nome</strong>
+              </>
+            )}
+            . Não há desfazer simples.
+          </Alert>
+          <ul className={styles.listaRegras}>
+            <li>Desenho com título diferente do código do item fica de fora (o e-mail lista quais).</li>
+            <li>Se a simulação der qualquer erro, nada é liberado e você revisa pela tela.</li>
+            <li>Dá para cancelar enquanto a contagem não terminar. Você recebe um e-mail no fim.</li>
+            {!liberaComoAdminPlataforma && (
+              <li>A senha fica só na memória do servidor até o 3DX receber o pedido; nunca é gravada.</li>
+            )}
+          </ul>
+          {!liberaComoAdminPlataforma && (
+            <Field label="Sua senha (a mesma do Portal)" htmlFor="senhaAgendamento3dx" required>
+              <Input
+                id="senhaAgendamento3dx"
+                type="password"
+                autoComplete="current-password"
+                value={senhaAgendamento}
+                onChange={(event) => setSenhaAgendamento(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !enviandoAgendamento) void agendar();
+                }}
+                disabled={enviandoAgendamento}
+              />
+            </Field>
+          )}
+          {erroAgendamento && <Alert variant="danger">{erroAgendamento}</Alert>}
         </Stack>
       </Modal>
     </Stack>

@@ -43,6 +43,11 @@ export async function register() {
   );
   iniciarAgendadorAutoResolucaoChamados();
 
+  const { iniciarAgendadorLiberacaoDesenhos } = await import(
+    "@/lib/3dexperience/liberacao-agendada"
+  );
+  iniciarAgendadorLiberacaoDesenhos();
+
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );

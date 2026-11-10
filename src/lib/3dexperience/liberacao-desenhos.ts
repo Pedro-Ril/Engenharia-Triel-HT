@@ -31,7 +31,15 @@ const LOTE_DESENHOS = 300;
 /* Rodada parada há mais tempo que isso não bloqueia outra (servidor reiniciado no meio, por exemplo). */
 const MINUTOS_RODADA_TRAVADA = 30;
 
-export type StatusRodada = "explodindo" | "buscando_desenhos" | "processando" | "concluida" | "erro";
+/* "agendada": esperando a hora de começar (liberação agendada); "cancelada": o usuário desistiu antes. */
+export type StatusRodada =
+  | "agendada"
+  | "explodindo"
+  | "buscando_desenhos"
+  | "processando"
+  | "concluida"
+  | "erro"
+  | "cancelada";
 export type AcaoDesenho = "pendente" | "seria_liberado" | "liberado" | "ja_liberado" | "ignorado" | "erro";
 
 export interface DesenhoDaRodada {
@@ -67,6 +75,13 @@ export interface Rodada {
   finalizadoEm: string | null;
   /* Se já existe uma liberação real feita a partir desta simulação. */
   liberacaoId: string | null;
+  /* Fluxo agendado (ver liberacao-agendada.ts): simula e libera sozinho, avisa por e-mail. */
+  automatica: boolean;
+  agendadaPara: string | null;
+  /* Segundos que faltam para a rodada agendada começar (pelo relógio do banco); null fora de 'agendada'. */
+  segundosParaInicio: number | null;
+  /* Quando o e-mail final do fluxo agendado saiu (só na simulação, a raiz do fluxo). */
+  notificadoEm: string | null;
 }
 
 /* ------------------------------------------------------------------ API 3DX */
@@ -241,15 +256,23 @@ async function falhar(id: string, erro: unknown) {
   await atualizarRodada(id, { status: "erro", mensagem: mensagem.slice(0, 2000) }, true).catch(() => {});
 }
 
-/* Uma rodada por vez no portal inteiro (a sessão do 3DX é única). */
-async function garantirNenhumaEmAndamento() {
+/*
+ * A rodada que está rodando agora, se houver. Agendada não conta (ainda
+ * não começou); a que começou depois da hora marcada conta a partir dela.
+ */
+export async function rodadaEmAndamento(): Promise<{ codigo_pai: string; usuario_nome: string } | null> {
   const pool = await getSqlServerPool();
   const result = await pool.request().input("minutos", sql.Int, MINUTOS_RODADA_TRAVADA).query<{ codigo_pai: string; usuario_nome: string }>(`
     SELECT TOP 1 [codigo_pai], [usuario_nome] FROM dbo.portal_3dx_liberacoes
     WHERE [status] IN ('explodindo', 'buscando_desenhos', 'processando')
-      AND [criado_em] > DATEADD(MINUTE, -@minutos, SYSDATETIME());
+      AND COALESCE([agendada_para], [criado_em]) > DATEADD(MINUTE, -@minutos, SYSDATETIME());
   `);
-  const ativa = result.recordset[0];
+  return result.recordset[0] ?? null;
+}
+
+/* Uma rodada por vez no portal inteiro (a sessão do 3DX é única). */
+async function garantirNenhumaEmAndamento() {
+  const ativa = await rodadaEmAndamento();
   if (ativa) {
     throw new ValidationError(
       `Já há uma rodada em andamento (${ativa.codigo_pai}, por ${ativa.usuario_nome}). O 3DX atende uma por vez — aguarde ela terminar.`
@@ -263,6 +286,9 @@ async function criarRodada(params: {
   simulacaoId?: string | null;
   status: StatusRodada;
   usuario: { id: string; nomeExibicao: string };
+  automatica?: boolean;
+  /* Só na agendada: começa daqui a tantos minutos (pelo relógio do banco). */
+  comecaEmMinutos?: number | null;
 }): Promise<string> {
   const pool = await getSqlServerPool();
   const result = await pool
@@ -273,10 +299,14 @@ async function criarRodada(params: {
     .input("status", sql.VarChar(20), params.status)
     .input("usuarioId", sql.UniqueIdentifier, params.usuario.id)
     .input("usuarioNome", sql.NVarChar(200), params.usuario.nomeExibicao)
+    .input("automatica", sql.Bit, params.automatica ?? false)
+    .input("comecaEmMinutos", sql.Int, params.comecaEmMinutos ?? null)
     .query<{ id: string }>(`
-      INSERT INTO dbo.portal_3dx_liberacoes ([codigo_pai], [dry_run], [simulacao_id], [status], [usuario_id], [usuario_nome])
+      INSERT INTO dbo.portal_3dx_liberacoes
+        ([codigo_pai], [dry_run], [simulacao_id], [status], [usuario_id], [usuario_nome], [automatica], [agendada_para])
       OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
-      VALUES (@codigoPai, @dryRun, @simulacaoId, @status, @usuarioId, @usuarioNome);
+      VALUES (@codigoPai, @dryRun, @simulacaoId, @status, @usuarioId, @usuarioNome, @automatica,
+              CASE WHEN @comecaEmMinutos IS NULL THEN NULL ELSE DATEADD(MINUTE, @comecaEmMinutos, SYSDATETIME()) END);
     `);
   return result.recordset[0].id;
 }
@@ -333,6 +363,54 @@ export async function iniciarSimulacao(codigoPai: string, usuario: { id: string;
   return criarRodada({ codigoPai, dryRun: true, status: "explodindo", usuario });
 }
 
+/*
+ * Liberação AGENDADA: grava a simulação como 'agendada' para daqui a
+ * `minutos`; o agendador (liberacao-agendada.ts) simula, libera e avisa
+ * por e-mail. Não exige que o 3DX esteja livre agora: se estiver ocupado
+ * na hora, ela espera a vez.
+ */
+export async function agendarSimulacaoAutomatica(
+  codigoPai: string,
+  usuario: { id: string; nomeExibicao: string },
+  minutos: number
+) {
+  const pool = await getSqlServerPool();
+  const repetida = await pool
+    .request()
+    .input("codigoPai", sql.NVarChar(50), codigoPai)
+    .query<{ usuario_nome: string }>(`
+      SELECT TOP 1 [usuario_nome] FROM dbo.portal_3dx_liberacoes
+      WHERE [codigo_pai] = @codigoPai AND [status] = 'agendada';
+    `);
+  if (repetida.recordset[0]) {
+    throw new ValidationError(
+      `Já há uma liberação agendada para ${codigoPai} (por ${repetida.recordset[0].usuario_nome}). Aguarde ela começar.`
+    );
+  }
+  return criarRodada({ codigoPai, dryRun: true, status: "agendada", usuario, automatica: true, comecaEmMinutos: minutos });
+}
+
+/* Cancela uma rodada agendada que ainda não começou. Devolve false se ela já começou (ou não existe). */
+export async function cancelarRodadaAgendada(id: string): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const result = await pool.request().input("id", sql.UniqueIdentifier, id).query(`
+    UPDATE dbo.portal_3dx_liberacoes
+    SET [status] = 'cancelada', [mensagem] = N'Cancelada antes de começar.', [finalizado_em] = SYSDATETIME()
+    WHERE [id] = @id AND [status] = 'agendada';
+  `);
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/* Quem pediu a rodada (para conferir quem pode cancelar). */
+export async function donoDaRodada(id: string): Promise<{ usuarioId: string | null; status: StatusRodada } | null> {
+  const pool = await getSqlServerPool();
+  const result = await pool.request().input("id", sql.UniqueIdentifier, id).query<{ usuario_id: string | null; status: StatusRodada }>(`
+    SELECT CONVERT(VARCHAR(36), [usuario_id]) AS [usuario_id], [status] FROM dbo.portal_3dx_liberacoes WHERE [id] = @id;
+  `);
+  const linha = result.recordset[0];
+  return linha ? { usuarioId: linha.usuario_id, status: linha.status } : null;
+}
+
 export async function executarSimulacao(rodadaId: string, codigoPai: string) {
   try {
     const itens = achatarEstrutura(await explodirEstrutura(codigoPai));
@@ -383,7 +461,9 @@ export async function iniciarLiberacao(
   simulacaoId: string,
   desenhosEscolhidos: string[],
   usuario: { id: string; nomeExibicao: string; samAccountName: string; ehAdministrador: boolean },
-  senha: string | null
+  senha: string | null,
+  /* automatica: liberação que sai do fluxo agendado (quem chama é o agendador, não a tela). */
+  opcoes: { automatica?: boolean } = {}
 ) {
   /* Administrador do Portal libera com o admin da plataforma; os demais, em nome próprio (com a senha). */
   const comoAdmin = usuario.ehAdministrador;
@@ -392,6 +472,10 @@ export async function iniciarLiberacao(
   if (!simulacao || !simulacao.rodada.dryRun) throw new ValidationError("Simulação não encontrada.");
   if (simulacao.rodada.status !== "concluida") throw new ValidationError("A simulação ainda não terminou.");
   if (simulacao.rodada.liberacaoId) throw new ValidationError("Esta simulação já foi liberada.");
+  /* Simulação de uma liberação agendada: quem libera é o agendador; pela tela, só depois que ele parou (e avisou). */
+  if (!opcoes.automatica && simulacao.rodada.automatica && !simulacao.rodada.notificadoEm) {
+    throw new ValidationError("Esta simulação faz parte de uma liberação agendada, que vai seguir sozinha. Aguarde.");
+  }
   if (desenhosEscolhidos.length === 0) throw new ValidationError("Marque pelo menos um desenho para liberar.");
 
   /* Só o que a simulação apontou como liberável; a ordem (de baixo para cima) é a da simulação. */
@@ -442,6 +526,7 @@ export async function iniciarLiberacao(
     simulacaoId,
     status: "processando",
     usuario,
+    automatica: opcoes.automatica ?? false,
   });
   await atualizarRodada(rodadaId, { job_id: job.jobId, executado_como: job.executadoComo });
 
@@ -537,7 +622,10 @@ const COLUNAS_RODADA = `
   r.[status], r.[job_id], r.[total_itens], r.[total_desenhos], r.[total_em_trabalho], r.[total_liberados], r.[total_erros],
   r.[mensagem], r.[usuario_nome], r.[executado_como], CONVERT(VARCHAR(33), r.[criado_em], 126) AS [criado_em],
   CONVERT(VARCHAR(33), r.[finalizado_em], 126) AS [finalizado_em],
-  (SELECT TOP 1 CONVERT(VARCHAR(36), l.[id]) FROM dbo.portal_3dx_liberacoes AS l WHERE l.[simulacao_id] = r.[id]) AS [liberacao_id]`;
+  (SELECT TOP 1 CONVERT(VARCHAR(36), l.[id]) FROM dbo.portal_3dx_liberacoes AS l WHERE l.[simulacao_id] = r.[id]) AS [liberacao_id],
+  CAST(r.[automatica] AS BIT) AS [automatica], CONVERT(VARCHAR(33), r.[agendada_para], 126) AS [agendada_para],
+  CASE WHEN r.[status] = 'agendada' THEN DATEDIFF(SECOND, SYSDATETIME(), r.[agendada_para]) END AS [segundos_para_inicio],
+  CONVERT(VARCHAR(33), r.[notificado_em], 126) AS [notificado_em]`;
 
 interface LinhaRodada {
   id: string;
@@ -557,6 +645,10 @@ interface LinhaRodada {
   criado_em: string;
   finalizado_em: string | null;
   liberacao_id: string | null;
+  automatica: boolean;
+  agendada_para: string | null;
+  segundos_para_inicio: number | null;
+  notificado_em: string | null;
 }
 
 function paraRodada(l: LinhaRodada): Rodada {
@@ -577,6 +669,10 @@ function paraRodada(l: LinhaRodada): Rodada {
     criadoEm: l.criado_em,
     finalizadoEm: l.finalizado_em,
     liberacaoId: l.liberacao_id,
+    automatica: Boolean(l.automatica),
+    agendadaPara: l.agendada_para,
+    segundosParaInicio: l.segundos_para_inicio === null ? null : Math.max(0, l.segundos_para_inicio),
+    notificadoEm: l.notificado_em,
   };
 }
 

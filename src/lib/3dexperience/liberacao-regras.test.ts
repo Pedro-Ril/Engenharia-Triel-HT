@@ -1,6 +1,50 @@
 import { describe, expect, it } from "vitest";
 
-import { achatarEstrutura, emTrabalho, montarFila, type NoEstrutura3DX } from "./liberacao-regras";
+import {
+  achatarEstrutura,
+  emTrabalho,
+  escolherDesenhosAutomaticos,
+  montarFila,
+  tituloDiferenteDoItem,
+  type NoEstrutura3DX,
+} from "./liberacao-regras";
+
+describe("liberação agendada: escolherDesenhosAutomaticos", () => {
+  const d = (id: string, item: string, titulo: string, acao: string) => ({
+    desenhoPhysicalId: id,
+    itemCodigo: item,
+    desenhoTitulo: titulo,
+    acao,
+  });
+  const simulacao = [
+    d("D1", "311", "311", "seria_liberado"),
+    d("D2", "310", "310", "ja_liberado"),
+    d("D3", "307748", "F0298804_novo", "seria_liberado"),
+    d("D4", "300", "300", "seria_liberado"),
+  ];
+
+  it("libera tudo o que seria liberado, na ordem, menos título diferente do item", () => {
+    const escolha = escolherDesenhosAutomaticos(simulacao, null);
+    expect(escolha.liberar).toEqual(["D1", "D4"]);
+    expect(escolha.deFora.map((x) => x.desenhoPhysicalId)).toEqual(["D3"]);
+    expect(escolha.bloqueio).toBeNull();
+  });
+
+  it("erro na busca de desenhos ou desenho com erro trava tudo", () => {
+    const comErroNaBusca = escolherDesenhosAutomaticos(simulacao, "Itens com erro na busca de desenhos: X");
+    expect(comErroNaBusca.liberar).toEqual([]);
+    expect(comErroNaBusca.bloqueio).toMatch(/busca de desenhos/);
+
+    const comDesenhoComErro = escolherDesenhosAutomaticos([...simulacao, d("D5", "312", "312", "erro")], null);
+    expect(comDesenhoComErro.liberar).toEqual([]);
+    expect(comDesenhoComErro.bloqueio).toMatch(/1 desenho/);
+  });
+
+  it("título igual ao item ignora maiúsculas e espaços; sem título não alerta", () => {
+    expect(tituloDiferenteDoItem({ itemCodigo: "a12 ", desenhoTitulo: "A12" })).toBe(false);
+    expect(tituloDiferenteDoItem({ itemCodigo: "A12", desenhoTitulo: null })).toBe(false);
+  });
+});
 
 /* 300 (pai) -> 310 (conj) -> 311 (peça); 311 também direto debaixo do pai. */
 const ARVORE: NoEstrutura3DX = {

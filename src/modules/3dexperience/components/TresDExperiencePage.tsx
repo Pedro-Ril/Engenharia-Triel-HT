@@ -17,6 +17,8 @@ export type AbaTresDExperience = "ultima-revisao" | "liberar-desenhos";
 interface TresDExperiencePageProps {
   abaInicial: AbaTresDExperience;
   codigoInicial: string;
+  /* Rodada a abrir na aba de liberação (link do e-mail da liberação agendada). */
+  rodadaInicialId?: string | null;
   /* Administrador do Portal libera com o admin da plataforma (sem pedir senha); o servidor decide de novo. */
   liberaComoAdminPlataforma?: boolean;
 }
@@ -40,12 +42,15 @@ interface TresDExperiencePageProps {
 export function TresDExperiencePage({
   abaInicial,
   codigoInicial,
+  rodadaInicialId = null,
   liberaComoAdminPlataforma = false,
 }: TresDExperiencePageProps) {
   const [aba, setAba] = useState<AbaTresDExperience>(abaInicial);
   const [codigo, setCodigo] = useState(codigoInicial);
   /* Simulação disparada na troca de aba: a aba de liberação abre já acompanhando ela (ou com o erro). */
-  const [simulacaoAutomatica, setSimulacaoAutomatica] = useState<{ rodadaId: string | null; erro: string | null } | null>(null);
+  const [simulacaoAutomatica, setSimulacaoAutomatica] = useState<{ rodadaId: string | null; erro: string | null } | null>(
+    rodadaInicialId ? { rodadaId: rodadaInicialId, erro: null } : null
+  );
   const [iniciandoSimulacao, setIniciandoSimulacao] = useState(false);
 
   function mostrarAba(valor: AbaTresDExperience) {

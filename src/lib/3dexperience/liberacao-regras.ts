@@ -110,3 +110,53 @@ export function montarFila(
 export function emTrabalho(desenho: Pick<Desenho3DX, "status">): boolean {
   return (desenho.status ?? "").toUpperCase() === STATUS_EM_TRABALHO;
 }
+
+/* Um desenho já gravado na rodada, só com o que as regras abaixo olham. */
+export interface DesenhoParaEscolha {
+  desenhoPhysicalId: string;
+  desenhoTitulo: string | null;
+  itemCodigo: string | null;
+  acao: string;
+}
+
+/*
+ * O título do desenho deveria ser o código do item; diferente disso, a
+ * linha alerta (ex.: "F0298804_novo" no 307748). Na tela vem desmarcado;
+ * na liberação agendada fica de fora.
+ */
+export function tituloDiferenteDoItem(d: Pick<DesenhoParaEscolha, "desenhoTitulo" | "itemCodigo">): boolean {
+  const titulo = (d.desenhoTitulo ?? "").trim().toUpperCase();
+  const item = (d.itemCodigo ?? "").trim().toUpperCase();
+  return Boolean(titulo && item && titulo !== item);
+}
+
+export interface EscolhaAutomatica<T extends DesenhoParaEscolha> {
+  /* physicalIds a liberar, na ordem da simulação (de baixo para cima). */
+  liberar: string[];
+  /* Liberáveis que ficaram de fora por título diferente do item. */
+  deFora: T[];
+  /* Motivo para NÃO liberar nada (o usuário revisa na tela); null = pode seguir. */
+  bloqueio: string | null;
+}
+
+/*
+ * Liberação agendada: o que sai de uma simulação concluída sem ninguém
+ * revisar. Libera tudo o que "seria liberado", menos título diferente do
+ * item. Qualquer erro na simulação (busca de desenhos ou desenho com
+ * erro) trava tudo: sem revisão humana, na dúvida não libera.
+ */
+export function escolherDesenhosAutomaticos<T extends DesenhoParaEscolha>(
+  desenhos: T[],
+  erroNaBusca: string | null
+): EscolhaAutomatica<T> {
+  const liberaveis = desenhos.filter((d) => d.acao === "seria_liberado");
+  const deFora = liberaveis.filter(tituloDiferenteDoItem);
+  const liberar = liberaveis.filter((d) => !tituloDiferenteDoItem(d)).map((d) => d.desenhoPhysicalId);
+  const comErro = desenhos.filter((d) => d.acao === "erro").length;
+
+  let bloqueio: string | null = null;
+  if (erroNaBusca) bloqueio = "A busca de desenhos deu erro em algum item da estrutura.";
+  else if (comErro > 0) bloqueio = `A simulação apontou erro em ${comErro} desenho(s).`;
+
+  return { liberar: bloqueio ? [] : liberar, deFora, bloqueio };
+}

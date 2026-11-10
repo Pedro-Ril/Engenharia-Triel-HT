@@ -1,6 +1,13 @@
 /* Espelha src/lib/3dexperience/liberacao-desenhos.ts (lado do navegador). */
 
-export type StatusRodada = "explodindo" | "buscando_desenhos" | "processando" | "concluida" | "erro";
+export type StatusRodada =
+  | "agendada"
+  | "explodindo"
+  | "buscando_desenhos"
+  | "processando"
+  | "concluida"
+  | "erro"
+  | "cancelada";
 export type AcaoDesenho = "pendente" | "seria_liberado" | "liberado" | "ja_liberado" | "ignorado" | "erro";
 
 export interface Rodada {
@@ -21,6 +28,13 @@ export interface Rodada {
   criadoEm: string;
   finalizadoEm: string | null;
   liberacaoId: string | null;
+  /* Fluxo agendado: simula e libera sozinho depois da espera, avisa por e-mail. */
+  automatica: boolean;
+  agendadaPara: string | null;
+  /* Segundos que faltam para começar (relógio do servidor), só enquanto 'agendada'. */
+  segundosParaInicio: number | null;
+  /* Quando o e-mail final saiu (o fluxo agendado terminou). */
+  notificadoEm: string | null;
 }
 
 export interface DesenhoDaRodada {
@@ -69,6 +83,23 @@ export async function liberarSimulacao(id: string, desenhos: string[], senha: st
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ desenhos, senha }),
   });
+  return parseResponse(response);
+}
+
+export async function agendarLiberacao(
+  codigo: string,
+  senha: string | null
+): Promise<ApiEnvelope<{ id: string; minutos: number; semEmail: boolean }>> {
+  const response = await fetch("/api/3dexperience/liberacao/agendar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codigo, senha }),
+  });
+  return parseResponse(response);
+}
+
+export async function cancelarAgendamento(id: string): Promise<ApiEnvelope<unknown>> {
+  const response = await fetch(`/api/3dexperience/liberacao/${id}/cancelar`, { method: "POST" });
   return parseResponse(response);
 }
 
