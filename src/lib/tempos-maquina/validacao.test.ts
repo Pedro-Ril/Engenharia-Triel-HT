@@ -5,7 +5,7 @@ import { corteCncParaForm, formParaCorteCnc, formParaTabela, tabelaParaForm } fr
 import { identificarMaterial } from "./materiais";
 import { PERFIS_REFERENCIA_PLANILHAS as REF } from "./referencia-planilhas";
 import type { PerfilTempo } from "./tipos";
-import { validarDadosPeca, validarParametrosPerfil } from "./validacao";
+import { ordenarLinhas, validarDadosPeca, validarParametrosPerfil } from "./validacao";
 
 const copia = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -14,7 +14,7 @@ describe("validarParametrosPerfil", () => {
     for (const { perfil } of Object.values(REF)) {
       expect(validarParametrosPerfil(perfil.metodo, copia(perfil))).toEqual(
         perfil.metodo === "corte_cnc"
-          ? { ...perfil, linhas: [...perfil.linhas].sort((a, b) => a.variante.localeCompare(b.variante) || a.espessuraMm - b.espessuraMm) }
+          ? { ...perfil, linhas: ordenarLinhas(perfil.linhas, perfil.variantes) }
           : perfil
       );
     }
@@ -120,5 +120,20 @@ describe("validarDadosPeca", () => {
     expect(() => validarDadosPeca({ ...base, geometria: { ...base.geometria, contornosInternos: [{ tipo: "estrela" }] } })).toThrow("inválido");
     expect(() => validarDadosPeca({ ...base, espessuraMm: 0 })).toThrow("maior que zero");
     expect(() => validarDadosPeca({ ...base, geometria: { ...base.geometria, areaMm2: "muito" } })).toThrow("Informe a área");
+  });
+});
+
+describe("ordenarLinhas", () => {
+  it("segue a ordem das variantes do perfil, não a ordem alfabética", () => {
+    const linhas = [
+      { variante: "especial", espessuraMm: 2 },
+      { variante: "padrao", espessuraMm: 3 },
+      { variante: "padrao", espessuraMm: 1.5 },
+    ];
+    expect(ordenarLinhas(linhas, [{ chave: "padrao" }, { chave: "especial" }])).toEqual([
+      { variante: "padrao", espessuraMm: 1.5 },
+      { variante: "padrao", espessuraMm: 3 },
+      { variante: "especial", espessuraMm: 2 },
+    ]);
   });
 });

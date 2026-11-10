@@ -1,4 +1,5 @@
 import type { PerfilCorteCnc, PerfilTabelaDimensao } from "@/lib/tempos-maquina/tipos";
+import { ordenarLinhas } from "@/lib/tempos-maquina/validacao";
 
 /*
  * Formulário do editor de perfil: tudo texto (a pessoa digita com
@@ -96,7 +97,7 @@ export function corteCncParaForm(p: PerfilCorteCnc): CorteCncForm {
     limpezaBico: textoDeNumero(p.limpezaBicoMin),
     temposPorChapa: p.temposPorChapa.map((t) => ({ chave: t.chave, rotulo: t.rotulo, minutos: textoDeNumero(t.minutos) })),
     variantes: p.variantes.map((v) => ({ ...v })),
-    linhas: p.linhas.map((l) => ({
+    linhas: ordenarLinhas(p.linhas, p.variantes).map((l) => ({
       espessura: textoDeNumero(l.espessuraMm),
       variante: l.variante,
       velocidade: textoDeNumero(l.velocidadeMmMin),

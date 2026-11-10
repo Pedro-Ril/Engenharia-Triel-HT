@@ -60,7 +60,12 @@ export function Modal({
   });
 
   useEffect(() => {
-    if (!open) return;
+    /*
+     * Espera o portal existir: montado já aberto (ex.: `{x && <Modal open />}`),
+     * o primeiro efeito roda antes do conteúdo -- o foco ficava no elemento
+     * de trás e o Esc chegava também ao modal de baixo (fechava os dois).
+     */
+    if (!open || !mounted) return;
 
     const previousOverflow = document.body.style.overflow;
 
@@ -110,7 +115,7 @@ export function Modal({
       document.removeEventListener("keydown", handleKeyDown);
       elementoAnteriorRef.current?.focus();
     };
-  }, [open]);
+  }, [open, mounted]);
 
   if (!mounted || !open) {
     return null;

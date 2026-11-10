@@ -130,8 +130,14 @@ function validarCorteCnc(p: Record<string, unknown>): PerfilCorteCnc {
     temposPorChapa,
     limpezaBicoMin: numeroOuNulo(p.limpezaBicoMin, "a limpeza do bico", { min: 0 }),
     variantes,
-    linhas: linhas.sort((a, b) => a.variante.localeCompare(b.variante) || a.espessuraMm - b.espessuraMm),
+    linhas: ordenarLinhas(linhas, variantes),
   };
+}
+
+/* Na ordem das variantes do perfil (padrão antes de especial, 80 A antes de 260 A) e por espessura. */
+export function ordenarLinhas<T extends { variante: string; espessuraMm: number }>(linhas: T[], variantes: { chave: string }[]): T[] {
+  const ordem = (chave: string) => variantes.findIndex((v) => v.chave === chave);
+  return [...linhas].sort((a, b) => ordem(a.variante) - ordem(b.variante) || a.espessuraMm - b.espessuraMm);
 }
 
 function degraus(valor: unknown, campo: string): number[] {

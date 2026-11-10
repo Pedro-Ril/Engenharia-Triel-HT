@@ -4,6 +4,8 @@ import { Stack } from "@/components/ui/Stack";
 
 import type { PerfilTempo } from "@/lib/tempos-maquina/tipos";
 
+import { ordenarLinhas } from "@/lib/tempos-maquina/validacao";
+
 import { textoDeNumero } from "../utils/perfil-form";
 import styles from "./admin/TemposMaquina.module.css";
 
@@ -44,7 +46,7 @@ export function PerfilTempoLeitura({ perfil }: { perfil: PerfilTempo }) {
               </tr>
             </thead>
             <tbody>
-              {perfil.linhas.map((l) => (
+              {ordenarLinhas(perfil.linhas, perfil.variantes).map((l) => (
                 <tr key={`${l.variante}-${l.espessuraMm}`}>
                   <td>{textoDeNumero(l.espessuraMm)}</td>
                   <td>{rotuloVariante(l.variante)}</td>
