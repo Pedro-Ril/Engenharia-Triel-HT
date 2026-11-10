@@ -173,9 +173,23 @@ function contarItensUnicos(
 /*
  * De onde vem a estrutura. "ciber": estruturas que não existem no 3DX --
  * a árvore sai do ERP (TCAD_EST_ITE), e só para itens Ciber, os de item
- * base 2316. Daí em diante (roteiros, cadastro, filtros) é tudo igual.
+ * base 2316. "erp": a mesma leitura do ERP para um item Triel-HT que o 3DX
+ * não achou (o fallback oferecido na tela), sem exigir o item base. Daí em
+ * diante (roteiros, cadastro, filtros) é tudo igual.
  */
-export type OrigemEstrutura = "3dx" | "ciber";
+export type OrigemEstrutura = "3dx" | "ciber" | "erp";
+
+/*
+ * O 3DX respondeu que o item (ou a estrutura) não existe lá -- HTTP 404.
+ * Só nesse caso a tela oferece buscar a estrutura no ERP; 3DX fora do ar
+ * ou outro erro continua sendo erro.
+ */
+export class ItemNaoEncontradoNo3dxError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ItemNaoEncontradoNo3dxError";
+  }
+}
 
 export const ITEM_BASE_CIBER = "2316";
 
@@ -191,8 +205,8 @@ type LinhaEstruturaErp = {
   COD_DESENHO_FILHO: string | null;
 };
 
-/* O item pai no cadastro do ERP: confere que é Ciber e dá descrição e tipo da raiz. */
-async function buscarItemCiber(codigo: string) {
+/* O item pai no cadastro do ERP: dá descrição e tipo da raiz (e, para Ciber, confere o item base). */
+async function buscarItemErp(codigo: string, exigirCiber: boolean) {
   const url = new URL(API_ITEM);
   url.searchParams.set("cod_emp", String(EMPR_ID_FIXO));
   url.searchParams.set("cod_item", codigo);
@@ -214,7 +228,7 @@ async function buscarItemCiber(codigo: string) {
 
   const itemBase = normalizarTexto(item.COD_ITEM_BASE);
 
-  if (itemBase !== ITEM_BASE_CIBER) {
+  if (exigirCiber && itemBase !== ITEM_BASE_CIBER) {
     throw new Error(
       `O item ${codigo} não é Ciber: o item base dele é ${itemBase || "vazio"}, e não ${ITEM_BASE_CIBER}. Escolha "Triel-HT" em Origem da estrutura para buscar no 3DX.`
     );
@@ -228,13 +242,14 @@ async function buscarItemCiber(codigo: string) {
 }
 
 /*
- * Estrutura Ciber, montada a partir do ERP no mesmo formato da do 3DX.
+ * Estrutura do ERP (Ciber, ou o fallback de um item Triel-HT que não está
+ * no 3DX), montada no mesmo formato da do 3DX.
  * Só ligações vigentes: uma vencida sai com tudo o que está abaixo dela
  * (o filho de uma ligação vencida não tem pai na árvore e fica de fora).
  * Não há revisão -- o roteiro dessas peças vai sem.
  */
-async function buscarEstruturaCiber(codigo: string): Promise<Estrutura3DXNode> {
-  const raizErp = await buscarItemCiber(codigo);
+async function buscarEstruturaErp(codigo: string, exigirCiber: boolean): Promise<Estrutura3DXNode> {
+  const raizErp = await buscarItemErp(codigo, exigirCiber);
 
   const response = await fetch(`${API_ESTRUTURA}/${encodeURIComponent(codigo)}`, { cache: "no-store" });
   const json = await response.json().catch(() => null);
@@ -309,7 +324,8 @@ export async function buscarEstruturaComRoteiros(
 
   onProgresso?.({ etapa: "estrutura", origem });
 
-  const arvore = origem === "ciber" ? await buscarEstruturaCiber(codigo) : await buscarEstrutura3dx(codigo);
+  const arvore =
+    origem === "3dx" ? await buscarEstrutura3dx(codigo) : await buscarEstruturaErp(codigo, origem === "ciber");
 
   const codigos = Array.from(coletarCodigos(arvore));
   const roteirosPorCodigo = await buscarRoteirosEmLote(codigos, onProgresso);
@@ -341,6 +357,10 @@ async function buscarEstrutura3dx(codigo: string): Promise<Estrutura3DXNode> {
   });
 
   const json = await response.json().catch(() => null);
+
+  if (response.status === 404) {
+    throw new ItemNaoEncontradoNo3dxError(json?.message || `O item ${codigo} não foi encontrado no 3DX.`);
+  }
 
   if (!response.ok) {
     throw new Error(

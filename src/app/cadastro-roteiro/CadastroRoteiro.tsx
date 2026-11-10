@@ -25,6 +25,7 @@ import {
     buscarRoteirosDoItem,
     deletarOperacaoRoteiro,
     deletarRoteiroCompleto,
+    ItemNaoEncontradoNo3dxError,
     type ProgressoConsulta,
     type OrigemEstrutura,
 } from "@/modules/cadastro-roteiro/services/cadastroRoteiro.service";
@@ -43,6 +44,7 @@ import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Stack } from "@/components/ui/Stack";
 import { IconButton } from "@/components/ui/IconButton";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
@@ -671,7 +673,11 @@ function montarLinhasExportacao(
  * e o router.replace refaria o render do page.tsx a cada consulta só
  * para trocar a barra de endereço.
  */
-/* Triel-HT: estrutura do 3DX (o padrão). Ciber: estrutura do ERP. */
+/*
+ * Triel-HT: estrutura do 3DX (o padrão). Ciber: estrutura do ERP. A origem
+ * "erp" (item Triel-HT que não está no 3DX) não é opção do seletor: só se
+ * chega nela pelo botão que aparece quando o 3DX não acha o item.
+ */
 const OPCOES_ORIGEM = [
     { value: "3dx", label: "Triel-HT" },
     { value: "ciber", label: "Ciber" },
@@ -681,8 +687,8 @@ function gravarCodigoNaUrl(codigo: string, origem: OrigemEstrutura) {
     try {
         const params = new URLSearchParams(window.location.search);
         params.set("codigo", codigo);
-        if (origem === "ciber") params.set("origem", "ciber");
-        else params.delete("origem");
+        if (origem === "3dx") params.delete("origem");
+        else params.set("origem", origem);
         window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
     } catch {
         /* Sem URL atualizada a consulta funciona do mesmo jeito. */
@@ -692,7 +698,9 @@ function gravarCodigoNaUrl(codigo: string, origem: OrigemEstrutura) {
 function textoDoProgresso(progresso: ProgressoConsulta | null): string {
     if (!progresso) return "Consultando…";
     if (progresso.etapa === "estrutura") {
-        return progresso.origem === "ciber" ? "Lendo estrutura no ERP (Ciber)…" : "Lendo estrutura no 3DX…";
+        if (progresso.origem === "ciber") return "Lendo estrutura no ERP (Ciber)…";
+        if (progresso.origem === "erp") return "Lendo estrutura no ERP…";
+        return "Lendo estrutura no 3DX…";
     }
     return `Lendo roteiros no ERP ${progresso.feitos}/${progresso.total}…`;
 }
@@ -1676,6 +1684,7 @@ export default function CadastroRoteiro({
     /* ?codigo= na URL: a tela abre já consultando (ver efeito abaixo). */
     const searchParams = useSearchParams();
     const codigoDaUrl = (searchParams.get("codigo") ?? "").trim();
+    const origemDaUrl = searchParams.get("origem");
 
     const [codigoPai, setCodigoPai] = useState(codigoDaUrl);
     /*
@@ -1695,9 +1704,13 @@ export default function CadastroRoteiro({
      * vão para toast -- antes iam para cá e apareciam no card de
      * pesquisa como se a consulta tivesse falhado.
      */
-    const [erroConsulta, setErroConsulta] = useState<{ mensagem: string; codigo: string } | null>(
-        null
-    );
+    /* naoNo3dx: o 3DX respondeu que o item não existe lá -- oferece buscar no ERP. */
+    const [erroConsulta, setErroConsulta] = useState<{
+        mensagem: string;
+        codigo: string;
+        origem: OrigemEstrutura;
+        naoNo3dx: boolean;
+    } | null>(null);
     const [progresso, setProgresso] = useState<ProgressoConsulta | null>(null);
     const [mostrarSemRoteiro, setMostrarSemRoteiro] = useState(false);
     const [mostrarComAtencao, setMostrarComAtencao] = useState(false);
@@ -1870,7 +1883,12 @@ export default function CadastroRoteiro({
             });
     }
 
-    async function handleBuscar(codigoInformado: string = codigoPai) {
+    /*
+     * origemForcada: "erp" quando a pessoa pede a estrutura do ERP para um
+     * item que o 3DX não achou (ou abre um link com ?origem=erp); sem ela,
+     * vale o seletor (Triel-HT ou Ciber).
+     */
+    async function handleBuscar(codigoInformado: string = codigoPai, origemForcada?: OrigemEstrutura) {
         const codigo = codigoInformado.trim();
 
         if (!codigo) {
@@ -1916,7 +1934,7 @@ export default function CadastroRoteiro({
             setRoteiroExclusao(null);
             setRoteiroCompletoExclusao(null);
             setRetornoErpModal(null);
-            const origem: OrigemEstrutura = ciber ? "ciber" : "3dx";
+            const origem: OrigemEstrutura = origemForcada ?? (ciber ? "ciber" : "3dx");
             gravarCodigoNaUrl(codigo, origem);
 
             const dados = await buscarEstruturaComRoteiros(
@@ -1967,7 +1985,8 @@ export default function CadastroRoteiro({
                Ciber não tem 3DX para conferir com o ERP. */
             if (origem === "3dx") conferirNoErp(dados.tree, consulta);
         } catch (error) {
-            console.error(error);
+            /* Item fora do 3DX é resposta esperada (a tela oferece o ERP), não erro. */
+            if (!(error instanceof ItemNaoEncontradoNo3dxError)) console.error(error);
 
             if (consultaAtualRef.current !== consulta) return;
 
@@ -1977,6 +1996,8 @@ export default function CadastroRoteiro({
                         ? error.message
                         : "Erro ao consultar estrutura e roteiros.",
                 codigo,
+                origem: origemForcada ?? (ciber ? "ciber" : "3dx"),
+                naoNo3dx: error instanceof ItemNaoEncontradoNo3dxError,
             });
         } finally {
             if (consultaAtualRef.current === consulta) {
@@ -2005,11 +2026,11 @@ export default function CadastroRoteiro({
            monta, desmonta (cancelando o quadro) e monta de novo. */
         const quadro = requestAnimationFrame(() => {
             consultouDaUrlRef.current = true;
-            void handleBuscarRef.current(codigoDaUrl);
+            void handleBuscarRef.current(codigoDaUrl, origemDaUrl === "erp" ? "erp" : undefined);
         });
 
         return () => cancelAnimationFrame(quadro);
-    }, [codigoDaUrl]);
+    }, [codigoDaUrl, origemDaUrl]);
 
     async function confirmarExclusaoOperacao() {
         if (!roteiroExclusao) return;
@@ -2593,7 +2614,9 @@ export default function CadastroRoteiro({
                         <div className={styles.summary}>
                             <div className={styles.summaryCard}>
                                 <span className={styles.summaryLabel}>
-                                    Item pai{origemConsulta === "ciber" && " · Ciber (estrutura do ERP)"}
+                                    Item pai
+                                    {origemConsulta === "ciber" && " · Ciber (estrutura do ERP)"}
+                                    {origemConsulta === "erp" && " · estrutura do ERP"}
                                 </span>
                                 <strong>{resultado.codigo}</strong>
                             </div>
@@ -2741,6 +2764,25 @@ export default function CadastroRoteiro({
                 */}
                 {loading ? (
                     <Loader centered label={textoDoProgresso(progresso)} />
+                ) : erroConsulta?.naoNo3dx ? (
+                    /* Fallback: o item não está no 3DX, mas pode ter estrutura no ERP. */
+                    <EmptyState
+                        title={`${erroConsulta.codigo} não foi encontrado no 3DX`}
+                        description={`${erroConsulta.mensagem} Se o item tem estrutura cadastrada no ERP, dá para carregá-la e roteirizar a partir dela, como nas peças Ciber: sem revisão do 3DX, sem 3D e sem a conferência 3DX x ERP.`}
+                        action={
+                            <Stack direction="row" gap={8} justify="center" wrap>
+                                <Button onClick={() => void handleBuscar(erroConsulta.codigo, "erp")}>
+                                    Buscar estrutura no ERP
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => void handleBuscar(erroConsulta.codigo)}
+                                >
+                                    Tentar de novo no 3DX
+                                </Button>
+                            </Stack>
+                        }
+                    />
                 ) : erroConsulta ? (
                     <EmptyState
                         title="Não foi possível carregar a estrutura"
@@ -2748,7 +2790,7 @@ export default function CadastroRoteiro({
                         action={
                             <Button
                                 variant="secondary"
-                                onClick={() => void handleBuscar(erroConsulta.codigo)}
+                                onClick={() => void handleBuscar(erroConsulta.codigo, erroConsulta.origem)}
                             >
                                 Tentar de novo
                             </Button>
