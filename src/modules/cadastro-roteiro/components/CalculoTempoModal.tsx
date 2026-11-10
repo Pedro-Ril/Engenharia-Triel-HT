@@ -316,15 +316,16 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
             <Stack gap={16}>
               {avisoArea && <Alert variant="warning" title="Confira a espessura">{avisoArea}</Alert>}
               {resultado && <ResultadoTempoView resultado={resultado} />}
-              {verTabela && (
-                <section className={styles.secao}>
-                  <h3 className={styles.secaoTitulo}>Tabela da máquina: {maquina.perfil.nome}</h3>
-                  <PerfilTempoLeitura perfil={perfil} />
-                </section>
-              )}
             </Stack>
           </Card>
         </div>
+
+        {/* Na largura toda: a tabela tem colunas demais para a metade da janela. */}
+        {verTabela && (
+          <Card title={`Tabela da máquina: ${maquina.perfil.nome}`} description="Somente consulta. Os valores são alterados em Administração > Tempos de Máquina.">
+            <PerfilTempoLeitura perfil={perfil} />
+          </Card>
+        )}
       </Stack>
     </Modal>
   );
