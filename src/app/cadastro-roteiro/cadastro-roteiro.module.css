@@ -308,37 +308,10 @@
   font-weight: 700;
 }
 
-.filterSelectGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 220px;
-}
-
 .filterSelectLabel {
   font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
-}
-
-.filterSelect {
-  height: 40px;
-  border: 1px solid var(--border-input);
-  border-radius: 10px;
-  padding: 0 12px;
-  background: var(--bg-surface);
-  font-size: 14px;
-  outline: none;
-}
-
-.filterSelect:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-ring);
-}
-.tipoCheckboxList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 24px;
 }
 
 .treeRow {
@@ -363,7 +336,44 @@
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   background: var(--bg-surface-soft);
-  overflow: hidden;
+  /* Sem overflow: hidden -- a lista do filtro de operação abre por cima
+     do que vem abaixo do cartão. Os filhos não têm fundo próprio, então
+     os cantos arredondados continuam certos. */
+}
+
+/* Corpo dos filtros: "Mostrar apenas" | Operação | Tipo do item, lado a
+   lado; em tela estreita, um embaixo do outro. */
+.filtrosGrade {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.6fr) minmax(180px, 1fr);
+  gap: 20px 32px;
+  align-items: start;
+}
+
+.filtroColuna {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.filtroOpcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filtrosRodape {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+@media (max-width: 900px) {
+  .filtrosGrade {
+    grid-template-columns: 1fr;
+  }
 }
 
 .filtersHeader {

@@ -37,6 +37,7 @@ import {
 import { codigoDoPdf } from "@/modules/cadastro-roteiro/utils/codigo-pdf";
 import AbrirPdfItemButton from "@/modules/cadastro-roteiro/components/AbrirPdfItemButton";
 import Abrir3DPlayButton from "@/modules/cadastro-roteiro/components/Abrir3DPlayButton";
+import { Autocomplete } from "@/components/ui/Autocomplete";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -377,6 +378,55 @@ function filtrarComAtencao(node: RoteiroTreeNode): RoteiroTreeNode | null {
     const comAtencao = tipoItem === "fabricado" && roteiroComAtencao(node);
 
     if (!comAtencao && filhosFiltrados.length === 0) return null;
+
+    return { ...node, children: filhosFiltrados };
+}
+
+/* A operação do filtro: o código, igual ao do ERP (COD_OPERACAO). */
+function codigoOperacao(roteiro: RoteiroItem): string {
+    return String(roteiro.COD_OPERACAO ?? "").trim();
+}
+
+/*
+ * As operações que aparecem nos roteiros da estrutura, para o filtro:
+ * "1005 - CORTE LASER · 12 itens" (itens únicos, não instâncias).
+ */
+function coletarOperacoes(raiz: RoteiroTreeNode | null): { value: string; label: string }[] {
+    const porCodigo = new Map<string, { descricao: string; itens: Set<string> }>();
+
+    function visitar(node: RoteiroTreeNode) {
+        for (const roteiro of node.roteiros) {
+            const codigo = codigoOperacao(roteiro);
+            if (!codigo) continue;
+
+            const atual = porCodigo.get(codigo) ?? { descricao: "", itens: new Set<string>() };
+            atual.descricao ||= String(roteiro.DESC_OPERACAO ?? "").trim();
+            atual.itens.add(node.codigoNormalizado);
+            porCodigo.set(codigo, atual);
+        }
+
+        for (const filho of node.children) visitar(filho);
+    }
+
+    if (raiz) visitar(raiz);
+
+    return [...porCodigo.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0], "pt-BR", { numeric: true }))
+        .map(([codigo, { descricao, itens }]) => ({
+            value: codigo,
+            label: `${[codigo, descricao].filter(Boolean).join(" - ")} · ${itens.size === 1 ? "1 item" : `${itens.size} itens`}`,
+        }));
+}
+
+/* Itens que têm a operação no roteiro (em qualquer alternativo), com o caminho até eles. */
+function filtrarPorOperacao(node: RoteiroTreeNode, codigo: string): RoteiroTreeNode | null {
+    const filhosFiltrados = node.children
+        .map((child) => filtrarPorOperacao(child, codigo))
+        .filter((child): child is RoteiroTreeNode => child !== null);
+
+    const temOperacao = node.roteiros.some((roteiro) => codigoOperacao(roteiro) === codigo);
+
+    if (!temOperacao && filhosFiltrados.length === 0) return null;
 
     return { ...node, children: filhosFiltrados };
 }
@@ -1748,6 +1798,8 @@ export default function CadastroRoteiro({
     const [mostrarComAtencao, setMostrarComAtencao] = useState(false);
     const [filtrosAbertos, setFiltrosAbertos] = useState(false);
     const [tiposSelecionados, setTiposSelecionados] = useState<string[]>([TIPO_FILTRO_PADRAO]);
+    /* COD_OPERACAO escolhida no filtro de operação (null = todas). */
+    const [operacaoFiltro, setOperacaoFiltro] = useState<string | null>(null);
 
     /* Estado da árvore (ver TreeNode): ids abertos, ids com detalhes à
        mostra e o nó destacado pela última navegação. `vez` muda a cada
@@ -1948,6 +2000,7 @@ export default function CadastroRoteiro({
             /* Volta no padrao, nao em branco: cada consulta nova comeca
                filtrada em Fabricado, igual a primeira. */
             setTiposSelecionados([TIPO_FILTRO_PADRAO]);
+            setOperacaoFiltro(null);
             setExpandidos(new Set());
             setDetalhesAbertos(new Set());
             setDestaque(null);
@@ -2233,8 +2286,28 @@ export default function CadastroRoteiro({
             tree = filtrarComAtencao(tree);
         }
 
+        if (tree && operacaoFiltro) {
+            tree = filtrarPorOperacao(tree, operacaoFiltro);
+        }
+
         return tree;
-    }, [resultado, mostrarSemRoteiro, mostrarComAtencao, tiposSelecionados]);
+    }, [resultado, mostrarSemRoteiro, mostrarComAtencao, tiposSelecionados, operacaoFiltro]);
+
+    /* Da estrutura inteira, não da filtrada: a lista não encolhe conforme os outros filtros. */
+    const operacoesDisponiveis = useMemo(() => coletarOperacoes(resultado?.tree ?? null), [resultado]);
+
+    const operacaoFiltroOpcao = useMemo(
+        () =>
+            operacaoFiltro
+                ? operacoesDisponiveis.find((opcao) => opcao.value === operacaoFiltro) ?? {
+                      /* A operação saiu da estrutura (roteiro editado): o filtro
+                         continua visível, para dar para desligar. */
+                      value: operacaoFiltro,
+                      label: `${operacaoFiltro} · nenhum item`,
+                  }
+                : null,
+        [operacaoFiltro, operacoesDisponiveis]
+    );
 
     const totalItensFiltrado = useMemo(() => {
         return contarItensUnicos(arvoreExibida);
@@ -2264,7 +2337,7 @@ export default function CadastroRoteiro({
     }
 
     const filtrosAplicados =
-        mostrarSemRoteiro || mostrarComAtencao || tiposSelecionados.length > 0;
+        mostrarSemRoteiro || mostrarComAtencao || tiposSelecionados.length > 0 || operacaoFiltro !== null;
 
     const totalItensEstrutura = useMemo(() => {
         return contarItensUnicos(resultado?.tree ?? null);
@@ -2280,6 +2353,7 @@ export default function CadastroRoteiro({
             .join(", "),
         mostrarSemRoteiro ? "Sem roteiro" : "",
         mostrarComAtencao ? "Com atenção" : "",
+        operacaoFiltroOpcao ? `Operação ${operacaoFiltroOpcao.label.split(" · ")[0]}` : "",
     ]
         .filter(Boolean)
         .join(" · ");
@@ -2291,18 +2365,28 @@ export default function CadastroRoteiro({
         setTiposSelecionados([]);
         setMostrarSemRoteiro(false);
         setMostrarComAtencao(false);
+        setOperacaoFiltro(null);
     }
 
     /*
      * "Sem roteiro" e "Com atenção" se excluem (um item com atenção tem
      * roteiro); marcar um desmarca o outro. Ligar qualquer um abre a
      * árvore inteira, como antes -- o que sobra é justamente o que se
-     * quer ver.
+     * quer ver. Operação também exclui "Sem roteiro" (quem tem a
+     * operação tem roteiro).
      */
     function alternarFiltroSemRoteiro(checked: boolean) {
         setMostrarSemRoteiro(checked);
         if (!checked) return;
         setMostrarComAtencao(false);
+        setOperacaoFiltro(null);
+        setExpandidos(coletarIdsComFilhos(resultado?.tree ?? null));
+    }
+
+    function escolherOperacaoFiltro(codigo: string | null) {
+        setOperacaoFiltro(codigo);
+        if (!codigo) return;
+        setMostrarSemRoteiro(false);
         setExpandidos(coletarIdsComFilhos(resultado?.tree ?? null));
     }
 
@@ -2729,37 +2813,61 @@ export default function CadastroRoteiro({
 
                             {filtrosAbertos && (
                                 <div className={styles.filtersBody}>
-                                    <Checkbox
-                                        label="Mostrar apenas itens sem roteiro"
-                                        checked={mostrarSemRoteiro}
-                                        onChange={(e) => alternarFiltroSemRoteiro(e.target.checked)}
-                                    />
+                                    {/* Três colunas: o que mostrar, a operação e o tipo. */}
+                                    <div className={styles.filtrosGrade}>
+                                        <div className={styles.filtroColuna}>
+                                            <span className={styles.filterSelectLabel}>Mostrar apenas</span>
 
-                                    <Checkbox
-                                        label="Mostrar apenas itens com atenção"
-                                        checked={mostrarComAtencao}
-                                        onChange={(e) => alternarFiltroComAtencao(e.target.checked)}
-                                    />
-
-                                    <div className={styles.filterSelectGroup}>
-                                        <label className={styles.filterSelectLabel}>
-                                            Tipo do item
-                                        </label>
-
-                                        <div className={styles.tipoCheckboxList}>
-                                            {tiposDisponiveis.map(([tipoKey, tipoLabel]) => (
+                                            <div className={styles.filtroOpcoes}>
                                                 <Checkbox
-                                                    key={tipoKey}
-                                                    label={tipoLabel}
-                                                    checked={tiposSelecionados.includes(tipoKey)}
-                                                    onChange={(e) =>
-                                                        toggleTipo(tipoKey, e.target.checked)
-                                                    }
+                                                    label="Itens sem roteiro"
+                                                    checked={mostrarSemRoteiro}
+                                                    onChange={(e) => alternarFiltroSemRoteiro(e.target.checked)}
                                                 />
-                                            ))}
+
+                                                <Checkbox
+                                                    label="Itens com atenção"
+                                                    checked={mostrarComAtencao}
+                                                    onChange={(e) => alternarFiltroComAtencao(e.target.checked)}
+                                                />
+                                            </div>
                                         </div>
 
-                                        {filtrosAplicados && (
+                                        <div className={styles.filtroColuna}>
+                                            <label className={styles.filterSelectLabel} htmlFor="filtro-operacao">
+                                                Operação do roteiro
+                                            </label>
+
+                                            <Autocomplete
+                                                id="filtro-operacao"
+                                                options={operacoesDisponiveis}
+                                                selectedOption={operacaoFiltroOpcao}
+                                                onSelect={(opcao) => escolherOperacaoFiltro(opcao?.value ?? null)}
+                                                placeholder="Todas -- digite o código ou o nome"
+                                                emptyMessage="Nenhuma operação da estrutura com esse texto."
+                                            />
+                                        </div>
+
+                                        <div className={styles.filtroColuna}>
+                                            <span className={styles.filterSelectLabel}>Tipo do item</span>
+
+                                            <div className={styles.filtroOpcoes}>
+                                                {tiposDisponiveis.map(([tipoKey, tipoLabel]) => (
+                                                    <Checkbox
+                                                        key={tipoKey}
+                                                        label={tipoLabel}
+                                                        checked={tiposSelecionados.includes(tipoKey)}
+                                                        onChange={(e) =>
+                                                            toggleTipo(tipoKey, e.target.checked)
+                                                        }
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {filtrosAplicados && (
+                                        <div className={styles.filtrosRodape}>
                                             <button
                                                 type="button"
                                                 className={styles.clearFilterButton}
@@ -2767,8 +2875,8 @@ export default function CadastroRoteiro({
                                             >
                                                 Limpar filtros
                                             </button>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
