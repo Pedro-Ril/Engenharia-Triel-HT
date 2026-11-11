@@ -5,10 +5,12 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { NumberInput } from "@/components/ui/NumberInput";
 import styles from "./page.module.css";
+import { ehClienteCiber } from "@/lib/liberacao-projeto/analise-regras";
 import {
   buscarClientes,
   buscarNomes,
   enviarEmail,
+  pedirAnaliseEstrutura,
 } from "../../modules/liberacao-projeto/liberacaoProjeto.service";
 import type {
   ClienteItem,
@@ -17,7 +19,24 @@ import type {
 } from "../../modules/liberacao-projeto/liberacaoProjeto.types";
 
 type StatusType = "idle" | "success" | "error";
-type ModalStep = "confirmar-consulta" | "confirmar-envio";
+
+/*
+ * Depois dos envios que deram certo: uma análise por Código CJ Geral
+ * (sem repetir quando vários envios têm o mesmo), em segundo plano no
+ * servidor -- a tela não muda, o resultado vai por e-mail. Sem Código CJ
+ * Geral não há o que analisar; cliente Ciber fica de fora.
+ */
+function analisarEstruturasEnviadas(payloads: EmailPayload[]) {
+  const jaPedidos = new Set<string>();
+
+  for (const payload of payloads) {
+    const codigo = payload.codCjGeral.trim();
+    if (!codigo || ehClienteCiber(payload.cliente) || jaPedidos.has(codigo)) continue;
+
+    jaPedidos.add(codigo);
+    pedirAnaliseEstrutura(payload);
+  }
+}
 
 /*
  * Campos elegíveis pros "campos que mudam" nos múltiplos envios — só os
@@ -74,7 +93,6 @@ export default function LiberacaoProjetoPage() {
   const [statusMessage, setStatusMessage] = useState("");
 
   const [modalAberto, setModalAberto] = useState(false);
-  const [modalStep, setModalStep] = useState<ModalStep>("confirmar-consulta");
   const [modalErro, setModalErro] = useState("");
 
   const [multiploAtivo, setMultiploAtivo] = useState(false);
@@ -211,7 +229,6 @@ export default function LiberacaoProjetoPage() {
 
   const fecharModal = () => {
     setModalAberto(false);
-    setModalStep("confirmar-consulta");
     setModalErro("");
     setMultiploAtivo(false);
     setMultiploCampos([]);
@@ -308,11 +325,13 @@ export default function LiberacaoProjetoPage() {
     ];
 
     const resultados: { descricao: string; ok: boolean; erro?: string }[] = [];
+    const enviados: EmailPayload[] = [];
 
     for (const tentativa of tentativas) {
       try {
         await enviarEmail(tentativa.payload);
         resultados.push({ descricao: tentativa.descricao, ok: true });
+        enviados.push(tentativa.payload);
       } catch (error) {
         resultados.push({
           descricao: tentativa.descricao,
@@ -323,6 +342,7 @@ export default function LiberacaoProjetoPage() {
     }
 
     setEnviando(false);
+    analisarEstruturasEnviadas(enviados);
 
     const sucessos = resultados.filter((r) => r.ok).length;
     const falhas = resultados.filter((r) => !r.ok);
@@ -363,6 +383,7 @@ export default function LiberacaoProjetoPage() {
     try {
       setEnviando(true);
       await enviarEmail(payload);
+      analisarEstruturasEnviadas([payload]);
 
       setStatusType("success");
       setStatusMessage("E-mail enviado com sucesso!");
@@ -388,25 +409,7 @@ export default function LiberacaoProjetoPage() {
     const payload = montarPayload();
     if (!payload) return;
 
-    setModalStep("confirmar-consulta");
     setModalAberto(true);
-  };
-
-  const handleConsultarEstrutura = () => {
-    const codigo = codCjGeral.trim();
-
-    if (!codigo) {
-      setStatusType("error");
-      setStatusMessage(
-        'Informe o campo "Código CJ Geral" para consultar a estrutura antes do envio.'
-      );
-      fecharModal();
-      return;
-    }
-
-    const url = `/consulta-estrutura?itemPai=${encodeURIComponent(codigo)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    setModalStep("confirmar-envio");
   };
 
   /* O Envio 1 é o próprio formulário -- mostrado na grade como
@@ -771,80 +774,32 @@ export default function LiberacaoProjetoPage() {
             className={`${styles.modalContent} ${multiploAtivo ? styles.modalContentLargo : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {modalStep === "confirmar-consulta" ? (
-              <>
-                <h3 className={styles.modalTitle}>Consultar estrutura?</h3>
-                <p className={styles.modalText}>
-                  Deseja consultar a estrutura do item liberado antes de realizar
-                  o envio do e-mail?
-                </p>
+            <h3 className={styles.modalTitle}>Realizar envio?</h3>
+            <p className={styles.modalText}>
+              Deseja realizar o envio do e-mail de liberação de projeto?
+            </p>
 
-                {blocoMultiplosEnvios}
+            {blocoMultiplosEnvios}
 
-                <div className={styles.modalActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={fecharModal}
-                    disabled={enviando}
-                  >
-                    Cancelar
-                  </button>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={fecharModal}
+                disabled={enviando}
+              >
+                Cancelar
+              </button>
 
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={executarEnvio}
-                    disabled={enviando}
-                  >
-                    {enviando
-                      ? "Enviando..."
-                      : multiploAtivo
-                        ? "Enviar todos sem consultar"
-                        : "Enviar sem consultar"}
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={handleConsultarEstrutura}
-                    disabled={enviando}
-                  >
-                    Consultar estrutura
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className={styles.modalTitle}>Realizar envio?</h3>
-                <p className={styles.modalText}>
-                  A tela de consulta da estrutura foi aberta em uma nova guia com
-                  o item pai preenchido. Deseja realizar o envio do e-mail agora?
-                </p>
-
-                {blocoMultiplosEnvios}
-
-                <div className={styles.modalActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={fecharModal}
-                    disabled={enviando}
-                  >
-                    Não
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={executarEnvio}
-                    disabled={enviando}
-                  >
-                    {enviando ? "Enviando..." : multiploAtivo ? "Sim, enviar todos" : "Sim, enviar"}
-                  </button>
-                </div>
-              </>
-            )}
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={executarEnvio}
+                disabled={enviando}
+              >
+                {enviando ? "Enviando..." : multiploAtivo ? "Enviar todos" : "Enviar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

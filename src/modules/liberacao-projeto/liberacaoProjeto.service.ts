@@ -88,6 +88,28 @@ function reportarMetricaEmail(params: {
   });
 }
 
+/*
+ * Depois do envio: pede ao Portal a conferência "código do item = código
+ * do desenho" da estrutura do Código CJ Geral. Roda em segundo plano no
+ * servidor e o resultado chega por e-mail; aqui não se espera nem se
+ * mostra nada -- nunca lança e não atrasa a tela.
+ */
+export function pedirAnaliseEstrutura(payload: EmailPayload): void {
+  fetch("/api/liberacao-projeto/analise-estrutura", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      codigo: payload.codCjGeral,
+      cliente: payload.cliente,
+      ordem: payload.ordem,
+      nome: payload.nome,
+    }),
+    keepalive: true,
+  }).catch(() => {
+    /* A análise é um extra: falhar aqui não pode afetar o envio. */
+  });
+}
+
 export async function enviarEmail(payload: EmailPayload): Promise<void> {
   const inicio = performance.now();
 
