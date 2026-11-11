@@ -200,6 +200,7 @@ type LinhaEstruturaErp = {
   COD_ITEM_FILHO: string;
   DESC_TECNICA_FILHO: string | null;
   SEQ_ORD: number | null;
+  QTDE: number | null;
   STATUS_VALIDADE: "VALIDO" | "INVALIDO";
   TP_ITEM_FILHO: string | null;
   COD_DESENHO_FILHO: string | null;
@@ -291,6 +292,7 @@ async function buscarEstruturaErp(codigo: string, exigirCiber: boolean): Promise
       tipoint: normalizarTexto(linha.TP_ITEM_FILHO),
       revisao: "",
       nivel: Number(linha.NIVEL),
+      quantidade: linha.QTDE == null ? null : Number(linha.QTDE),
       instancia: {
         physicalId: `erp-${linha.ID_ESTRUTURA}`,
         nome: normalizarTexto(linha.COD_ITEM_FILHO),

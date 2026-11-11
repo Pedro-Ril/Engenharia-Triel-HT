@@ -594,6 +594,11 @@ function itemComAtencao(node: RoteiroTreeNode): boolean {
  * Planilha da estrutura como está na tela (com os filtros aplicados):
  * uma linha por operação, e uma linha só para item sem operação. Sai
  * em .xlsx pelo exportarPlanilha do portal (o xlsx já é dependência).
+ *
+ * O 3DX traz uma linha por instância: um suporte montado 20 vezes no
+ * mesmo conjunto vira 20 nós iguais na árvore. Na planilha eles saem
+ * agrupados (um bloco por item dentro de cada pai) com a quantidade
+ * em "Qtd. no pai"; no ERP a ligação já é uma só, com a QTDE dela.
  */
 const CABECALHO_EXPORTACAO = [
     "Nível",
@@ -601,6 +606,7 @@ const CABECALHO_EXPORTACAO = [
     "Revisão",
     "Tipo",
     "Descrição",
+    "Qtd. no pai",
     "Situação",
     "Alternativo",
     "Sequência",
@@ -617,14 +623,36 @@ function montarLinhasExportacao(
 ): (string | number)[][] {
     const linhas: (string | number)[][] = [];
 
-    function visitar(node: RoteiroTreeNode, nivel: number) {
-        const situacoes: string[] = [];
+    /* As instâncias do mesmo item (e revisão) sob o mesmo pai, na ordem em
+       que o item aparece pela primeira vez. */
+    function agruparFilhos(filhos: RoteiroTreeNode[]): RoteiroTreeNode[][] {
+        const grupos = new Map<string, RoteiroTreeNode[]>();
 
-        if (itemSemRoteiro(node)) situacoes.push("Sem roteiro");
-        if (itemComAtencao(node)) situacoes.push("Com atenção");
+        for (const filho of filhos) {
+            const chave = `${filho.codigoNormalizado}\u0000${filho.revisao ?? ""}`;
+            const grupo = grupos.get(chave);
 
-        const divergencia = divergencias.get(node.id);
-        if (divergencia) situacoes.push(divergencia === "vencida" ? "Vencido no ERP" : "Não tem no ERP");
+            if (grupo) grupo.push(filho);
+            else grupos.set(chave, [filho]);
+        }
+
+        return [...grupos.values()];
+    }
+
+    /* A raiz não tem pai: vai sem quantidade. */
+    function visitar(instancias: RoteiroTreeNode[], nivel: number, quantidade: number | "") {
+        /* Mesmo item, mesma referência: os filhos e o roteiro são os mesmos
+           em todas as instâncias; a primeira representa o grupo. */
+        const node = instancias[0];
+        const situacoes = new Set<string>();
+
+        for (const instancia of instancias) {
+            if (itemSemRoteiro(instancia)) situacoes.add("Sem roteiro");
+            if (itemComAtencao(instancia)) situacoes.add("Com atenção");
+
+            const divergencia = divergencias.get(instancia.id);
+            if (divergencia) situacoes.add(divergencia === "vencida" ? "Vencido no ERP" : "Não tem no ERP");
+        }
 
         const base = [
             nivel,
@@ -632,7 +660,8 @@ function montarLinhasExportacao(
             node.revisao || "",
             formatarTipo(tipoBrutoDoItem(node)),
             node.descricaoNormalizada,
-            situacoes.length > 0 ? situacoes.join(", ") : "OK",
+            quantidade,
+            situacoes.size > 0 ? [...situacoes].join(", ") : "OK",
         ];
 
         const roteiros = [...node.roteiros].sort(
@@ -658,10 +687,13 @@ function montarLinhasExportacao(
             ]);
         }
 
-        for (const filho of node.children) visitar(filho, nivel + 1);
+        for (const grupo of agruparFilhos(node.children)) {
+            const qtd = grupo.reduce((soma, filho) => soma + (filho.quantidade ?? 1), 0);
+            visitar(grupo, nivel + 1, qtd);
+        }
     }
 
-    visitar(raiz, 0);
+    visitar([raiz], 0, "");
 
     return linhas;
 }

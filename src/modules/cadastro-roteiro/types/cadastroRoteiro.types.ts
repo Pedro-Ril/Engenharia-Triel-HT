@@ -68,6 +68,9 @@ export type Estrutura3DXNode = {
   criadoEm?: string;
   modificadoEm?: string;
   nivel?: number;
+  /* Quantidade no pai. Só o ERP informa (QTDE da ligação); no 3DX cada
+     instância é uma peça, e o mesmo item aparece uma vez por instância. */
+  quantidade?: number | null;
   instancia?: {
     physicalId?: string;
     nome?: string;
