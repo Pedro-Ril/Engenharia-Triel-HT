@@ -62,7 +62,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { cpus, freemem, homedir, networkInterfaces, platform, totalmem } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -716,6 +716,70 @@ function iniciarProcessoControleCursor(exibirCursor) {
   return spawn("unclutter", ["-idle", "3", "-jitter", "2", "-root"], { stdio: "ignore" });
 }
 
+/*
+ * Acesso remoto (VNC), só no Linux: x11vnc compartilha a própria tela
+ * do kiosk (o X :0 que o .xinitrc subiu), então quem conecta pelo VNC
+ * Viewer vê exatamente o que está na TV e pode mexer com mouse e
+ * teclado. A senha vem do portal (TV Corporativa → Configurações,
+ * GET /api/tv/agente/config) -- nunca do instalador, que é público.
+ * Sem senha cadastrada, o x11vnc fica desligado.
+ *
+ * Roda como o próprio tvkiosk, dentro da sessão X: herda DISPLAY e
+ * XAUTHORITY do ambiente que o startx montou, sem precisar de root.
+ * A senha vai num arquivo só desse usuário (-passwdfile), não na linha
+ * de comando (que qualquer um vê no `ps`). Porta 5900 (padrão do VNC
+ * Viewer: basta digitar o IP do terminal).
+ *
+ * Terminais instalados antes disto não têm o pacote -- o autoupdate só
+ * troca este arquivo. Uma vez via SSH: `sudo apt-get install -y x11vnc`;
+ * o agente tenta de novo a cada ciclo de configuração, sem reiniciar.
+ */
+const ARQUIVO_SENHA_VNC = path.join(DIRETORIO_DADOS, "vnc.senha");
+const PORTA_VNC = "5900";
+const INTERVALO_RELANCAR_VNC_MS = 15 * 1000;
+
+function iniciarProcessoVnc(senha) {
+  try {
+    execFileSync("which", ["x11vnc"], { stdio: "ignore" });
+  } catch {
+    console.error('"x11vnc" não está instalado (acesso remoto VNC) -- rode "sudo apt-get install -y x11vnc".');
+    return null;
+  }
+
+  garantirDiretorioDados();
+  writeFileSync(ARQUIVO_SENHA_VNC, `${senha}\n`, { mode: 0o600 });
+  chmodSync(ARQUIVO_SENHA_VNC, 0o600);
+
+  console.log(`Acesso remoto (VNC) ligado na porta ${PORTA_VNC}.`);
+
+  return spawn(
+    "x11vnc",
+    [
+      "-display", process.env.DISPLAY || ":0",
+      "-passwdfile", ARQUIVO_SENHA_VNC,
+      "-rfbport", PORTA_VNC,
+      /* Continua aceitando conexões depois que o primeiro cliente sai, e mais de um ao mesmo tempo. */
+      "-forever",
+      "-shared",
+      /* O Chrome redesenha a tela inteira o tempo todo (vídeo, slides): sem isso a imagem no VNC fica com pedaços velhos. */
+      "-noxdamage",
+      "-quiet",
+    ],
+    { stdio: "ignore" }
+  );
+}
+
+/* Um x11vnc de uma instância anterior do agente (autoupdate, queda) fica órfão, com a senha antiga -- mata antes de começar. */
+function limparProcessoVncOrfao() {
+  if (EH_WINDOWS) return;
+
+  try {
+    execFileSync("pkill", ["-x", "x11vnc"], { stdio: "ignore" });
+  } catch {
+    /* pkill sai com código != 0 quando não encontra nada -- não é erro de verdade aqui. */
+  }
+}
+
 /* true = o agente deveria ter um processo de controle de cursor rodando agora, dado o valor atual de "exibirCursor". */
 function precisaDeProcessoControleCursor(exibirCursor) {
   return EH_WINDOWS ? exibirCursor : !exibirCursor;
@@ -778,11 +842,54 @@ async function main() {
   console.log("Iniciando modo kiosk com", caminhoNavegador);
 
   limparProcessoControleCursorOrfao();
+  limparProcessoVncOrfao();
 
   let caminhoAtual = CAMINHO_PADRAO;
   let processoAtual = null;
   let exibindoCursorAtual = false;
   let processoControleCursor = null;
+  /* Senha do VNC em uso agora (null = desligado) e o processo x11vnc correspondente. Ver iniciarProcessoVnc. */
+  let vncSenhaAtual = null;
+  let processoVnc = null;
+
+  /* Liga o x11vnc com a senha atual e, se ele cair sozinho, liga de novo -- a não ser que a senha tenha mudado/sumido nesse meio-tempo. */
+  function ligarVnc() {
+    const senhaDoProcesso = vncSenhaAtual;
+    const processo = iniciarProcessoVnc(senhaDoProcesso);
+    processoVnc = processo;
+    if (!processo) return;
+
+    processo.on("exit", (codigo) => {
+      if (processoVnc !== processo) return;
+      processoVnc = null;
+      if (vncSenhaAtual !== senhaDoProcesso) return;
+      console.error(`x11vnc encerrou (código ${codigo}) -- religando em ${INTERVALO_RELANCAR_VNC_MS / 1000}s...`);
+      setTimeout(() => {
+        if (vncSenhaAtual === senhaDoProcesso && !processoVnc) ligarVnc();
+      }, INTERVALO_RELANCAR_VNC_MS);
+    });
+  }
+
+  function desligarVnc() {
+    const processo = processoVnc;
+    processoVnc = null;
+    processo?.kill();
+  }
+
+  function aplicarConfigVnc(novaSenha) {
+    if (EH_WINDOWS) return;
+    const senha = typeof novaSenha === "string" && novaSenha ? novaSenha : null;
+
+    if (senha !== vncSenhaAtual) {
+      if (vncSenhaAtual && !senha) console.log("Acesso remoto (VNC) desligado pelo portal.");
+      vncSenhaAtual = senha;
+      desligarVnc();
+      if (senha) ligarVnc();
+    } else if (senha && !processoVnc) {
+      /* Devia estar ligado mas não está (ex: x11vnc ainda não instalado) -- tenta de novo a cada ciclo. */
+      ligarVnc();
+    }
+  }
   /* Atualizados por verificarEReconectarRede (Linux, a cada INTERVALO_VERIFICAR_REDE_MS) e lidos por verificarConfiguracaoAgente pra reportar junto com IP/CPU/memória. */
   let tipoConexaoAtual = null;
   let wifiSsidAtual = null;
@@ -902,6 +1009,8 @@ async function main() {
          */
         processoControleCursor = iniciarProcessoControleCursor(novoExibirCursor);
       }
+
+      aplicarConfigVnc(corpo.data.vncSenha);
     } catch (error) {
       console.error("Erro ao verificar atualização/configuração do agente:", error.message);
     }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { calcularHashAgente } from "@/lib/tv/agente-hash";
+import { buscarSenhaVncParaAgente } from "@/lib/tv/config";
 import { listarRedesWifiParaAgente } from "@/lib/tv/redes-wifi";
 import {
   consumirComandoPendente,
@@ -77,6 +78,7 @@ async function handleGET(request: Request) {
     const hash = await calcularHashAgente();
     const comando = await consumirComandoPendente(acesso.terminal.id);
     const redesWifi = await listarRedesWifiParaAgente();
+    const vncSenha = await buscarSenhaVncParaAgente();
 
     return NextResponse.json({
       ok: true,
@@ -86,6 +88,8 @@ async function handleGET(request: Request) {
         exibirCursor: acesso.terminal.exibirCursor,
         comando,
         redesWifi,
+        /* Acesso remoto (x11vnc, só o agente Linux usa) -- null = desligado. Ver portal_tv_config.vnc_senha_cifrada. */
+        vncSenha,
       },
     });
   } catch (error) {

@@ -18,6 +18,7 @@ import {
   statusSignaling,
 } from "../services/tvCorporativa.service";
 import type { FeedbackHandler } from "@/modules/admin-permissoes/types/toast.types";
+import { AcessoRemotoVncCard } from "./AcessoRemotoVncCard";
 import { RedesWifiCard } from "./RedesWifiCard";
 
 interface ConfiguracoesTvPainelProps {
@@ -91,6 +92,7 @@ export function ConfiguracoesTvPainel({ onFeedback }: ConfiguracoesTvPainelProps
   const [diretorioMidias, setDiretorioMidias] = useState("");
   const [signalingUrl, setSignalingUrl] = useState("");
   const [urlAgente, setUrlAgente] = useState("");
+  const [vncSenhaDefinida, setVncSenhaDefinida] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -101,6 +103,7 @@ export function ConfiguracoesTvPainel({ onFeedback }: ConfiguracoesTvPainelProps
       setDiretorioMidias(config?.diretorioMidias ?? "");
       setSignalingUrl(config?.signalingUrl ?? "");
       setUrlAgente(config?.urlAgente ?? "");
+      setVncSenhaDefinida(config?.vncSenhaDefinida ?? false);
       setCarregando(false);
     });
 
@@ -196,6 +199,8 @@ export function ConfiguracoesTvPainel({ onFeedback }: ConfiguracoesTvPainelProps
       </Card>
 
       <RedesWifiCard onFeedback={onFeedback} />
+
+      <AcessoRemotoVncCard senhaDefinida={vncSenhaDefinida} onFeedback={onFeedback} />
     </Stack>
   );
 }

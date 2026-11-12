@@ -96,6 +96,8 @@ export interface ConfigTv {
   diretorioMidias: string | null;
   signalingUrl: string | null;
   urlAgente: string | null;
+  /* Só se existe: a senha do VNC nunca vem para o navegador. */
+  vncSenhaDefinida: boolean;
   atualizadoEm: string | null;
   atualizadoPor: string | null;
 }

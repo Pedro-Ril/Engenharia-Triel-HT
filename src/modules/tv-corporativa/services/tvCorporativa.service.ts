@@ -295,6 +295,20 @@ export async function salvarConfigTv(
   return parseResponse(response);
 }
 
+export async function salvarSenhaVncTv(senha: string): Promise<ApiEnvelope<ConfigTv>> {
+  const response = await fetch("/api/admin/tv/config/vnc", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ senha }),
+  });
+  return parseResponse(response);
+}
+
+export async function desligarVncTv(): Promise<ApiEnvelope<ConfigTv>> {
+  const response = await fetch("/api/admin/tv/config/vnc", { method: "DELETE" });
+  return parseResponse(response);
+}
+
 export async function statusSignaling(): Promise<ApiEnvelope<{ online: boolean }>> {
   const response = await fetch("/api/admin/tv/signaling/status");
   return parseResponse(response);

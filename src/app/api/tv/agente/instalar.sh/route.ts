@@ -93,6 +93,13 @@ export const dynamic = "force-dynamic";
  * Sobrescrito a cada reinício do processo (sem rotação) — só importa
  * a última execução, não histórico.
  *
+ * x11vnc vai junto com o X: acesso remoto (VNC Viewer na porta 5900
+ * do terminal) à própria tela do kiosk. Este script só instala o
+ * pacote -- quem liga/desliga é o agente, com a senha cadastrada em
+ * TV Corporativa → Configurações (ver tv-agente/agente.mjs,
+ * iniciarProcessoVnc). A senha nunca entra aqui: esta rota é pública.
+ * Terminais já em produção: uma vez via SSH, `sudo apt-get install -y x11vnc`.
+ *
  * Extensão de captura de tela (ver src/lib/tv/extensao-captura.ts):
  * Google Chrome oficial ignora --load-extension fora do modo
  * desenvolvedor (confirmado ao vivo), então a instalação dela usa a
@@ -180,9 +187,9 @@ if ! command -v google-chrome >/dev/null 2>&1 && ! command -v chromium-browser >
   fi
 fi
 
-echo "Instalando X minimo (sem ambiente de desktop)..."
+echo "Instalando X minimo (sem ambiente de desktop) e o x11vnc (acesso remoto)..."
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils unclutter
+  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils unclutter x11vnc
 else
   echo "Gerenciador de pacotes nao suportado para instalar o X automaticamente (so apt/Debian/Ubuntu por enquanto)." >&2
   exit 1
