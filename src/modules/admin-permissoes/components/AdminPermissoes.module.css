@@ -104,6 +104,147 @@
   }
 }
 
+/*
+ * Aba Permissões (Por usuário / Por módulo): coluna da esquerda com
+ * busca e filtros fixos no topo e a lista rolando por dentro, para não
+ * ser preciso rolar a página inteira com 100+ usuários.
+ */
+.permissoesGrade {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.colunaSelecao {
+  position: sticky;
+  top: 16px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-surface);
+}
+
+.contadorLista {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.listaRolavel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  max-height: max(260px, calc(100vh - 380px));
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px;
+}
+
+.listaGrupoTitulo {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.itemTexto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.itemSub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.acaoLink {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.acaoLink:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+
+.acaoLink:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.semResultado {
+  padding: 16px 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.filtroPessoas {
+  width: 280px;
+  max-width: 100%;
+}
+
+/* Lista dentro de modal: altura fixa menor, o modal já tem a própria rolagem. */
+.listaModal {
+  max-height: 280px;
+}
+
+.listaModal .usuarioItem,
+.listaModal .checkboxLinha {
+  flex-shrink: 0;
+}
+
+.checkboxLinha {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.checkboxLinha:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.previaModulos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .permissoesGrade {
+    grid-template-columns: 1fr;
+  }
+
+  .colunaSelecao {
+    position: static;
+  }
+
+  .listaRolavel {
+    max-height: 320px;
+  }
+}
+
 .corSwatch {
   width: 28px;
   height: 28px;
