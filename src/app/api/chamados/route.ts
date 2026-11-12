@@ -8,6 +8,7 @@ import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { getSetoresQueAtende } from "@/lib/chamados/autorizacao-chamados";
 import { criarChamado } from "@/lib/chamados/chamados";
 import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
+import { lerMensagemFormData } from "@/lib/chamados/mensagem-html";
 import {
   notificarAtendentesDoSetor,
   notificarSolicitanteChamado,
@@ -50,7 +51,7 @@ async function handlePOST(request: Request) {
     const categoriaId = requiredText(formData.get("categoriaId"), "categoria", 60);
     const prioridade = requiredPrioridade(formData.get("prioridade"));
     const titulo = requiredText(formData.get("titulo"), "título", 200);
-    const descricao = requiredText(formData.get("descricao"), "descrição", 4000);
+    const descricao = await lerMensagemFormData(formData, "descricao", "descrição");
 
     let solicitante = usuario;
     let criadoPorUsuarioId: string | null = null;
@@ -89,14 +90,15 @@ async function handlePOST(request: Request) {
       categoriaId,
       prioridade,
       titulo,
-      descricao,
+      descricao: descricao.texto,
+      descricaoFormato: descricao.formato,
       solicitanteUsuarioId: solicitante?.id ?? null,
       solicitanteNome,
       solicitanteContato,
       empresa: solicitante?.codigoEmpresa ?? null,
       solicitanteDepartamento: solicitante?.departamento ?? null,
       ipOrigem: extrairIpOrigem(request),
-      anexos,
+      anexos: [...anexos, ...descricao.imagens],
       criadoPorUsuarioId,
     });
 

@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
-import { requiredText } from "@/lib/auth/validation";
 import { verificarAcessoChamado } from "@/lib/chamados/autorizacao-chamados";
 import { adicionarMensagem, buscarChamadoPorNumero } from "@/lib/chamados/chamados";
 import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
+import { lerMensagemFormData } from "@/lib/chamados/mensagem-html";
 import {
   notificarAtendenteChamado,
   notificarCopiaChamado,
@@ -82,7 +82,7 @@ async function handlePOST(request: Request, context: RouteContext) {
       );
     }
 
-    const texto = requiredText(formData.get("texto"), "mensagem", 4000);
+    const recebida = await lerMensagemFormData(formData, "texto", "mensagem");
     const interno = ehAtendente && formData.get("interno") === "true";
     const anexos = await parseAnexosFormData(formData, "anexos");
 
@@ -94,9 +94,11 @@ async function handlePOST(request: Request, context: RouteContext) {
       autorNome,
       autorTipo: ehAtendente ? "atendente" : "solicitante",
       interno,
-      texto,
-      anexos,
+      texto: recebida.texto,
+      formato: recebida.formato,
+      anexos: [...anexos, ...recebida.imagens],
     });
+    const mensagemEmail = { texto: recebida.texto, formato: recebida.formato };
 
     if (!interno) {
       const origem = await origemPublicaEfetivaChamados(request);
@@ -112,7 +114,7 @@ async function handlePOST(request: Request, context: RouteContext) {
           evento: "nova_resposta",
           origem,
           autorNome,
-          mensagemTexto: texto,
+          mensagem: mensagemEmail,
           anexos: anexosNotificacao,
         });
       } else if (!ehAtendente) {
@@ -120,7 +122,7 @@ async function handlePOST(request: Request, context: RouteContext) {
           chamado,
           origem,
           autorNome,
-          mensagemTexto: texto,
+          mensagem: mensagemEmail,
           anexos: anexosNotificacao,
         });
       }
@@ -136,7 +138,7 @@ async function handlePOST(request: Request, context: RouteContext) {
         origem,
         autorNome,
         autorUsuarioId: usuario?.id ?? null,
-        mensagemTexto: texto,
+        mensagem: mensagemEmail,
         anexos: anexosNotificacao,
       });
     }

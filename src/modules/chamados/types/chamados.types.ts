@@ -34,7 +34,9 @@ export interface ChamadoMensagem {
   autorNome: string;
   autorTipo: AutorTipoMensagem;
   interno: boolean;
+  /* Texto puro quando formato = "texto"; HTML já limpo pelo servidor quando "html". */
   texto: string;
+  formato: "texto" | "html";
   criadoEm: string;
   anexos: ChamadoAnexo[];
 }

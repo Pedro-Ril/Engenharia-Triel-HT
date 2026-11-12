@@ -27,8 +27,8 @@ import { FormGrid } from "@/components/ui/FormGrid";
 import { Modal } from "@/components/ui/Modal";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RichTextEditor, RichTextViewer } from "@/components/ui/RichTextEditor";
 import { Stack } from "@/components/ui/Stack";
-import { Textarea } from "@/components/ui/Textarea";
 
 import {
   aceitarChamado,
@@ -51,6 +51,7 @@ import type {
   SetorChamado,
   UsuarioCopiaChamado,
 } from "../types/chamados.types";
+import { LIMITE_TEXTO_MENSAGEM, mensagemVazia, useImagensColadas } from "../utils/mensagemFormatada";
 import { PrioridadeBadge, PRIORIDADE_LABELS, StatusBadge } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
 import { UsuarioAutocomplete } from "./UsuarioAutocomplete";
@@ -82,6 +83,15 @@ function anexoHref(anexoId: string, nomeConfirmado: string | null): string {
     : `/api/chamados/anexos/${anexoId}`;
 }
 
+/* Prints colados apontam para o anexo; quem consulta sem login precisa do "?nome=" também na imagem. */
+function comNomeNasImagens(html: string, nomeConfirmado: string | null): string {
+  if (!nomeConfirmado) return html;
+  return html.replace(
+    /src="\/api\/chamados\/anexos\/([0-9a-f-]{36})"/gi,
+    (_, id: string) => `src="${anexoHref(id, nomeConfirmado).replace(/&/g, "&amp;")}"`
+  );
+}
+
 const OPCOES_PRIORIDADE = (Object.keys(PRIORIDADE_LABELS) as PrioridadeChamado[]).map(
   (prioridade) => ({ value: prioridade, label: PRIORIDADE_LABELS[prioridade].label })
 );
@@ -100,6 +110,8 @@ export function ChamadoDetalhePage({
   const router = useRouter();
 
   const [texto, setTexto] = useState("");
+  const [textoVisivel, setTextoVisivel] = useState("");
+  const imagensColadas = useImagensColadas();
   const [anexos, setAnexos] = useState<File[]>([]);
   const [interno, setInterno] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -171,8 +183,13 @@ export function ChamadoDetalhePage({
   }
 
   async function handleEnviarMensagem() {
-    if (!texto.trim()) {
+    if (mensagemVazia(texto, textoVisivel)) {
       setErro("Escreva uma mensagem.");
+      return;
+    }
+
+    if (textoVisivel.trim().length > LIMITE_TEXTO_MENSAGEM) {
+      setErro(`A mensagem passou de ${LIMITE_TEXTO_MENSAGEM} caracteres.`);
       return;
     }
 
@@ -181,7 +198,7 @@ export function ChamadoDetalhePage({
 
     try {
       const formData = new FormData();
-      formData.append("texto", texto);
+      imagensColadas.anexarAoFormulario(formData, "texto", texto);
       if (interno) formData.append("interno", "true");
       if (nomeConfirmado) formData.append("nome", nomeConfirmado);
       for (const arquivo of anexos) formData.append("anexos", arquivo);
@@ -190,6 +207,8 @@ export function ChamadoDetalhePage({
 
       if (resultado.ok) {
         setTexto("");
+        setTextoVisivel("");
+        imagensColadas.limpar();
         setAnexos([]);
         setInterno(false);
         router.refresh();
@@ -573,7 +592,15 @@ export function ChamadoDetalhePage({
                     <span className={styles.mensagemData}>{formatarData(mensagem.criadoEm)}</span>
                   </div>
 
-                  <p className={styles.mensagemTexto}>{mensagem.texto}</p>
+                  {mensagem.formato === "html" ? (
+                    <RichTextViewer
+                      compacto
+                      className={styles.mensagemFormatada}
+                      html={comNomeNasImagens(mensagem.texto, nomeConfirmado)}
+                    />
+                  ) : (
+                    <p className={styles.mensagemTexto}>{mensagem.texto}</p>
+                  )}
 
                   {mensagem.anexos.length > 0 && (
                     <div className={styles.mensagemAnexos}>
@@ -606,12 +633,20 @@ export function ChamadoDetalhePage({
             </Alert>
           ) : (
             <>
-              <Field label="Responder" hint={`${texto.length}/4000 caracteres`}>
-                <Textarea
-                  rows={4}
-                  maxLength={4000}
+              <Field
+                label="Responder"
+                hint={`${textoVisivel.trim().length}/${LIMITE_TEXTO_MENSAGEM} caracteres · dá para colar prints (Ctrl+V) e tabelas do Excel`}
+              >
+                <RichTextEditor
+                  tabelas
+                  alturaMinima={120}
                   value={texto}
-                  onChange={(event) => setTexto(event.target.value)}
+                  placeholder="Escreva sua mensagem..."
+                  imagemUpload={imagensColadas.registrar}
+                  onChange={(html, visivel) => {
+                    setTexto(html);
+                    setTextoVisivel(visivel);
+                  }}
                 />
               </Field>
 

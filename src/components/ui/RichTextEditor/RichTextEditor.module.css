@@ -200,6 +200,64 @@
   border-top: 1px solid var(--border);
 }
 
+/* Tabelas (coladas do Excel/Word ou inseridas pela toolbar). */
+.conteudo :global(.tableWrapper) {
+  max-width: 100%;
+  margin: 0 0 12px;
+  overflow-x: auto;
+}
+
+.conteudo :global(table) {
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conteudo :global(.tableWrapper table) {
+  margin: 0;
+}
+
+.conteudo :global(th),
+.conteudo :global(td) {
+  position: relative;
+  min-width: 48px;
+  padding: 5px 9px;
+  border: 1px solid var(--border-strong);
+  text-align: left;
+  vertical-align: top;
+}
+
+.conteudo :global(th) {
+  background: var(--bg-surface-soft);
+  font-weight: 700;
+}
+
+.conteudo :global(th p),
+.conteudo :global(td p) {
+  margin: 0;
+}
+
+.conteudo :global(.selectedCell)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--primary-soft);
+  pointer-events: none;
+}
+
+/* Visualização compacta (mensagens de chamado): sem a altura mínima e o respiro pensados para artigo. */
+.compacto {
+  min-height: 0;
+  padding: 0;
+}
+
+.compacto :global(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .conteudo :global(.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
   float: left;

@@ -191,6 +191,17 @@
   line-height: 1.6;
 }
 
+/*
+ * Mensagem com texto formatado (prints e tabelas coladas) -- mesmo tom e
+ * tamanho da de texto puro. Com `.mensagem` na frente para ganhar do
+ * `.conteudo` do RichTextViewer, que tem a mesma especificidade.
+ */
+.mensagem .mensagemFormatada {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
 .mensagemAnexos {
   display: flex;
   flex-wrap: wrap;

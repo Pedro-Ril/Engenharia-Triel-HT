@@ -15,11 +15,12 @@ import { FormGrid } from "@/components/ui/FormGrid";
 import { Input } from "@/components/ui/Input";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Stack } from "@/components/ui/Stack";
-import { Textarea } from "@/components/ui/Textarea";
 
 import { abrirChamado, adicionarUsuarioCopiaChamado } from "../services/chamados.service";
 import type { CategoriaChamado, PrioridadeChamado, SetorChamado } from "../types/chamados.types";
+import { LIMITE_TEXTO_MENSAGEM, mensagemVazia, useImagensColadas } from "../utils/mensagemFormatada";
 import { PRIORIDADE_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
 import { UsuarioAutocomplete } from "./UsuarioAutocomplete";
@@ -47,6 +48,8 @@ export function AbrirChamadoPage({
   const [prioridade, setPrioridade] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [descricaoTexto, setDescricaoTexto] = useState("");
+  const imagensColadas = useImagensColadas();
   const [nome, setNome] = useState("");
   const [contato, setContato] = useState("");
   const [anexos, setAnexos] = useState<File[]>([]);
@@ -102,6 +105,11 @@ export function AbrirChamadoPage({
       return;
     }
 
+    if (descricaoTexto.trim().length > LIMITE_TEXTO_MENSAGEM) {
+      setErro(`A descrição passou de ${LIMITE_TEXTO_MENSAGEM} caracteres.`);
+      return;
+    }
+
     setEnviando(true);
 
     try {
@@ -110,7 +118,7 @@ export function AbrirChamadoPage({
       formData.append("categoriaId", categoriaId);
       formData.append("prioridade", prioridade);
       formData.append("titulo", titulo);
-      formData.append("descricao", descricao);
+      imagensColadas.anexarAoFormulario(formData, "descricao", descricao);
 
       if (!usuarioLogado) {
         formData.append("nome", nome);
@@ -142,6 +150,7 @@ export function AbrirChamadoPage({
           }
         }
 
+        imagensColadas.limpar();
         setNumeroCriado(numero);
       } else {
         setErro(resultado.message ?? "Não foi possível abrir o chamado.");
@@ -196,6 +205,7 @@ export function AbrirChamadoPage({
                   setNumeroCriado(null);
                   setTitulo("");
                   setDescricao("");
+                  setDescricaoTexto("");
                   setAnexos([]);
                 }}
               >
@@ -377,13 +387,21 @@ export function AbrirChamadoPage({
             />
           </Field>
 
-          <Field label="Descrição" required hint={`${descricao.length}/4000 caracteres`}>
-            <Textarea
-              rows={6}
-              maxLength={4000}
+          <Field
+            label="Descrição"
+            required
+            hint={`${descricaoTexto.trim().length}/${LIMITE_TEXTO_MENSAGEM} caracteres · dá para colar prints (Ctrl+V) e tabelas do Excel`}
+          >
+            <RichTextEditor
+              tabelas
+              alturaMinima={160}
               value={descricao}
               placeholder="Descreva com o máximo de detalhes possível: o que aconteceu, quando, e o que você esperava que acontecesse."
-              onChange={(event) => setDescricao(event.target.value)}
+              imagemUpload={imagensColadas.registrar}
+              onChange={(html, texto) => {
+                setDescricao(html);
+                setDescricaoTexto(texto);
+              }}
             />
           </Field>
 
@@ -398,7 +416,11 @@ export function AbrirChamadoPage({
               onClick={handleSubmit}
               loading={enviando}
               disabled={
-                !setorId || !categoriaId || !prioridade || !titulo.trim() || !descricao.trim()
+                !setorId ||
+                !categoriaId ||
+                !prioridade ||
+                !titulo.trim() ||
+                mensagemVazia(descricao, descricaoTexto)
               }
             >
               Abrir chamado

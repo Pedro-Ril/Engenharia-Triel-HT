@@ -3,6 +3,8 @@ import "server-only";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import { ValidationError } from "@/lib/auth/errors";
 
+import { limparHtmlMensagem } from "./mensagem-html";
+
 export type StatusChamado =
   | "aberto"
   | "em_andamento"
@@ -11,6 +13,8 @@ export type StatusChamado =
   | "fechado";
 export type PrioridadeChamado = "baixa" | "media" | "alta" | "urgente";
 export type AutorTipoMensagem = "solicitante" | "atendente" | "sistema";
+/* 'texto' = texto puro (mensagens antigas e de sistema); 'html' = HTML já limpo (ver mensagem-html.ts). */
+export type FormatoMensagem = "texto" | "html";
 
 export const TAMANHO_MAXIMO_ANEXO_BYTES = 10 * 1024 * 1024;
 export const MAXIMO_ANEXOS_POR_MENSAGEM = 5;
@@ -96,6 +100,7 @@ export interface ChamadoMensagem {
   autorTipo: AutorTipoMensagem;
   interno: boolean;
   texto: string;
+  formato: FormatoMensagem;
   criadoEm: string;
   anexos: ChamadoAnexo[];
 }
@@ -133,6 +138,8 @@ export interface Chamado extends ChamadoResumo {
 }
 
 export interface NovoAnexo {
+  /* Só para prints colados no texto: o id já vem definido porque o HTML da mensagem aponta para ele (ver mensagem-html.ts). */
+  id?: string;
   nomeArquivo: string;
   tipoMime: string;
   tamanhoBytes: number;
@@ -242,6 +249,7 @@ async function inserirAnexos(
   for (const anexo of anexos) {
     const request = new sql.Request(transaction);
 
+    request.input("id", sql.UniqueIdentifier, anexo.id ?? null);
     request.input("mensagemId", sql.UniqueIdentifier, mensagemId);
     request.input("nomeArquivo", sql.NVarChar(260), anexo.nomeArquivo);
     request.input("tipoMime", sql.NVarChar(150), anexo.tipoMime);
@@ -250,9 +258,9 @@ async function inserirAnexos(
 
     const result = await request.query<{ id: string }>(`
       INSERT INTO dbo.portal_chamados_anexos
-        ([mensagem_id], [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo])
+        ([id], [mensagem_id], [nome_arquivo], [tipo_mime], [tamanho_bytes], [conteudo])
       OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
-      VALUES (@mensagemId, @nomeArquivo, @tipoMime, @tamanhoBytes, @conteudo);
+      VALUES (ISNULL(@id, NEWID()), @mensagemId, @nomeArquivo, @tipoMime, @tamanhoBytes, @conteudo);
     `);
 
     idsGerados.push(result.recordset[0].id);
@@ -269,6 +277,7 @@ export interface CriarChamadoParams {
   prioridade: PrioridadeChamado;
   titulo: string;
   descricao: string;
+  descricaoFormato: FormatoMensagem;
   solicitanteUsuarioId: string | null;
   solicitanteNome: string;
   solicitanteContato: string | null;
@@ -349,12 +358,13 @@ export async function criarChamado(
     );
     insertMensagem.input("autorNome", sql.NVarChar(200), params.solicitanteNome);
     insertMensagem.input("texto", sql.NVarChar(sql.MAX), params.descricao);
+    insertMensagem.input("formato", sql.VarChar(10), params.descricaoFormato);
 
     const mensagemResult = await insertMensagem.query<{ id: string }>(`
       INSERT INTO dbo.portal_chamados_mensagens
-        ([chamado_id], [autor_usuario_id], [autor_nome], [autor_tipo], [texto])
+        ([chamado_id], [autor_usuario_id], [autor_nome], [autor_tipo], [texto], [formato])
       OUTPUT CONVERT(VARCHAR(36), INSERTED.[id]) AS [id]
-      VALUES (@chamadoId, @autorUsuarioId, @autorNome, 'solicitante', @texto);
+      VALUES (@chamadoId, @autorUsuarioId, @autorNome, 'solicitante', @texto, @formato);
     `);
 
     await inserirAnexos(transaction, mensagemResult.recordset[0].id, params.anexos);
@@ -380,6 +390,7 @@ async function carregarMensagens(chamadoId: string): Promise<ChamadoMensagem[]> 
     autor_tipo: string;
     interno: boolean;
     texto: string;
+    formato: string;
     criado_em: string;
   }>(`
     SELECT
@@ -388,6 +399,7 @@ async function carregarMensagens(chamadoId: string): Promise<ChamadoMensagem[]> 
       [autor_tipo],
       CAST([interno] AS BIT) AS [interno],
       [texto],
+      [formato],
       CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em]
     FROM dbo.portal_chamados_mensagens
     WHERE [chamado_id] = @chamadoId
@@ -441,7 +453,9 @@ async function carregarMensagens(chamadoId: string): Promise<ChamadoMensagem[]> 
     autorNome: row.autor_nome,
     autorTipo: row.autor_tipo as AutorTipoMensagem,
     interno: row.interno,
-    texto: row.texto,
+    /* Limpa de novo na leitura: a tela renderiza esse HTML direto (ver mensagem-html.ts). */
+    texto: row.formato === "html" ? limparHtmlMensagem(row.texto) : row.texto,
+    formato: row.formato === "html" ? "html" : "texto",
     criadoEm: row.criado_em,
     anexos: anexosPorMensagem.get(row.id) ?? [],
   }));
@@ -834,6 +848,7 @@ export interface AdicionarMensagemParams {
   autorTipo: AutorTipoMensagem;
   interno: boolean;
   texto: string;
+  formato: FormatoMensagem;
   anexos: NovoAnexo[];
 }
 
@@ -853,14 +868,15 @@ export async function adicionarMensagem(
     insertMensagem.input("autorTipo", sql.VarChar(15), params.autorTipo);
     insertMensagem.input("interno", sql.Bit, params.interno);
     insertMensagem.input("texto", sql.NVarChar(sql.MAX), params.texto);
+    insertMensagem.input("formato", sql.VarChar(10), params.formato);
 
     const mensagemResult = await insertMensagem.query<{ id: string; criado_em: string }>(`
       INSERT INTO dbo.portal_chamados_mensagens
-        ([chamado_id], [autor_usuario_id], [autor_nome], [autor_tipo], [interno], [texto])
+        ([chamado_id], [autor_usuario_id], [autor_nome], [autor_tipo], [interno], [texto], [formato])
       OUTPUT
         CONVERT(VARCHAR(36), INSERTED.[id]) AS [id],
         CONVERT(VARCHAR(33), INSERTED.[criado_em], 126) AS [criado_em]
-      VALUES (@chamadoId, @autorUsuarioId, @autorNome, @autorTipo, @interno, @texto);
+      VALUES (@chamadoId, @autorUsuarioId, @autorNome, @autorTipo, @interno, @texto, @formato);
     `);
 
     const mensagemId = mensagemResult.recordset[0].id;
@@ -891,6 +907,7 @@ export async function adicionarMensagem(
       autorTipo: params.autorTipo,
       interno: params.interno,
       texto: params.texto,
+      formato: params.formato,
       criadoEm: mensagemResult.recordset[0].criado_em,
       anexos,
     };
