@@ -1,73 +1,50 @@
 import { NextResponse } from "next/server";
 
-import { getConfiguracaoAdSemSenha } from "@/lib/auth/configuracao-ad";
-import { AuthenticationError, ValidationError } from "@/lib/auth/errors";
-import { createSessionToken, deveUsarCookieSeguro, SESSION_COOKIE_NAME } from "@/lib/auth/jwt";
+import { AuthenticationError, TrocaSenhaPendenteError, ValidationError } from "@/lib/auth/errors";
+import { barrarAntesDoAd, concluirLogin } from "@/lib/auth/fluxo-login";
+import type { ContextoLogin } from "@/lib/auth/fluxo-login";
 import { authenticateWithActiveDirectory } from "@/lib/auth/ldap";
 import {
   extrairIpOrigem,
   registrarTentativaLogin,
 } from "@/lib/auth/login-historico";
+import { registrarTentativaFalha } from "@/lib/auth/rate-limit";
+import { isObject, requiredText } from "@/lib/auth/validation";
 import { registrarChamadaExternaSemFalhar } from "@/lib/monitoramento/chamadas-externas";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
-import {
-  registrarTentativaFalha,
-  limparTentativas,
-  verificarLimiteLogin,
-} from "@/lib/auth/rate-limit";
-import { upsertUsuarioLogin } from "@/lib/auth/usuarios";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface LoginRequestBody {
-  usuario?: unknown;
-  senha?: unknown;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function requiredText(value: unknown, fieldName: string): string {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new ValidationError(`Informe o campo ${fieldName}.`);
-  }
-
-  return value.trim();
-}
+/*
+ * Motivos em que o AD respondeu normalmente (só recusou a credencial ou
+ * pediu troca de senha) -- contam como chamada bem-sucedida na saúde do
+ * serviço. "erro_conexao_ad" é o único que indica o AD fora do ar; os
+ * demais ("ad_nao_configurado"/"credenciais_invalidas") nem chegam a
+ * falar com o AD, então não geram métrica.
+ */
+const MOTIVOS_AD_RESPONDEU = new Set([
+  "usuario_nao_encontrado",
+  "senha_invalida",
+  "senha_troca_obrigatoria",
+  "senha_expirada",
+]);
 
 async function handlePOST(request: Request) {
-  let requestBody: LoginRequestBody;
-
-  try {
-    const parsedBody: unknown = await request.json();
-
-    if (!isObject(parsedBody)) {
-      throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");
-    }
-
-    requestBody = parsedBody;
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      { ok: false, message: "O corpo da requisição contém um JSON inválido." },
-      { status: 400 }
-    );
-  }
-
-  const ipOrigem = extrairIpOrigem(request);
-  const userAgent = request.headers.get("user-agent");
-
   let usuarioDigitado: string;
   let senha: string;
 
   try {
-    usuarioDigitado = requiredText(requestBody.usuario, "usuário").toLowerCase();
-    senha = requiredText(requestBody.senha, "senha");
+    const corpo: unknown = await request.json().catch(() => {
+      throw new ValidationError("O corpo da requisição contém um JSON inválido.");
+    });
+
+    if (!isObject(corpo)) {
+      throw new ValidationError("O corpo da requisição deve ser um objeto JSON.");
+    }
+
+    usuarioDigitado = requiredText(corpo.usuario, "usuário", 150).toLowerCase();
+    senha = requiredText(corpo.senha, "senha", 256);
   } catch (error) {
     if (error instanceof ValidationError) {
       return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
@@ -76,55 +53,16 @@ async function handlePOST(request: Request) {
     throw error;
   }
 
-  /*
-   * A conta de serviço (configurada em Administração →
-   * Configurações) é só para o backend usar no LDAP — nunca
-   * deve conseguir logar interativamente no portal nem
-   * aparecer como um usuário.
-   */
-  const configuracaoAd = await getConfiguracaoAdSemSenha();
-  const contaServico = (configuracaoAd?.usuarioServico ?? "")
-    .trim()
-    .toLowerCase();
+  const ipOrigem = extrairIpOrigem(request);
+  const contexto: ContextoLogin = {
+    usuarioDigitado,
+    chaveLimite: `${ipOrigem ?? "sem-ip"}:${usuarioDigitado}`,
+    ipOrigem,
+    userAgent: request.headers.get("user-agent"),
+  };
 
-  if (contaServico && usuarioDigitado === contaServico) {
-    await registrarTentativaLogin({
-      usuarioId: null,
-      samAccountNameTentado: usuarioDigitado,
-      sucesso: false,
-      motivoFalha: "conta_servico_bloqueada",
-      ipOrigem,
-      userAgent,
-    });
-
-    return NextResponse.json(
-      { ok: false, message: "Usuário ou senha inválidos." },
-      { status: 401 }
-    );
-  }
-
-  const chaveLimite = `${ipOrigem ?? "sem-ip"}:${usuarioDigitado}`;
-  const limite = verificarLimiteLogin(chaveLimite);
-
-  if (!limite.permitido) {
-    await registrarTentativaLogin({
-      usuarioId: null,
-      samAccountNameTentado: usuarioDigitado,
-      sucesso: false,
-      motivoFalha: "limite_tentativas_excedido",
-      ipOrigem,
-      userAgent,
-    });
-
-    return NextResponse.json(
-      {
-        ok: false,
-        message:
-          "Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.",
-      },
-      { status: 429 }
-    );
-  }
+  const barrado = await barrarAntesDoAd(contexto);
+  if (barrado) return barrado;
 
   try {
     const inicioAd = performance.now();
@@ -140,13 +78,6 @@ async function handlePOST(request: Request) {
         duracaoMs: performance.now() - inicioAd,
       });
     } catch (erroAd) {
-      /*
-       * Só "erro_conexao_ad" indica que o AD em si está fora do ar —
-       * usuário/senha inválidos ou credenciais vazias significam que
-       * o AD respondeu normalmente, então não contam como falha de
-       * saúde do serviço (e "ad_nao_configurado"/"credenciais_invalidas"
-       * nem chegam a tentar contato com o AD, então não geram métrica).
-       */
       if (erroAd instanceof AuthenticationError) {
         if (erroAd.motivo === "erro_conexao_ad") {
           await registrarChamadaExternaSemFalhar({
@@ -156,10 +87,7 @@ async function handlePOST(request: Request) {
             duracaoMs: performance.now() - inicioAd,
             mensagemErro: erroAd.message,
           });
-        } else if (
-          erroAd.motivo === "usuario_nao_encontrado" ||
-          erroAd.motivo === "senha_invalida"
-        ) {
+        } else if (MOTIVOS_AD_RESPONDEU.has(erroAd.motivo)) {
           await registrarChamadaExternaSemFalhar({
             servico: "active_directory",
             origem: "uso_real",
@@ -172,68 +100,34 @@ async function handlePOST(request: Request) {
       throw erroAd;
     }
 
-    const usuario = await upsertUsuarioLogin(diretorioUsuario);
-
-    if (!usuario.ativo) {
-      registrarTentativaFalha(chaveLimite);
-
+    return await concluirLogin(request, contexto, diretorioUsuario, "Login realizado com sucesso.");
+  } catch (error) {
+    /*
+     * Senha certa, mas o AD exige trocar antes de entrar: não conta como
+     * tentativa errada no limitador -- a tela abre o passo de nova senha.
+     */
+    if (error instanceof TrocaSenhaPendenteError) {
       await registrarTentativaLogin({
-        usuarioId: usuario.id,
+        usuarioId: null,
         samAccountNameTentado: usuarioDigitado,
         sucesso: false,
-        motivoFalha: "usuario_inativo",
+        motivoFalha: error.motivo,
         ipOrigem,
-        userAgent,
+        userAgent: contexto.userAgent,
       });
 
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "Seu acesso ao portal está desativado. Fale com o administrador.",
+          message: error.message,
+          data: { trocarSenha: error.tipo, politica: error.politica },
         },
         { status: 403 }
       );
     }
 
-    limparTentativas(chaveLimite);
-
-    await registrarTentativaLogin({
-      usuarioId: usuario.id,
-      samAccountNameTentado: usuarioDigitado,
-      sucesso: true,
-      ipOrigem,
-      userAgent,
-    });
-
-    const { token, expiraEmSegundos } = await createSessionToken({
-      sub: usuario.samAccountName,
-      nomeExibicao: usuario.nomeExibicao,
-      email: usuario.email,
-    });
-
-    const response = NextResponse.json({
-      ok: true,
-      message: "Login realizado com sucesso.",
-      data: {
-        nomeExibicao: usuario.nomeExibicao,
-        email: usuario.email,
-        ehAdministrador: usuario.ehAdministrador,
-      },
-    });
-
-    response.cookies.set(SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: deveUsarCookieSeguro(request),
-      path: "/",
-      maxAge: expiraEmSegundos,
-    });
-
-    return response;
-  } catch (error) {
     if (error instanceof AuthenticationError) {
-      registrarTentativaFalha(chaveLimite);
+      registrarTentativaFalha(contexto.chaveLimite);
 
       await registrarTentativaLogin({
         usuarioId: null,
@@ -241,7 +135,7 @@ async function handlePOST(request: Request) {
         sucesso: false,
         motivoFalha: error.motivo,
         ipOrigem,
-        userAgent,
+        userAgent: contexto.userAgent,
       });
 
       return NextResponse.json({ ok: false, message: error.message }, { status: 401 });

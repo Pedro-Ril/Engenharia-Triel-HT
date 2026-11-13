@@ -80,6 +80,9 @@ const motivosFalha: Record<string, string> = {
   erro_conexao_ad: "Erro de conexão com o Active Directory",
   limite_tentativas_excedido: "Muitas tentativas seguidas",
   conta_servico_bloqueada: "Usuário ou senha inválidos",
+  senha_troca_obrigatoria: "Senha provisória — troca pedida",
+  senha_expirada: "Senha vencida — troca pedida",
+  nova_senha_recusada: "Nova senha não aceita pela rede",
 };
 
 function formatarData(valorIso: string | null): string {

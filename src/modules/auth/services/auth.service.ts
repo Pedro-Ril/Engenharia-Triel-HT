@@ -13,6 +13,20 @@ export async function login(
   return response.json();
 }
 
+export async function trocarSenhaPendente(
+  usuario: string,
+  senhaAtual: string,
+  novaSenha: string
+): Promise<LoginResponse> {
+  const response = await fetch("/api/auth/trocar-senha", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuario, senhaAtual, novaSenha }),
+  });
+
+  return response.json();
+}
+
 export async function logout(): Promise<void> {
   await fetch("/api/auth/logout", { method: "POST" });
 }

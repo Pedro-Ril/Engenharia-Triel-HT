@@ -1,11 +1,25 @@
 import "server-only";
 
-import { Client, escapeFilter } from "ldapts";
+import { isIP } from "node:net";
+import { checkServerIdentity } from "node:tls";
+import type { ConnectionOptions } from "node:tls";
+
+import {
+  Attribute,
+  Change,
+  Client,
+  ConstraintViolationError,
+  InvalidCredentialsError,
+  escapeFilter,
+} from "ldapts";
 import type { Entry } from "ldapts";
 
+import { CERTIFICADO_CA_AD } from "./ad-ca";
 import { getConfiguracaoAd } from "./configuracao-ad";
 import type { ConfiguracaoAd } from "./configuracao-ad";
-import { AuthenticationError } from "./errors";
+import { AuthenticationError, TrocaSenhaPendenteError, ValidationError } from "./errors";
+import { descreverPoliticaSenha } from "./politica-senha";
+import type { PoliticaSenhaAd } from "./politica-senha";
 
 export interface ActiveDirectoryUser {
   distinguishedName: string;
@@ -116,6 +130,25 @@ async function buscarUsuarioNoDiretorio(
 }
 
 /*
+ * "troca_obrigatoria" = "o usuário deve alterar a senha no próximo
+ * logon" marcado no AD; "expirada" = passou da validade da política
+ * (hoje 180 dias). Nos dois casos o AD recusa o bind com o código 49,
+ * mas o sub-código ("data 773"/"data 532" na mensagem) só vem quando a
+ * senha digitada está CERTA -- senha errada é sempre "data 52e". Por
+ * isso diferenciar aqui não revela nada a quem não sabe a senha.
+ */
+type ResultadoValidacaoSenha = "ok" | "invalida" | "troca_obrigatoria" | "expirada";
+
+const SUBCODIGO_AD_TROCA_OBRIGATORIA = "773";
+const SUBCODIGO_AD_SENHA_EXPIRADA = "532";
+
+function subcodigoErroBindAd(error: unknown): string | null {
+  if (!(error instanceof InvalidCredentialsError)) return null;
+
+  return /\bdata ([0-9a-f]+)/i.exec(error.message)?.[1]?.toLowerCase() ?? null;
+}
+
+/*
  * Valida a senha digitada abrindo uma segunda conexão e
  * tentando o bind como o próprio usuário (nunca reaproveita
  * a conexão da conta de serviço para isso).
@@ -124,23 +157,130 @@ async function validarSenhaNoDiretorio(
   config: ConfiguracaoAd,
   distinguishedName: string,
   senha: string
-): Promise<boolean> {
+): Promise<ResultadoValidacaoSenha> {
   const client = new Client({ url: config.url });
 
   try {
     await client.bind(distinguishedName, senha);
-    return true;
-  } catch {
-    return false;
+    return "ok";
+  } catch (error) {
+    const subcodigo = subcodigoErroBindAd(error);
+
+    if (subcodigo === SUBCODIGO_AD_TROCA_OBRIGATORIA) return "troca_obrigatoria";
+    if (subcodigo === SUBCODIGO_AD_SENHA_EXPIRADA) return "expirada";
+
+    return "invalida";
   } finally {
     await client.unbind();
   }
 }
 
-export async function authenticateWithActiveDirectory(
+/*
+ * O AD só aceita mexer em senha (unicodePwd) por conexão criptografada.
+ * A configuração salva usa ldap://IP:389 para todo o resto; para a troca
+ * de senha abre-se a mesma máquina em LDAPS (636).
+ */
+function urlSeguraDoAd(url: string): string {
+  const atual = new URL(url);
+
+  if (atual.protocol === "ldaps:") return url;
+
+  return `ldaps://${atual.hostname}:636`;
+}
+
+/*
+ * `ca` SUBSTITUI as raízes públicas do Node: só um certificado emitido
+ * pela CA interna é aceito. A configuração aponta o DC pelo IP, e o
+ * certificado do DC só traz o nome DNS (SRV-DC01.trielht.ad) -- pelo IP
+ * vale a cadeia (que só a nossa CA consegue satisfazer); por nome,
+ * confere o nome também.
+ */
+function opcoesTlsAd(): ConnectionOptions {
+  return {
+    ca: [CERTIFICADO_CA_AD],
+    checkServerIdentity: (host, certificado) =>
+      isIP(host) ? undefined : checkServerIdentity(host, certificado),
+  };
+}
+
+/* unicodePwd é a senha entre aspas duplas, em UTF-16LE. */
+function valorUnicodePwd(senha: string): Buffer {
+  return Buffer.from(`"${senha}"`, "utf16le");
+}
+
+/* Atributos de intervalo do AD vêm em unidades de 100ns, negativos. */
+function intervaloAdEmDias(valor: string | null): number {
+  if (!valor) return 0;
+
+  const numero = Number(valor);
+  if (!Number.isFinite(numero) || numero >= 0) return 0;
+
+  return Math.round(-numero / 864_000_000_000);
+}
+
+/*
+ * Política de senha padrão do domínio (lida do objeto raiz). Se a TI
+ * criar uma política refinada (PSO) para algum grupo, ela vale para
+ * aquele grupo e não aparece aqui -- a mensagem do AD continua sendo a
+ * palavra final, isto é só a dica mostrada antes de digitar.
+ */
+async function lerPoliticaSenha(
+  client: Client,
+  config: ConfiguracaoAd
+): Promise<PoliticaSenhaAd | null> {
+  try {
+    const { searchEntries } = await client.search(config.baseDn, {
+      scope: "base",
+      attributes: ["minPwdLength", "pwdProperties", "pwdHistoryLength", "maxPwdAge"],
+    });
+
+    const entry = searchEntries[0];
+    if (!entry) return null;
+
+    const DOMAIN_PASSWORD_COMPLEX = 0x1;
+
+    return {
+      tamanhoMinimo: Number(toSingleString(entry.minPwdLength) ?? 0),
+      exigeComplexidade:
+        (Number(toSingleString(entry.pwdProperties) ?? 0) & DOMAIN_PASSWORD_COMPLEX) !== 0,
+      historico: Number(toSingleString(entry.pwdHistoryLength) ?? 0),
+      validadeDias: intervaloAdEmDias(toSingleString(entry.maxPwdAge)),
+    };
+  } catch (error) {
+    console.error("Erro ao ler a política de senha do AD:", error);
+    return null;
+  }
+}
+
+async function lerPoliticaSenhaComContaServico(
+  config: ConfiguracaoAd
+): Promise<PoliticaSenhaAd | null> {
+  const client = new Client({ url: config.url });
+
+  try {
+    await client.bind(config.usuarioServico, config.senhaServico);
+    return await lerPoliticaSenha(client, config);
+  } catch (error) {
+    console.error("Erro ao ler a política de senha do AD:", error);
+    return null;
+  } finally {
+    await client.unbind();
+  }
+}
+
+/*
+ * Passos comuns ao login e à troca de senha: entrada preenchida, AD
+ * configurado, usuário existe no diretório e a senha digitada confere
+ * (inclusive no caso "certa, mas precisa trocar").
+ */
+async function localizarEValidarSenha(
   usuarioDigitado: string,
   senha: string
-): Promise<ActiveDirectoryUser> {
+): Promise<{
+  config: ConfiguracaoAd;
+  diretorioUsuario: Omit<ActiveDirectoryUser, "ehAdministrador">;
+  resultado: Exclude<ResultadoValidacaoSenha, "invalida">;
+}> {
   const samAccountName = usuarioDigitado.trim();
 
   if (!samAccountName || !senha) {
@@ -179,19 +319,26 @@ export async function authenticateWithActiveDirectory(
     );
   }
 
-  const senhaValida = await validarSenhaNoDiretorio(
+  const resultado = await validarSenhaNoDiretorio(
     config,
     diretorioUsuario.distinguishedName,
     senha
   );
 
-  if (!senhaValida) {
+  if (resultado === "invalida") {
     throw new AuthenticationError(
       "Usuário ou senha inválidos.",
       "senha_invalida"
     );
   }
 
+  return { config, diretorioUsuario, resultado };
+}
+
+function comPerfilAdmin(
+  diretorioUsuario: Omit<ActiveDirectoryUser, "ehAdministrador">,
+  config: ConfiguracaoAd
+): ActiveDirectoryUser {
   return {
     ...diretorioUsuario,
     ehAdministrador: ehMembroDoGrupoAdmin(
@@ -199,6 +346,102 @@ export async function authenticateWithActiveDirectory(
       config.grupoAdminDn
     ),
   };
+}
+
+export async function authenticateWithActiveDirectory(
+  usuarioDigitado: string,
+  senha: string
+): Promise<ActiveDirectoryUser> {
+  const { config, diretorioUsuario, resultado } = await localizarEValidarSenha(
+    usuarioDigitado,
+    senha
+  );
+
+  if (resultado !== "ok") {
+    throw new TrocaSenhaPendenteError(
+      resultado === "expirada" ? "expirada" : "obrigatoria",
+      await lerPoliticaSenhaComContaServico(config)
+    );
+  }
+
+  return comPerfilAdmin(diretorioUsuario, config);
+}
+
+/*
+ * Troca de senha pendente (provisória ou vencida), feita na tela de
+ * login. Só serve para esse caso: se a senha atual ainda está valendo,
+ * recusa -- o endpoint não vira um "trocar senha" genérico sem sessão.
+ *
+ * O usuário não consegue fazer bind (é justamente o que o AD bloqueia),
+ * então a troca vai pela conta de serviço, com a operação de TROCA
+ * (apaga o valor antigo + grava o novo na mesma modificação), não de
+ * redefinição: o próprio AD confere a senha antiga e aplica histórico e
+ * política normalmente -- o direito "Alterar senha" é de Todos por
+ * padrão, a conta de serviço não precisa de permissão especial.
+ */
+export async function trocarSenhaPendenteNoAd(
+  usuarioDigitado: string,
+  senhaAtual: string,
+  novaSenha: string
+): Promise<ActiveDirectoryUser> {
+  const { config, diretorioUsuario, resultado } = await localizarEValidarSenha(
+    usuarioDigitado,
+    senhaAtual
+  );
+
+  if (resultado === "ok") {
+    throw new ValidationError(
+      "Sua senha atual ainda está valendo, não é preciso trocá-la agora. Entre normalmente."
+    );
+  }
+
+  const client = new Client({
+    url: urlSeguraDoAd(config.url),
+    connectTimeout: 10_000,
+    tlsOptions: opcoesTlsAd(),
+  });
+
+  try {
+    await client.bind(config.usuarioServico, config.senhaServico);
+
+    try {
+      await client.modify(diretorioUsuario.distinguishedName, [
+        new Change({
+          operation: "delete",
+          modification: new Attribute({
+            type: "unicodePwd",
+            values: [valorUnicodePwd(senhaAtual)],
+          }),
+        }),
+        new Change({
+          operation: "add",
+          modification: new Attribute({
+            type: "unicodePwd",
+            values: [valorUnicodePwd(novaSenha)],
+          }),
+        }),
+      ]);
+    } catch (error) {
+      /*
+       * 19 (constraintViolation) com 0000052D = a nova senha não passou
+       * na política (tamanho, complexidade, histórico). Qualquer outra
+       * recusa é problema de infraestrutura/permissão, não do usuário.
+       */
+      if (error instanceof ConstraintViolationError && /0000052D/i.test(error.message)) {
+        throw new ValidationError(
+          `A rede não aceitou essa nova senha. ${descreverPoliticaSenha(
+            await lerPoliticaSenha(client, config)
+          )}`.trim()
+        );
+      }
+
+      throw error;
+    }
+  } finally {
+    await client.unbind();
+  }
+
+  return comPerfilAdmin(diretorioUsuario, config);
 }
 
 /*

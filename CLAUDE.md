@@ -138,6 +138,7 @@ direto via `setAttribute` fora dali.
   `Nome.module.css` e um `index.ts` reexportando (`export { Nome } from "./Nome";`).
 - Reaproveite o que já existe antes de criar algo novo: `Card`, `Stack`,
   `FormGrid`, `Field`, `Input`/`Textarea`/`NumberInput`/`Dropdown`,
+  `PasswordInput` (campo de senha com olhinho — use em todo campo de senha),
   `Table`/`TableHead`/`TableBody`/`TableRow`/`TableCell`/`TableHeaderCell`,
   `Modal`/`Drawer`, `ConfirmDialog`, `Toast`, `Badge`, `StatCard`,
   `EmptyState`, `Loader`, `Pagination`, `IconButton`, `Switch`,
