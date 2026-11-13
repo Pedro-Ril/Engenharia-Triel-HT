@@ -10,11 +10,13 @@ import {
   atualizarDataPrevistaConclusao,
   atualizarPrioridade,
   atualizarPublico,
+  atualizarUnidadeChamado,
   buscarChamadoPorNumero,
   excluirChamado,
   registrarVisualizacaoChamadoSemFalhar,
 } from "@/lib/chamados/chamados";
 import { optionalUuid, requiredPrioridade } from "@/lib/chamados/validacao";
+import { listarUnidadesAtivasDaEmpresa } from "@/lib/empresas/unidades";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { registrarLog } from "@/lib/monitoramento/logs";
 
@@ -153,6 +155,23 @@ async function handlePATCH(request: Request, context: RouteContext) {
         throw new ValidationError("O campo publico deve ser verdadeiro ou falso.");
       }
       await atualizarPublico(chamado.id, parsedBody.publico);
+    }
+
+    /* Correção de unidade: vale até em chamado fechado (é classificação, usada nos relatórios). */
+    if (parsedBody.unidadeId !== undefined) {
+      const unidadeId = optionalUuid(parsedBody.unidadeId, "unidade");
+      if (!unidadeId) {
+        throw new ValidationError("Selecione a unidade.");
+      }
+
+      const disponiveis = await listarUnidadesAtivasDaEmpresa(chamado.empresa);
+      const unidade = disponiveis.find((item) => item.id.toLowerCase() === unidadeId.toLowerCase());
+
+      if (!unidade) {
+        throw new ValidationError("Essa unidade não é da empresa do chamado ou está desativada.");
+      }
+
+      await atualizarUnidadeChamado(chamado.id, unidade);
     }
 
     if (parsedBody.dataPrevistaConclusao !== undefined) {

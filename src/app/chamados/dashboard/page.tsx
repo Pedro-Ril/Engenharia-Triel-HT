@@ -4,6 +4,7 @@ import {
   listarDepartamentosComChamados,
   listarEmpresasComChamados,
   listarSetoresParaChamado,
+  listarUnidadesComChamados,
 } from "@/lib/chamados/chamados";
 import { requireAtendenteChamados } from "@/lib/chamados/autorizacao-chamados";
 import { DashboardChamadosPage } from "@/modules/chamados/components/DashboardChamadosPage";
@@ -13,6 +14,7 @@ interface PageProps {
     fullscreen?: string;
     setorId?: string;
     empresa?: string;
+    unidadeId?: string;
     departamento?: string;
     categoriaId?: string;
     dataInicial?: string;
@@ -24,10 +26,11 @@ export default async function Page({ searchParams }: PageProps) {
   const { usuario, setorIds } = await requireAtendenteChamados();
   await registrarAcessoModuloSemFalhar(usuario.id, "chamados-dashboard");
 
-  const [todosSetores, categorias, empresas, departamentos, params] = await Promise.all([
+  const [todosSetores, categorias, empresas, unidades, departamentos, params] = await Promise.all([
     listarSetoresParaChamado(),
     listarCategoriasAtivas(),
     listarEmpresasComChamados(),
+    listarUnidadesComChamados(),
     listarDepartamentosComChamados(),
     searchParams,
   ]);
@@ -40,11 +43,13 @@ export default async function Page({ searchParams }: PageProps) {
       setores={setores}
       categorias={categorias}
       empresas={empresas}
+      unidades={unidades}
       departamentos={departamentos}
       fullscreen={params.fullscreen === "1"}
       filtrosIniciais={{
         setorId: params.setorId ?? "",
         empresa: params.empresa ?? "",
+        unidadeId: params.unidadeId ?? "",
         departamento: params.departamento ?? "",
         categoriaId: params.categoriaId ?? "",
         dataInicial: params.dataInicial ?? "",

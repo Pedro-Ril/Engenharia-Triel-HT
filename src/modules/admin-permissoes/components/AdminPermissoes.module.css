@@ -8,6 +8,14 @@
   max-width: 120px;
 }
 
+.unidadesCelula {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 160px;
+  font-size: 13px;
+}
+
 /*
  * O Checkbox tem largura fit-content e é um bloco — dentro de
  * uma célula de tabela com align="center" (text-align), ele

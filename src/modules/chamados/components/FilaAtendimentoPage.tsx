@@ -46,6 +46,7 @@ import { listarFilaAtendimento } from "../services/chamados.service";
 import type {
   CategoriaChamado,
   ChamadoResumoFila,
+  OpcaoUnidadeFiltro,
   PrioridadeChamado,
   SetorChamado,
   StatusChamado,
@@ -57,6 +58,7 @@ interface FilaAtendimentoPageProps {
   setores: SetorChamado[];
   categorias: CategoriaChamado[];
   empresas: string[];
+  unidades: OpcaoUnidadeFiltro[];
   departamentos: string[];
 }
 
@@ -116,6 +118,7 @@ export function FilaAtendimentoPage({
   setores,
   categorias,
   empresas,
+  unidades,
   departamentos,
 }: FilaAtendimentoPageProps) {
   const router = useRouter();
@@ -125,6 +128,7 @@ export function FilaAtendimentoPage({
   const [prioridade, setPrioridade] = useState("");
   const [setorId, setSetorId] = useState("");
   const [empresa, setEmpresa] = useState("");
+  const [unidadeId, setUnidadeId] = useState("");
   const [departamento, setDepartamento] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [buscaDigitada, setBuscaDigitada] = useState("");
@@ -154,6 +158,7 @@ export function FilaAtendimentoPage({
       prioridade: (prioridade as PrioridadeChamado) || undefined,
       setorId: setorId || undefined,
       empresa: empresa || undefined,
+      unidadeId: unidadeId || undefined,
       departamento: departamento || undefined,
       categoriaId: categoriaId || undefined,
       busca: busca || undefined,
@@ -173,7 +178,7 @@ export function FilaAtendimentoPage({
     return () => {
       cancelado = true;
     };
-  }, [status, prioridade, setorId, empresa, departamento, categoriaId, busca]);
+  }, [status, prioridade, setorId, empresa, unidadeId, departamento, categoriaId, busca]);
 
   const itensVisiveis = useMemo(
     () => (ocultarFechados ? itens.filter((item) => !STATUS_OCULTAVEIS.has(item.status)) : itens),
@@ -190,6 +195,11 @@ export function FilaAtendimentoPage({
   const opcoesEmpresa = [
     { value: "", label: "Todas" },
     ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
+  ];
+
+  const opcoesUnidade = [
+    { value: "", label: "Todas" },
+    ...unidades.map((unidade) => ({ value: unidade.id, label: unidade.rotulo })),
   ];
 
   const opcoesDepartamento = [
@@ -289,6 +299,21 @@ export function FilaAtendimentoPage({
                 />
               </Field>
             </div>
+
+            {unidades.length > 0 && (
+              <div className={styles.filaFiltroCampo}>
+                <Field label="Unidade">
+                  <Dropdown
+                    value={unidadeId}
+                    options={opcoesUnidade}
+                    onValueChange={(valor) => {
+                      setUnidadeId(valor);
+                      setPaginaLista(1);
+                    }}
+                  />
+                </Field>
+              </div>
+            )}
 
             <div className={styles.filaFiltroCampo}>
               <Field label="Departamento">
@@ -421,6 +446,7 @@ export function FilaAtendimentoPage({
                   <TableHeaderCell>Setor</TableHeaderCell>
                   <TableHeaderCell>Categoria</TableHeaderCell>
                   <TableHeaderCell>Empresa</TableHeaderCell>
+                  <TableHeaderCell>Unidade</TableHeaderCell>
                   <TableHeaderCell>Solicitante</TableHeaderCell>
                   <TableHeaderCell>Departamento</TableHeaderCell>
                   <TableHeaderCell>Atendente</TableHeaderCell>
@@ -454,6 +480,7 @@ export function FilaAtendimentoPage({
                     <TableCell>{chamado.setorNome}</TableCell>
                     <TableCell>{chamado.categoriaNome ?? "—"}</TableCell>
                     <TableCell>{chamado.empresa ?? "—"}</TableCell>
+                    <TableCell>{chamado.unidade ?? "—"}</TableCell>
                     <TableCell>{chamado.solicitanteNome}</TableCell>
                     <TableCell>{chamado.solicitanteDepartamento ?? "—"}</TableCell>
                     <TableCell>{chamado.atendenteNome ?? "—"}</TableCell>

@@ -18,6 +18,7 @@ import {
   registrarVisualizacaoChamadoSemFalhar,
 } from "@/lib/chamados/chamados";
 import { listarNotificacoesEmailChamados } from "@/lib/chamados/notificacoes-email";
+import { listarUnidadesAtivasDaEmpresa } from "@/lib/empresas/unidades";
 import { ChamadoDetalhePage } from "@/modules/chamados/components/ChamadoDetalhePage";
 
 interface PageProps {
@@ -152,12 +153,14 @@ export default async function Page({ params, searchParams }: PageProps) {
     ? chamado.mensagens
     : chamado.mensagens.filter((mensagem) => !mensagem.interno);
 
-  const [atendentesDoSetor, setoresParaTransferir] = ehAtendente
+  /* Unidades: só o atendente corrige, entre as ativas da empresa do chamado (ver PATCH /api/chamados/[numero]). */
+  const [atendentesDoSetor, setoresParaTransferir, unidadesDisponiveis] = ehAtendente
     ? await Promise.all([
         listarAtendentesDisponiveisParaSetor(chamado.setorId),
         listarSetoresParaChamado(),
+        listarUnidadesAtivasDaEmpresa(chamado.empresa),
       ])
-    : [[], []];
+    : [[], [], []];
 
   const [copiaAtual, notificacoesComFalha] = await Promise.all([
     listarCopiaDoChamado(chamado.id),
@@ -170,6 +173,7 @@ export default async function Page({ params, searchParams }: PageProps) {
       nomeConfirmado={nomeConfirmado}
       atendentesDoSetor={atendentesDoSetor}
       setoresParaTransferir={setoresParaTransferir}
+      unidadesDisponiveis={unidadesDisponiveis}
       podeResponder={podeVer}
       ehAdministrador={usuario?.ehAdministrador ?? false}
       copiaAtual={copiaAtual}

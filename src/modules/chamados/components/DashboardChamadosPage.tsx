@@ -34,13 +34,19 @@ import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 
 import { buscarEstatisticasChamados } from "../services/chamados.service";
-import type { CategoriaChamado, EstatisticasChamados, SetorChamado } from "../types/chamados.types";
+import type {
+  CategoriaChamado,
+  EstatisticasChamados,
+  OpcaoUnidadeFiltro,
+  SetorChamado,
+} from "../types/chamados.types";
 import { PRIORIDADE_LABELS, STATUS_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
 
 interface FiltrosDashboard {
   setorId: string;
   empresa: string;
+  unidadeId: string;
   departamento: string;
   categoriaId: string;
   dataInicial: string;
@@ -51,6 +57,7 @@ interface DashboardChamadosPageProps {
   setores: SetorChamado[];
   categorias: CategoriaChamado[];
   empresas: string[];
+  unidades: OpcaoUnidadeFiltro[];
   departamentos: string[];
   fullscreen?: boolean;
   filtrosIniciais?: FiltrosDashboard;
@@ -91,12 +98,14 @@ export function DashboardChamadosPage({
   setores,
   categorias,
   empresas,
+  unidades,
   departamentos,
   fullscreen = false,
   filtrosIniciais,
 }: DashboardChamadosPageProps) {
   const [setorId, setSetorId] = useState(filtrosIniciais?.setorId ?? "");
   const [empresa, setEmpresa] = useState(filtrosIniciais?.empresa ?? "");
+  const [unidadeId, setUnidadeId] = useState(filtrosIniciais?.unidadeId ?? "");
   const [departamento, setDepartamento] = useState(filtrosIniciais?.departamento ?? "");
   const [categoriaId, setCategoriaId] = useState(filtrosIniciais?.categoriaId ?? "");
   const [dataInicial, setDataInicial] = useState(filtrosIniciais?.dataInicial ?? "");
@@ -122,6 +131,7 @@ export function DashboardChamadosPage({
       buscarEstatisticasChamados({
         setorId: setorId || undefined,
         empresa: empresa || undefined,
+        unidadeId: unidadeId || undefined,
         departamento: departamento || undefined,
         categoriaId: categoriaId || undefined,
         dataInicial: dataInicial || undefined,
@@ -157,6 +167,7 @@ export function DashboardChamadosPage({
   }, [
     setorId,
     empresa,
+    unidadeId,
     departamento,
     categoriaId,
     dataInicial,
@@ -208,6 +219,19 @@ export function DashboardChamadosPage({
       ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
     ],
     [empresas]
+  );
+
+  const opcoesUnidade = useMemo(
+    () => [
+      { value: "", label: "Todas" },
+      ...unidades.map((unidade) => ({ value: unidade.id, label: unidade.rotulo })),
+    ],
+    [unidades]
+  );
+
+  const unidadeFiltradaNome = useMemo(
+    () => unidades.find((unidade) => unidade.id === unidadeId)?.rotulo,
+    [unidades, unidadeId]
   );
 
   const opcoesDepartamento = useMemo(
@@ -346,6 +370,16 @@ export function DashboardChamadosPage({
     </BarChart>
   );
 
+  const graficoPorUnidade = (
+    <BarChart data={dados.porUnidade} layout="vertical" margin={{ left: 24 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis type="number" allowDecimals={false} />
+      <YAxis type="category" dataKey="unidade" width={160} tick={{ fontSize: 12 }} />
+      <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
+      <Bar dataKey="total" name="Chamados" fill="#0277bd" radius={[0, 8, 8, 0]} />
+    </BarChart>
+  );
+
   const graficoPorDepartamento = (
     <BarChart data={dados.porDepartamento} layout="vertical" margin={{ left: 24 }}>
       <CartesianGrid strokeDasharray="3 3" />
@@ -371,9 +405,11 @@ export function DashboardChamadosPage({
       <div className={styles.tvDashboard}>
         <div className={styles.tvHeader}>
           <h1 className={styles.tvTitulo}>Dashboard de chamados</h1>
-          {(setorFiltradoNome || empresa || departamento) && (
+          {(setorFiltradoNome || empresa || unidadeFiltradaNome || departamento) && (
             <span className={styles.tvSubtitulo}>
-              {[setorFiltradoNome, empresa, departamento].filter(Boolean).join(" · ")}
+              {[setorFiltradoNome, empresa, unidadeFiltradaNome, departamento]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           )}
         </div>
@@ -509,6 +545,12 @@ export function DashboardChamadosPage({
             <Dropdown value={empresa} options={opcoesEmpresa} onValueChange={setEmpresa} />
           </Field>
 
+          {unidades.length > 0 && (
+            <Field label="Unidade">
+              <Dropdown value={unidadeId} options={opcoesUnidade} onValueChange={setUnidadeId} />
+            </Field>
+          )}
+
           <Field label="Departamento">
             <Dropdown
               value={departamento}
@@ -613,13 +655,23 @@ export function DashboardChamadosPage({
           </Card>
         </FormGrid>
 
-        <Card title="Chamados por empresa">
-          <div className={styles.chartWrapper}>
-            <ResponsiveContainer width="100%" height={280}>
-              {graficoPorEmpresa}
-            </ResponsiveContainer>
-          </div>
-        </Card>
+        <FormGrid columns={2}>
+          <Card title="Chamados por empresa">
+            <div className={styles.chartWrapper}>
+              <ResponsiveContainer width="100%" height={280}>
+                {graficoPorEmpresa}
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Chamados por unidade">
+            <div className={styles.chartWrapper}>
+              <ResponsiveContainer width="100%" height={280}>
+                {graficoPorUnidade}
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </FormGrid>
 
         <Card title="Chamados por departamento">
           <div className={styles.chartWrapper}>

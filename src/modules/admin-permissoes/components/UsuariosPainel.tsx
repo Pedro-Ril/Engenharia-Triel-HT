@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Download, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, Pencil, RefreshCw, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -25,14 +25,26 @@ import {
   atualizarUsuariosDoAd,
   excluirUsuario,
   importarUsuariosAd,
+  listarUnidades,
+  listarVinculosUnidades,
 } from "../services/adminPermissoes.service";
-import type { PortalPermissao, PortalUsuarioAdmin } from "../types/adminPermissoes.types";
+import type {
+  Empresa,
+  PortalPermissao,
+  PortalUsuarioAdmin,
+  UnidadeEmpresa,
+  VinculoUnidade,
+} from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
+import { empresaDoCodigo, unidadesAtivasDaEmpresa } from "../utils/unidades";
 import styles from "./AdminPermissoes.module.css";
+import { UnidadesUsuarioModal } from "./UnidadesUsuarioModal";
 
 interface UsuariosPainelProps {
   usuarios: PortalUsuarioAdmin[];
   permissoes: PortalPermissao[];
+  /* Para achar a empresa (e as unidades) de cada usuário pelo código. */
+  empresas: Empresa[];
   onUsuarioAtualizado: (usuario: PortalUsuarioAdmin) => void;
   onUsuarioExcluido: (usuarioId: string) => void;
   onUsuariosImportados: (usuarios: PortalUsuarioAdmin[]) => void;
@@ -42,6 +54,7 @@ interface UsuariosPainelProps {
 export function UsuariosPainel({
   usuarios,
   permissoes,
+  empresas,
   onUsuarioAtualizado,
   onUsuarioExcluido,
   onUsuariosImportados,
@@ -61,6 +74,47 @@ export function UsuariosPainel({
   const [confirmandoImportar, setConfirmandoImportar] = useState(false);
   const [atualizandoAd, setAtualizandoAd] = useState(false);
   const [confirmandoAtualizarAd, setConfirmandoAtualizarAd] = useState(false);
+
+  const [unidades, setUnidades] = useState<UnidadeEmpresa[]>([]);
+  const [vinculos, setVinculos] = useState<VinculoUnidade[]>([]);
+  const [usuarioUnidades, setUsuarioUnidades] = useState<PortalUsuarioAdmin | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    Promise.all([listarUnidades(), listarVinculosUnidades()]).then(([listaUnidades, listaVinculos]) => {
+      if (cancelado) return;
+      setUnidades(listaUnidades);
+      setVinculos(listaVinculos);
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  function unidadesDoUsuario(usuario: PortalUsuarioAdmin) {
+    const empresa = empresaDoCodigo(empresas, usuario.codigoEmpresa);
+    const daEmpresa = unidadesAtivasDaEmpresa(unidades, empresa?.id);
+    const idsVinculados = new Set(
+      vinculos.filter((vinculo) => vinculo.usuarioId === usuario.id).map((vinculo) => vinculo.unidadeId)
+    );
+
+    return {
+      empresa,
+      daEmpresa,
+      vinculadas: daEmpresa.filter((unidade) => idsVinculados.has(unidade.id)),
+    };
+  }
+
+  function aoSalvarUnidades(usuarioId: string, unidadeIds: string[]) {
+    setVinculos((atual) => [
+      ...atual.filter((vinculo) => vinculo.usuarioId !== usuarioId),
+      ...unidadeIds.map((unidadeId) => ({ usuarioId, unidadeId })),
+    ]);
+    setUsuarioUnidades(null);
+    onFeedback("success", "Unidades salvas", "O vínculo do usuário com as unidades foi atualizado.");
+  }
 
   async function handleImportarAd() {
     setConfirmandoImportar(false);
@@ -317,13 +371,14 @@ export function UsuariosPainel({
     <Stack gap={16}>
       {botaoImportar}
 
-      <Table minWidth={1020}>
+      <Table minWidth={1220}>
         <TableHead>
           <TableRow>
             <TableHeaderCell>Usuário</TableHeaderCell>
             <TableHeaderCell>E-mail</TableHeaderCell>
             <TableHeaderCell>Setor</TableHeaderCell>
             <TableHeaderCell>Código de empresa</TableHeaderCell>
+            <TableHeaderCell>Unidades</TableHeaderCell>
             <TableHeaderCell>Perfil</TableHeaderCell>
             <TableHeaderCell align="center">Ativo</TableHeaderCell>
             <TableHeaderCell align="center">Ações</TableHeaderCell>
@@ -396,6 +451,32 @@ export function UsuariosPainel({
                 </TableCell>
 
                 <TableCell>
+                  {(() => {
+                    const { daEmpresa, vinculadas } = unidadesDoUsuario(usuario);
+
+                    if (daEmpresa.length === 0) {
+                      return <span className={styles.usuarioSub}>Empresa sem unidades</span>;
+                    }
+
+                    return (
+                      <div className={styles.unidadesCelula}>
+                        <span className={vinculadas.length === 0 ? styles.usuarioSub : undefined}>
+                          {vinculadas.length === 0
+                            ? "Nenhuma — escolhe no chamado"
+                            : vinculadas.map((unidade) => unidade.nome).join(", ")}
+                        </span>
+                        <IconButton
+                          icon={<Pencil size={14} />}
+                          label="Editar unidades"
+                          size="small"
+                          onClick={() => setUsuarioUnidades(usuario)}
+                        />
+                      </div>
+                    );
+                  })()}
+                </TableCell>
+
+                <TableCell>
                   {usuario.ehAdministrador ? (
                     <Badge variant="info">Administrador</Badge>
                   ) : (
@@ -433,6 +514,23 @@ export function UsuariosPainel({
           })}
         </TableBody>
       </Table>
+
+      {usuarioUnidades &&
+        (() => {
+          const { empresa, daEmpresa, vinculadas } = unidadesDoUsuario(usuarioUnidades);
+          if (!empresa) return null;
+
+          return (
+            <UnidadesUsuarioModal
+              usuario={usuarioUnidades}
+              empresa={empresa}
+              unidades={daEmpresa}
+              selecionadasIniciais={vinculadas.map((unidade) => unidade.id)}
+              onFechar={() => setUsuarioUnidades(null)}
+              onSalvo={(ids) => aoSalvarUnidades(usuarioUnidades.id, ids)}
+            />
+          );
+        })()}
 
       <ConfirmDialog
         open={usuarioExcluindo !== null}

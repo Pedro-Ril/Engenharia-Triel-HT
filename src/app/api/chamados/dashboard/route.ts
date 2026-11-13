@@ -16,6 +16,12 @@ async function handleGET(request: Request) {
 
   const setorId = url.searchParams.get("setorId") ?? undefined;
   const empresa = url.searchParams.get("empresa") ?? undefined;
+  const unidadeParam = url.searchParams.get("unidadeId");
+  /* Vai como UNIQUEIDENTIFIER -- valor malformado é ignorado em vez de virar erro de conversão no SQL. */
+  const unidadeId =
+    unidadeParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(unidadeParam)
+      ? unidadeParam
+      : undefined;
   const departamento = url.searchParams.get("departamento") ?? undefined;
   const categoriaId = url.searchParams.get("categoriaId") ?? undefined;
   const dataInicial = url.searchParams.get("dataInicial") ?? undefined;
@@ -26,6 +32,7 @@ async function handleGET(request: Request) {
       setorIds,
       setorId,
       empresa,
+      unidadeId,
       departamento,
       categoriaId,
       dataInicial,

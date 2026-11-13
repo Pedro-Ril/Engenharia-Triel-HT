@@ -46,6 +46,20 @@ export interface Empresa {
   ativa: boolean;
 }
 
+/* Espelho de src/lib/empresas/unidades.ts. */
+export interface UnidadeEmpresa {
+  id: string;
+  empresaId: string;
+  nome: string;
+  ativa: boolean;
+  totalUsuarios: number;
+}
+
+export interface VinculoUnidade {
+  usuarioId: string;
+  unidadeId: string;
+}
+
 export interface TemaPadrao {
   corPrimariaClara: string;
   corPrimariaEscura: string;

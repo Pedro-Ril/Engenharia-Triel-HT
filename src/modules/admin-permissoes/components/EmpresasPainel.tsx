@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
@@ -22,12 +23,14 @@ import {
 import {
   atualizarEmpresa,
   criarEmpresa,
+  listarUnidades,
   restaurarTemaPadrao,
   salvarTemaPadrao,
 } from "../services/adminPermissoes.service";
-import type { Empresa, TemaPadrao } from "../types/adminPermissoes.types";
+import type { Empresa, TemaPadrao, UnidadeEmpresa } from "../types/adminPermissoes.types";
 import type { FeedbackHandler } from "../types/toast.types";
 import styles from "./AdminPermissoes.module.css";
+import { UnidadesEmpresaModal } from "./UnidadesEmpresaModal";
 
 interface EmpresasPainelProps {
   empresas: Empresa[];
@@ -72,6 +75,29 @@ export function EmpresasPainel({
   );
   const [salvandoTemaPadrao, setSalvandoTemaPadrao] = useState(false);
   const [restaurandoTemaPadrao, setRestaurandoTemaPadrao] = useState(false);
+
+  const [unidades, setUnidades] = useState<UnidadeEmpresa[]>([]);
+  const [empresaUnidades, setEmpresaUnidades] = useState<Empresa | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    listarUnidades().then((lista) => {
+      if (!cancelado) setUnidades(lista);
+    });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  function aoSalvarUnidade(unidade: UnidadeEmpresa) {
+    setUnidades((atual) =>
+      atual.some((item) => item.id === unidade.id)
+        ? atual.map((item) => (item.id === unidade.id ? unidade : item))
+        : [...atual, unidade]
+    );
+  }
 
   async function handleSalvarTemaPadrao() {
     setSalvandoTemaPadrao(true);
@@ -300,12 +326,13 @@ export function EmpresasPainel({
             (vermelho).
           </p>
         ) : (
-          <Table minWidth={900}>
+          <Table minWidth={1040}>
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Nome</TableHeaderCell>
                 <TableHeaderCell>Código</TableHeaderCell>
                 <TableHeaderCell>CNPJ</TableHeaderCell>
+                <TableHeaderCell align="center">Unidades</TableHeaderCell>
                 <TableHeaderCell align="center">Cor (claro)</TableHeaderCell>
                 <TableHeaderCell align="center">Cor (escuro)</TableHeaderCell>
                 <TableHeaderCell align="center">Ativa</TableHeaderCell>
@@ -313,7 +340,12 @@ export function EmpresasPainel({
             </TableHead>
 
             <TableBody>
-              {empresas.map((empresa) => (
+              {empresas.map((empresa) => {
+                const ativas = unidades.filter(
+                  (unidade) => unidade.empresaId === empresa.id && unidade.ativa
+                ).length;
+
+                return (
                 <TableRow key={empresa.id}>
                   <TableCell>
                     <Input
@@ -354,6 +386,17 @@ export function EmpresasPainel({
                         }
                       }}
                     />
+                  </TableCell>
+
+                  <TableCell align="center">
+                    <Stack direction="row" gap={8} align="center" justify="center">
+                      <Badge variant={ativas > 0 ? "info" : "neutral"}>
+                        {ativas === 0 ? "Nenhuma" : ativas === 1 ? "1 ativa" : `${ativas} ativas`}
+                      </Badge>
+                      <Button variant="secondary" onClick={() => setEmpresaUnidades(empresa)}>
+                        Gerenciar
+                      </Button>
+                    </Stack>
                   </TableCell>
 
                   <TableCell align="center">
@@ -398,11 +441,20 @@ export function EmpresasPainel({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
       </Card>
+
+      <UnidadesEmpresaModal
+        empresa={empresaUnidades}
+        unidades={unidades}
+        onFechar={() => setEmpresaUnidades(null)}
+        onUnidadeSalva={aoSalvarUnidade}
+        onFeedback={onFeedback}
+      />
     </Stack>
   );
 }

@@ -86,6 +86,53 @@ export async function listarDepartamentosComChamados(): Promise<string[]> {
   return result.recordset.map((row) => row.solicitante_departamento);
 }
 
+export interface OpcaoUnidadeFiltro {
+  id: string;
+  rotulo: string;
+}
+
+/*
+ * Unidades que já aparecem em algum chamado -- para os filtros de
+ * "Unidade" (fila e dashboard), mesma ideia de listarEmpresasComChamados.
+ * Rótulo com o nome atual da unidade; se duas empresas tiverem unidade
+ * com o mesmo nome, entra o código da empresa para diferenciar.
+ */
+export async function listarUnidadesComChamados(): Promise<OpcaoUnidadeFiltro[]> {
+  const pool = await getSqlServerPool();
+
+  const result = await pool.request().query<{ id: string; nome: string; empresa_codigo: string | null }>(`
+    SELECT
+      CONVERT(VARCHAR(36), u.[id]) AS [id],
+      u.[nome],
+      e.[codigo] AS [empresa_codigo]
+    FROM dbo.portal_empresas_unidades AS u
+    INNER JOIN dbo.portal_empresas AS e ON e.[id] = u.[empresa_id]
+    WHERE EXISTS (SELECT 1 FROM dbo.portal_chamados AS c WHERE c.[unidade_id] = u.[id])
+    ORDER BY u.[nome];
+  `);
+
+  return rotularUnidades(result.recordset);
+}
+
+/* Nome da unidade; repetido entre empresas -> "Nome (empresa X)". */
+export function rotularUnidades<T extends { id: string; nome: string; empresa_codigo: string | null }>(
+  linhas: T[]
+): OpcaoUnidadeFiltro[] {
+  const contagem = new Map<string, number>();
+  for (const linha of linhas) {
+    const chave = linha.nome.toLowerCase();
+    contagem.set(chave, (contagem.get(chave) ?? 0) + 1);
+  }
+
+  return linhas.map((linha) => ({
+    id: linha.id,
+    rotulo:
+      (contagem.get(linha.nome.toLowerCase()) ?? 0) > 1 && linha.empresa_codigo
+        ? `${linha.nome} (empresa ${linha.empresa_codigo})`
+        : linha.nome,
+  }));
+}
+
 export interface ChamadoAnexo {
   id: string;
   nomeArquivo: string;
@@ -116,6 +163,9 @@ export interface ChamadoResumo {
   solicitanteNome: string;
   atendenteNome: string | null;
   empresa: string | null;
+  /* Unidade da empresa (ver src/lib/empresas/unidades.ts) -- id para filtro, nome como estava na abertura. */
+  unidadeId: string | null;
+  unidade: string | null;
   solicitanteDepartamento: string | null;
   categoriaId: string | null;
   categoriaNome: string | null;
@@ -160,6 +210,8 @@ const colunasChamado = `
   CONVERT(VARCHAR(36), c.[atendente_usuario_id]) AS [atendente_usuario_id],
   atendente.[nome_exibicao] AS [atendente_nome],
   c.[empresa],
+  CONVERT(VARCHAR(36), c.[unidade_id]) AS [unidade_id],
+  c.[unidade],
   c.[solicitante_departamento],
   CONVERT(VARCHAR(36), c.[categoria_id]) AS [categoria_id],
   categoria.[nome] AS [categoria_nome],
@@ -196,6 +248,8 @@ interface ChamadoRow {
   atendente_usuario_id: string | null;
   atendente_nome: string | null;
   empresa: string | null;
+  unidade_id: string | null;
+  unidade: string | null;
   solicitante_departamento: string | null;
   categoria_id: string | null;
   categoria_nome: string | null;
@@ -224,6 +278,8 @@ function mapChamadoRow(row: ChamadoRow): Chamado {
     atendenteUsuarioId: row.atendente_usuario_id,
     atendenteNome: row.atendente_nome,
     empresa: row.empresa,
+    unidadeId: row.unidade_id,
+    unidade: row.unidade,
     solicitanteDepartamento: row.solicitante_departamento,
     categoriaId: row.categoria_id,
     categoriaNome: row.categoria_nome,
@@ -283,6 +339,8 @@ export interface CriarChamadoParams {
   solicitanteContato: string | null;
   /* Foto do codigoEmpresa do usuário no momento da abertura — null se anônimo ou sem empresa cadastrada. */
   empresa: string | null;
+  /* Unidade conferida em resolverUnidadeParaChamado -- null se a empresa não tem unidade (ou anônimo). */
+  unidade: { id: string; nome: string } | null;
   /* Foto do departamento (grupo "GRUPO X" do AD) do usuário no momento da abertura — null se anônimo ou sem grupo de setor. */
   solicitanteDepartamento: string | null;
   ipOrigem: string | null;
@@ -318,6 +376,8 @@ export async function criarChamado(
       params.solicitanteContato
     );
     insertChamado.input("empresa", sql.NVarChar(30), params.empresa);
+    insertChamado.input("unidadeId", sql.UniqueIdentifier, params.unidade?.id ?? null);
+    insertChamado.input("unidade", sql.NVarChar(100), params.unidade?.nome ?? null);
     insertChamado.input(
       "solicitanteDepartamento",
       sql.NVarChar(200),
@@ -331,11 +391,11 @@ export async function criarChamado(
     try {
       chamadoResult = await insertChamado.query<{ id: string; numero: number }>(`
         INSERT INTO dbo.portal_chamados
-          ([setor_id], [categoria_id], [prioridade], [titulo], [solicitante_usuario_id], [solicitante_nome], [solicitante_contato], [empresa], [solicitante_departamento], [ip_origem], [criado_por_usuario_id])
+          ([setor_id], [categoria_id], [prioridade], [titulo], [solicitante_usuario_id], [solicitante_nome], [solicitante_contato], [empresa], [unidade_id], [unidade], [solicitante_departamento], [ip_origem], [criado_por_usuario_id])
         OUTPUT
           CONVERT(VARCHAR(36), INSERTED.[id]) AS [id],
           INSERTED.[numero] AS [numero]
-        VALUES (@setorId, @categoriaId, @prioridade, @titulo, @solicitanteUsuarioId, @solicitanteNome, @solicitanteContato, @empresa, @solicitanteDepartamento, @ipOrigem, @criadoPorUsuarioId);
+        VALUES (@setorId, @categoriaId, @prioridade, @titulo, @solicitanteUsuarioId, @solicitanteNome, @solicitanteContato, @empresa, @unidadeId, @unidade, @solicitanteDepartamento, @ipOrigem, @criadoPorUsuarioId);
       `);
     } catch (error) {
       if (error instanceof Error && /FK_portal_chamados_setor/i.test(error.message)) {
@@ -673,6 +733,7 @@ export interface FiltrosFila {
   /* Setor escolhido no filtro da tela — sempre aplicado por cima da restrição de acesso acima. */
   setorId?: string;
   empresa?: string;
+  unidadeId?: string;
   departamento?: string;
   categoriaId?: string;
   status?: StatusChamado;
@@ -736,6 +797,11 @@ export async function listarFilaAtendimento(
   if (filtros.empresa) {
     request.input("empresaFiltro", sql.NVarChar(30), filtros.empresa);
     condicoes.push(`c.[empresa] = @empresaFiltro`);
+  }
+
+  if (filtros.unidadeId) {
+    request.input("unidadeIdFiltro", sql.UniqueIdentifier, filtros.unidadeId);
+    condicoes.push(`c.[unidade_id] = @unidadeIdFiltro`);
   }
 
   if (filtros.departamento) {
@@ -930,6 +996,27 @@ export async function atualizarPrioridade(
   const result = await request.query(`
     UPDATE dbo.portal_chamados
     SET [prioridade] = @prioridade, [atualizado_em] = SYSDATETIME()
+    WHERE [id] = @chamadoId;
+  `);
+
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/* Correção feita pelo atendente -- grava o id e o nome atual da unidade (nova "foto"). */
+export async function atualizarUnidadeChamado(
+  chamadoId: string,
+  unidade: { id: string; nome: string }
+): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const request = pool.request();
+
+  request.input("chamadoId", sql.UniqueIdentifier, chamadoId);
+  request.input("unidadeId", sql.UniqueIdentifier, unidade.id);
+  request.input("unidade", sql.NVarChar(100), unidade.nome);
+
+  const result = await request.query(`
+    UPDATE dbo.portal_chamados
+    SET [unidade_id] = @unidadeId, [unidade] = @unidade, [atualizado_em] = SYSDATETIME()
     WHERE [id] = @chamadoId;
   `);
 

@@ -58,6 +58,8 @@ import type {
   TipoAtualizacaoItem,
   TransferenciaAdmin,
   TransferenciaConfig,
+  UnidadeEmpresa,
+  VinculoUnidade,
 } from "../types/adminPermissoes.types";
 
 interface ApiEnvelope<T> {
@@ -248,6 +250,54 @@ export async function criarEmpresa(dados: {
     body: JSON.stringify(dados),
   });
   return parseResponse<Empresa>(response);
+}
+
+export async function listarUnidades(): Promise<UnidadeEmpresa[]> {
+  const response = await fetch("/api/admin/empresas/unidades");
+  const body = await parseResponse<UnidadeEmpresa[]>(response);
+  return body.data ?? [];
+}
+
+export async function criarUnidade(dados: {
+  empresaId: string;
+  nome: string;
+}): Promise<ApiEnvelope<UnidadeEmpresa>> {
+  const response = await fetch("/api/admin/empresas/unidades", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<UnidadeEmpresa>(response);
+}
+
+export async function atualizarUnidade(
+  id: string,
+  dados: { nome?: string; ativa?: boolean }
+): Promise<ApiEnvelope<UnidadeEmpresa>> {
+  const response = await fetch(`/api/admin/empresas/unidades/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return parseResponse<UnidadeEmpresa>(response);
+}
+
+export async function listarVinculosUnidades(): Promise<VinculoUnidade[]> {
+  const response = await fetch("/api/admin/usuarios/unidades");
+  const body = await parseResponse<VinculoUnidade[]>(response);
+  return body.data ?? [];
+}
+
+export async function definirUnidadesDoUsuario(
+  usuarioId: string,
+  unidadeIds: string[]
+): Promise<ApiEnvelope<string[]>> {
+  const response = await fetch(`/api/admin/usuarios/${usuarioId}/unidades`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ unidadeIds }),
+  });
+  return parseResponse<string[]>(response);
 }
 
 export async function atualizarEmpresa(

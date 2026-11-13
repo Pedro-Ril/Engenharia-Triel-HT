@@ -3,6 +3,7 @@ import { getUsuarioAutenticado } from "@/lib/auth/autorizacao";
 import { getSetoresQueAtende } from "@/lib/chamados/autorizacao-chamados";
 import { listarCategoriasAtivas } from "@/lib/chamados/categorias";
 import { listarSetoresParaChamado } from "@/lib/chamados/chamados";
+import { opcoesUnidadeParaChamado } from "@/lib/empresas/unidades";
 import { AbrirChamadoPage } from "@/modules/chamados/components/AbrirChamadoPage";
 
 export default async function Page() {
@@ -17,7 +18,10 @@ export default async function Page() {
   }
 
   /* Atendente de qualquer setor ou admin -- só essas pessoas podem abrir um chamado em nome de outra. */
-  const setoresAtendidos = await getSetoresQueAtende(usuario);
+  const [setoresAtendidos, opcoesUnidade] = await Promise.all([
+    getSetoresQueAtende(usuario),
+    opcoesUnidadeParaChamado(usuario),
+  ]);
   const podeAbrirEmNomeDe = setoresAtendidos === null || setoresAtendidos.length > 0;
 
   return (
@@ -28,6 +32,7 @@ export default async function Page() {
         usuario ? { nomeExibicao: usuario.nomeExibicao, email: usuario.email } : null
       }
       podeAbrirEmNomeDe={podeAbrirEmNomeDe}
+      opcoesUnidade={opcoesUnidade}
     />
   );
 }

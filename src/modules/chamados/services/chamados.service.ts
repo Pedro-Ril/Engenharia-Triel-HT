@@ -8,6 +8,7 @@ import type {
   EstatisticasChamados,
   EventoNotificacaoChamado,
   NotificacaoEmailChamado,
+  OpcoesUnidadeChamado,
   PrioridadeChamado,
   SetorAceiteChamados,
   StatusChamado,
@@ -37,6 +38,15 @@ export async function abrirChamado(
     method: "POST",
     body: formData,
   });
+  return parseResponse(response);
+}
+
+/* Unidades que o solicitante pode escolher; com usuarioId, as do alvo do "abrir em nome de". */
+export async function buscarOpcoesUnidadeChamado(
+  usuarioId?: string
+): Promise<ApiEnvelope<OpcoesUnidadeChamado>> {
+  const query = usuarioId ? `?usuarioId=${encodeURIComponent(usuarioId)}` : "";
+  const response = await fetch(`/api/chamados/unidades${query}`);
   return parseResponse(response);
 }
 
@@ -117,6 +127,7 @@ export async function atualizarChamado(
     atendenteUsuarioId?: string | null;
     publico?: boolean;
     dataPrevistaConclusao?: string | null;
+    unidadeId?: string;
   }
 ): Promise<ApiEnvelope<Chamado>> {
   const response = await fetch(`/api/chamados/${numero}`, {
@@ -216,6 +227,7 @@ export async function listarFilaAtendimento(params: {
   busca?: string;
   setorId?: string;
   empresa?: string;
+  unidadeId?: string;
   departamento?: string;
   categoriaId?: string;
   pagina?: number;
@@ -227,6 +239,7 @@ export async function listarFilaAtendimento(params: {
   if (params.busca) query.set("busca", params.busca);
   if (params.setorId) query.set("setorId", params.setorId);
   if (params.empresa) query.set("empresa", params.empresa);
+  if (params.unidadeId) query.set("unidadeId", params.unidadeId);
   if (params.departamento) query.set("departamento", params.departamento);
   if (params.categoriaId) query.set("categoriaId", params.categoriaId);
   if (params.pagina) query.set("pagina", String(params.pagina));
@@ -239,6 +252,7 @@ export async function listarFilaAtendimento(params: {
 export async function buscarEstatisticasChamados(params: {
   setorId?: string;
   empresa?: string;
+  unidadeId?: string;
   departamento?: string;
   categoriaId?: string;
   dataInicial?: string;
@@ -247,6 +261,7 @@ export async function buscarEstatisticasChamados(params: {
   const query = new URLSearchParams();
   if (params.setorId) query.set("setorId", params.setorId);
   if (params.empresa) query.set("empresa", params.empresa);
+  if (params.unidadeId) query.set("unidadeId", params.unidadeId);
   if (params.departamento) query.set("departamento", params.departamento);
   if (params.categoriaId) query.set("categoriaId", params.categoriaId);
   if (params.dataInicial) query.set("dataInicial", params.dataInicial);

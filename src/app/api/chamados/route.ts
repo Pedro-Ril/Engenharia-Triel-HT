@@ -13,7 +13,8 @@ import {
   notificarAtendentesDoSetor,
   notificarSolicitanteChamado,
 } from "@/lib/chamados/notificacoes-email";
-import { parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
+import { optionalUuid, parseAnexosFormData, requiredPrioridade } from "@/lib/chamados/validacao";
+import { resolverUnidadeParaChamado } from "@/lib/empresas/unidades";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -83,6 +84,16 @@ async function handlePOST(request: Request) {
       ? optionalText(formData.get("contato"), "contato", 200) ?? solicitante.email
       : optionalText(formData.get("contato"), "contato", 200);
 
+    /*
+     * Unidade do SOLICITANTE (no "em nome de", a do alvo): a tela só
+     * sugere -- aqui confere que a escolhida está entre as permitidas, e
+     * que não ficou vazia quando a empresa tem unidade.
+     */
+    const unidade = await resolverUnidadeParaChamado(
+      solicitante ? { id: solicitante.id, codigoEmpresa: solicitante.codigoEmpresa } : null,
+      optionalUuid(formData.get("unidadeId"), "unidade")
+    );
+
     const anexos = await parseAnexosFormData(formData, "anexos");
 
     const { id, numero } = await criarChamado({
@@ -96,6 +107,7 @@ async function handlePOST(request: Request) {
       solicitanteNome,
       solicitanteContato,
       empresa: solicitante?.codigoEmpresa ?? null,
+      unidade,
       solicitanteDepartamento: solicitante?.departamento ?? null,
       ipOrigem: extrairIpOrigem(request),
       anexos: [...anexos, ...descricao.imagens],

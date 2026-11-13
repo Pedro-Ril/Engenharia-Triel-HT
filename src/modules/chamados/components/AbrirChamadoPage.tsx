@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, Home, LifeBuoy, X } from "lucide-react";
 import Link from "next/link";
 
@@ -18,8 +18,17 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Stack } from "@/components/ui/Stack";
 
-import { abrirChamado, adicionarUsuarioCopiaChamado } from "../services/chamados.service";
-import type { CategoriaChamado, PrioridadeChamado, SetorChamado } from "../types/chamados.types";
+import {
+  abrirChamado,
+  adicionarUsuarioCopiaChamado,
+  buscarOpcoesUnidadeChamado,
+} from "../services/chamados.service";
+import type {
+  CategoriaChamado,
+  OpcoesUnidadeChamado,
+  PrioridadeChamado,
+  SetorChamado,
+} from "../types/chamados.types";
 import { LIMITE_TEXTO_MENSAGEM, mensagemVazia, useImagensColadas } from "../utils/mensagemFormatada";
 import { PRIORIDADE_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
@@ -35,6 +44,14 @@ interface AbrirChamadoPageProps {
   usuarioLogado: { nomeExibicao: string; email: string | null } | null;
   /* Atendente de algum setor ou admin -- só essas pessoas podem abrir um chamado em nome de outra. */
   podeAbrirEmNomeDe: boolean;
+  /* Unidades do próprio usuário logado (ver opcoesUnidadeParaChamado) -- anônimo: "nenhuma". */
+  opcoesUnidade: OpcoesUnidadeChamado;
+}
+
+const SEM_UNIDADE: OpcoesUnidadeChamado = { modo: "nenhuma", unidades: [] };
+
+function unidadeInicial(opcoes: OpcoesUnidadeChamado): string {
+  return opcoes.modo === "fixa" ? (opcoes.unidades[0]?.id ?? "") : "";
 }
 
 export function AbrirChamadoPage({
@@ -42,6 +59,7 @@ export function AbrirChamadoPage({
   categorias,
   usuarioLogado,
   podeAbrirEmNomeDe,
+  opcoesUnidade: opcoesUnidadeProprias,
 }: AbrirChamadoPageProps) {
   const [setorId, setSetorId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
@@ -57,6 +75,16 @@ export function AbrirChamadoPage({
     null
   );
   const [copiaSelecionada, setCopiaSelecionada] = useState<{ id: string; nomeExibicao: string }[]>([]);
+
+  /*
+   * Unidade é sempre a do SOLICITANTE: no "abrir em nome de", troca para
+   * as opções do alvo (buscadas na hora); ao cancelar, volta às próprias.
+   */
+  const [opcoesUnidade, setOpcoesUnidade] = useState<OpcoesUnidadeChamado>(opcoesUnidadeProprias);
+  const [unidadeId, setUnidadeId] = useState(() => unidadeInicial(opcoesUnidadeProprias));
+  const [carregandoUnidades, setCarregandoUnidades] = useState(false);
+  /* Resposta atrasada de um alvo já trocado/cancelado é descartada. */
+  const buscaUnidadesRef = useRef(0);
 
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -82,11 +110,55 @@ export function AbrirChamadoPage({
     setCategoriaId("");
   }
 
+  function aplicarOpcoesUnidade(opcoes: OpcoesUnidadeChamado) {
+    setOpcoesUnidade(opcoes);
+    setUnidadeId(unidadeInicial(opcoes));
+  }
+
+  async function selecionarSolicitanteAlvo(alvo: { id: string; nomeExibicao: string }) {
+    const busca = ++buscaUnidadesRef.current;
+
+    setSolicitanteAlvo(alvo);
+    aplicarOpcoesUnidade(SEM_UNIDADE);
+    setCarregandoUnidades(true);
+
+    try {
+      const resultado = await buscarOpcoesUnidadeChamado(alvo.id);
+      if (busca !== buscaUnidadesRef.current) return;
+
+      if (resultado.ok && resultado.data) {
+        aplicarOpcoesUnidade(resultado.data);
+      } else {
+        setErro(resultado.message ?? "Não foi possível carregar as unidades dessa pessoa.");
+      }
+    } catch {
+      if (busca === buscaUnidadesRef.current) {
+        setErro("Não foi possível carregar as unidades dessa pessoa.");
+      }
+    } finally {
+      if (busca === buscaUnidadesRef.current) setCarregandoUnidades(false);
+    }
+  }
+
+  function cancelarSolicitanteAlvo() {
+    buscaUnidadesRef.current++;
+    setSolicitanteAlvo(null);
+    setCarregandoUnidades(false);
+    aplicarOpcoesUnidade(opcoesUnidadeProprias);
+  }
+
+  const precisaEscolherUnidade = opcoesUnidade.modo === "escolher" && !unidadeId;
+
   async function handleSubmit() {
     setErro(null);
 
     if (!setorId) {
       setErro("Selecione um setor.");
+      return;
+    }
+
+    if (precisaEscolherUnidade) {
+      setErro("Selecione a unidade deste chamado.");
       return;
     }
 
@@ -127,6 +199,10 @@ export function AbrirChamadoPage({
 
       if (solicitanteAlvo) {
         formData.append("solicitanteAlvoId", solicitanteAlvo.id);
+      }
+
+      if (unidadeId) {
+        formData.append("unidadeId", unidadeId);
       }
 
       for (const arquivo of anexos) {
@@ -257,7 +333,7 @@ export function AbrirChamadoPage({
                     <button
                       type="button"
                       className={styles.linkBotao}
-                      onClick={() => setSolicitanteAlvo(null)}
+                      onClick={cancelarSolicitanteAlvo}
                     >
                       Cancelar
                     </button>
@@ -273,7 +349,10 @@ export function AbrirChamadoPage({
                     <UsuarioAutocomplete
                       placeholder="Buscar usuário por nome ou e-mail"
                       onSelecionar={(usuario) =>
-                        setSolicitanteAlvo({ id: usuario.id, nomeExibicao: usuario.nomeExibicao })
+                        void selecionarSolicitanteAlvo({
+                          id: usuario.id,
+                          nomeExibicao: usuario.nomeExibicao,
+                        })
                       }
                     />
                   </Field>
@@ -325,6 +404,43 @@ export function AbrirChamadoPage({
               <Field label="Contato" hint="e-mail ou telefone (opcional)">
                 <Input value={contato} onChange={(event) => setContato(event.target.value)} />
               </Field>
+            </FormGrid>
+          )}
+
+          {(carregandoUnidades || opcoesUnidade.modo !== "nenhuma") && (
+            <FormGrid columns={3}>
+              {carregandoUnidades ? (
+                <Field label="Unidade">
+                  <Input value="Carregando unidades..." disabled readOnly />
+                </Field>
+              ) : opcoesUnidade.modo === "fixa" ? (
+                <Field
+                  label="Unidade"
+                  hint={solicitanteAlvo ? "a unidade cadastrada para essa pessoa" : "a unidade do seu cadastro"}
+                >
+                  <Input value={opcoesUnidade.unidades[0]?.nome ?? ""} disabled readOnly />
+                </Field>
+              ) : (
+                <Field
+                  label="Unidade"
+                  required
+                  hint={
+                    solicitanteAlvo
+                      ? "de qual unidade é este chamado"
+                      : "você está em mais de uma unidade — de qual é este chamado?"
+                  }
+                >
+                  <Dropdown
+                    value={unidadeId}
+                    onValueChange={setUnidadeId}
+                    placeholder="Selecione a unidade"
+                    options={opcoesUnidade.unidades.map((unidade) => ({
+                      value: unidade.id,
+                      label: unidade.nome,
+                    }))}
+                  />
+                </Field>
+              )}
             </FormGrid>
           )}
 
@@ -416,6 +532,8 @@ export function AbrirChamadoPage({
               onClick={handleSubmit}
               loading={enviando}
               disabled={
+                carregandoUnidades ||
+                precisaEscolherUnidade ||
                 !setorId ||
                 !categoriaId ||
                 !prioridade ||

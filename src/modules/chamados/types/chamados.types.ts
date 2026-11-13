@@ -52,12 +52,32 @@ export interface ChamadoResumo {
   solicitanteNome: string;
   atendenteNome: string | null;
   empresa: string | null;
+  /* Unidade da empresa -- id para filtro, nome como estava na abertura. */
+  unidadeId: string | null;
+  unidade: string | null;
   solicitanteDepartamento: string | null;
   categoriaId: string | null;
   categoriaNome: string | null;
   publico: boolean;
   criadoEm: string;
   atualizadoEm: string;
+}
+
+/* Espelho de src/lib/empresas/unidades.ts (OpcoesUnidadeChamado). */
+export interface UnidadeResumo {
+  id: string;
+  nome: string;
+}
+
+export interface OpcoesUnidadeChamado {
+  modo: "nenhuma" | "fixa" | "escolher";
+  unidades: UnidadeResumo[];
+}
+
+/* Filtro de unidade (fila/dashboard) -- ver listarUnidadesComChamados. */
+export interface OpcaoUnidadeFiltro {
+  id: string;
+  rotulo: string;
 }
 
 /* Só a fila de atendimento devolve esse campo extra — ver listarFilaAtendimento no servidor. */
@@ -140,6 +160,11 @@ export interface ContagemDepartamento {
   total: number;
 }
 
+export interface ContagemUnidade {
+  unidade: string;
+  total: number;
+}
+
 export interface ContagemCategoria {
   categoria: string;
   total: number;
@@ -177,6 +202,7 @@ export interface EstatisticasChamados {
   porDia: ContagemDia[];
   porAtendente: ContagemAtendente[];
   porEmpresa: ContagemEmpresa[];
+  porUnidade: ContagemUnidade[];
   porDepartamento: ContagemDepartamento[];
   porCategoria: ContagemCategoria[];
 }

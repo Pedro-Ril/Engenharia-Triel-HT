@@ -49,6 +49,7 @@ import type {
   ChamadosAtendente,
   PrioridadeChamado,
   SetorChamado,
+  UnidadeResumo,
   UsuarioCopiaChamado,
 } from "../types/chamados.types";
 import { LIMITE_TEXTO_MENSAGEM, mensagemVazia, useImagensColadas } from "../utils/mensagemFormatada";
@@ -61,6 +62,8 @@ interface ChamadoDetalhePageProps {
   nomeConfirmado: string | null;
   atendentesDoSetor: ChamadosAtendente[];
   setoresParaTransferir: SetorChamado[];
+  /* Unidades ativas da empresa do chamado -- só vem preenchido para o atendente, que pode corrigir a unidade. */
+  unidadesDisponiveis: UnidadeResumo[];
   /* false quando o acesso só foi liberado por o chamado ser público (visitante sem sessão/dono/atendente) — esconde ações e resposta. */
   podeResponder: boolean;
   ehAdministrador: boolean;
@@ -101,6 +104,7 @@ export function ChamadoDetalhePage({
   nomeConfirmado,
   atendentesDoSetor,
   setoresParaTransferir,
+  unidadesDisponiveis,
   podeResponder,
   ehAdministrador,
   copiaAtual,
@@ -221,7 +225,7 @@ export function ChamadoDetalhePage({
   }
 
   async function handleAtualizar(
-    campo: "prioridade" | "atendenteUsuarioId" | "publico" | "dataPrevistaConclusao",
+    campo: "prioridade" | "atendenteUsuarioId" | "publico" | "dataPrevistaConclusao" | "unidadeId",
     valor: string | boolean
   ) {
     setErro(null);
@@ -235,7 +239,9 @@ export function ChamadoDetalhePage({
             ? { atendenteUsuarioId: (valor as string) || null }
             : campo === "dataPrevistaConclusao"
               ? { dataPrevistaConclusao: (valor as string) || null }
-              : { publico: valor as boolean };
+              : campo === "unidadeId"
+                ? { unidadeId: valor as string }
+                : { publico: valor as boolean };
 
       const resultado = await atualizarChamado(chamado.numero, dados);
 
@@ -361,6 +367,8 @@ export function ChamadoDetalhePage({
           chamado.categoriaNome ? ` · ${chamado.categoriaNome}` : ""
         }${
           chamado.empresa ? ` · ${chamado.empresa}` : ""
+        }${
+          chamado.unidade ? ` · ${chamado.unidade}` : ""
         } · aberto por ${chamado.solicitanteNome}${
           chamado.criadoPorNome ? ` (registrado por ${chamado.criadoPorNome})` : ""
         } em ${formatarData(chamado.criadoEm)}`}
@@ -498,13 +506,34 @@ export function ChamadoDetalhePage({
               </Field>
             </FormGrid>
 
-            <Field label="Previsão de conclusão">
-              <DateInput
-                value={chamado.dataPrevistaConclusao ?? ""}
-                disabled={salvandoControle}
-                onValueChange={(valor) => handleAtualizar("dataPrevistaConclusao", valor)}
-              />
-            </Field>
+            <FormGrid columns={2}>
+              <Field label="Previsão de conclusão">
+                <DateInput
+                  value={chamado.dataPrevistaConclusao ?? ""}
+                  disabled={salvandoControle}
+                  onValueChange={(valor) => handleAtualizar("dataPrevistaConclusao", valor)}
+                />
+              </Field>
+
+              {unidadesDisponiveis.length > 0 && (
+                <Field label="Unidade" hint="corrija se a pessoa escolheu a unidade errada">
+                  <Dropdown
+                    value={chamado.unidadeId ?? ""}
+                    disabled={salvandoControle}
+                    placeholder="Sem unidade definida"
+                    onValueChange={(valor) => valor && handleAtualizar("unidadeId", valor)}
+                    options={[
+                      /* Unidade desativada depois da abertura continua aparecendo como valor atual. */
+                      ...(chamado.unidadeId &&
+                      !unidadesDisponiveis.some((unidade) => unidade.id === chamado.unidadeId)
+                        ? [{ value: chamado.unidadeId, label: `${chamado.unidade ?? "Unidade"} (desativada)` }]
+                        : []),
+                      ...unidadesDisponiveis.map((unidade) => ({ value: unidade.id, label: unidade.nome })),
+                    ]}
+                  />
+                </Field>
+              )}
+            </FormGrid>
 
             <Checkbox
               label="Chamado público"

@@ -398,6 +398,7 @@ export function AdminPermissoesPage() {
             <UsuariosPainel
               usuarios={usuarios}
               permissoes={permissoes}
+              empresas={empresas}
               onFeedback={mostrarFeedback}
               onUsuarioAtualizado={(usuario) =>
                 setUsuarios((atual) =>

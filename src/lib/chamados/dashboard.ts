@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
+import { rotularUnidades } from "./chamados";
 import type { PrioridadeChamado } from "./chamados";
 
 export interface FiltrosDashboard {
@@ -10,6 +11,7 @@ export interface FiltrosDashboard {
   /* Setor escolhido no filtro da tela — sempre aplicado por cima da restrição de acesso acima. */
   setorId?: string;
   empresa?: string;
+  unidadeId?: string;
   departamento?: string;
   categoriaId?: string;
   dataInicial?: string;
@@ -56,6 +58,11 @@ export interface ContagemDepartamento {
   total: number;
 }
 
+export interface ContagemUnidade {
+  unidade: string;
+  total: number;
+}
+
 export interface ContagemCategoria {
   categoria: string;
   total: number;
@@ -69,6 +76,7 @@ export interface EstatisticasChamados {
   porDia: ContagemDia[];
   porAtendente: ContagemAtendente[];
   porEmpresa: ContagemEmpresa[];
+  porUnidade: ContagemUnidade[];
   porDepartamento: ContagemDepartamento[];
   porCategoria: ContagemCategoria[];
 }
@@ -111,6 +119,13 @@ function construirFiltro(filtros: FiltrosDashboard) {
     condicoes.push("c.[empresa] = @empresaFiltro");
     inputs.push((request) =>
       request.input("empresaFiltro", sql.NVarChar(30), filtros.empresa)
+    );
+  }
+
+  if (filtros.unidadeId) {
+    condicoes.push("c.[unidade_id] = @unidadeIdFiltro");
+    inputs.push((request) =>
+      request.input("unidadeIdFiltro", sql.UniqueIdentifier, filtros.unidadeId)
     );
   }
 
@@ -165,6 +180,7 @@ export async function buscarEstatisticasChamados(
     empresaResult,
     departamentoResult,
     categoriaResult,
+    unidadeResult,
   ] = await Promise.all([
       (async () => {
         const request = await criarRequestFiltrado(inputs);
@@ -280,7 +296,30 @@ export async function buscarEstatisticasChamados(
           ORDER BY COUNT(*) DESC;
         `);
       })(),
+      (async () => {
+        /* Agrupa pelo id e rotula com o nome atual (renomear a unidade não divide o gráfico em dois). */
+        const request = await criarRequestFiltrado(inputs);
+        return request.query<{ id: string | null; nome: string | null; empresa_codigo: string | null; total: number }>(`
+          SELECT
+            CONVERT(VARCHAR(36), c.[unidade_id]) AS [id],
+            u.[nome],
+            e.[codigo] AS [empresa_codigo],
+            COUNT(*) AS [total]
+          FROM dbo.portal_chamados AS c
+          LEFT JOIN dbo.portal_empresas_unidades AS u ON u.[id] = c.[unidade_id]
+          LEFT JOIN dbo.portal_empresas AS e ON e.[id] = u.[empresa_id]
+          ${clausulaWhere}
+          GROUP BY c.[unidade_id], u.[nome], e.[codigo]
+          ORDER BY COUNT(*) DESC;
+        `);
+      })(),
     ]);
+
+  const comUnidade = unidadeResult.recordset.filter(
+    (row): row is { id: string; nome: string; empresa_codigo: string | null; total: number } =>
+      row.id !== null && row.nome !== null
+  );
+  const rotulos = new Map(rotularUnidades(comUnidade).map((opcao) => [opcao.id, opcao.rotulo]));
 
   const totaisRow = totaisResult.recordset[0];
 
@@ -310,6 +349,10 @@ export async function buscarEstatisticasChamados(
     })),
     porEmpresa: empresaResult.recordset.map((row) => ({
       empresa: row.empresa ?? "Sem empresa",
+      total: row.total,
+    })),
+    porUnidade: unidadeResult.recordset.map((row) => ({
+      unidade: (row.id && rotulos.get(row.id)) || "Sem unidade",
       total: row.total,
     })),
     porDepartamento: departamentoResult.recordset.map((row) => ({

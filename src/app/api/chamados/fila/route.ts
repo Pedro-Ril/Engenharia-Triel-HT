@@ -17,6 +17,13 @@ const statusValidos: StatusChamado[] = [
 ];
 const prioridadesValidas: PrioridadeChamado[] = ["baixa", "media", "alta", "urgente"];
 
+/* Filtro de unidade vai como UNIQUEIDENTIFIER -- valor malformado é ignorado em vez de virar erro de conversão no SQL. */
+function uuidOuUndefined(valor: string | null): string | undefined {
+  return valor && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor)
+    ? valor
+    : undefined;
+}
+
 async function handleGET(request: Request) {
   const resultadoAcesso = await requireAtendenteChamadosApi();
   if (resultadoAcesso.negado) return resultadoAcesso.negado;
@@ -29,6 +36,7 @@ async function handleGET(request: Request) {
   const busca = url.searchParams.get("busca") ?? undefined;
   const setorId = url.searchParams.get("setorId") ?? undefined;
   const empresa = url.searchParams.get("empresa") ?? undefined;
+  const unidadeId = uuidOuUndefined(url.searchParams.get("unidadeId"));
   const departamento = url.searchParams.get("departamento") ?? undefined;
   const categoriaId = url.searchParams.get("categoriaId") ?? undefined;
   const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
@@ -40,6 +48,7 @@ async function handleGET(request: Request) {
       setorIds,
       setorId,
       empresa,
+      unidadeId,
       departamento,
       categoriaId,
       status: statusValidos.includes(statusParam as StatusChamado)
