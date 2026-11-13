@@ -72,6 +72,58 @@
   opacity: 0.4;
 }
 
+/* Cor do texto / marca-texto (recursosAvancados): paleta que abre abaixo do botão. */
+.paletaGrupo {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.paleta {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 196px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+}
+
+.paletaCor {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+
+.paletaCor:hover {
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.paletaLimpar {
+  width: 100%;
+  margin-top: 2px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface-soft);
+  color: var(--text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.paletaLimpar:hover {
+  background: var(--bg-hover-neutral);
+}
+
 .statusUpload {
   padding: 6px 14px;
 
@@ -114,6 +166,19 @@
 
 .conteudo :global(p:last-child) {
   margin-bottom: 0;
+}
+
+/* Título 1: só no modo recursosAvancados (Bloco de Notas). */
+.conteudo :global(h1) {
+  margin: 24px 0 12px;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.conteudo :global(h1:first-child) {
+  margin-top: 0;
 }
 
 .conteudo :global(h2) {
@@ -173,6 +238,59 @@
 
 .conteudo :global(li) {
   margin-bottom: 4px;
+}
+
+/* Lista de tarefas (recursosAvancados): caixinha à esquerda, item feito fica riscado e apagado. */
+.conteudo :global(ul[data-type="taskList"]) {
+  list-style: none;
+  padding-left: 2px;
+}
+
+.conteudo :global(ul[data-type="taskList"] ul[data-type="taskList"]) {
+  padding-left: 22px;
+  margin: 4px 0 0;
+}
+
+/* Itens pelo pai (o editor desenha o <li> sem data-type; o HTML salvo tem) -- vale editando e lendo. */
+.conteudo :global(ul[data-type="taskList"] > li) {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.conteudo :global(ul[data-type="taskList"] > li > label) {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 4px;
+  user-select: none;
+}
+
+.conteudo :global(ul[data-type="taskList"] > li > label input) {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.conteudo :global(ul[data-type="taskList"] > li > div) {
+  flex: 1;
+  min-width: 0;
+}
+
+.conteudo :global(ul[data-type="taskList"] > li[data-checked="true"] > div) {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/*
+ * Marca-texto: o fundo é uma cor clara fixa da paleta, então o texto por
+ * cima é sempre escuro (no tema escuro o texto padrão é claro e sumiria).
+ * !important vence o "color: inherit" que o editor grava inline.
+ */
+.conteudo :global(mark) {
+  color: #1f2937 !important;
+  border-radius: 3px;
+  padding: 0 2px;
 }
 
 .conteudo :global(blockquote) {

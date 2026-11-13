@@ -8,19 +8,32 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TableKit } from "@tiptap/extension-table";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
+import Highlight from "@tiptap/extension-highlight";
+import { Color, TextStyle } from "@tiptap/extension-text-style";
+import TextAlign from "@tiptap/extension-text-align";
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Baseline,
   BetweenHorizontalEnd,
   BetweenVerticalEnd,
   Bold,
   Code,
   Grid2x2X,
+  Heading1,
   Heading2,
   Heading3,
+  Highlighter,
   Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
+  ListChecks,
   ListOrdered,
+  Minus,
   Quote,
   Redo,
   Strikethrough,
@@ -32,6 +45,30 @@ import {
 } from "lucide-react";
 
 import styles from "./RichTextEditor.module.css";
+
+/*
+ * Paletas do modo `recursosAvancados` (Bloco de Notas). Cores de texto em
+ * tom médio -- legíveis no tema claro e no escuro; marca-texto em tons
+ * claros com texto sempre escuro por cima (ver `mark` no CSS).
+ */
+const CORES_TEXTO = [
+  { nome: "Vermelho", cor: "#dc2626" },
+  { nome: "Laranja", cor: "#ea580c" },
+  { nome: "Verde", cor: "#16a34a" },
+  { nome: "Azul", cor: "#2563eb" },
+  { nome: "Roxo", cor: "#9333ea" },
+  { nome: "Cinza", cor: "#6b7280" },
+];
+
+const CORES_MARCA_TEXTO = [
+  { nome: "Amarelo", cor: "#fef08a" },
+  { nome: "Verde", cor: "#bbf7d0" },
+  { nome: "Azul", cor: "#bfdbfe" },
+  { nome: "Rosa", cor: "#fbcfe8" },
+  { nome: "Laranja", cor: "#fed7aa" },
+];
+
+type Alinhamento = "left" | "center" | "right" | "justify";
 
 interface RichTextEditorProps {
   value: string;
@@ -52,6 +89,12 @@ interface RichTextEditorProps {
    * de URL por prompt.
    */
   imagemUpload?: (arquivo: File) => Promise<string>;
+  /*
+   * Recursos de caderno (Bloco de Notas): Título 1, lista de tarefas, cor
+   * do texto, marca-texto, alinhamento e linha divisória. Desligado, o
+   * editor fica exatamente como sempre foi (Chamados, Wiki).
+   */
+  recursosAvancados?: boolean;
 }
 
 const TAMANHO_MAXIMO_IMAGEM_BYTES = 8 * 1024 * 1024;
@@ -73,6 +116,13 @@ function ToolbarButton({
     <button
       type="button"
       className={`${styles.toolbarButton} ${active ? styles.toolbarButtonAtivo : ""}`}
+      /*
+       * Não deixa o clique tirar o foco do texto: o editor só recupera o
+       * foco no quadro seguinte, e o que fosse digitado nesse meio-tempo
+       * (logo depois de clicar em Centralizar, por exemplo) se perdia. De
+       * quebra a seleção continua visível ao aplicar a formatação.
+       */
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
@@ -92,10 +142,23 @@ export function RichTextEditor({
   tabelas = false,
   alturaMinima,
   imagemUpload,
+  recursosAvancados = false,
 }: RichTextEditorProps) {
   const [enviandoImagem, setEnviandoImagem] = useState(false);
   const [erroUpload, setErroUpload] = useState<string | null>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
+  /* Paleta aberta (cor do texto / marca-texto); fecha ao clicar fora. */
+  const [paletaAberta, setPaletaAberta] = useState<"cor" | "marca" | null>(null);
+  const paletaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!paletaAberta) return;
+    function aoClicarFora(event: MouseEvent) {
+      if (paletaRef.current && !paletaRef.current.contains(event.target as Node)) setPaletaAberta(null);
+    }
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, [paletaAberta]);
 
   /*
    * Guardada em ref (não em state) porque as callbacks do ProseMirror
@@ -105,12 +168,22 @@ export function RichTextEditor({
    */
   const processarImagemRef = useRef<(arquivo: File) => void>(() => {});
 
+  /*
+   * Último HTML que o próprio editor mandou pelo onChange. Quando o pai
+   * devolve esse mesmo valor em `value` (o eco normal de um campo
+   * controlado), não é mudança "de fora" -- e o editor pode até já estar
+   * à frente dele (digitação rápida, o React ainda não redesenhou). Sem
+   * isto, o efeito de sincronizar abaixo reaplicava o valor atrasado e
+   * apagava as últimas letras digitadas.
+   */
+  const ultimoHtmlEmitidoRef = useRef<string | null>(null);
+
   const editor = useEditor({
     immediatelyRender: false,
     editable: !disabled,
     extensions: [
       StarterKit.configure({
-        heading: { levels: [2, 3] },
+        heading: { levels: recursosAvancados ? [1, 2, 3] : [2, 3] },
       }),
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),
@@ -119,10 +192,22 @@ export function RichTextEditor({
         placeholder: placeholder ?? "Escreva o conteúdo do artigo...",
       }),
       ...(tabelas ? [TableKit.configure({ table: { resizable: false } })] : []),
+      ...(recursosAvancados
+        ? [
+            TaskList,
+            TaskItem.configure({ nested: true }),
+            Highlight.configure({ multicolor: true }),
+            TextStyle,
+            Color,
+            TextAlign.configure({ types: ["heading", "paragraph"] }),
+          ]
+        : []),
     ],
     content: value,
     onUpdate: ({ editor: editorAtualizado }) => {
-      onChange(editorAtualizado.getHTML(), editorAtualizado.getText({ blockSeparator: "\n" }));
+      const html = editorAtualizado.getHTML();
+      ultimoHtmlEmitidoRef.current = html;
+      onChange(html, editorAtualizado.getText({ blockSeparator: "\n" }));
     },
     editorProps: {
       attributes: {
@@ -200,9 +285,10 @@ export function RichTextEditor({
     };
   }, [imagemUpload, editor]);
 
-  /* Sincroniza quando `value` muda por fora (ex: trocar de artigo no formulário). */
+  /* Sincroniza quando `value` muda por fora (ex: trocar de artigo no formulário, limpar depois de enviar). */
   useEffect(() => {
     if (!editor) return;
+    if (value === ultimoHtmlEmitidoRef.current) return;
     if (value !== editor.getHTML()) {
       editor.commands.setContent(value, { emitUpdate: false });
     }
@@ -227,8 +313,15 @@ export function RichTextEditor({
       italic: atual?.isActive("italic") ?? false,
       underline: atual?.isActive("underline") ?? false,
       strike: atual?.isActive("strike") ?? false,
+      h1: atual?.isActive("heading", { level: 1 }) ?? false,
       h2: atual?.isActive("heading", { level: 2 }) ?? false,
       h3: atual?.isActive("heading", { level: 3 }) ?? false,
+      taskList: recursosAvancados ? (atual?.isActive("taskList") ?? false) : false,
+      alinhamento: (recursosAvancados
+        ? (["center", "right", "justify"] as Alinhamento[]).find((valor) => atual?.isActive({ textAlign: valor })) ?? "left"
+        : "left") as Alinhamento,
+      corTexto: recursosAvancados ? ((atual?.getAttributes("textStyle").color as string | undefined) ?? null) : null,
+      corMarca: recursosAvancados ? ((atual?.getAttributes("highlight").color as string | undefined) ?? null) : null,
       bulletList: atual?.isActive("bulletList") ?? false,
       orderedList: atual?.isActive("orderedList") ?? false,
       blockquote: atual?.isActive("blockquote") ?? false,
@@ -325,7 +418,75 @@ export function RichTextEditor({
           <Strikethrough size={16} />
         </ToolbarButton>
 
+        {recursosAvancados && (
+          <div className={styles.paletaGrupo} ref={paletaRef}>
+            <ToolbarButton
+              label="Cor do texto"
+              active={Boolean(estado?.corTexto) || paletaAberta === "cor"}
+              disabled={disabled}
+              onClick={() => setPaletaAberta((atual) => (atual === "cor" ? null : "cor"))}
+            >
+              <Baseline size={16} style={estado?.corTexto ? { color: estado.corTexto } : undefined} />
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Marca-texto"
+              active={Boolean(estado?.corMarca) || paletaAberta === "marca"}
+              disabled={disabled}
+              onClick={() => setPaletaAberta((atual) => (atual === "marca" ? null : "marca"))}
+            >
+              <Highlighter size={16} />
+            </ToolbarButton>
+
+            {paletaAberta && (
+              <div className={styles.paleta} role="menu" aria-label={paletaAberta === "cor" ? "Cor do texto" : "Marca-texto"}>
+                {(paletaAberta === "cor" ? CORES_TEXTO : CORES_MARCA_TEXTO).map((opcao) => (
+                  <button
+                    key={opcao.cor}
+                    type="button"
+                    role="menuitem"
+                    className={styles.paletaCor}
+                    onMouseDown={(event) => event.preventDefault()}
+                    style={{ background: opcao.cor }}
+                    title={opcao.nome}
+                    aria-label={opcao.nome}
+                    onClick={() => {
+                      if (paletaAberta === "cor") editor.chain().focus().setColor(opcao.cor).run();
+                      else editor.chain().focus().setHighlight({ color: opcao.cor }).run();
+                      setPaletaAberta(null);
+                    }}
+                  />
+                ))}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.paletaLimpar}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    if (paletaAberta === "cor") editor.chain().focus().unsetColor().run();
+                    else editor.chain().focus().unsetHighlight().run();
+                    setPaletaAberta(null);
+                  }}
+                >
+                  {paletaAberta === "cor" ? "Cor padrão" : "Sem marca"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <span className={styles.separador} aria-hidden="true" />
+
+        {recursosAvancados && (
+          <ToolbarButton
+            label="Título 1"
+            active={estado?.h1}
+            disabled={disabled}
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          >
+            <Heading1 size={16} />
+          </ToolbarButton>
+        )}
 
         <ToolbarButton
           label="Título 2"
@@ -365,6 +526,17 @@ export function RichTextEditor({
           <ListOrdered size={16} />
         </ToolbarButton>
 
+        {recursosAvancados && (
+          <ToolbarButton
+            label="Lista de tarefas"
+            active={estado?.taskList}
+            disabled={disabled}
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+          >
+            <ListChecks size={16} />
+          </ToolbarButton>
+        )}
+
         <ToolbarButton
           label="Citação"
           active={estado?.blockquote}
@@ -382,6 +554,39 @@ export function RichTextEditor({
         >
           <Code size={16} />
         </ToolbarButton>
+
+        {recursosAvancados && (
+          <>
+            <ToolbarButton
+              label="Linha divisória"
+              disabled={disabled}
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            >
+              <Minus size={16} />
+            </ToolbarButton>
+
+            <span className={styles.separador} aria-hidden="true" />
+
+            {(
+              [
+                ["left", "Alinhar à esquerda", AlignLeft],
+                ["center", "Centralizar", AlignCenter],
+                ["right", "Alinhar à direita", AlignRight],
+                ["justify", "Justificar", AlignJustify],
+              ] as const
+            ).map(([valor, rotulo, Icone]) => (
+              <ToolbarButton
+                key={valor}
+                label={rotulo}
+                active={estado?.alinhamento === valor && valor !== "left"}
+                disabled={disabled}
+                onClick={() => editor.chain().focus().setTextAlign(valor).run()}
+              >
+                <Icone size={16} />
+              </ToolbarButton>
+            ))}
+          </>
+        )}
 
         <span className={styles.separador} aria-hidden="true" />
 

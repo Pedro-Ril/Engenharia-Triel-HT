@@ -1,0 +1,564 @@
+/* Bloco de Notas: lateral com as páginas + área do editor. Só tokens de tema (claro/escuro). */
+
+.layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* ===================== LATERAL ===================== */
+
+.lateral {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 32px);
+  padding: 14px;
+  overflow-y: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--bg-surface);
+}
+
+.busca {
+  position: relative;
+}
+
+.buscaIcone {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.busca .buscaInput {
+  padding-left: 34px;
+  height: 38px;
+  font-size: 14px;
+}
+
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.secaoTitulo {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.vazioLateral {
+  margin: 4px 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.arvoreLista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arvoreItemArrastando {
+  position: relative;
+  z-index: 2;
+  opacity: 0.85;
+}
+
+.arvoreLinha {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 32px;
+  padding-right: 4px;
+  border-radius: 8px;
+  color: var(--text-soft);
+}
+
+.arvoreLinha:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.arvoreLinhaSelecionada,
+.arvoreLinhaSelecionada:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.arvoreAlca,
+.arvoreSeta,
+.arvoreAcao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.arvoreAlca {
+  width: 14px;
+  height: 24px;
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
+}
+
+.arvoreLinha:hover .arvoreAlca,
+.arvoreAlca:focus-visible {
+  opacity: 1;
+}
+
+.arvoreSeta {
+  width: 20px;
+  height: 22px;
+  transition: transform 0.15s ease;
+}
+
+.arvoreSeta:disabled {
+  cursor: default;
+}
+
+.arvoreSetaAberta {
+  transform: rotate(90deg);
+}
+
+.arvoreTitulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 2px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.arvoreTitulo span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arvoreIcone {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.semTitulo {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.estrelaMini {
+  flex-shrink: 0;
+  color: var(--warning-text);
+  fill: currentColor;
+}
+
+.arvoreAcoes {
+  position: relative;
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+}
+
+.arvoreLinha:hover .arvoreAcoes,
+.arvoreLinha:focus-within .arvoreAcoes {
+  opacity: 1;
+}
+
+.arvoreAcao {
+  width: 24px;
+  height: 24px;
+}
+
+.arvoreAcao:hover {
+  background: var(--bg-surface-muted);
+  color: var(--text);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+}
+
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--bg-hover-neutral);
+  color: var(--text);
+}
+
+.menu .menuPerigo,
+.menu .menuPerigo:hover {
+  color: var(--danger-text);
+}
+
+.favorita {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.favorita:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.favorita span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultados {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resultado:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.resultado strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.resultado span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.botaoLixeira {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.botaoLixeira:hover {
+  background: var(--bg-hover-neutral);
+  color: var(--text);
+}
+
+.contador {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ===================== ÁREA DO EDITOR ===================== */
+
+.area {
+  min-width: 0;
+  min-height: 60vh;
+  padding: 22px 26px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--bg-surface);
+}
+
+.barraMobile {
+  display: none;
+}
+
+.editorTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.trilha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.trilhaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trilhaItem button {
+  padding: 2px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.trilhaItem button:hover {
+  background: var(--bg-hover-neutral);
+  color: var(--text);
+}
+
+.trilhaAtual {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.editorAcoes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.statusProblema {
+  color: var(--danger-text);
+}
+
+.girando {
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.estrelaAtiva {
+  color: var(--warning-text);
+  fill: currentColor;
+}
+
+.titulo {
+  width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.titulo::placeholder {
+  color: var(--text-faint);
+}
+
+/* O editor de sempre, com mais ar para texto longo. */
+.editor :global(.ProseMirror) {
+  font-size: 15px;
+}
+
+/* ===================== MODAIS ===================== */
+
+.destinos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.destino {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.destino:hover {
+  background: var(--bg-hover-neutral);
+}
+
+.destinoSelecionado,
+.destinoSelecionado:hover {
+  border-color: var(--primary-soft-border);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.lixeiraLista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lixeiraItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.lixeiraTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lixeiraTextos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.lixeiraTextos span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ===================== CELULAR / TELA ESTREITA ===================== */
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .lateral {
+    position: static;
+    max-height: none;
+  }
+
+  .lateralFechada {
+    display: none;
+  }
+
+  .barraMobile {
+    display: flex;
+    margin-bottom: 12px;
+  }
+
+  .area {
+    padding: 16px;
+  }
+
+  .titulo {
+    font-size: 22px;
+  }
+
+  /* Sem hover no toque: ações da página sempre visíveis. */
+  .arvoreAcoes,
+  .arvoreAlca {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation: none;
+  }
+}
