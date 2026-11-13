@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Printer, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  MoveHorizontal,
+  Printer,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 /*
  * Build "legacy" (não a raiz "pdfjs-dist") -- a raiz assume DOMMatrix
  * disponível já na avaliação do módulo, o que não existe em Node.js.
@@ -46,10 +55,28 @@ interface PdfViewerKioskProps {
   onFechar: () => void;
 }
 
-const ZOOM_MIN = 0.5;
+/* 0.2 e não 0.5: no celular, uma folha A3 inteira na largura da tela fica perto de 30%. */
+const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;
 const ZOOM_PASSO = 0.25;
 const ZOOM_INICIAL = 1.2;
+
+/*
+ * Tela estreita (celular/tablet em pé): abre a folha ajustada à largura
+ * em vez dos 120% do terminal -- senão só aparece um canto do desenho.
+ * Mesmo corte do @media de PdfViewerKiosk.module.css, e o respiro em
+ * volta da folha precisa bater com o padding de .paginaWrapper lá.
+ */
+const LARGURA_TELA_ESTREITA = 900;
+const RESPIRO_FOLHA = 24;
+const RESPIRO_FOLHA_ESTREITA = 8;
+
+/*
+ * Teto de pixels do canvas. Safari no iPhone recusa canvas acima de
+ * ~16,7 milhões de pixels (fica em branco, sem erro); com a densidade
+ * de tela (2x/3x) multiplicando a resolução, um zoom alto passaria disso.
+ */
+const MAXIMO_PIXELS_CANVAS = 16_000_000;
 
 /* Fator por "unidade" de deltaY do wheel — dá uma sensação contínua/suave tanto no scroll do mouse quanto no pinça do trackpad (que reporta deltaY fracionário). */
 const ZOOM_SENSIBILIDADE_SCROLL = 0.0015;
@@ -74,13 +101,56 @@ const DEBOUNCE_ZOOM_MS = 160;
  */
 const TIMEOUT_IMPRESSAO_MS = 20000;
 
+/*
+ * Ponto da folha que deve ficar parado na tela durante o zoom: a
+ * posição relativa dentro da folha (0..1) e onde, na tela, ela tem que
+ * continuar. Aplicado logo depois do redimensionar (ver o
+ * useLayoutEffect de zoom).
+ */
 interface FocoZoom {
   ratioX: number;
   ratioY: number;
-  offsetX: number;
-  offsetY: number;
   clientX: number;
   clientY: number;
+}
+
+function limitarZoom(valor: number) {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, valor));
+}
+
+function focoNoPonto(canvas: HTMLCanvasElement | null, clientX: number, clientY: number): FocoZoom | null {
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+
+  return {
+    ratioX: (clientX - rect.left) / rect.width,
+    ratioY: (clientY - rect.top) / rect.height,
+    clientX,
+    clientY,
+  };
+}
+
+function focoNoCentro(canvas: HTMLCanvasElement | null, container: HTMLElement | null): FocoZoom | null {
+  if (!container) return null;
+  const rect = container.getBoundingClientRect();
+  return focoNoPonto(canvas, rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
+
+/* Zoom que faz a folha caber na largura do container. */
+function zoomParaLargura(container: HTMLElement | null, larguraFolha: number) {
+  if (!container || larguraFolha <= 0) return null;
+  const respiro = container.clientWidth < LARGURA_TELA_ESTREITA ? RESPIRO_FOLHA_ESTREITA : RESPIRO_FOLHA;
+  return limitarZoom((container.clientWidth - respiro * 2) / larguraFolha);
+}
+
+/*
+ * Resolução real do canvas: acompanha a densidade da tela (senão o
+ * desenho fica borrado no celular), respeitando o teto de pixels.
+ */
+function escalaDeSaida(largura: number, altura: number) {
+  const densidade = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  return Math.min(densidade, Math.sqrt(MAXIMO_PIXELS_CANVAS / Math.max(1, largura * altura)));
 }
 
 export function PdfViewerKiosk({
@@ -95,6 +165,8 @@ export function PdfViewerKiosk({
   const urlImpressaoRef = useRef<string | null>(null);
   const timeoutImpressaoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focoZoomRef = useRef<FocoZoom | null>(null);
+  const zoomRef = useRef(ZOOM_INICIAL);
+  const larguraFolhaRef = useRef(0);
   const arrastoRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(
     null
   );
@@ -102,6 +174,8 @@ export function PdfViewerKiosk({
   const [documento, setDocumento] = useState<PDFDocumentProxy | null>(null);
   const [pagina, setPagina] = useState(1);
   const [zoom, setZoom] = useState(ZOOM_INICIAL);
+  /* Muda a cada gesto com foco -- faz o ajuste de rolagem rodar mesmo quando o zoom não muda (pinça só arrastando). */
+  const [ajusteFoco, setAjusteFoco] = useState(0);
   const [zoomParaRenderizar, setZoomParaRenderizar] = useState(ZOOM_INICIAL);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -116,18 +190,47 @@ export function PdfViewerKiosk({
   const [erroImpressao, setErroImpressao] = useState<string | null>(null);
 
   useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  function aplicarZoom(novoZoom: number, foco: FocoZoom | null) {
+    focoZoomRef.current = foco;
+    setZoom(limitarZoom(novoZoom));
+    setAjusteFoco((atual) => atual + 1);
+  }
+
+  useEffect(() => {
     let cancelado = false;
 
     /* pdf.js pode assumir posse do buffer (detach) — copia pra não quebrar se algo mais usar `data`. */
     const bytes = new Uint8Array(data.slice(0));
 
-    pdfjsLib.getDocument({ data: bytes }).promise.then(
-      (doc) => {
+    pdfjsLib
+      .getDocument({ data: bytes })
+      .promise.then(async (doc) => {
         if (cancelado) return;
+
+        /*
+         * Em tela estreita já abre na largura da tela (antes do primeiro
+         * desenho, pra não rasterizar uma vez em 120% à toa).
+         */
+        const primeira = await doc.getPage(1);
+        if (cancelado) return;
+
+        const container = containerRef.current;
+        if (container && container.clientWidth < LARGURA_TELA_ESTREITA) {
+          const ajustado = zoomParaLargura(container, primeira.getViewport({ scale: 1 }).width);
+          if (ajustado !== null) {
+            setZoom(ajustado);
+            setZoomParaRenderizar(ajustado);
+            setZoomRenderizado(ajustado);
+          }
+        }
+
         setDocumento(doc);
         setCarregando(false);
-      },
-      (erroCarregamento: unknown) => {
+      })
+      .catch((erroCarregamento: unknown) => {
         if (cancelado) return;
         setErro(
           erroCarregamento instanceof Error
@@ -135,8 +238,7 @@ export function PdfViewerKiosk({
             : "Não foi possível abrir o PDF."
         );
         setCarregando(false);
-      }
-    );
+      });
 
     return () => {
       cancelado = true;
@@ -149,6 +251,23 @@ export function PdfViewerKiosk({
     return () => clearTimeout(id);
   }, [zoom]);
 
+  /*
+   * Mantém sob o dedo/cursor (ou no centro, nos botões) o mesmo ponto da
+   * folha depois que o canvas muda de tamanho. Roda depois do DOM já ter
+   * o tamanho novo (prévia em CSS) e antes da pintura, então não pisca.
+   */
+  useLayoutEffect(() => {
+    const foco = focoZoomRef.current;
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!foco || !canvas || !container) return;
+
+    focoZoomRef.current = null;
+    const rect = canvas.getBoundingClientRect();
+    container.scrollLeft += rect.left + foco.ratioX * rect.width - foco.clientX;
+    container.scrollTop += rect.top + foco.ratioY * rect.height - foco.clientY;
+  }, [zoom, ajusteFoco]);
+
   useEffect(() => {
     if (!documento) return;
 
@@ -159,32 +278,24 @@ export function PdfViewerKiosk({
       .then(async (page) => {
         if (cancelado) return;
 
+        larguraFolhaRef.current = page.getViewport({ scale: 1 }).width;
+
         const viewport = page.getViewport({ scale: zoomParaRenderizar });
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        const escala = escalaDeSaida(viewport.width, viewport.height);
+        canvas.width = Math.floor(viewport.width * escala);
+        canvas.height = Math.floor(viewport.height * escala);
+        /* Tamanho na tela continua o do zoom; a escala extra é só nitidez. */
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
 
-        /*
-         * Zoom pelo scroll/pinça guarda em focoZoomRef o ponto do
-         * PDF que estava sob o cursor antes do redimensionar — aqui
-         * (já com o canvas no tamanho novo, mas antes do render
-         * assíncrono terminar) reposiciona o scroll pra manter esse
-         * mesmo ponto sob o cursor, em vez de saltar pro canto.
-         */
-        const foco = focoZoomRef.current;
-        const container = containerRef.current;
-        if (foco && container) {
-          const containerRect = container.getBoundingClientRect();
-          container.scrollLeft =
-            foco.offsetX + foco.ratioX * canvas.width - (foco.clientX - containerRect.left);
-          container.scrollTop =
-            foco.offsetY + foco.ratioY * canvas.height - (foco.clientY - containerRect.top);
-          focoZoomRef.current = null;
-        }
-
-        await page.render({ canvas, viewport }).promise;
+        await page.render({
+          canvas,
+          viewport,
+          transform: escala !== 1 ? [escala, 0, 0, escala, 0, 0] : undefined,
+        }).promise;
         if (cancelado) return;
 
         setPaginaRenderizada(pagina);
@@ -203,7 +314,7 @@ export function PdfViewerKiosk({
     };
   }, [documento, pagina, zoomParaRenderizar]);
 
-  /* Clicar e arrastar pra rolar a folha (o mesmo gesto do Google Maps/Figma), sem depender só das barras de rolagem. */
+  /* Clicar e arrastar pra rolar a folha (o mesmo gesto do Google Maps/Figma), sem depender só das barras de rolagem. No toque, a rolagem nativa já faz isso. */
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -265,28 +376,74 @@ export function PdfViewerKiosk({
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
 
-      const canvas = canvasRef.current;
-      const containerAtual = containerRef.current;
-      if (canvas && containerAtual) {
-        const canvasRect = canvas.getBoundingClientRect();
-        const containerRect = containerAtual.getBoundingClientRect();
-
-        focoZoomRef.current = {
-          ratioX: (event.clientX - canvasRect.left) / canvasRect.width,
-          ratioY: (event.clientY - canvasRect.top) / canvasRect.height,
-          offsetX: canvasRect.left - containerRect.left + containerAtual.scrollLeft,
-          offsetY: canvasRect.top - containerRect.top + containerAtual.scrollTop,
-          clientX: event.clientX,
-          clientY: event.clientY,
-        };
-      }
-
+      focoZoomRef.current = focoNoPonto(canvasRef.current, event.clientX, event.clientY);
       const fator = Math.exp(-event.deltaY * ZOOM_SENSIBILIDADE_SCROLL);
-      setZoom((atual) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, atual * fator)));
+      setZoom((atual) => limitarZoom(atual * fator));
+      setAjusteFoco((atual) => atual + 1);
     }
 
     container.addEventListener("wheel", aoWheel, { passive: false });
     return () => container.removeEventListener("wheel", aoWheel);
+  }, []);
+
+  /*
+   * Pinça com dois dedos (celular, tablet, terminal com tela de toque):
+   * zoom só no desenho, ancorado entre os dedos, e arrastar os dois
+   * dedos move a folha junto. Um dedo continua rolando normalmente
+   * (touch-action: pan-x pan-y no CSS, que também impede o navegador de
+   * dar zoom na página inteira, barra incluída).
+   */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let pinca: { distancia: number; zoom: number; ratioX: number; ratioY: number } | null = null;
+
+    function medir(toques: TouchList) {
+      const [a, b] = [toques[0], toques[1]];
+      return {
+        distancia: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        x: (a.clientX + b.clientX) / 2,
+        y: (a.clientY + b.clientY) / 2,
+      };
+    }
+
+    function aoTouchStart(event: TouchEvent) {
+      if (event.touches.length !== 2) return;
+
+      const { distancia, x, y } = medir(event.touches);
+      const foco = focoNoPonto(canvasRef.current, x, y);
+      if (!foco || distancia === 0) return;
+
+      pinca = { distancia, zoom: zoomRef.current, ratioX: foco.ratioX, ratioY: foco.ratioY };
+      event.preventDefault();
+    }
+
+    function aoTouchMove(event: TouchEvent) {
+      if (!pinca || event.touches.length !== 2) return;
+      event.preventDefault();
+
+      const { distancia, x, y } = medir(event.touches);
+      focoZoomRef.current = { ratioX: pinca.ratioX, ratioY: pinca.ratioY, clientX: x, clientY: y };
+      setZoom(limitarZoom(pinca.zoom * (distancia / pinca.distancia)));
+      setAjusteFoco((atual) => atual + 1);
+    }
+
+    function aoTouchEnd(event: TouchEvent) {
+      if (event.touches.length < 2) pinca = null;
+    }
+
+    container.addEventListener("touchstart", aoTouchStart, { passive: false });
+    container.addEventListener("touchmove", aoTouchMove, { passive: false });
+    container.addEventListener("touchend", aoTouchEnd);
+    container.addEventListener("touchcancel", aoTouchEnd);
+
+    return () => {
+      container.removeEventListener("touchstart", aoTouchStart);
+      container.removeEventListener("touchmove", aoTouchMove);
+      container.removeEventListener("touchend", aoTouchEnd);
+      container.removeEventListener("touchcancel", aoTouchEnd);
+    };
   }, []);
 
   /* O blob da impressão vive enquanto o visualizador estiver aberto. */
@@ -305,6 +462,23 @@ export function PdfViewerKiosk({
   }, []);
 
   const totalPaginas = documento?.numPages ?? 1;
+
+  function zoomPeloBotao(delta: number) {
+    aplicarZoom(zoom + delta, focoNoCentro(canvasRef.current, containerRef.current));
+  }
+
+  function ajustarALargura() {
+    const ajustado = zoomParaLargura(containerRef.current, larguraFolhaRef.current);
+    if (ajustado === null) return;
+
+    /* Ancora o topo da folha no topo da área: depois de caber na largura, o natural é ver a folha desde o alto. */
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const respiro = container.clientWidth < LARGURA_TELA_ESTREITA ? RESPIRO_FOLHA_ESTREITA : RESPIRO_FOLHA;
+    aplicarZoom(ajustado, { ratioX: 0.5, ratioY: 0, clientX: rect.left + rect.width / 2, clientY: rect.top + respiro });
+  }
 
   /*
    * Imprime o PDF ORIGINAL, não os canvas desenhados na tela: o
@@ -387,7 +561,10 @@ export function PdfViewerKiosk({
   return (
     <div className={styles.overlay}>
       <div className={styles.overlayBarra}>
-        <span className={styles.overlayTitulo}>Desenho — {itemCodigo}</span>
+        <span className={styles.overlayTitulo}>
+          <span className={styles.textoLargo}>Desenho — </span>
+          {itemCodigo}
+        </span>
 
         <div className={styles.controles}>
           <div className={styles.grupo}>
@@ -402,7 +579,17 @@ export function PdfViewerKiosk({
             </button>
 
             <span className={styles.paginaTexto}>
-              {carregando ? "—" : `Página ${pagina} de ${totalPaginas}`}
+              {carregando ? (
+                "—"
+              ) : (
+                <>
+                  <span className={styles.textoLargo}>Página </span>
+                  {pagina}
+                  <span className={styles.textoLargo}> de </span>
+                  <span className={styles.textoEstreito}>/</span>
+                  {totalPaginas}
+                </>
+              )}
             </span>
 
             <button
@@ -420,23 +607,34 @@ export function PdfViewerKiosk({
             <button
               type="button"
               className={styles.botao}
-              onClick={() => setZoom((atual) => Math.max(ZOOM_MIN, atual - ZOOM_PASSO))}
+              onClick={() => zoomPeloBotao(-ZOOM_PASSO)}
               disabled={carregando || zoom <= ZOOM_MIN}
               aria-label="Diminuir zoom"
             >
               <ZoomOut size={18} />
             </button>
 
-            <span className={styles.paginaTexto}>{Math.round(zoom * 100)}%</span>
+            <span className={`${styles.paginaTexto} ${styles.zoomTexto}`}>{Math.round(zoom * 100)}%</span>
 
             <button
               type="button"
               className={styles.botao}
-              onClick={() => setZoom((atual) => Math.min(ZOOM_MAX, atual + ZOOM_PASSO))}
+              onClick={() => zoomPeloBotao(ZOOM_PASSO)}
               disabled={carregando || zoom >= ZOOM_MAX}
               aria-label="Aumentar zoom"
             >
               <ZoomIn size={18} />
+            </button>
+
+            <button
+              type="button"
+              className={styles.botao}
+              onClick={ajustarALargura}
+              disabled={carregando || !!erro}
+              aria-label="Ajustar à largura da tela"
+              title="Ajustar à largura da tela"
+            >
+              <MoveHorizontal size={18} />
             </button>
           </div>
 
@@ -448,13 +646,14 @@ export function PdfViewerKiosk({
                 onClick={imprimir}
                 disabled={carregando || !!erro || preparandoImpressao}
                 title="Imprimir o desenho"
+                aria-label="Imprimir o desenho"
               >
                 {preparandoImpressao ? (
                   <Loader2 className={styles.spin} size={18} />
                 ) : (
                   <Printer size={18} />
                 )}
-                Imprimir
+                <span className={styles.textoLargo}>Imprimir</span>
               </button>
 
               {erroImpressao && (

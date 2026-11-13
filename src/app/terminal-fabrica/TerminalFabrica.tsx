@@ -78,6 +78,8 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
   const [modelos3DCache, setModelos3DCache] = useState<Modelo3DPlay[] | null>(null);
 
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  /* URL do 3D quando o navegador bloqueou a aba nova -- vira um link para tocar. */
+  const [link3DBloqueado, setLink3DBloqueado] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const janela3DRef = useRef<Window | null>(null);
@@ -182,6 +184,7 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
 
     setBuscando(true);
     setErro(null);
+    setLink3DBloqueado(null);
     setModelos3D([]);
     setPdfDisponivel(null);
     setModelos3DCache(null);
@@ -226,6 +229,7 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
     setCodigo("");
     setItem(null);
     setErro(null);
+    setLink3DBloqueado(null);
     setModelos3D([]);
     setPdfDisponivel(null);
     setModelos3DCache(null);
@@ -254,6 +258,7 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
     if (!item) return;
 
     setErro(null);
+    setLink3DBloqueado(null);
 
     /* A verificação de disponibilidade em segundo plano já buscou isso — reaproveita em vez de consultar de novo. */
     if (modelos3DCache !== null) {
@@ -325,6 +330,17 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
     fecharJanela3DSeAberta();
     janela3DRef.current = window.open(url, "_blank");
 
+    /*
+     * Celular (Safari/Chrome) bloqueia aba aberta depois de uma espera
+     * assíncrona -- caso de clicar antes da busca do 3D em segundo plano
+     * terminar. Em vez de não acontecer nada, vira um link: o toque nele
+     * é um gesto direto, que o navegador deixa abrir.
+     */
+    if (!janela3DRef.current) {
+      setLink3DBloqueado(url);
+      return;
+    }
+
     timeoutFechar3DRef.current = setTimeout(fecharJanela3DSeAberta, 5 * 60 * 1000);
   }
 
@@ -368,7 +384,14 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
                 value={codigo}
                 onChange={(event) => setCodigo(event.target.value)}
                 placeholder="Código do item"
+                aria-label="Código do item"
                 autoFocus
+                /* Celular: teclado com "Buscar" no Enter, sem corretor nem sugestão mexendo no código. */
+                enterKeyHint="search"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
                 disabled={buscando}
               />
             </div>
@@ -487,6 +510,18 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
               <AlertCircle size={22} />
               {erro}
             </div>
+          )}
+
+          {link3DBloqueado && (
+            <a
+              className={styles.link3D}
+              href={link3DBloqueado}
+              target="_blank"
+              onClick={() => setLink3DBloqueado(null)}
+            >
+              <Box size={20} />
+              Modelo 3D pronto — toque para abrir
+            </a>
           )}
 
           <button

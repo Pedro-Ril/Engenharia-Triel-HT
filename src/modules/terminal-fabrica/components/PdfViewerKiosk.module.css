@@ -130,6 +130,11 @@
 
   cursor: grab;
   user-select: none;
+
+  /* Um dedo rola (nativo); a pinça de dois dedos é tratada no componente, só no desenho -- sem isso o navegador dá zoom na página toda, barra junto. */
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .overlayConteudo.arrastando {
@@ -240,4 +245,106 @@
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.3;
+}
+
+/* Rótulos que encurtam em tela estreita ("Página 1 de 3" vira "1/3"). */
+.textoEstreito {
+  display: none;
+}
+
+/*
+ * Tela estreita (celular, inclusive deitado; tablet em pé). Mesmo corte
+ * de LARGURA_TELA_ESTREITA em PdfViewerKiosk.tsx. Tudo compacto numa
+ * linha; o título encolhe antes de qualquer botão, então o "Fechar"
+ * nunca sai da tela.
+ */
+@media (max-width: 900px) {
+  .overlayBarra {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  }
+
+  .overlayTitulo {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1rem;
+  }
+
+  .overlayFecharBotao {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 0.95rem;
+  }
+
+  .controles {
+    gap: 12px;
+  }
+
+  .grupo {
+    gap: 4px;
+  }
+
+  .botao {
+    width: 38px;
+    height: 38px;
+  }
+
+  .paginaTexto {
+    min-width: 34px;
+  }
+
+  .zoomTexto {
+    min-width: 44px;
+  }
+
+  .botaoImprimir {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .textoLargo {
+    display: none;
+  }
+
+  .textoEstreito {
+    display: inline;
+  }
+
+  .paginaWrapper {
+    padding: 8px;
+  }
+
+  .avisoImpressao {
+    max-width: 160px;
+  }
+}
+
+/*
+ * Celular em pé: não cabe numa linha. Código + Fechar em cima, os
+ * controles embaixo ocupando a largura toda. Botões de 36px para caber
+ * até em tela de 360px sem quebrar uma terceira linha.
+ */
+@media (max-width: 640px) {
+  .controles {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .botao,
+  .botaoImprimir {
+    width: 36px;
+    height: 36px;
+  }
+
+  .zoomTexto {
+    min-width: 42px;
+  }
 }
