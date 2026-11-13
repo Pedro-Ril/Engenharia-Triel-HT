@@ -170,6 +170,31 @@ export interface ContagemCategoria {
   total: number;
 }
 
+/* Linha da lista do relatório exportado do dashboard (ver listarChamadosRelatorio). */
+export interface ChamadoRelatorio {
+  numero: number;
+  titulo: string;
+  setorNome: string;
+  categoriaNome: string | null;
+  empresa: string | null;
+  unidade: string | null;
+  solicitanteNome: string;
+  solicitanteDepartamento: string | null;
+  atendenteNome: string | null;
+  status: StatusChamado;
+  prioridade: PrioridadeChamado;
+  criadoEm: string;
+  resolvidoEm: string | null;
+  fechadoEm: string | null;
+  dataPrevistaConclusao: string | null;
+}
+
+export interface RelatorioChamados {
+  itens: ChamadoRelatorio[];
+  total: number;
+  limite: number;
+}
+
 export type EventoNotificacaoChamado =
   | "aberto"
   | "aceito"

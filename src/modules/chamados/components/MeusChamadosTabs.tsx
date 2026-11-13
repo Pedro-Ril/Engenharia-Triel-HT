@@ -18,6 +18,7 @@ import {
 
 import type { ChamadoResumo } from "../types/chamados.types";
 import { PrioridadeBadge, StatusBadge } from "./ChamadoBadges";
+import { ExportarChamadoAcoes } from "./ExportarChamadoAcoes";
 
 interface MeusChamadosTabsProps {
   meusChamados: ChamadoResumo[];
@@ -54,6 +55,7 @@ function TabelaChamados({ chamados, mensagemVazia }: { chamados: ChamadoResumo[]
             <TableHeaderCell>Status</TableHeaderCell>
             <TableHeaderCell>Prioridade</TableHeaderCell>
             <TableHeaderCell>Atualizado em</TableHeaderCell>
+            <TableHeaderCell align="center">Ações</TableHeaderCell>
           </TableRow>
         </TableHead>
 
@@ -73,6 +75,9 @@ function TabelaChamados({ chamados, mensagemVazia }: { chamados: ChamadoResumo[]
                 <PrioridadeBadge prioridade={chamado.prioridade} />
               </TableCell>
               <TableCell>{formatarData(chamado.atualizadoEm)}</TableCell>
+              <TableCell align="center">
+                <ExportarChamadoAcoes numero={chamado.numero} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

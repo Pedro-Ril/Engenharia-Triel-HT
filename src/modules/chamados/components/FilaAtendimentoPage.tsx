@@ -53,6 +53,7 @@ import type {
 } from "../types/chamados.types";
 import { PrioridadeBadge, PRIORIDADE_LABELS, StatusBadge, STATUS_LABELS } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
+import { ExportarChamadoAcoes } from "./ExportarChamadoAcoes";
 
 interface FilaAtendimentoPageProps {
   setores: SetorChamado[];
@@ -453,6 +454,7 @@ export function FilaAtendimentoPage({
                   <TableHeaderCell>Status</TableHeaderCell>
                   <TableHeaderCell>Prioridade</TableHeaderCell>
                   <TableHeaderCell>Atualizado em</TableHeaderCell>
+                  <TableHeaderCell align="center">Ações</TableHeaderCell>
                 </TableRow>
               </TableHead>
 
@@ -491,6 +493,9 @@ export function FilaAtendimentoPage({
                       <PrioridadeBadge prioridade={chamado.prioridade} />
                     </TableCell>
                     <TableCell>{formatarData(chamado.atualizadoEm)}</TableCell>
+                    <TableCell align="center">
+                      <ExportarChamadoAcoes numero={chamado.numero} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

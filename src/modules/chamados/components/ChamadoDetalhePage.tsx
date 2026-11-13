@@ -55,6 +55,7 @@ import type {
 import { LIMITE_TEXTO_MENSAGEM, mensagemVazia, useImagensColadas } from "../utils/mensagemFormatada";
 import { PrioridadeBadge, PRIORIDADE_LABELS, StatusBadge } from "./ChamadoBadges";
 import styles from "./Chamados.module.css";
+import { ExportarChamadoAcoes } from "./ExportarChamadoAcoes";
 import { UsuarioAutocomplete } from "./UsuarioAutocomplete";
 
 interface ChamadoDetalhePageProps {
@@ -373,9 +374,12 @@ export function ChamadoDetalhePage({
           chamado.criadoPorNome ? ` (registrado por ${chamado.criadoPorNome})` : ""
         } em ${formatarData(chamado.criadoEm)}`}
         actions={
-          <Stack direction="row" gap={8}>
-            <StatusBadge status={chamado.status} />
-            <PrioridadeBadge prioridade={chamado.prioridade} />
+          <Stack direction="row" gap={12} align="center" wrap>
+            <Stack direction="row" gap={8}>
+              <StatusBadge status={chamado.status} />
+              <PrioridadeBadge prioridade={chamado.prioridade} />
+            </Stack>
+            <ExportarChamadoAcoes numero={chamado.numero} chamado={chamado} aparencia="botoes" />
           </Stack>
         }
       />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Clock3, Headset, Home, Inbox } from "lucide-react";
+import { BarChart3, Clock3, FileSpreadsheet, FileText, Headset, Home, Inbox } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -28,12 +28,17 @@ import { Dropdown } from "@/components/ui/Dropdown";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
 import { Loader } from "@/components/ui/Loader";
+import { Toast } from "@/components/ui/Toast";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 
-import { buscarEstatisticasChamados } from "../services/chamados.service";
+import { buscarEstatisticasChamados, buscarRelatorioChamados } from "../services/chamados.service";
+import type { FiltrosDashboardParams } from "../services/chamados.service";
+import { formatarDataSimples } from "../utils/exportarChamado";
+import { exportarDashboardExcel, exportarDashboardPdf } from "../utils/exportarDashboard";
+import type { FiltroAplicado } from "../utils/exportarDashboard";
 import type {
   CategoriaChamado,
   EstatisticasChamados,
@@ -116,6 +121,8 @@ export function DashboardChamadosPage({
   const [erro, setErro] = useState<string | null>(null);
   const [recarregarChave, setRecarregarChave] = useState(0);
   const temDadosRef = useRef(false);
+  const [exportando, setExportando] = useState<"pdf" | "excel" | null>(null);
+  const [erroExportacao, setErroExportacao] = useState<string | null>(null);
 
   /*
    * Em modo TV (fullscreen) esta tela roda sem ninguém pra
@@ -261,6 +268,58 @@ export function DashboardChamadosPage({
   function tentarNovamente() {
     setCarregando(true);
     setRecarregarChave((atual) => atual + 1);
+  }
+
+  /* Filtros como aparecem no cabeçalho do relatório (só os preenchidos). */
+  function filtrosAplicados(): FiltroAplicado[] {
+    const categoriaNome = categorias.find((categoria) => categoria.id === categoriaId)?.nome;
+    const lista: (FiltroAplicado | null)[] = [
+      setorFiltradoNome ? { rotulo: "Setor", valor: setorFiltradoNome } : null,
+      empresa ? { rotulo: "Empresa", valor: empresa } : null,
+      unidadeFiltradaNome ? { rotulo: "Unidade", valor: unidadeFiltradaNome } : null,
+      departamento ? { rotulo: "Departamento", valor: departamento } : null,
+      categoriaNome ? { rotulo: "Categoria", valor: categoriaNome } : null,
+      dataInicial ? { rotulo: "Data inicial", valor: formatarDataSimples(dataInicial) } : null,
+      dataFinal ? { rotulo: "Data final", valor: formatarDataSimples(dataFinal) } : null,
+    ];
+    return lista.filter((filtro): filtro is FiltroAplicado => filtro !== null);
+  }
+
+  /*
+   * Números e lista buscados juntos, na hora, com os filtros da tela -- a
+   * página gerencial e a lista do relatório saem do mesmo instante.
+   */
+  async function exportar(formato: "pdf" | "excel") {
+    setExportando(formato);
+    setErroExportacao(null);
+
+    const params: FiltrosDashboardParams = {
+      setorId: setorId || undefined,
+      empresa: empresa || undefined,
+      unidadeId: unidadeId || undefined,
+      departamento: departamento || undefined,
+      categoriaId: categoriaId || undefined,
+      dataInicial: dataInicial || undefined,
+      dataFinal: dataFinal || undefined,
+    };
+
+    try {
+      const [estatisticas, relatorio] = await Promise.all([
+        buscarEstatisticasChamados(params),
+        buscarRelatorioChamados(params),
+      ]);
+
+      if (!estatisticas.ok || !estatisticas.data || !relatorio.ok || !relatorio.data) {
+        throw new Error(estatisticas.message ?? relatorio.message ?? "Não foi possível montar o relatório.");
+      }
+
+      if (formato === "pdf") exportarDashboardPdf(estatisticas.data, relatorio.data, filtrosAplicados());
+      else exportarDashboardExcel(estatisticas.data, relatorio.data, filtrosAplicados());
+    } catch (error) {
+      setErroExportacao(error instanceof Error ? error.message : "Não foi possível gerar o arquivo.");
+    } finally {
+      setExportando(null);
+    }
   }
 
   if (carregando || !dados) {
@@ -525,6 +584,30 @@ export function DashboardChamadosPage({
       <PageHeader
         title="Dashboard de chamados"
         description="Indicadores consolidados dos setores que você atende."
+        actions={
+          <Stack direction="row" gap={8}>
+            <Button
+              variant="secondary"
+              onClick={() => exportar("pdf")}
+              loading={exportando === "pdf"}
+              loadingLabel="Gerando..."
+              disabled={exportando !== null}
+            >
+              <FileText size={16} />
+              Exportar PDF
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => exportar("excel")}
+              loading={exportando === "excel"}
+              loadingLabel="Gerando..."
+              disabled={exportando !== null}
+            >
+              <FileSpreadsheet size={16} />
+              Exportar Excel
+            </Button>
+          </Stack>
+        }
       />
 
       <Breadcrumb
@@ -689,6 +772,14 @@ export function DashboardChamadosPage({
           </div>
         </Card>
       </Stack>
+
+      <Toast
+        open={erroExportacao !== null}
+        variant="danger"
+        title="Não foi possível exportar o relatório"
+        description={erroExportacao ?? undefined}
+        onClose={() => setErroExportacao(null)}
+      />
     </PageContainer>
   );
 }

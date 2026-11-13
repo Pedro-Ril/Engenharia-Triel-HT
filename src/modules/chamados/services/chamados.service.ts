@@ -10,6 +10,7 @@ import type {
   NotificacaoEmailChamado,
   OpcoesUnidadeChamado,
   PrioridadeChamado,
+  RelatorioChamados,
   SetorAceiteChamados,
   StatusChamado,
   UsuarioCopiaChamado,
@@ -249,7 +250,7 @@ export async function listarFilaAtendimento(params: {
   return parseResponse(response);
 }
 
-export async function buscarEstatisticasChamados(params: {
+export interface FiltrosDashboardParams {
   setorId?: string;
   empresa?: string;
   unidadeId?: string;
@@ -257,7 +258,9 @@ export async function buscarEstatisticasChamados(params: {
   categoriaId?: string;
   dataInicial?: string;
   dataFinal?: string;
-}): Promise<ApiEnvelope<EstatisticasChamados>> {
+}
+
+function queryFiltrosDashboard(params: FiltrosDashboardParams): string {
   const query = new URLSearchParams();
   if (params.setorId) query.set("setorId", params.setorId);
   if (params.empresa) query.set("empresa", params.empresa);
@@ -266,8 +269,21 @@ export async function buscarEstatisticasChamados(params: {
   if (params.categoriaId) query.set("categoriaId", params.categoriaId);
   if (params.dataInicial) query.set("dataInicial", params.dataInicial);
   if (params.dataFinal) query.set("dataFinal", params.dataFinal);
+  return query.toString();
+}
 
-  const response = await fetch(`/api/chamados/dashboard?${query.toString()}`);
+export async function buscarEstatisticasChamados(
+  params: FiltrosDashboardParams
+): Promise<ApiEnvelope<EstatisticasChamados>> {
+  const response = await fetch(`/api/chamados/dashboard?${queryFiltrosDashboard(params)}`);
+  return parseResponse(response);
+}
+
+/* Lista de chamados do relatório exportado -- mesmos filtros do dashboard. */
+export async function buscarRelatorioChamados(
+  params: FiltrosDashboardParams
+): Promise<ApiEnvelope<RelatorioChamados>> {
+  const response = await fetch(`/api/chamados/dashboard/relatorio?${queryFiltrosDashboard(params)}`);
   return parseResponse(response);
 }
 

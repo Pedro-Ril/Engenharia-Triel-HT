@@ -158,11 +158,149 @@ function construirFiltro(filtros: FiltrosDashboard) {
   return { clausulaWhere, inputs };
 }
 
+const PADRAO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PADRAO_DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+/*
+ * Filtros da tela (query string) -> FiltrosDashboard, já com o escopo de
+ * setores de quem pede. Usado pelo dashboard e pelo relatório exportado,
+ * para os dois saírem sempre com o mesmo recorte. Valor malformado em
+ * campo de id/data é ignorado (não vira erro de conversão no SQL).
+ */
+export function filtrosDashboardDaUrl(url: URL, setorIds: string[] | null): FiltrosDashboard {
+  const texto = (nome: string) => url.searchParams.get(nome) || undefined;
+  const uuid = (nome: string) => {
+    const valor = url.searchParams.get(nome);
+    return valor && PADRAO_UUID.test(valor) ? valor : undefined;
+  };
+  const data = (nome: string) => {
+    const valor = url.searchParams.get(nome);
+    return valor && PADRAO_DATA.test(valor) ? valor : undefined;
+  };
+
+  return {
+    setorIds,
+    setorId: uuid("setorId"),
+    empresa: texto("empresa"),
+    unidadeId: uuid("unidadeId"),
+    departamento: texto("departamento"),
+    categoriaId: uuid("categoriaId"),
+    dataInicial: data("dataInicial"),
+    dataFinal: data("dataFinal"),
+  };
+}
+
 async function criarRequestFiltrado(inputs: AplicarInput[]) {
   const pool = await getSqlServerPool();
   const request = pool.request();
   inputs.forEach((aplicar) => aplicar(request));
   return request;
+}
+
+export interface ChamadoRelatorio {
+  numero: number;
+  titulo: string;
+  setorNome: string;
+  categoriaNome: string | null;
+  empresa: string | null;
+  unidade: string | null;
+  solicitanteNome: string;
+  solicitanteDepartamento: string | null;
+  atendenteNome: string | null;
+  status: string;
+  prioridade: PrioridadeChamado;
+  criadoEm: string;
+  resolvidoEm: string | null;
+  fechadoEm: string | null;
+  dataPrevistaConclusao: string | null;
+}
+
+/* Teto do relatório exportado -- acima disso a pessoa refina os filtros (a tela avisa). */
+export const LIMITE_RELATORIO_CHAMADOS = 5000;
+
+/*
+ * A lista "propriamente dita" do relatório exportado do dashboard (PDF da
+ * página 2 em diante e aba "Chamados" do Excel) -- mesmo WHERE das
+ * estatísticas, então os números da página 1 batem com a lista.
+ */
+export async function listarChamadosRelatorio(
+  filtros: FiltrosDashboard
+): Promise<{ itens: ChamadoRelatorio[]; total: number }> {
+  const { clausulaWhere, inputs } = construirFiltro(filtros);
+
+  const [totalResult, itensResult] = await Promise.all([
+    (async () => {
+      const request = await criarRequestFiltrado(inputs);
+      return request.query<{ total: number }>(`
+        SELECT COUNT(*) AS [total] FROM dbo.portal_chamados AS c ${clausulaWhere};
+      `);
+    })(),
+    (async () => {
+      const request = await criarRequestFiltrado(inputs);
+      request.input("limite", sql.Int, LIMITE_RELATORIO_CHAMADOS);
+      return request.query<{
+        numero: number;
+        titulo: string;
+        setor_nome: string;
+        categoria_nome: string | null;
+        empresa: string | null;
+        unidade: string | null;
+        solicitante_nome: string | null;
+        solicitante_departamento: string | null;
+        atendente_nome: string | null;
+        status: string;
+        prioridade: string;
+        criado_em: string;
+        resolvido_em: string | null;
+        fechado_em: string | null;
+        data_prevista_conclusao: string | null;
+      }>(`
+        SELECT TOP (@limite)
+          c.[numero],
+          c.[titulo],
+          s.[nome] AS [setor_nome],
+          cat.[nome] AS [categoria_nome],
+          c.[empresa],
+          c.[unidade],
+          c.[solicitante_nome],
+          c.[solicitante_departamento],
+          atendente.[nome_exibicao] AS [atendente_nome],
+          c.[status],
+          c.[prioridade],
+          CONVERT(VARCHAR(33), c.[criado_em], 126) AS [criado_em],
+          CONVERT(VARCHAR(33), c.[resolvido_em], 126) AS [resolvido_em],
+          CONVERT(VARCHAR(33), c.[fechado_em], 126) AS [fechado_em],
+          CONVERT(VARCHAR(10), c.[data_prevista_conclusao], 126) AS [data_prevista_conclusao]
+        FROM dbo.portal_chamados AS c
+        INNER JOIN dbo.portal_setores AS s ON s.[id] = c.[setor_id]
+        LEFT JOIN dbo.portal_chamados_categorias AS cat ON cat.[id] = c.[categoria_id]
+        LEFT JOIN dbo.portal_usuarios AS atendente ON atendente.[id] = c.[atendente_usuario_id]
+        ${clausulaWhere}
+        ORDER BY c.[numero] DESC;
+      `);
+    })(),
+  ]);
+
+  return {
+    total: totalResult.recordset[0]?.total ?? 0,
+    itens: itensResult.recordset.map((row) => ({
+      numero: row.numero,
+      titulo: row.titulo,
+      setorNome: row.setor_nome,
+      categoriaNome: row.categoria_nome,
+      empresa: row.empresa,
+      unidade: row.unidade,
+      solicitanteNome: row.solicitante_nome ?? "",
+      solicitanteDepartamento: row.solicitante_departamento,
+      atendenteNome: row.atendente_nome,
+      status: row.status,
+      prioridade: row.prioridade as PrioridadeChamado,
+      criadoEm: row.criado_em,
+      resolvidoEm: row.resolvido_em,
+      fechadoEm: row.fechado_em,
+      dataPrevistaConclusao: row.data_prevista_conclusao,
+    })),
+  };
 }
 
 export async function buscarEstatisticasChamados(
