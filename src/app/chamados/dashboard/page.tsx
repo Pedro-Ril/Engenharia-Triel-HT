@@ -1,6 +1,7 @@
 import { registrarAcessoModuloSemFalhar } from "@/lib/auth/acesso-modulo";
 import { listarCategoriasAtivas } from "@/lib/chamados/categorias";
 import {
+  filtrarPorSetoresAtendidos,
   listarDepartamentosComChamados,
   listarEmpresasComChamados,
   listarSetoresParaChamado,
@@ -26,17 +27,22 @@ export default async function Page({ searchParams }: PageProps) {
   const { usuario, setorIds } = await requireAtendenteChamados();
   await registrarAcessoModuloSemFalhar(usuario.id, "chamados-dashboard");
 
-  const [todosSetores, categorias, empresas, unidades, departamentos, params] = await Promise.all([
-    listarSetoresParaChamado(),
-    listarCategoriasAtivas(),
-    listarEmpresasComChamados(),
-    listarUnidadesComChamados(),
-    listarDepartamentosComChamados(),
-    searchParams,
-  ]);
+  /*
+   * Admin (setorIds null) vê todos os setores; atendente, só os que atende
+   * -- nos números (API) e também nas opções de cada filtro.
+   */
+  const [todosSetores, todasCategorias, empresas, unidades, departamentos, params] =
+    await Promise.all([
+      listarSetoresParaChamado(),
+      listarCategoriasAtivas(),
+      listarEmpresasComChamados(setorIds),
+      listarUnidadesComChamados(setorIds),
+      listarDepartamentosComChamados(setorIds),
+      searchParams,
+    ]);
 
-  const setores =
-    setorIds === null ? todosSetores : todosSetores.filter((setor) => setorIds.includes(setor.id));
+  const setores = filtrarPorSetoresAtendidos(todosSetores, setorIds, (setor) => setor.id);
+  const categorias = filtrarPorSetoresAtendidos(todasCategorias, setorIds, (categoria) => categoria.setorId);
 
   return (
     <DashboardChamadosPage

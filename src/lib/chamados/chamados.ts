@@ -46,6 +46,40 @@ export async function listarSetoresParaChamado(): Promise<SetorChamado[]> {
 }
 
 /*
+ * Escopo de setor das listas de opções de filtro (fila e dashboard):
+ * null = administrador, sem restrição; lista = só chamados dos setores
+ * que a pessoa atende -- senão o filtro mostraria empresas/unidades/
+ * departamentos que só aparecem em chamados de outro setor.
+ */
+function aplicarEscopoSetores(
+  request: InstanceType<typeof sql.Request>,
+  setorIds: string[] | null,
+  coluna: string
+): string {
+  if (setorIds === null) return "";
+  if (setorIds.length === 0) return " AND 1 = 0";
+
+  const parametros = setorIds.map((id, indice) => {
+    request.input(`escopoSetor${indice}`, sql.UniqueIdentifier, id);
+    return `@escopoSetor${indice}`;
+  });
+
+  return ` AND ${coluna} IN (${parametros.join(", ")})`;
+}
+
+/* Setores (ou itens com setorId) dentro do escopo de quem atende -- null = administrador, todos. */
+export function filtrarPorSetoresAtendidos<T>(
+  itens: T[],
+  setorIds: string[] | null,
+  setorDe: (item: T) => string
+): T[] {
+  if (setorIds === null) return itens;
+
+  const permitidos = new Set(setorIds.map((id) => id.toLowerCase()));
+  return itens.filter((item) => permitidos.has(setorDe(item).toLowerCase()));
+}
+
+/*
  * Lista de códigos de empresa distintos já usados em algum
  * chamado — para os filtros de "Empresa" na fila de atendimento
  * e no dashboard (ver src/lib/chamados/dashboard.ts). Lida do
@@ -53,13 +87,15 @@ export async function listarSetoresParaChamado(): Promise<SetorChamado[]> {
  * mostrar empresas que realmente têm chamados, evitando um
  * filtro cheio de opções sem nenhum resultado.
  */
-export async function listarEmpresasComChamados(): Promise<string[]> {
+export async function listarEmpresasComChamados(setorIds: string[] | null): Promise<string[]> {
   const pool = await getSqlServerPool();
+  const request = pool.request();
+  const escopo = aplicarEscopoSetores(request, setorIds, "[setor_id]");
 
-  const result = await pool.request().query<{ empresa: string }>(`
+  const result = await request.query<{ empresa: string }>(`
     SELECT DISTINCT [empresa]
     FROM dbo.portal_chamados
-    WHERE [empresa] IS NOT NULL AND [empresa] <> ''
+    WHERE [empresa] IS NOT NULL AND [empresa] <> ''${escopo}
     ORDER BY [empresa];
   `);
 
@@ -73,13 +109,17 @@ export async function listarEmpresasComChamados(): Promise<string[]> {
  * extrairDepartamentoDoMemberOf), usada nos relatórios de
  * chamados por setor de origem.
  */
-export async function listarDepartamentosComChamados(): Promise<string[]> {
+export async function listarDepartamentosComChamados(
+  setorIds: string[] | null
+): Promise<string[]> {
   const pool = await getSqlServerPool();
+  const request = pool.request();
+  const escopo = aplicarEscopoSetores(request, setorIds, "[setor_id]");
 
-  const result = await pool.request().query<{ solicitante_departamento: string }>(`
+  const result = await request.query<{ solicitante_departamento: string }>(`
     SELECT DISTINCT [solicitante_departamento]
     FROM dbo.portal_chamados
-    WHERE [solicitante_departamento] IS NOT NULL AND [solicitante_departamento] <> ''
+    WHERE [solicitante_departamento] IS NOT NULL AND [solicitante_departamento] <> ''${escopo}
     ORDER BY [solicitante_departamento];
   `);
 
@@ -97,17 +137,21 @@ export interface OpcaoUnidadeFiltro {
  * Rótulo com o nome atual da unidade; se duas empresas tiverem unidade
  * com o mesmo nome, entra o código da empresa para diferenciar.
  */
-export async function listarUnidadesComChamados(): Promise<OpcaoUnidadeFiltro[]> {
+export async function listarUnidadesComChamados(
+  setorIds: string[] | null
+): Promise<OpcaoUnidadeFiltro[]> {
   const pool = await getSqlServerPool();
+  const request = pool.request();
+  const escopo = aplicarEscopoSetores(request, setorIds, "c.[setor_id]");
 
-  const result = await pool.request().query<{ id: string; nome: string; empresa_codigo: string | null }>(`
+  const result = await request.query<{ id: string; nome: string; empresa_codigo: string | null }>(`
     SELECT
       CONVERT(VARCHAR(36), u.[id]) AS [id],
       u.[nome],
       e.[codigo] AS [empresa_codigo]
     FROM dbo.portal_empresas_unidades AS u
     INNER JOIN dbo.portal_empresas AS e ON e.[id] = u.[empresa_id]
-    WHERE EXISTS (SELECT 1 FROM dbo.portal_chamados AS c WHERE c.[unidade_id] = u.[id])
+    WHERE EXISTS (SELECT 1 FROM dbo.portal_chamados AS c WHERE c.[unidade_id] = u.[id]${escopo})
     ORDER BY u.[nome];
   `);
 

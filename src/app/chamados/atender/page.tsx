@@ -1,6 +1,7 @@
 import { registrarAcessoModuloSemFalhar } from "@/lib/auth/acesso-modulo";
 import { listarCategoriasAtivas } from "@/lib/chamados/categorias";
 import {
+  filtrarPorSetoresAtendidos,
   listarDepartamentosComChamados,
   listarEmpresasComChamados,
   listarSetoresParaChamado,
@@ -10,16 +11,20 @@ import { requireAtendenteChamados } from "@/lib/chamados/autorizacao-chamados";
 import { FilaAtendimentoPage } from "@/modules/chamados/components/FilaAtendimentoPage";
 
 export default async function Page() {
-  const { usuario } = await requireAtendenteChamados();
+  const { usuario, setorIds } = await requireAtendenteChamados();
   await registrarAcessoModuloSemFalhar(usuario.id, "chamados-atender");
 
-  const [setores, categorias, empresas, unidades, departamentos] = await Promise.all([
+  /* Mesmo escopo do dashboard: admin vê todos os setores; atendente, só os dele (também nos filtros). */
+  const [todosSetores, todasCategorias, empresas, unidades, departamentos] = await Promise.all([
     listarSetoresParaChamado(),
     listarCategoriasAtivas(),
-    listarEmpresasComChamados(),
-    listarUnidadesComChamados(),
-    listarDepartamentosComChamados(),
+    listarEmpresasComChamados(setorIds),
+    listarUnidadesComChamados(setorIds),
+    listarDepartamentosComChamados(setorIds),
   ]);
+
+  const setores = filtrarPorSetoresAtendidos(todosSetores, setorIds, (setor) => setor.id);
+  const categorias = filtrarPorSetoresAtendidos(todasCategorias, setorIds, (categoria) => categoria.setorId);
 
   return (
     <FilaAtendimentoPage
