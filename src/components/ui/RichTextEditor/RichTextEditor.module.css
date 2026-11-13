@@ -142,6 +142,35 @@
   padding-left: 22px;
 }
 
+/*
+ * O reset base do Tailwind (@import "tailwindcss" no globals.css) zera
+ * o marcador de todo ul/ol -- sem devolver aqui, a lista numerada e a de
+ * marcadores ficavam só com o recuo, sem número nem bolinha.
+ */
+.conteudo :global(ul) {
+  list-style-type: disc;
+}
+
+.conteudo :global(ol) {
+  list-style-type: decimal;
+}
+
+.conteudo :global(ul ul) {
+  list-style-type: circle;
+}
+
+.conteudo :global(ol ol) {
+  list-style-type: lower-alpha;
+}
+
+.conteudo :global(li::marker) {
+  color: var(--text-muted);
+}
+
+.conteudo :global(li > p) {
+  margin-bottom: 0;
+}
+
 .conteudo :global(li) {
   margin-bottom: 4px;
 }
