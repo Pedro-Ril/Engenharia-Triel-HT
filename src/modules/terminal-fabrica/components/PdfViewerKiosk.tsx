@@ -41,10 +41,13 @@ import styles from "./PdfViewerKiosk.module.css";
  * src/lib/terminal-fabrica/impressao.ts): quem tem a permissão ganha
  * um botão a mais, e cada clique fica registrado.
  */
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+/*
+ * Worker servido de public/pdfjs (copiado de node_modules no predev/
+ * prebuild -- ver scripts/copiar-pdfjs-worker.mjs). A versão na URL evita
+ * o navegador usar um worker antigo do cache depois de atualizar o
+ * pdfjs-dist (o pdf.js recusa worker de versão diferente da API).
+ */
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdfjs/pdf.worker.min.js?v=${pdfjsLib.version}`;
 
 interface PdfViewerKioskProps {
   data: ArrayBuffer;

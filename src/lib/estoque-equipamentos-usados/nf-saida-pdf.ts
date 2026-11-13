@@ -72,9 +72,15 @@ export async function localizarPdfNfSaida(params: {
   const mes = Number(params.dataEmissao.slice(5, 7));
   if (!ano || !mes) return null;
 
+  /*
+   * turbopackIgnore: os caminhos são da pasta de rede, montados em tempo
+   * de execução -- sem o comentário o Turbopack tenta adivinhar que
+   * arquivos do projeto eles poderiam ser e avisa no build ("matches
+   * 10036 files"). Mesmo padrão que o próprio Next usa no código dele.
+   */
   const anos = [ano, ...(mes === 1 ? [ano - 1] : []), ...(mes === 12 ? [ano + 1] : [])];
   for (const anoBusca of anos) {
-    const pastaAno = path.join(params.pastaBase, String(anoBusca));
+    const pastaAno = path.join(/* turbopackIgnore: true */ params.pastaBase, String(anoBusca));
     const raiz = await listar(pastaAno);
     if (raiz.pastas.length === 0 && raiz.arquivos.length === 0) continue;
 
@@ -82,12 +88,12 @@ export async function localizarPdfNfSaida(params: {
     const outras = raiz.pastas.filter((p) => !doMes.includes(p));
 
     for (const pasta of [...doMes, ...outras]) {
-      const { arquivos } = await listar(path.join(pastaAno, pasta));
+      const { arquivos } = await listar(path.join(/* turbopackIgnore: true */ pastaAno, pasta));
       const achado = escolherArquivoNf(arquivos, params.numeroNf, params.numeroEquipamento);
-      if (achado) return path.join(pastaAno, pasta, achado);
+      if (achado) return path.join(/* turbopackIgnore: true */ pastaAno, pasta, achado);
     }
     const naRaiz = escolherArquivoNf(raiz.arquivos, params.numeroNf, params.numeroEquipamento);
-    if (naRaiz) return path.join(pastaAno, naRaiz);
+    if (naRaiz) return path.join(/* turbopackIgnore: true */ pastaAno, naRaiz);
   }
   return null;
 }

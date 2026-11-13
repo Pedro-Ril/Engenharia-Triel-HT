@@ -52,3 +52,6 @@ Gerador_Assinaturas
 
 # leitor de STEP/IGES copiado de node_modules (ver scripts/copiar-occt.mjs)
 /public/occt/
+
+# worker do pdf.js copiado de node_modules (ver scripts/copiar-pdfjs-worker.mjs)
+/public/pdfjs/

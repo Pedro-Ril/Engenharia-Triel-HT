@@ -9,8 +9,8 @@
     "lint": "eslint",
     "tv-signaling": "node --env-file=.env tv-signaling/server.mjs",
     "copiar-occt": "node scripts/copiar-occt.mjs",
-    "predev": "node scripts/copiar-occt.mjs",
-    "prebuild": "node scripts/copiar-occt.mjs",
+    "predev": "node scripts/copiar-occt.mjs && node scripts/copiar-pdfjs-worker.mjs",
+    "prebuild": "node scripts/copiar-occt.mjs && node scripts/copiar-pdfjs-worker.mjs",
     "test": "tsc -p tsconfig.test.json && vitest run",
     "test:integracao": "vitest run --config vitest.integracao.config.ts"
   },

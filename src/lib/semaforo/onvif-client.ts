@@ -1,6 +1,12 @@
 import "server-only";
 
-import onvifPromises from "onvif/promises";
+/*
+ * Caminho do arquivo, não "onvif/promises": o pacote não tem "exports" e
+ * "promises" é uma pasta -- import de pasta não existe em ESM no Node
+ * (ERR_UNSUPPORTED_DIR_IMPORT), e o build avisava que não dava para
+ * deixar o onvif externo (serverExternalPackages).
+ */
+import onvifPromises from "onvif/promises/index.js";
 
 import { ValidationError } from "@/lib/auth/errors";
 
