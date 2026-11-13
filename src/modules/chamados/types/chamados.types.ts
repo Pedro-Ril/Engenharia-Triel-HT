@@ -74,6 +74,12 @@ export interface OpcoesUnidadeChamado {
   unidades: UnidadeResumo[];
 }
 
+/* Filtro de empresa (fila/dashboard): filtra pelo código gravado no chamado, mostra o nome cadastrado. */
+export interface OpcaoEmpresaFiltro {
+  codigo: string;
+  nome: string;
+}
+
 /* Filtro de unidade (fila/dashboard) -- ver listarUnidadesComChamados. */
 export interface OpcaoUnidadeFiltro {
   id: string;
@@ -193,6 +199,44 @@ export interface RelatorioChamados {
   itens: ChamadoRelatorio[];
   total: number;
   limite: number;
+}
+
+/* Espelho de src/lib/chamados/painel-tv.ts (BI de chamados para TV). */
+export interface ChamadoTv {
+  numero: number;
+  titulo: string;
+  setorNome: string;
+  categoriaNome: string | null;
+  solicitanteNome: string;
+  solicitanteDepartamento: string | null;
+  atendenteNome: string | null;
+  status: StatusChamado;
+  prioridade: PrioridadeChamado;
+  criadoEm: string;
+  minutosAberto: number;
+}
+
+export interface PainelTvChamados {
+  atualizadoEm: string;
+  setorNome: string | null;
+  totais: {
+    emAberto: number;
+    semAtendente: number;
+    urgentesEmAberto: number;
+    emAndamento: number;
+    aguardandoConfirmacao: number;
+    abertosHoje: number;
+    resolvidosHoje: number;
+    tempoMedioResolucaoHoras: number | null;
+  };
+  porDia: { dia: string; abertos: number; resolvidos: number }[];
+  porPrioridade: { prioridade: PrioridadeChamado; total: number }[];
+  porCategoria: { categoria: string; total: number }[];
+  porAtendente: { atendente: string; total: number }[];
+  aguardandoAtendente: ChamadoTv[];
+  resolvidosRecentes: { numero: number; titulo: string; atendenteNome: string | null; resolvidoEm: string }[];
+  emAberto: ChamadoTv[];
+  emAbertoTotal: number;
 }
 
 export type EventoNotificacaoChamado =

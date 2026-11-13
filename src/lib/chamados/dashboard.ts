@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
-import { rotularUnidades } from "./chamados";
+import { SQL_EMPRESA_DO_CHAMADO, rotularUnidades } from "./chamados";
 import type { PrioridadeChamado } from "./chamados";
 
 export interface FiltrosDashboard {
@@ -260,7 +260,7 @@ export async function listarChamadosRelatorio(
           c.[titulo],
           s.[nome] AS [setor_nome],
           cat.[nome] AS [categoria_nome],
-          c.[empresa],
+          COALESCE(empresaCadastro.[nome], NULLIF(c.[empresa], '')) AS [empresa],
           c.[unidade],
           c.[solicitante_nome],
           c.[solicitante_departamento],
@@ -275,6 +275,7 @@ export async function listarChamadosRelatorio(
         INNER JOIN dbo.portal_setores AS s ON s.[id] = c.[setor_id]
         LEFT JOIN dbo.portal_chamados_categorias AS cat ON cat.[id] = c.[categoria_id]
         LEFT JOIN dbo.portal_usuarios AS atendente ON atendente.[id] = c.[atendente_usuario_id]
+        ${SQL_EMPRESA_DO_CHAMADO}
         ${clausulaWhere}
         ORDER BY c.[numero] DESC;
       `);
@@ -399,13 +400,15 @@ export async function buscarEstatisticasChamados(
       })(),
       (async () => {
         const request = await criarRequestFiltrado(inputs);
+        /* Nome cadastrado da empresa; sem cadastro, o código; sem nada, "Sem empresa". */
         return request.query<{ empresa: string | null; total: number }>(`
           SELECT
-            COALESCE(NULLIF(c.[empresa], ''), 'Sem empresa') AS [empresa],
+            COALESCE(empresaCadastro.[nome], NULLIF(c.[empresa], ''), 'Sem empresa') AS [empresa],
             COUNT(*) AS [total]
           FROM dbo.portal_chamados AS c
+          ${SQL_EMPRESA_DO_CHAMADO}
           ${clausulaWhere}
-          GROUP BY c.[empresa]
+          GROUP BY COALESCE(empresaCadastro.[nome], NULLIF(c.[empresa], ''), 'Sem empresa')
           ORDER BY COUNT(*) DESC;
         `);
       })(),

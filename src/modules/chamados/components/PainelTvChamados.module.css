@@ -1,0 +1,455 @@
+/*
+ * BI de chamados para TV (/chamados/dashboard/tv). Moldura, cabeçalho,
+ * tiles e rodízio vêm do BI de Equipamentos Usados (PainelBiPartes /
+ * RodizioPaginas); aqui só o que é próprio de chamados. Desenhado sobre a
+ * base de 1920 px da MolduraEscalavel -- tamanhos em px/rem valem para ela.
+ */
+
+/* ========================= INDICADORES ========================= */
+
+.kpiRow {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+.kpiIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.kpiTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kpiValor {
+  font-size: 1.85rem;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Até duas linhas ("Aguardando confirmação", "Tempo médio (30 dias)") -- sem cortar com reticências. */
+.kpiRotulo {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+
+.kpiAlerta {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.kpiAlerta .kpiIcone {
+  background: var(--warning-bg-strong);
+  color: var(--warning-text);
+}
+
+.kpiSucesso .kpiIcone {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+/* Chamado sem ninguém atendendo: vermelho e pulsando, para ser visto de longe. */
+.kpiPerigo {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  animation: kpiPulsa 2.2s ease-in-out infinite;
+}
+
+.kpiPerigo .kpiIcone {
+  background: var(--danger-bg-strong);
+  color: var(--danger-text);
+}
+
+.kpiPerigo .kpiValor {
+  color: var(--danger-text);
+}
+
+@keyframes kpiPulsa {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+}
+
+/* ========================= TILES ========================= */
+
+.tileDestaque {
+  border-color: var(--danger-border);
+  box-shadow: 0 0 0 2px var(--danger-bg-strong), 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.tituloLinha {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tituloLinha h2 {
+  margin: 0;
+}
+
+.contagem {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  background: var(--danger-bg-strong);
+  color: var(--danger-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lista {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.esperaLinha {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--bg-surface-soft);
+}
+
+.numero {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.textos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.titulo {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.espera {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.tempo {
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tempoOk {
+  color: var(--text-soft);
+}
+
+.tempoAtencao {
+  color: var(--warning-text);
+}
+
+.tempoCritico {
+  color: var(--danger-text);
+}
+
+.vazioOk {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--success-text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.vazio {
+  margin: auto;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.resolvidoLinha {
+  display: grid;
+  grid-template-columns: 22px 62px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.resolvidoLinha:last-child {
+  border-bottom: none;
+}
+
+.resolvidoIcone {
+  color: var(--success-text);
+}
+
+.quando {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.legendaTotal {
+  margin-left: auto;
+  font-size: 1rem;
+}
+
+/* Prioridade (tokens de status) */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.prioridade_urgente {
+  background: var(--danger-bg-strong);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.prioridade_alta {
+  background: var(--warning-bg-strong);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.prioridade_media {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info-text);
+}
+
+.prioridade_baixa {
+  background: var(--neutral-bg);
+  border-color: var(--neutral-border);
+  color: var(--neutral-text);
+}
+
+/* ========================= TABELA ========================= */
+
+.cartao {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.cartaoTopo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cartaoTitulo {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.cartaoResumo {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabelaArea {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+
+.tabelaAjuste {
+  width: 100%;
+  transform-origin: top left;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.05rem;
+  color: var(--text);
+  table-layout: fixed;
+}
+
+.tabela th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  background: var(--bg-surface-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.tabela td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabela tbody tr:nth-child(even) td {
+  background: var(--bg-surface-soft);
+}
+
+.tabela tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Sem atendente: a linha inteira em amarelo, com a faixa vermelha na borda. */
+.tabela tbody tr.linhaSemAtendente td {
+  background: var(--warning-bg);
+}
+
+.tabela tbody tr.linhaSemAtendente td:first-child {
+  box-shadow: inset 5px 0 0 var(--danger-text);
+}
+
+.celulaNumero {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.celulaTitulo {
+  font-weight: 700;
+}
+
+.celulaSub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.semAtendente {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: var(--danger-text);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.statusPonto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.vazioTabela {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--success-text);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpiPerigo {
+    animation: none;
+  }
+}

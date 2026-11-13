@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Clock3, FileSpreadsheet, FileText, Headset, Home, Inbox } from "lucide-react";
+import { BarChart3, Clock3, FileSpreadsheet, FileText, Headset, Home, Inbox, Tv } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -42,6 +42,7 @@ import type { FiltroAplicado } from "../utils/exportarDashboard";
 import type {
   CategoriaChamado,
   EstatisticasChamados,
+  OpcaoEmpresaFiltro,
   OpcaoUnidadeFiltro,
   SetorChamado,
 } from "../types/chamados.types";
@@ -61,7 +62,7 @@ interface FiltrosDashboard {
 interface DashboardChamadosPageProps {
   setores: SetorChamado[];
   categorias: CategoriaChamado[];
-  empresas: string[];
+  empresas: OpcaoEmpresaFiltro[];
   unidades: OpcaoUnidadeFiltro[];
   departamentos: string[];
   fullscreen?: boolean;
@@ -223,9 +224,14 @@ export function DashboardChamadosPage({
   const opcoesEmpresa = useMemo(
     () => [
       { value: "", label: "Todas" },
-      ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
+      ...empresas.map((opcao) => ({ value: opcao.codigo, label: opcao.nome })),
     ],
     [empresas]
+  );
+
+  const empresaFiltradaNome = useMemo(
+    () => (empresa ? (empresas.find((opcao) => opcao.codigo === empresa)?.nome ?? empresa) : undefined),
+    [empresas, empresa]
   );
 
   const opcoesUnidade = useMemo(
@@ -275,7 +281,7 @@ export function DashboardChamadosPage({
     const categoriaNome = categorias.find((categoria) => categoria.id === categoriaId)?.nome;
     const lista: (FiltroAplicado | null)[] = [
       setorFiltradoNome ? { rotulo: "Setor", valor: setorFiltradoNome } : null,
-      empresa ? { rotulo: "Empresa", valor: empresa } : null,
+      empresaFiltradaNome ? { rotulo: "Empresa", valor: empresaFiltradaNome } : null,
       unidadeFiltradaNome ? { rotulo: "Unidade", valor: unidadeFiltradaNome } : null,
       departamento ? { rotulo: "Departamento", valor: departamento } : null,
       categoriaNome ? { rotulo: "Categoria", valor: categoriaNome } : null,
@@ -423,7 +429,14 @@ export function DashboardChamadosPage({
     <BarChart data={dados.porEmpresa} layout="vertical" margin={{ left: 24 }}>
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis type="number" allowDecimals={false} />
-      <YAxis type="category" dataKey="empresa" width={160} tick={{ fontSize: 12 }} />
+      {/* Razão social é longa: o eixo já quebra em duas linhas; só nome fora do comum é cortado (inteiro no tooltip). */}
+      <YAxis
+        type="category"
+        dataKey="empresa"
+        width={200}
+        tick={{ fontSize: 12 }}
+        tickFormatter={(valor: string) => (valor.length > 44 ? `${valor.slice(0, 43)}…` : valor)}
+      />
       <Tooltip {...TOOLTIP_GRAFICO_TEMA} />
       <Bar dataKey="total" name="Chamados" fill="#00897b" radius={[0, 8, 8, 0]} />
     </BarChart>
@@ -464,9 +477,9 @@ export function DashboardChamadosPage({
       <div className={styles.tvDashboard}>
         <div className={styles.tvHeader}>
           <h1 className={styles.tvTitulo}>Dashboard de chamados</h1>
-          {(setorFiltradoNome || empresa || unidadeFiltradaNome || departamento) && (
+          {(setorFiltradoNome || empresaFiltradaNome || unidadeFiltradaNome || departamento) && (
             <span className={styles.tvSubtitulo}>
-              {[setorFiltradoNome, empresa, unidadeFiltradaNome, departamento]
+              {[setorFiltradoNome, empresaFiltradaNome, unidadeFiltradaNome, departamento]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -586,6 +599,12 @@ export function DashboardChamadosPage({
         description="Indicadores consolidados dos setores que você atende."
         actions={
           <Stack direction="row" gap={8}>
+            <a href="/chamados/dashboard/tv" target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary">
+                <Tv size={16} />
+                Versão TV
+              </Button>
+            </a>
             <Button
               variant="secondary"
               onClick={() => exportar("pdf")}

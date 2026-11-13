@@ -9,6 +9,7 @@ import type {
   EventoNotificacaoChamado,
   NotificacaoEmailChamado,
   OpcoesUnidadeChamado,
+  PainelTvChamados,
   PrioridadeChamado,
   RelatorioChamados,
   SetorAceiteChamados,
@@ -276,6 +277,13 @@ export async function buscarEstatisticasChamados(
   params: FiltrosDashboardParams
 ): Promise<ApiEnvelope<EstatisticasChamados>> {
   const response = await fetch(`/api/chamados/dashboard?${queryFiltrosDashboard(params)}`);
+  return parseResponse(response);
+}
+
+/* BI de chamados para TV (rota pública); setor opcional restringe a um setor. */
+export async function buscarPainelTvChamados(setor: string | null): Promise<ApiEnvelope<PainelTvChamados>> {
+  const query = setor ? `?setor=${encodeURIComponent(setor)}` : "";
+  const response = await fetch(`/api/chamados/tv${query}`, { cache: "no-store" });
   return parseResponse(response);
 }
 

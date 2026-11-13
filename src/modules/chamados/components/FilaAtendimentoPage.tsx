@@ -46,6 +46,7 @@ import { listarFilaAtendimento } from "../services/chamados.service";
 import type {
   CategoriaChamado,
   ChamadoResumoFila,
+  OpcaoEmpresaFiltro,
   OpcaoUnidadeFiltro,
   PrioridadeChamado,
   SetorChamado,
@@ -58,7 +59,7 @@ import { ExportarChamadoAcoes } from "./ExportarChamadoAcoes";
 interface FilaAtendimentoPageProps {
   setores: SetorChamado[];
   categorias: CategoriaChamado[];
-  empresas: string[];
+  empresas: OpcaoEmpresaFiltro[];
   unidades: OpcaoUnidadeFiltro[];
   departamentos: string[];
 }
@@ -195,8 +196,11 @@ export function FilaAtendimentoPage({
 
   const opcoesEmpresa = [
     { value: "", label: "Todas" },
-    ...empresas.map((codigo) => ({ value: codigo, label: codigo })),
+    ...empresas.map((opcao) => ({ value: opcao.codigo, label: opcao.nome })),
   ];
+
+  /* O chamado guarda o código; a coluna mostra o nome cadastrado (sem cadastro, o código). */
+  const nomeEmpresaPorCodigo = new Map(empresas.map((opcao) => [opcao.codigo, opcao.nome]));
 
   const opcoesUnidade = [
     { value: "", label: "Todas" },
@@ -481,7 +485,9 @@ export function FilaAtendimentoPage({
                     <TableCell>{chamado.titulo}</TableCell>
                     <TableCell>{chamado.setorNome}</TableCell>
                     <TableCell>{chamado.categoriaNome ?? "—"}</TableCell>
-                    <TableCell>{chamado.empresa ?? "—"}</TableCell>
+                    <TableCell>
+                      {chamado.empresa ? (nomeEmpresaPorCodigo.get(chamado.empresa) ?? chamado.empresa) : "—"}
+                    </TableCell>
                     <TableCell>{chamado.unidade ?? "—"}</TableCell>
                     <TableCell>{chamado.solicitanteNome}</TableCell>
                     <TableCell>{chamado.solicitanteDepartamento ?? "—"}</TableCell>

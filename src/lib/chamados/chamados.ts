@@ -80,26 +80,52 @@ export function filtrarPorSetoresAtendidos<T>(
 }
 
 /*
- * Lista de códigos de empresa distintos já usados em algum
- * chamado — para os filtros de "Empresa" na fila de atendimento
- * e no dashboard (ver src/lib/chamados/dashboard.ts). Lida do
- * próprio portal_chamados (não de portal_usuarios) para só
- * mostrar empresas que realmente têm chamados, evitando um
- * filtro cheio de opções sem nenhum resultado.
+ * O chamado guarda o CÓDIGO da empresa (foto do "Código de empresa" do
+ * usuário). Para exibir, o nome vem de portal_empresas pelo mesmo
+ * casamento de buscarEmpresaPorCodigo (trim + sem diferenciar
+ * maiúsculas); código sem empresa cadastrada continua aparecendo como
+ * código. Usar em OUTER APPLY com o alias `c` do chamado.
  */
-export async function listarEmpresasComChamados(setorIds: string[] | null): Promise<string[]> {
+export const SQL_EMPRESA_DO_CHAMADO = `
+  OUTER APPLY (
+    SELECT TOP 1 emp.[nome]
+    FROM dbo.portal_empresas AS emp
+    WHERE LOWER(LTRIM(RTRIM(emp.[codigo]))) = LOWER(LTRIM(RTRIM(c.[empresa])))
+    ORDER BY emp.[ativa] DESC
+  ) AS empresaCadastro
+`;
+
+export interface OpcaoEmpresaFiltro {
+  /* Valor do filtro (o que está gravado no chamado). */
+  codigo: string;
+  /* Nome cadastrado em Administração → Empresas; sem cadastro, o próprio código. */
+  nome: string;
+}
+
+/*
+ * Empresas distintas já usadas em algum chamado — para os filtros de
+ * "Empresa" na fila de atendimento e no dashboard (ver
+ * src/lib/chamados/dashboard.ts). Lida do próprio portal_chamados (não de
+ * portal_usuarios) para só mostrar empresas que realmente têm chamados,
+ * evitando um filtro cheio de opções sem nenhum resultado.
+ */
+export async function listarEmpresasComChamados(
+  setorIds: string[] | null
+): Promise<OpcaoEmpresaFiltro[]> {
   const pool = await getSqlServerPool();
   const request = pool.request();
-  const escopo = aplicarEscopoSetores(request, setorIds, "[setor_id]");
+  const escopo = aplicarEscopoSetores(request, setorIds, "c.[setor_id]");
 
-  const result = await request.query<{ empresa: string }>(`
-    SELECT DISTINCT [empresa]
-    FROM dbo.portal_chamados
-    WHERE [empresa] IS NOT NULL AND [empresa] <> ''${escopo}
-    ORDER BY [empresa];
+  const result = await request.query<{ empresa: string; nome: string | null }>(`
+    SELECT DISTINCT c.[empresa], empresaCadastro.[nome]
+    FROM dbo.portal_chamados AS c
+    ${SQL_EMPRESA_DO_CHAMADO}
+    WHERE c.[empresa] IS NOT NULL AND c.[empresa] <> ''${escopo};
   `);
 
-  return result.recordset.map((row) => row.empresa);
+  return result.recordset
+    .map((row) => ({ codigo: row.empresa, nome: row.nome ?? row.empresa }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 /*
