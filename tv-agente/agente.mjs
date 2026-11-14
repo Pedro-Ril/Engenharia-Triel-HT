@@ -601,6 +601,8 @@ function lancarKiosk(caminhoNavegador, token, hardwareId, caminhoInicial) {
     `--user-data-dir=${path.join(DIRETORIO_DADOS, "chrome-profile")}`,
     "--noerrdialogs",
     "--disable-infobars",
+    /* Reaberto depois de um fechamento forçado ("Recarregar parado"): sem o balão "restaurar páginas?". */
+    "--hide-crash-restore-bubble",
     "--no-first-run",
     "--overscroll-history-navigation=0",
     /*
@@ -832,20 +834,28 @@ function limparProcessoControleCursorOrfao() {
  *
  * "Parado" = nenhuma entrada no X: mouse, teclado, rolagem, toque, e
  * também o acesso remoto por VNC (o x11vnc injeta no mesmo X). Quem diz
- * há quanto tempo não há entrada é o "xprintidle"; quem aperta o F5 é o
- * "xdotool" (os dois via apt, ver instalar.sh). Medir aqui, e não na
- * página, pega também o uso dentro de conteúdo de outro site embutido na
- * TV, que a página não enxerga.
+ * há quanto tempo não há entrada é o "xprintidle" (via apt, ver
+ * instalar.sh). Medir aqui, e não na página, pega também o uso dentro de
+ * conteúdo de outro site embutido na TV, que a página não enxerga.
  *
- * Uma vez por período parado: o próprio F5 sintético zera o contador do
- * X, então sem cuidado a TV recarregaria a cada N segundos para sempre
- * (piscando sem ninguém usar). Depois do F5, só volta a contar quando
- * alguém mexer de verdade -- percebido porque o tempo parado fica menor
- * que o tempo desde o nosso F5.
+ * Como recarrega: fecha e reabre o Chrome (o mesmo caminho de quando a
+ * página inicial muda), e NÃO apertando F5. Testado ao vivo no
+ * TERMINALAGRO01: com um Google Forms meio preenchido na tela, o F5 cai
+ * no "Reload app? Changes you made may not be saved" (beforeunload do
+ * formulário) e fica esperando alguém clicar -- numa TV sem ninguém, a
+ * recarga nunca acontecia. Fechar o processo não passa por esse aviso, e
+ * a TV volta limpa para a página inicial.
+ *
+ * Uma vez por período parado: depois de recarregar, só volta a contar
+ * quando alguém mexer de verdade -- percebido porque o tempo parado fica
+ * menor que o tempo desde a recarga. Sem isso uma TV parada recarregaria
+ * a cada N segundos para sempre.
  */
 const INTERVALO_CHECAR_INATIVIDADE_MS = 2000;
-/* Folga para o contador do X refletir o nosso próprio F5. */
-const FOLGA_F5_PROPRIO_MS = 3000;
+/* Folga entre o tempo parado e o tempo desde a recarga, para não confundir arredondamentos com alguém mexendo. */
+const FOLGA_RECARGA_MS = 3000;
+/* Tempo para o navegador fechar sozinho antes de o agente forçar. */
+const ESPERA_FECHAR_NAVEGADOR_MS = 5000;
 
 function lerTempoParadoMs() {
   try {
@@ -857,17 +867,14 @@ function lerTempoParadoMs() {
   }
 }
 
-function apertarF5() {
-  /* --clearmodifiers: se por acaso houver Ctrl/Shift preso, manda F5 puro (Ctrl+F5/Shift+F5 seriam outra coisa). */
-  execFileSync("xdotool", ["key", "--clearmodifiers", "F5"], { timeout: 3000, stdio: "ignore" });
-}
-
 /*
  * Roda o tempo todo; `obterConfig()` devolve a configuração atual
  * ({ ligado, segundos }), que verificarConfiguracaoAgente atualiza a
  * cada poll -- ligar/desligar no portal não precisa reiniciar o agente.
+ * `recarregar()` fecha o navegador (o supervisor reabre) e devolve
+ * false se não havia navegador para fechar.
  */
-function iniciarMonitorInatividade(obterConfig) {
+function iniciarMonitorInatividade(obterConfig, recarregar) {
   if (EH_WINDOWS) return;
 
   let recarregouEm = null;
@@ -885,7 +892,7 @@ function iniciarMonitorInatividade(obterConfig) {
       if (!avisouFaltaFerramenta) {
         avisouFaltaFerramenta = true;
         console.error(
-          '"Recarregar parado" ligado, mas o "xprintidle" não está disponível -- rode "sudo apt-get install -y xprintidle xdotool".'
+          '"Recarregar parado" ligado, mas o "xprintidle" não está disponível -- rode "sudo apt-get install -y xprintidle".'
         );
       }
       return;
@@ -893,24 +900,21 @@ function iniciarMonitorInatividade(obterConfig) {
 
     if (recarregouEm !== null) {
       /* Já recarregou neste período parado: espera alguém mexer de verdade. */
-      const desdeF5Ms = Date.now() - recarregouEm;
-      if (paradoMs + FOLGA_F5_PROPRIO_MS < desdeF5Ms) recarregouEm = null;
+      const desdeRecargaMs = Date.now() - recarregouEm;
+      if (paradoMs + FOLGA_RECARGA_MS < desdeRecargaMs) {
+        recarregouEm = null;
+        console.log("Recarregar parado: alguém mexeu no terminal -- volta a contar.");
+      }
       return;
     }
 
     if (paradoMs < segundos * 1000) return;
 
-    try {
-      apertarF5();
+    if (recarregar()) {
       recarregouEm = Date.now();
-      console.log(`Terminal parado há ${Math.round(paradoMs / 1000)}s (limite ${segundos}s) -- F5 enviado.`);
-    } catch (error) {
-      if (!avisouFaltaFerramenta) {
-        avisouFaltaFerramenta = true;
-        console.error(
-          `Não foi possível enviar o F5 (${error.message}) -- confira se o "xdotool" está instalado: "sudo apt-get install -y xprintidle xdotool".`
-        );
-      }
+      console.log(
+        `Terminal parado há ${Math.round(paradoMs / 1000)}s (limite ${segundos}s) -- recarregando (navegador reaberto).`
+      );
     }
   }, INTERVALO_CHECAR_INATIVIDADE_MS);
 }
@@ -943,7 +947,32 @@ async function main() {
   let processoVnc = null;
   /* "Recarregar parado" -- atualizado a cada poll de configuração, lido pelo monitor. */
   let configInatividade = { ligado: false, segundos: 60 };
-  iniciarMonitorInatividade(() => configInatividade);
+  /*
+   * Fecha o navegador e deixa o supervisor (iniciarESupervisionar, handler
+   * de "exit") reabrir na página inicial em INTERVALO_RELANCAR_MS -- o
+   * mesmo ciclo de quando o Chrome cai sozinho.
+   */
+  iniciarMonitorInatividade(
+    () => configInatividade,
+    () => {
+      const navegador = processoAtual;
+      if (!navegador || navegador.exitCode !== null || navegador.signalCode !== null) return false;
+      navegador.kill("SIGTERM");
+      /*
+       * O pedido educado de fechar pode esbarrar no mesmo "Changes you made
+       * may not be saved" da página e não terminar: depois de
+       * ESPERA_FECHAR_NAVEGADOR_MS, força. O reaberto não mostra o balão de
+       * "restaurar páginas" (--hide-crash-restore-bubble em lancarKiosk).
+       */
+      setTimeout(() => {
+        if (navegador.exitCode === null && navegador.signalCode === null) {
+          console.log("Navegador não fechou sozinho (aviso de sair da página?) -- forçando.");
+          navegador.kill("SIGKILL");
+        }
+      }, ESPERA_FECHAR_NAVEGADOR_MS);
+      return true;
+    }
+  );
 
   /* Liga o x11vnc com a senha atual e, se ele cair sozinho, liga de novo -- a não ser que a senha tenha mudado/sumido nesse meio-tempo. */
   function ligarVnc() {
@@ -1114,7 +1143,7 @@ async function main() {
       if (novaInatividade.ligado !== configInatividade.ligado || novaInatividade.segundos !== configInatividade.segundos) {
         console.log(
           novaInatividade.ligado
-            ? `Recarregar parado: ligado (${novaInatividade.segundos}s sem mexer -> F5).`
+            ? `Recarregar parado: ligado (${novaInatividade.segundos}s sem mexer -> reabre o navegador).`
             : "Recarregar parado: desligado."
         );
         configInatividade = novaInatividade;

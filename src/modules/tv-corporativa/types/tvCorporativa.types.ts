@@ -19,7 +19,7 @@ export interface TerminalTv {
   agenteSistemaOperacional: string | null;
   empresa: string | null;
   exibirCursor: boolean;
-  /* F5 quando o terminal fica `inatividadeSegundos` sem mouse/teclado/rolagem (agente Linux). */
+  /* Recarrega (reabre o navegador) quando o terminal fica `inatividadeSegundos` sem mouse/teclado/rolagem (agente Linux). */
   recarregarInatividade: boolean;
   inatividadeSegundos: number;
   agenteTipoConexao: string | null;

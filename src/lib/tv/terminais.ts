@@ -41,9 +41,9 @@ export interface TerminalTv {
   /* Terminal com mouse de verdade, operado por alguém (ex: TLT01) -- ver tv-agente/agente.mjs, iniciarNudgeCursor. Padrão false: TV de sinalização passiva não precisa de cursor. */
   exibirCursor: boolean;
   /*
-   * Recarregar a página (F5) quando o terminal ficar `inatividadeSegundos`
+   * Recarregar a página quando o terminal ficar `inatividadeSegundos`
    * sem nenhuma entrada (mouse, teclado, rolagem) -- quem mede e aperta o
-   * F5 é o agente (tv-agente/agente.mjs, iniciarMonitorInatividade).
+   * reabre o navegador é o agente (tv-agente/agente.mjs, iniciarMonitorInatividade).
    */
   recarregarInatividade: boolean;
   inatividadeSegundos: number;

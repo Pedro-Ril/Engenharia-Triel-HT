@@ -27,7 +27,7 @@ interface AtualizarTerminalBody {
   inatividadeSegundos?: unknown;
 }
 
-/* Tempo parado antes do F5: mesma faixa do CHECK da migração 0168. */
+/* Tempo parado antes de recarregar: mesma faixa do CHECK da migração 0168. */
 const INATIVIDADE_MINIMA_S = 10;
 const INATIVIDADE_MAXIMA_S = 86400;
 

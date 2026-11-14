@@ -100,11 +100,11 @@ export const dynamic = "force-dynamic";
  * iniciarProcessoVnc). A senha nunca entra aqui: esta rota é pública.
  * Terminais já em produção: uma vez via SSH, `sudo apt-get install -y x11vnc`.
  *
- * xprintidle + xdotool: "Recarregar parado" em Dispositivos -- o agente
- * mede há quanto tempo o X está sem entrada (xprintidle) e aperta F5 no
- * Chrome (xdotool). Ver tv-agente/agente.mjs, iniciarMonitorInatividade.
+ * xprintidle: "Recarregar parado" em Dispositivos -- o agente mede há
+ * quanto tempo o X está sem entrada e, passado o tempo, reabre o
+ * navegador. Ver tv-agente/agente.mjs, iniciarMonitorInatividade.
  * Terminais já em produção: uma vez via SSH,
- * `sudo apt-get install -y xprintidle xdotool`.
+ * `sudo apt-get install -y xprintidle`.
  *
  * Extensão de captura de tela (ver src/lib/tv/extensao-captura.ts):
  * Google Chrome oficial ignora --load-extension fora do modo
@@ -193,9 +193,9 @@ if ! command -v google-chrome >/dev/null 2>&1 && ! command -v chromium-browser >
   fi
 fi
 
-echo "Instalando X minimo (sem ambiente de desktop), o x11vnc (acesso remoto) e xprintidle/xdotool (recarregar parado)..."
+echo "Instalando X minimo (sem ambiente de desktop), o x11vnc (acesso remoto) e o xprintidle (recarregar parado)..."
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils unclutter x11vnc xprintidle xdotool
+  apt-get install -y $APT_NONINTERATIVO xserver-xorg xinit x11-xserver-utils unclutter x11vnc xprintidle
 else
   echo "Gerenciador de pacotes nao suportado para instalar o X automaticamente (so apt/Debian/Ubuntu por enquanto)." >&2
   exit 1

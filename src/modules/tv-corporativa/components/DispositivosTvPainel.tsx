@@ -515,7 +515,7 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
 
                   {/*
                     Ligado: se o terminal ficar esse tempo sem nenhuma entrada
-                    (mouse, teclado, rolagem), o agente aperta F5 -- uma vez,
+                    (mouse, teclado, rolagem), o agente reabre o navegador -- uma vez,
                     e só conta de novo depois que alguém mexer.
                   */}
                   <TableCell align="center">
@@ -529,7 +529,7 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
                           handleAlterarRecarregarInatividade(terminal, event.target.checked)
                         }
                       />
-                      <div style={{ width: 84 }} title="Segundos sem mexer até o F5">
+                      <div style={{ width: 84 }} title="Segundos sem mexer até recarregar">
                         <NumberInput
                           value={valorInatividade(terminal)}
                           min={10}

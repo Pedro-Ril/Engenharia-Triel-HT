@@ -86,7 +86,7 @@ async function handleGET(request: Request) {
         hash,
         caminhoInicial: acesso.terminal.caminhoInicial || "/tv",
         exibirCursor: acesso.terminal.exibirCursor,
-        /* F5 depois de N segundos sem nenhuma entrada -- ver iniciarMonitorInatividade no agente. */
+        /* Recarregar (reabrir o navegador) depois de N segundos sem nenhuma entrada -- ver iniciarMonitorInatividade no agente. */
         recarregarInatividade: acesso.terminal.recarregarInatividade,
         inatividadeSegundos: acesso.terminal.inatividadeSegundos,
         comando,

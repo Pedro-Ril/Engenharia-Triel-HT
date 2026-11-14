@@ -1,9 +1,9 @@
 /*
- * TV Corporativa: recarregar a página (F5) quando o terminal fica parado.
+ * TV Corporativa: recarregar a página quando o terminal fica parado.
  *
  * recarregar_inatividade = 1 -> se o terminal ficar `inatividade_segundos`
  * sem nenhuma entrada (mouse, teclado, rolagem, toque, acesso remoto), o
- * agente do terminal manda um F5 para o navegador. Uma vez por período
+ * agente do terminal reabre o navegador. Uma vez por período
  * parado: só volta a contar depois que alguém mexer de novo. Ver
  * tv-agente/agente.mjs, iniciarMonitorInatividade.
  *
