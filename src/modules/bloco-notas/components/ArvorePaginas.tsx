@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -16,13 +15,14 @@ import {
   FileText,
   FolderInput,
   GripVertical,
-  MoreHorizontal,
   Plus,
   Star,
   StarOff,
   Trash2,
   Users,
 } from "lucide-react";
+
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 
 import type { NoArvore } from "../types/blocoNotas.types";
 import { tituloOuPadrao } from "../utils/arvore";
@@ -51,7 +51,6 @@ interface ArvorePaginasProps extends AcoesArvore {
  * arrastar entre níveis numa árvore é impreciso demais no mouse.
  */
 export function ArvorePaginas({ arvore, selecionadaId, expandidos, ...acoes }: ArvorePaginasProps) {
-  const [menuAbertoId, setMenuAbertoId] = useState<string | null>(null);
   const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   /* Pai de cada página e lista de irmãs, para saber o que reordenar ao soltar. */
@@ -84,15 +83,7 @@ export function ArvorePaginas({ arvore, selecionadaId, expandidos, ...acoes }: A
 
   return (
     <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoSoltar}>
-      <ListaNivel
-        nos={arvore}
-        profundidade={0}
-        selecionadaId={selecionadaId}
-        expandidos={expandidos}
-        menuAbertoId={menuAbertoId}
-        setMenuAbertoId={setMenuAbertoId}
-        acoes={acoes}
-      />
+      <ListaNivel nos={arvore} profundidade={0} selecionadaId={selecionadaId} expandidos={expandidos} acoes={acoes} />
     </DndContext>
   );
 }
@@ -102,8 +93,6 @@ interface ListaNivelProps {
   profundidade: number;
   selecionadaId: string | null;
   expandidos: Set<string>;
-  menuAbertoId: string | null;
-  setMenuAbertoId: (id: string | null) => void;
   acoes: AcoesArvore;
 }
 
@@ -120,30 +109,14 @@ function ListaNivel(props: ListaNivelProps) {
 }
 
 function ItemArvore({ no, ...props }: ListaNivelProps & { no: NoArvore }) {
-  const { profundidade, selecionadaId, expandidos, menuAbertoId, setMenuAbertoId, acoes } = props;
+  const { profundidade, selecionadaId, expandidos, acoes } = props;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: no.id,
   });
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const temFilhos = no.filhos.length > 0;
   const expandido = expandidos.has(no.id);
   const selecionada = selecionadaId === no.id;
-  const menuAberto = menuAbertoId === no.id;
-
-  useEffect(() => {
-    if (!menuAberto) return;
-    function aoClicarFora(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuAbertoId(null);
-    }
-    document.addEventListener("mousedown", aoClicarFora);
-    return () => document.removeEventListener("mousedown", aoClicarFora);
-  }, [menuAberto, setMenuAbertoId]);
-
-  function executar(acao: () => void) {
-    setMenuAbertoId(null);
-    acao();
-  }
 
   return (
     <li
@@ -188,7 +161,7 @@ function ItemArvore({ no, ...props }: ListaNivelProps & { no: NoArvore }) {
           {no.favorita && <Star size={12} className={styles.estrelaMini} aria-label="Favorita" />}
         </button>
 
-        <div className={styles.arvoreAcoes} ref={menuRef}>
+        <div className={styles.arvoreAcoes}>
           <button
             type="button"
             className={styles.arvoreAcao}
@@ -198,39 +171,43 @@ function ItemArvore({ no, ...props }: ListaNivelProps & { no: NoArvore }) {
           >
             <Plus size={14} />
           </button>
-          <button
-            type="button"
-            className={styles.arvoreAcao}
-            onClick={() => setMenuAbertoId(menuAberto ? null : no.id)}
-            aria-label={`Mais ações de "${tituloOuPadrao(no.titulo)}"`}
-            aria-expanded={menuAberto}
-            title="Mais ações"
-          >
-            <MoreHorizontal size={14} />
-          </button>
-
-          {menuAberto && (
-            <div className={styles.menu} role="menu">
-              <button type="button" role="menuitem" onClick={() => executar(() => acoes.onFavoritar(no))}>
-                {no.favorita ? <StarOff size={14} /> : <Star size={14} />}
-                {no.favorita ? "Tirar das favoritas" : "Adicionar às favoritas"}
-              </button>
-              <button type="button" role="menuitem" onClick={() => executar(() => acoes.onNovaSubpagina(no.id))}>
-                <Plus size={14} /> Nova subpágina
-              </button>
-              <button type="button" role="menuitem" onClick={() => executar(() => acoes.onMover(no))}>
-                <FolderInput size={14} /> Mover para...
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={styles.menuPerigo}
-                onClick={() => executar(() => acoes.onExcluir(no))}
-              >
-                <Trash2 size={14} /> Mover para a lixeira
-              </button>
-            </div>
-          )}
+          {/*
+            Menu desenhado por cima da página (portal), não dentro da
+            lateral: a lateral tem rolagem própria e cortava o menu. Perto
+            do fim da tela ele abre para cima sozinho.
+          */}
+          <DropdownMenu
+            label={`Mais ações de "${tituloOuPadrao(no.titulo)}"`}
+            className={styles.arvoreMenuGatilho}
+            items={[
+              {
+                value: "favorita",
+                label: no.favorita ? "Tirar das favoritas" : "Adicionar às favoritas",
+                icon: no.favorita ? <StarOff size={14} /> : <Star size={14} />,
+                onSelect: () => acoes.onFavoritar(no),
+              },
+              {
+                value: "subpagina",
+                label: "Nova subpágina",
+                icon: <Plus size={14} />,
+                onSelect: () => acoes.onNovaSubpagina(no.id),
+              },
+              {
+                value: "mover",
+                label: "Mover para...",
+                icon: <FolderInput size={14} />,
+                onSelect: () => acoes.onMover(no),
+              },
+              {
+                value: "lixeira",
+                label: "Mover para a lixeira",
+                icon: <Trash2 size={14} />,
+                danger: true,
+                separatorBefore: true,
+                onSelect: () => acoes.onExcluir(no),
+              },
+            ]}
+          />
         </div>
       </div>
 
