@@ -89,6 +89,15 @@ export async function verifySessionToken(
       return null;
     }
 
+    /*
+     * Sessão não tem audience. Um token COM audience foi emitido com a mesma
+     * chave para outra finalidade (ex: passe de edição ao vivo do Bloco de
+     * Notas, src/lib/bloco-notas/colaboracao.ts) e não vale como sessão.
+     */
+    if (payload.aud !== undefined) {
+      return null;
+    }
+
     return {
       sub: payload.sub,
       nomeExibicao:

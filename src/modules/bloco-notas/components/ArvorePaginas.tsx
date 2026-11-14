@@ -21,6 +21,7 @@ import {
   Star,
   StarOff,
   Trash2,
+  Users,
 } from "lucide-react";
 
 import type { NoArvore } from "../types/blocoNotas.types";
@@ -181,6 +182,9 @@ function ItemArvore({ no, ...props }: ListaNivelProps & { no: NoArvore }) {
         <button type="button" className={styles.arvoreTitulo} onClick={() => acoes.onSelecionar(no.id)}>
           <FileText size={15} className={styles.arvoreIcone} />
           <span className={no.titulo.trim() ? undefined : styles.semTitulo}>{tituloOuPadrao(no.titulo)}</span>
+          {no.compartilhada && (
+            <Users size={12} className={styles.iconeCompartilhada} aria-label="Compartilhada" />
+          )}
           {no.favorita && <Star size={12} className={styles.estrelaMini} aria-label="Favorita" />}
         </button>
 

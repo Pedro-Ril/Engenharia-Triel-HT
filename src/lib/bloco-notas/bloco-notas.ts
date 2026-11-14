@@ -3,6 +3,8 @@ import "server-only";
 import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
+import { acessoPagina, revalidarAoVivo } from "./compartilhamento";
+import type { PermissaoPagina } from "./compartilhamento";
 import { LIMITE_HTML_PAGINA, limparConteudoPagina, textoBuscaDoConteudo } from "./conteudo-html";
 
 /*
@@ -23,12 +25,19 @@ export interface PaginaResumo {
   favorita: boolean;
   ordem: number;
   atualizadoEm: string;
+  /* Aberta diretamente para alguém (ícone na árvore do dono). */
+  compartilhada: boolean;
 }
 
 export interface Pagina extends PaginaResumo {
   conteudo: string;
   versao: number;
   criadoEm: string;
+  /* De quem abriu: dono, ou o que o compartilhamento dá (editar/ver). */
+  permissao: PermissaoPagina;
+  donoNome: string;
+  /* Aberta para alguém (ela ou uma página acima) -> edição ao vivo. */
+  compartilhada: boolean;
 }
 
 export interface PaginaLixeira {
@@ -59,7 +68,10 @@ const colunasResumo = `
   p.[titulo],
   CAST(p.[favorita] AS BIT) AS [favorita],
   p.[ordem],
-  CONVERT(VARCHAR(33), p.[atualizado_em], 126) AS [atualizado_em]
+  CONVERT(VARCHAR(33), p.[atualizado_em], 126) AS [atualizado_em],
+  CAST(CASE WHEN EXISTS (
+    SELECT 1 FROM dbo.portal_notas_compartilhamentos AS c WHERE c.[pagina_id] = p.[id]
+  ) THEN 1 ELSE 0 END AS BIT) AS [compartilhada]
 `;
 
 interface ResumoRow {
@@ -69,6 +81,7 @@ interface ResumoRow {
   favorita: boolean;
   ordem: number;
   atualizado_em: string;
+  compartilhada?: boolean;
 }
 
 function mapResumo(row: ResumoRow): PaginaResumo {
@@ -79,6 +92,7 @@ function mapResumo(row: ResumoRow): PaginaResumo {
     favorita: row.favorita,
     ordem: row.ordem,
     atualizadoEm: row.atualizado_em,
+    compartilhada: row.compartilhada ?? false,
   };
 }
 
@@ -127,11 +141,14 @@ export async function listarPaginas(usuarioId: string): Promise<{ paginas: Pagin
   };
 }
 
+/* Do dono ou de quem recebeu o compartilhamento (dele ou de uma página acima). */
 export async function buscarPagina(usuarioId: string, id: string): Promise<Pagina | null> {
+  const acesso = await acessoPagina(usuarioId, id);
+  if (!acesso) return null;
+
   const pool = await getSqlServerPool();
   const result = await pool
     .request()
-    .input("usuarioId", sql.UniqueIdentifier, usuarioId)
     .input("id", sql.UniqueIdentifier, id)
     .query<ResumoRow & { conteudo: string; versao: number; criado_em: string }>(`
       SELECT ${colunasResumo},
@@ -139,7 +156,7 @@ export async function buscarPagina(usuarioId: string, id: string): Promise<Pagin
         p.[versao],
         CONVERT(VARCHAR(33), p.[criado_em], 126) AS [criado_em]
       FROM dbo.portal_notas_paginas AS p
-      WHERE p.[id] = @id AND p.[usuario_id] = @usuarioId AND p.[excluida_em] IS NULL;
+      WHERE p.[id] = @id AND p.[excluida_em] IS NULL;
     `);
 
   const row = result.recordset[0];
@@ -147,10 +164,15 @@ export async function buscarPagina(usuarioId: string, id: string): Promise<Pagin
 
   return {
     ...mapResumo(row),
+    /* Favorita é do dono; para quem recebeu, não se aplica. */
+    favorita: acesso.permissao === "dono" ? row.favorita : false,
     /* Limpa de novo ao ler: defesa extra se alguma linha foi gravada por fora da rota. */
     conteudo: limparConteudoPagina(row.conteudo),
     versao: row.versao,
     criadoEm: row.criado_em,
+    permissao: acesso.permissao,
+    donoNome: acesso.donoNome,
+    compartilhada: acesso.compartilhada,
   };
 }
 
@@ -209,6 +231,14 @@ export async function criarPagina(
  * abriu (`versaoEsperada`): se outra aba salvou antes, lança
  * ConflitoVersaoError -- a não ser com `forcar` (a pessoa escolheu manter
  * a versão dela).
+ *
+ * `colaborativo`: a gravação vem da edição ao vivo (todos já estão com o
+ * mesmo texto, sincronizado pelo serviço de colaboração) -- sem conferir
+ * versão e sem mexer no estado ao vivo. Gravação comum de conteúdo zera o
+ * estado ao vivo (a próxima sessão recomeça do HTML gravado).
+ *
+ * Quem recebeu com 'editar' muda título e conteúdo; 'ver' não muda nada;
+ * favorita é só do dono.
  */
 export async function atualizarPagina(
   usuarioId: string,
@@ -219,13 +249,22 @@ export async function atualizarPagina(
     favorita?: boolean;
     versaoEsperada?: number;
     forcar?: boolean;
+    colaborativo?: boolean;
   }
 ): Promise<{ versao: number; atualizadoEm: string; titulo: string }> {
+  const acesso = await acessoPagina(usuarioId, id);
+  if (!acesso) throw new ValidationError("Página não encontrada.");
+  if (acesso.permissao === "ver") throw new ValidationError("Você pode só ver esta página.");
+  if (params.favorita !== undefined && acesso.permissao !== "dono") {
+    throw new ValidationError("Só quem criou a página pode favoritá-la.");
+  }
+
   const pool = await getSqlServerPool();
   const request = pool.request();
   const sets: string[] = [];
 
-  request.input("usuarioId", sql.UniqueIdentifier, usuarioId);
+  /* A página é do dono: grava na linha dele, quem quer que esteja editando. */
+  request.input("usuarioId", sql.UniqueIdentifier, acesso.donoId);
   request.input("id", sql.UniqueIdentifier, id);
 
   if (params.titulo !== undefined) {
@@ -248,8 +287,9 @@ export async function atualizarPagina(
     request.input("conteudo", sql.NVarChar(sql.MAX), limpo);
     request.input("textoBusca", sql.NVarChar(sql.MAX), textoBuscaDoConteudo(limpo));
     sets.push("[conteudo] = @conteudo", "[texto_busca] = @textoBusca", "[versao] = [versao] + 1");
+    if (!params.colaborativo) sets.push("[estado_colaborativo] = NULL");
 
-    if (!params.forcar) {
+    if (!params.forcar && !params.colaborativo) {
       if (params.versaoEsperada === undefined) {
         throw new ValidationError("Informe a versão da página que está sendo editada.");
       }
@@ -322,6 +362,9 @@ export async function moverPagina(usuarioId: string, id: string, novoPaiId: stri
   if ((result.rowsAffected.at(-1) ?? 0) === 0) {
     throw new ValidationError("Página não encontrada.");
   }
+
+  /* Saiu (ou entrou) de baixo de uma página compartilhada: o acesso dela mudou. */
+  revalidarAoVivo(usuarioId, id);
 }
 
 /* Nova ordem das irmãs (arrastar na lista): só aceita páginas do usuário com esse mesmo pai. */
@@ -375,6 +418,8 @@ export async function enviarParaLixeira(usuarioId: string, id: string): Promise<
 
   const afetadas = result.rowsAffected.at(-1) ?? 0;
   if (afetadas === 0) throw new ValidationError("Página não encontrada.");
+  /* Na lixeira ninguém mais acessa: quem estava ao vivo nela sai. */
+  revalidarAoVivo(usuarioId, id);
   return afetadas;
 }
 
@@ -536,7 +581,9 @@ async function excluirDaLixeiraOndeSql(usuarioId: string, condicao: string): Pro
 /*
  * Imagens que nenhuma página (nem as da lixeira) usa mais. Só as com mais
  * de um dia: uma imagem recém-colada pode ainda não ter sido salva no
- * conteúdo (gravação automática a caminho).
+ * conteúdo (gravação automática a caminho). Procura em TODAS as páginas,
+ * não só nas de quem enviou: com compartilhamento, o print de um convidado
+ * mora na página do dono.
  */
 async function limparImagensSemUso(usuarioId: string): Promise<void> {
   const pool = await getSqlServerPool();
@@ -549,8 +596,7 @@ async function limparImagensSemUso(usuarioId: string): Promise<void> {
         AND i.[criado_em] < DATEADD(DAY, -1, SYSDATETIME())
         AND NOT EXISTS (
           SELECT 1 FROM dbo.portal_notas_paginas AS p
-          WHERE p.[usuario_id] = @usuarioId
-            AND p.[conteudo] LIKE '%' + CONVERT(VARCHAR(36), i.[id]) + '%'
+          WHERE p.[conteudo] LIKE '%' + CONVERT(VARCHAR(36), i.[id]) + '%'
         );
     `);
 }

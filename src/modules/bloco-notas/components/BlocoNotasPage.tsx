@@ -13,8 +13,10 @@ import {
   PanelLeft,
   Plus,
   Search,
+  Share2,
   Star,
   Trash2,
+  Users,
 } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
@@ -37,15 +39,25 @@ import {
   criarPagina,
   enviarImagemNota,
   enviarParaLixeira,
+  listarCompartilhadasComigo,
   listarPaginas,
   moverPagina,
   reordenarPaginas,
   salvarPagina,
 } from "../services/blocoNotas.service";
-import type { NoArvore, Pagina, PaginaResumo, ResultadoBusca } from "../types/blocoNotas.types";
+import type {
+  NoArvore,
+  Pagina,
+  PaginaCompartilhadaComigo,
+  PaginaResumo,
+  ResultadoBusca,
+} from "../types/blocoNotas.types";
 import { ancestrais, idsDaSubarvore, montarArvore, tituloOuPadrao } from "../utils/arvore";
+import { ArvoreCompartilhadas } from "./ArvoreCompartilhadas";
 import { ArvorePaginas } from "./ArvorePaginas";
 import styles from "./BlocoNotas.module.css";
+import { CompartilharModal } from "./CompartilharModal";
+import { EditorAoVivo } from "./EditorAoVivo";
 import { LixeiraModal } from "./LixeiraModal";
 import { MoverPaginaModal } from "./MoverPaginaModal";
 
@@ -82,6 +94,19 @@ function horaCurta(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/* As compartilhadas comigo no formato da árvore (para trilha/caminho). */
+function comoResumo(lista: PaginaCompartilhadaComigo[]): PaginaResumo[] {
+  return lista.map((item) => ({
+    id: item.id,
+    paiId: item.paiId,
+    titulo: item.titulo,
+    ordem: item.ordem,
+    atualizadoEm: item.atualizadoEm,
+    favorita: false,
+    compartilhada: false,
+  }));
+}
+
 export function BlocoNotasPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -89,6 +114,8 @@ export function BlocoNotasPage() {
   const paginaDaUrl = searchParams.get("pagina");
 
   const [paginas, setPaginas] = useState<PaginaResumo[] | null>(null);
+  const [compartilhadas, setCompartilhadas] = useState<PaginaCompartilhadaComigo[] | null>(null);
+  const [compartilharAberto, setCompartilharAberto] = useState(false);
   const [naLixeira, setNaLixeira] = useState(0);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(() => new Set());
@@ -120,6 +147,8 @@ export function BlocoNotasPage() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const gravacaoRef = useRef<Promise<void> | null>(null);
   const statusRef = useRef<StatusGravacao>("salvo");
+  /* Página aberta está ao vivo (compartilhada): o HTML é gravado sem conferir versão. */
+  const aoVivoRef = useRef(false);
   const tituloRef = useRef<HTMLInputElement>(null);
 
   const mudarStatus = useCallback((novo: StatusGravacao) => {
@@ -129,13 +158,16 @@ export function BlocoNotasPage() {
 
   const arvore = useMemo(() => (paginas ? montarArvore(paginas) : []), [paginas]);
   const favoritas = useMemo(() => (paginas ?? []).filter((item) => item.favorita), [paginas]);
-  const trilha = useMemo(
-    () => (pagina && paginas ? ancestrais(paginas, pagina.id) : []),
-    [pagina, paginas]
+  /* Minhas + compartilhadas comigo: para o caminho da página e para abrir pela URL. */
+  const todas = useMemo(
+    () => [...(paginas ?? []), ...comoResumo(compartilhadas ?? [])],
+    [paginas, compartilhadas]
   );
+  const trilha = useMemo(() => (pagina ? ancestrais(todas, pagina.id) : []), [pagina, todas]);
 
   const carregarArvore = useCallback(async () => {
-    const resultado = await listarPaginas();
+    const [resultado, deOutros] = await Promise.all([listarPaginas(), listarCompartilhadasComigo()]);
+    setCompartilhadas(deOutros.ok && deOutros.data ? deOutros.data : []);
     if (resultado.ok && resultado.data) {
       setPaginas(resultado.data.paginas);
       setNaLixeira(resultado.data.naLixeira);
@@ -162,10 +194,13 @@ export function BlocoNotasPage() {
       mudarStatus("salvando");
 
       const tarefa = (async () => {
+        /* Ao vivo, o texto já está junto para todos (Yjs): o HTML gravado é só a versão de leitura/busca. */
+        const colaborativo = aoVivoRef.current && campos.conteudo !== undefined;
         const resultado = await salvarPagina(id, {
           ...campos,
-          versao: campos.conteudo !== undefined ? versaoRef.current : undefined,
+          versao: campos.conteudo !== undefined && !colaborativo ? versaoRef.current : undefined,
           forcar,
+          colaborativo: colaborativo || undefined,
         });
 
         /* A pessoa trocou de página enquanto gravava: o resultado é da anterior. */
@@ -248,6 +283,7 @@ export function BlocoNotasPage() {
 
       const aberta = resultado.data;
       paginaIdRef.current = aberta.id;
+      aoVivoRef.current = aberta.compartilhada;
       versaoRef.current = aberta.versao;
       pendenteRef.current = {};
       setPagina(aberta);
@@ -259,7 +295,7 @@ export function BlocoNotasPage() {
       setFocarTitulo(Boolean(opcoes?.focarTitulo));
 
       /* Abre a trilha até ela na árvore. */
-      const lista = opcoes?.listaAtual ?? paginas ?? [];
+      const lista = opcoes?.listaAtual ?? todas;
       const caminho = ancestrais(lista, aberta.id).map((item) => item.id);
       if (caminho.length > 0) {
         setExpandidos((atual) => {
@@ -275,7 +311,7 @@ export function BlocoNotasPage() {
 
       if (window.matchMedia("(max-width: 900px)").matches) setLateralAberta(false);
     },
-    [descarregar, mudarStatus, paginas, pathname, router, searchParams]
+    [descarregar, mudarStatus, todas, pathname, router, searchParams]
   );
 
   async function novaPagina(paiId: string | null) {
@@ -308,13 +344,14 @@ export function BlocoNotasPage() {
   /* Primeira abertura: a página da URL, ou a primeira do caderno. */
   const abriuInicialRef = useRef(false);
   useEffect(() => {
-    if (!paginas || abriuInicialRef.current) return;
+    if (!paginas || !compartilhadas || abriuInicialRef.current) return;
     abriuInicialRef.current = true;
     const alvo =
-      (paginaDaUrl && paginas.some((item) => item.id === paginaDaUrl) && paginaDaUrl) ||
-      montarArvore(paginas)[0]?.id;
-    if (alvo) void abrir(alvo, { listaAtual: paginas });
-  }, [paginas, paginaDaUrl, abrir]);
+      (paginaDaUrl && todas.some((item) => item.id === paginaDaUrl) && paginaDaUrl) ||
+      montarArvore(paginas)[0]?.id ||
+      montarArvore(comoResumo(compartilhadas))[0]?.id;
+    if (alvo) void abrir(alvo, { listaAtual: todas });
+  }, [paginas, compartilhadas, todas, paginaDaUrl, abrir]);
 
   useEffect(() => {
     if (focarTitulo) {
@@ -443,6 +480,33 @@ export function BlocoNotasPage() {
     await carregarArvore();
   }
 
+  /* ---------- compartilhamento ---------- */
+
+  /*
+   * Fechou "Compartilhar": atualiza o ícone na árvore e, se a página
+   * passou a estar (ou deixou de estar) aberta para alguém, reabre -- liga
+   * ou desliga a edição ao vivo.
+   */
+  async function aoFecharCompartilhar() {
+    setCompartilharAberto(false);
+    if (!pagina) return;
+    const id = pagina.id;
+    const eraAoVivo = pagina.compartilhada;
+    void carregarArvore();
+    const atual = await abrirPagina(id);
+    if (atual.ok && atual.data && atual.data.compartilhada !== eraAoVivo && paginaIdRef.current === id) {
+      await abrir(id);
+    }
+  }
+
+  /* Tiraram o meu acesso (ou a página foi para a lixeira do dono) enquanto eu estava nela. */
+  const aoPerderAcesso = useCallback(() => {
+    clearTimeout(timerRef.current);
+    pendenteRef.current = {};
+    mudarStatus("salvo");
+    void carregarArvore();
+  }, [carregarArvore, mudarStatus]);
+
   /* ---------- conflito com outra aba ---------- */
 
   async function usarVersaoSalva() {
@@ -466,7 +530,7 @@ export function BlocoNotasPage() {
     <>
       <PageHeader
         title="Bloco de Notas"
-        description="Seu caderno pessoal — páginas, subpáginas, prints, tabelas e listas de tarefas. Só você tem acesso."
+        description="Seu caderno pessoal — páginas, subpáginas, prints, tabelas e listas de tarefas. Só você tem acesso, a não ser que compartilhe uma página."
       />
       <Breadcrumb
         items={[
@@ -494,6 +558,8 @@ export function BlocoNotasPage() {
       </PageContainer>
     );
   }
+
+  const ehDono = pagina?.permissao === "dono";
 
   const textoStatus =
     status === "salvando" || status === "pendente"
@@ -584,6 +650,19 @@ export function BlocoNotasPage() {
                   />
                 )}
               </div>
+
+              {compartilhadas && compartilhadas.length > 0 && (
+                <div className={styles.secao}>
+                  <span className={styles.secaoTitulo}>Compartilhadas comigo</span>
+                  <ArvoreCompartilhadas
+                    paginas={compartilhadas}
+                    selecionadaId={pagina?.id ?? null}
+                    expandidos={expandidos}
+                    onSelecionar={(id) => void abrir(id)}
+                    onAlternar={alternar}
+                  />
+                </div>
+              )}
             </>
           )}
 
@@ -648,22 +727,36 @@ export function BlocoNotasPage() {
                     )}
                     {textoStatus}
                   </span>
-                  <IconButton
-                    icon={<Star size={16} className={pagina.favorita ? styles.estrelaAtiva : undefined} />}
-                    label={pagina.favorita ? "Tirar das favoritas" : "Adicionar às favoritas"}
-                    size="small"
-                    onClick={() => void favoritar(pagina)}
-                  />
-                  <IconButton
-                    icon={<Trash2 size={16} />}
-                    label="Mover para a lixeira"
-                    size="small"
-                    variant="danger"
-                    onClick={() => {
-                      const no = arvore.length ? encontrarNo(arvore, pagina.id) : null;
-                      if (no) setExcluirNo(no);
-                    }}
-                  />
+                  {ehDono ? (
+                    <>
+                      <IconButton
+                        icon={pagina.compartilhada ? <Users size={16} /> : <Share2 size={16} />}
+                        label={pagina.compartilhada ? "Compartilhada — ver com quem" : "Compartilhar"}
+                        size="small"
+                        onClick={() => setCompartilharAberto(true)}
+                      />
+                      <IconButton
+                        icon={<Star size={16} className={pagina.favorita ? styles.estrelaAtiva : undefined} />}
+                        label={pagina.favorita ? "Tirar das favoritas" : "Adicionar às favoritas"}
+                        size="small"
+                        onClick={() => void favoritar(pagina)}
+                      />
+                      <IconButton
+                        icon={<Trash2 size={16} />}
+                        label="Mover para a lixeira"
+                        size="small"
+                        variant="danger"
+                        onClick={() => {
+                          const no = arvore.length ? encontrarNo(arvore, pagina.id) : null;
+                          if (no) setExcluirNo(no);
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <span className={styles.donoInfo}>
+                      <Users size={14} /> De {pagina.donoNome} · {pagina.permissao === "ver" ? "só leitura" : "pode editar"}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -671,6 +764,7 @@ export function BlocoNotasPage() {
                 ref={tituloRef}
                 className={styles.titulo}
                 value={titulo}
+                readOnly={pagina.permissao === "ver"}
                 maxLength={200}
                 placeholder="Sem título"
                 aria-label="Título da página"
@@ -714,19 +808,33 @@ export function BlocoNotasPage() {
               )}
 
               <div className={styles.editor}>
-                <RichTextEditor
-                  key={pagina.id}
-                  value={conteudo}
-                  tabelas
-                  recursosAvancados
-                  alturaMinima={460}
-                  imagemUpload={enviarImagemNota}
-                  placeholder="Escreva aqui. Cole prints com Ctrl+V, use a barra acima para tabelas, tarefas, cores..."
-                  onChange={(html) => {
-                    setConteudo(html);
-                    agendarGravacao({ conteudo: html });
-                  }}
-                />
+                {pagina.compartilhada ? (
+                  <EditorAoVivo
+                    key={pagina.id}
+                    paginaId={pagina.id}
+                    htmlInicial={pagina.conteudo}
+                    imagemUpload={(arquivo) => enviarImagemNota(arquivo, pagina.id)}
+                    onHtml={(html) => {
+                      setConteudo(html);
+                      agendarGravacao({ conteudo: html });
+                    }}
+                    onSemAcesso={aoPerderAcesso}
+                  />
+                ) : (
+                  <RichTextEditor
+                    key={pagina.id}
+                    value={conteudo}
+                    tabelas
+                    recursosAvancados
+                    alturaMinima={460}
+                    imagemUpload={(arquivo) => enviarImagemNota(arquivo, pagina.id)}
+                    placeholder="Escreva aqui. Cole prints com Ctrl+V, use a barra acima para tabelas, tarefas, cores..."
+                    onChange={(html) => {
+                      setConteudo(html);
+                      agendarGravacao({ conteudo: html });
+                    }}
+                  />
+                )}
               </div>
             </Stack>
           )}
@@ -740,6 +848,21 @@ export function BlocoNotasPage() {
           paginas={paginas}
           onFechar={() => setMoverNo(null)}
           onMover={mover}
+        />
+      )}
+
+      {compartilharAberto && pagina && ehDono && (
+        <CompartilharModal
+          paginaId={pagina.id}
+          titulo={titulo}
+          onFechar={() => void aoFecharCompartilhar()}
+          onMudou={(lista) =>
+            setPaginas(
+              (atual) =>
+                atual?.map((item) => (item.id === pagina.id ? { ...item, compartilhada: lista.length > 0 } : item)) ??
+                atual
+            )
+          }
         />
       )}
 

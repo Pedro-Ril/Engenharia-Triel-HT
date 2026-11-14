@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 
 import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
+import { acessoPagina } from "@/lib/bloco-notas/compartilhamento";
 import { salvarImagemNota, TAMANHO_MAXIMO_IMAGEM_NOTA, TIPOS_IMAGEM_NOTA } from "@/lib/bloco-notas/imagens";
-import { MODULO_BLOCO_NOTAS, respostaDeErro } from "@/lib/bloco-notas/rota";
+import { ehUuid, MODULO_BLOCO_NOTAS, respostaDeErro } from "@/lib/bloco-notas/rota";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -28,8 +29,21 @@ async function handlePOST(request: Request) {
       throw new ValidationError(`A imagem passa do limite de ${TAMANHO_MAXIMO_IMAGEM_NOTA / (1024 * 1024)} MB.`);
     }
 
+    /* Página em que o print vai: precisa poder editá-la (dona ou compartilhada com 'editar'). */
+    const paginaInformada = formData.get("paginaId");
+    let paginaId: string | null = null;
+    if (paginaInformada !== null && paginaInformada !== "") {
+      if (!ehUuid(paginaInformada)) throw new ValidationError("Página inválida.");
+      const acessoPg = await acessoPagina(acesso.usuario.id, paginaInformada);
+      if (!acessoPg || acessoPg.permissao === "ver") {
+        throw new ValidationError("Você não pode colar imagens nesta página.");
+      }
+      paginaId = paginaInformada;
+    }
+
     const id = await salvarImagemNota({
       usuarioId: acesso.usuario.id,
+      paginaId,
       tipoMime: arquivo.type,
       tamanhoBytes: arquivo.size,
       conteudo: Buffer.from(await arquivo.arrayBuffer()),

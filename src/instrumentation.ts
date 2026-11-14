@@ -23,6 +23,12 @@ export async function register() {
   );
   iniciarSignalingSeNecessario();
 
+  /* Edição ao vivo do Bloco de Notas (páginas compartilhadas) -- processo à parte, porta 3012. */
+  const { iniciarColaboracaoSeNecessario } = await import(
+    "@/lib/bloco-notas/colaboracao-processo"
+  );
+  iniciarColaboracaoSeNecessario();
+
   const { iniciarLimpezaTransferencias } = await import(
     "@/lib/transferencia/scheduler"
   );

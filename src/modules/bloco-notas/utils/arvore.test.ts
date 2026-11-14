@@ -4,7 +4,7 @@ import type { PaginaResumo } from "../types/blocoNotas.types";
 import { achatarArvore, ancestrais, idsDaSubarvore, montarArvore, tituloOuPadrao } from "./arvore";
 
 function pagina(id: string, paiId: string | null, ordem: number, titulo = id): PaginaResumo {
-  return { id, paiId, titulo, favorita: false, ordem, atualizadoEm: "2026-11-13T10:00:00" };
+  return { id, paiId, titulo, favorita: false, compartilhada: false, ordem, atualizadoEm: "2026-11-13T10:00:00" };
 }
 
 const paginas = [

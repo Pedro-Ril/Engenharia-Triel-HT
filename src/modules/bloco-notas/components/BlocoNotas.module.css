@@ -521,6 +521,187 @@
   color: var(--text-muted);
 }
 
+/* ===================== COMPARTILHAMENTO / AO VIVO ===================== */
+
+.iconeCompartilhada {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.compartilhadasGrupos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compartilhadasDono {
+  display: block;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.donoInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.aoVivo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.presenca {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.presencaPonto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.presencaPontoAtivo {
+  background: var(--success-text);
+  box-shadow: 0 0 0 3px var(--success-bg);
+}
+
+.presencaAvatares {
+  display: inline-flex;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: -4px;
+  border: 2px solid var(--bg-surface);
+  border-radius: 50%;
+  /* Fundo é a cor da pessoa (sempre saturada): texto branco nos dois temas. */
+  color: var(--text-inverse);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.selo {
+  padding: 2px 8px;
+  border: 1px solid var(--neutral-border);
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  font-weight: 600;
+}
+
+.compartilharLinhaBusca {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 8px;
+  align-items: center;
+}
+
+.pessoas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pessoa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pessoa:hover:not(:disabled) {
+  background: var(--bg-hover-neutral);
+  color: var(--text);
+}
+
+.pessoa:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.pessoaComAcesso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.pessoaTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pessoaTextos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.pessoaTextos span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pessoaJa {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pessoaAcoes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 190px;
+}
+
+.pessoaAcoes > :first-child {
+  flex: 1;
+}
+
 /* ===================== CELULAR / TELA ESTREITA ===================== */
 
 @media (max-width: 900px) {
@@ -548,6 +729,19 @@
 
   .titulo {
     font-size: 22px;
+  }
+
+  .compartilharLinhaBusca {
+    grid-template-columns: 1fr;
+  }
+
+  .pessoaComAcesso {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pessoaAcoes {
+    width: auto;
   }
 
   /* Sem hover no toque: ações da página sempre visíveis. */

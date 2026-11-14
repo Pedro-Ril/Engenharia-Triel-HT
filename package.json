@@ -8,6 +8,7 @@
     "start": "next start -p 80",
     "lint": "eslint",
     "tv-signaling": "node --env-file=.env tv-signaling/server.mjs",
+    "notas-colaboracao": "node --env-file=.env colaboracao/server.mjs",
     "copiar-occt": "node scripts/copiar-occt.mjs",
     "predev": "node scripts/copiar-occt.mjs && node scripts/copiar-pdfjs-worker.mjs",
     "prebuild": "node scripts/copiar-occt.mjs && node scripts/copiar-pdfjs-worker.mjs",
@@ -19,6 +20,10 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@handsontable/react-wrapper": "^17.1.0",
+    "@hocuspocus/provider": "^4.8.0",
+    "@hocuspocus/server": "^4.8.0",
+    "@tiptap/extension-collaboration": "^3.30.2",
+    "@tiptap/extension-collaboration-caret": "^3.30.2",
     "@tiptap/extension-highlight": "^3.30.2",
     "@tiptap/extension-image": "^3.30.2",
     "@tiptap/extension-link": "^3.30.2",
@@ -31,6 +36,7 @@
     "@tiptap/pm": "^3.30.2",
     "@tiptap/react": "^3.30.2",
     "@tiptap/starter-kit": "^3.30.2",
+    "@tiptap/y-tiptap": "^3.0.7",
     "archiver": "^8.0.0",
     "busboy": "^1.6.0",
     "dxf-viewer": "^1.0.48",
@@ -57,7 +63,9 @@
     "svg2pdf.js": "^2.7.0",
     "three": "^0.161.0",
     "ws": "^8.21.3",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.33"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

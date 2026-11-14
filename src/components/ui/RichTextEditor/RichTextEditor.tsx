@@ -12,6 +12,10 @@ import { TaskItem, TaskList } from "@tiptap/extension-list";
 import Highlight from "@tiptap/extension-highlight";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import TextAlign from "@tiptap/extension-text-align";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import type * as Y from "yjs";
 import {
   AlignCenter,
   AlignJustify,
@@ -95,6 +99,40 @@ interface RichTextEditorProps {
    * editor fica exatamente como sempre foi (Chamados, Wiki).
    */
   recursosAvancados?: boolean;
+  /*
+   * Edição ao vivo (Bloco de Notas compartilhado): o texto passa a morar
+   * no documento Yjs, sincronizado pelo provedor com quem mais estiver na
+   * página -- `value` deixa de mandar no conteúdo (só serve para semear).
+   * Desfazer/refazer viram os do Yjs (só desfazem o que VOCÊ fez).
+   */
+  colaboracao?: ColaboracaoEditor;
+}
+
+export interface ColaboracaoEditor {
+  documento: Y.Doc;
+  provedor: HocuspocusProvider;
+  pessoa: { nome: string; cor: string };
+  /*
+   * O servidor pediu a este navegador para preencher a página com o texto
+   * que já existia (`value`): é a primeira vez dela ao vivo. Feito isso,
+   * chama `onSemeado`.
+   */
+  semear: boolean;
+  onSemeado: () => void;
+}
+
+/* Cursor de outra pessoa: barrinha na cor dela + etiqueta com o nome. */
+function renderizarCursor(pessoa: Record<string, unknown>): HTMLElement {
+  const cor = typeof pessoa.color === "string" ? pessoa.color : "#6b7280";
+  const cursor = document.createElement("span");
+  cursor.classList.add("collaboration-carets__caret");
+  cursor.style.borderColor = cor;
+  const etiqueta = document.createElement("div");
+  etiqueta.classList.add("collaboration-carets__label");
+  etiqueta.style.backgroundColor = cor;
+  etiqueta.textContent = typeof pessoa.name === "string" ? pessoa.name : "";
+  cursor.appendChild(etiqueta);
+  return cursor;
 }
 
 const TAMANHO_MAXIMO_IMAGEM_BYTES = 8 * 1024 * 1024;
@@ -143,6 +181,7 @@ export function RichTextEditor({
   alturaMinima,
   imagemUpload,
   recursosAvancados = false,
+  colaboracao,
 }: RichTextEditorProps) {
   const [enviandoImagem, setEnviandoImagem] = useState(false);
   const [erroUpload, setErroUpload] = useState<string | null>(null);
@@ -178,12 +217,16 @@ export function RichTextEditor({
    */
   const ultimoHtmlEmitidoRef = useRef<string | null>(null);
 
+  const provedorColaboracao = colaboracao?.provedor ?? null;
+
   const editor = useEditor({
     immediatelyRender: false,
     editable: !disabled,
     extensions: [
       StarterKit.configure({
         heading: { levels: recursosAvancados ? [1, 2, 3] : [2, 3] },
+        /* Ao vivo, o histórico é o do Yjs (o do ProseMirror desfaria o texto dos outros). */
+        ...(colaboracao ? { undoRedo: false as const } : {}),
       }),
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),
@@ -202,8 +245,18 @@ export function RichTextEditor({
             TextAlign.configure({ types: ["heading", "paragraph"] }),
           ]
         : []),
+      ...(colaboracao
+        ? [
+            Collaboration.configure({ document: colaboracao.documento }),
+            CollaborationCaret.configure({
+              provider: colaboracao.provedor,
+              user: { name: colaboracao.pessoa.nome, color: colaboracao.pessoa.cor },
+              render: renderizarCursor,
+            }),
+          ]
+        : []),
     ],
-    content: value,
+    content: colaboracao ? undefined : value,
     onUpdate: ({ editor: editorAtualizado }) => {
       const html = editorAtualizado.getHTML();
       ultimoHtmlEmitidoRef.current = html;
@@ -250,7 +303,7 @@ export function RichTextEditor({
         return true;
       },
     },
-  });
+  }, [provedorColaboracao]);
 
   useEffect(() => {
     processarImagemRef.current = (arquivo: File) => {
@@ -286,13 +339,23 @@ export function RichTextEditor({
   }, [imagemUpload, editor]);
 
   /* Sincroniza quando `value` muda por fora (ex: trocar de artigo no formulário, limpar depois de enviar). */
+  const emColaboracao = Boolean(colaboracao);
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || emColaboracao) return;
     if (value === ultimoHtmlEmitidoRef.current) return;
     if (value !== editor.getHTML()) {
       editor.commands.setContent(value, { emitUpdate: false });
     }
-  }, [value, editor]);
+  }, [value, editor, emColaboracao]);
+
+  /* Primeira vez da página ao vivo: entra o texto que já existia, uma vez só. */
+  const precisaSemear = colaboracao?.semear ?? false;
+  const onSemeado = colaboracao?.onSemeado;
+  useEffect(() => {
+    if (!editor || !precisaSemear) return;
+    if (editor.isEmpty && value.trim()) editor.commands.setContent(value);
+    onSemeado?.();
+  }, [editor, precisaSemear, onSemeado, value]);
 
   useEffect(() => {
     editor?.setEditable(!disabled);

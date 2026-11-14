@@ -86,6 +86,7 @@ async function handlePATCH(request: Request, context: RouteContext) {
       favorita: corpo.favorita as boolean | undefined,
       versaoEsperada: corpo.versao as number | undefined,
       forcar: corpo.forcar === true,
+      colaborativo: corpo.colaborativo === true,
     });
 
     return NextResponse.json({ ok: true, data: resultado });
