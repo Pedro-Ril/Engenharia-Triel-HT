@@ -254,6 +254,8 @@ export interface Chamado extends ChamadoResumo {
   /* Quem de fato abriu, quando diferente do solicitante (delegação/"abrir em nome de") -- null no caso de sempre (abriu para si mesmo). */
   criadoPorUsuarioId: string | null;
   criadoPorNome: string | null;
+  /* Nome cadastrado da empresa do chamado (Administração → Empresas); sem cadastro, o próprio código. */
+  empresaNome: string | null;
   mensagens: ChamadoMensagem[];
 }
 
@@ -331,6 +333,8 @@ interface ChamadoRow {
   data_prevista_conclusao: string | null;
   criado_por_usuario_id: string | null;
   criado_por_nome: string | null;
+  /* Só na busca do chamado (buscarChamadoPorNumero). */
+  empresa_nome?: string | null;
 }
 
 function mapChamadoRow(row: ChamadoRow): Chamado {
@@ -348,6 +352,7 @@ function mapChamadoRow(row: ChamadoRow): Chamado {
     atendenteUsuarioId: row.atendente_usuario_id,
     atendenteNome: row.atendente_nome,
     empresa: row.empresa,
+    empresaNome: row.empresa_nome ?? row.empresa,
     unidadeId: row.unidade_id,
     unidade: row.unidade,
     solicitanteDepartamento: row.solicitante_departamento,
@@ -597,9 +602,12 @@ export async function buscarChamadoPorNumero(numero: number): Promise<Chamado | 
 
   request.input("numero", sql.Int, numero);
 
+  /* `empresa` continua sendo o código (filtra as unidades); `empresa_nome` é para exibir. */
   const result = await request.query<ChamadoRow>(`
-    SELECT ${colunasChamado}
+    SELECT ${colunasChamado},
+      COALESCE(empresaCadastro.[nome], NULLIF(c.[empresa], '')) AS [empresa_nome]
     ${juncoesChamado}
+    ${SQL_EMPRESA_DO_CHAMADO}
     WHERE c.[numero] = @numero;
   `);
 

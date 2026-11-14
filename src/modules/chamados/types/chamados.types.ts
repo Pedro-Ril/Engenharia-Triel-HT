@@ -100,6 +100,8 @@ export interface Chamado extends ChamadoResumo {
   dataPrevistaConclusao: string | null;
   criadoPorUsuarioId: string | null;
   criadoPorNome: string | null;
+  /* Nome cadastrado da empresa (o `empresa` é o código); sem cadastro, o próprio código. */
+  empresaNome: string | null;
   mensagens: ChamadoMensagem[];
   ehAtendente: boolean;
   ehDono: boolean;

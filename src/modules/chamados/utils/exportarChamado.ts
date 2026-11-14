@@ -176,7 +176,7 @@ function dadosDoChamado(chamado: Chamado): [string, string][] {
     ],
     ["Contato", chamado.solicitanteContato ?? "-"],
     ["Departamento", chamado.solicitanteDepartamento ?? "-"],
-    ["Empresa", chamado.empresa ?? "-"],
+    ["Empresa", chamado.empresaNome ?? chamado.empresa ?? "-"],
   ];
 
   if (chamado.unidade) linhas.push(["Unidade", chamado.unidade]);

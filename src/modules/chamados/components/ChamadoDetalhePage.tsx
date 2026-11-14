@@ -373,7 +373,7 @@ export function ChamadoDetalhePage({
         description={`Nº ${chamado.numero} · ${chamado.setorNome}${
           chamado.categoriaNome ? ` · ${chamado.categoriaNome}` : ""
         }${
-          chamado.empresa ? ` · ${chamado.empresa}` : ""
+          chamado.empresa ? ` · ${chamado.empresaNome ?? chamado.empresa}` : ""
         }${
           chamado.unidade ? ` · ${chamado.unidade}` : ""
         } · aberto por ${chamado.solicitanteNome}${
