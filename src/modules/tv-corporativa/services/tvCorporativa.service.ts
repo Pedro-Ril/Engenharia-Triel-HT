@@ -52,6 +52,8 @@ export async function atualizarTerminal(
     caminhoInicial?: string | null;
     empresa?: string | null;
     exibirCursor?: boolean;
+    recarregarInatividade?: boolean;
+    inatividadeSegundos?: number;
   }
 ): Promise<ApiEnvelope<TerminalTv>> {
   const response = await fetch(`/api/admin/tv/terminais/${id}`, {

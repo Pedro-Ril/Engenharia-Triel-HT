@@ -71,6 +71,8 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
   const [salvandoId, setSalvandoId] = useState<string | null>(null);
   const [terminalParaVisualizar, setTerminalParaVisualizar] = useState<TerminalTv | null>(null);
   const [caminhoEditando, setCaminhoEditando] = useState<Record<string, string>>({});
+  /* Tempo parado (s) sendo digitado -- só grava ao sair do campo. */
+  const [inatividadeEditando, setInatividadeEditando] = useState<Record<string, string>>({});
   const [terminalParaReiniciar, setTerminalParaReiniciar] = useState<TerminalTv | null>(null);
   const [terminalParaDetalharAgente, setTerminalParaDetalharAgente] = useState<TerminalTv | null>(
     null
@@ -230,6 +232,70 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
     }
   }
 
+  async function handleAlterarRecarregarInatividade(terminal: TerminalTv, recarregarInatividade: boolean) {
+    setSalvandoId(terminal.id);
+
+    try {
+      const resultado = await atualizarTerminal(terminal.id, { recarregarInatividade });
+
+      if (resultado.ok) {
+        await carregarTudo();
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível atualizar a recarga por inatividade",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
+  function valorInatividade(terminal: TerminalTv): string {
+    return inatividadeEditando[terminal.id] ?? String(terminal.inatividadeSegundos);
+  }
+
+  async function handleSalvarInatividade(terminal: TerminalTv) {
+    const digitado = valorInatividade(terminal).trim();
+    const limparEdicao = () =>
+      setInatividadeEditando((atual) => {
+        const copia = { ...atual };
+        delete copia[terminal.id];
+        return copia;
+      });
+
+    const segundos = Number(digitado);
+    if (digitado === String(terminal.inatividadeSegundos)) {
+      limparEdicao();
+      return;
+    }
+    if (!Number.isInteger(segundos) || segundos < 10 || segundos > 86400) {
+      onFeedback("danger", "Tempo parado inválido", "Use um número inteiro de 10 a 86400 segundos.");
+      limparEdicao();
+      return;
+    }
+
+    setSalvandoId(terminal.id);
+
+    try {
+      const resultado = await atualizarTerminal(terminal.id, { inatividadeSegundos: segundos });
+
+      if (resultado.ok) {
+        await carregarTudo();
+      } else {
+        onFeedback(
+          "danger",
+          "Não foi possível atualizar o tempo parado",
+          resultado.message ?? "Tente novamente em instantes."
+        );
+      }
+      limparEdicao();
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
   async function handleAlterarIntervalo(terminal: TerminalTv, valor: string) {
     const numero = Number(valor);
     if (!Number.isFinite(numero) || numero < 5) return;
@@ -360,7 +426,7 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
           description='Abra o player (/tv) numa TV e clique em "Parear terminal" com o código exibido na tela.'
         />
       ) : (
-        <Table minWidth={1180}>
+        <Table minWidth={1340}>
           <TableHead>
             <TableRow>
               <TableHeaderCell align="center">Status</TableHeaderCell>
@@ -370,6 +436,7 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
               <TableHeaderCell align="center">Intervalo (s)</TableHeaderCell>
               <TableHeaderCell>Página inicial</TableHeaderCell>
               <TableHeaderCell align="center">Cursor</TableHeaderCell>
+              <TableHeaderCell align="center">Recarregar parado</TableHeaderCell>
               <TableHeaderCell>Última atividade</TableHeaderCell>
               <TableHeaderCell>Agente</TableHeaderCell>
               <TableHeaderCell align="center">Ações</TableHeaderCell>
@@ -444,6 +511,42 @@ export function DispositivosTvPainel({ onFeedback }: DispositivosTvPainelProps) 
                         handleAlterarExibirCursor(terminal, event.target.checked)
                       }
                     />
+                  </TableCell>
+
+                  {/*
+                    Ligado: se o terminal ficar esse tempo sem nenhuma entrada
+                    (mouse, teclado, rolagem), o agente aperta F5 -- uma vez,
+                    e só conta de novo depois que alguém mexer.
+                  */}
+                  <TableCell align="center">
+                    <Stack direction="row" gap={6} align="center" justify="center">
+                      <Switch
+                        label=""
+                        compact
+                        checked={terminal.recarregarInatividade}
+                        disabled={salvandoId === terminal.id}
+                        onChange={(event) =>
+                          handleAlterarRecarregarInatividade(terminal, event.target.checked)
+                        }
+                      />
+                      <div style={{ width: 84 }} title="Segundos sem mexer até o F5">
+                        <NumberInput
+                          value={valorInatividade(terminal)}
+                          min={10}
+                          max={86400}
+                          aria-label={`Segundos parado até recarregar ${terminal.nome ?? "o terminal"}`}
+                          onChange={(event) =>
+                            setInatividadeEditando((atual) => ({
+                              ...atual,
+                              [terminal.id]: event.target.value,
+                            }))
+                          }
+                          onBlur={() => handleSalvarInatividade(terminal)}
+                          disabled={salvandoId === terminal.id || !terminal.recarregarInatividade}
+                        />
+                      </div>
+                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>s</span>
+                    </Stack>
                   </TableCell>
 
                   <TableCell>

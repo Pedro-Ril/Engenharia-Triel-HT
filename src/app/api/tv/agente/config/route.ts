@@ -86,6 +86,9 @@ async function handleGET(request: Request) {
         hash,
         caminhoInicial: acesso.terminal.caminhoInicial || "/tv",
         exibirCursor: acesso.terminal.exibirCursor,
+        /* F5 depois de N segundos sem nenhuma entrada -- ver iniciarMonitorInatividade no agente. */
+        recarregarInatividade: acesso.terminal.recarregarInatividade,
+        inatividadeSegundos: acesso.terminal.inatividadeSegundos,
         comando,
         redesWifi,
         /* Acesso remoto (x11vnc, só o agente Linux usa) -- null = desligado. Ver portal_tv_config.vnc_senha_cifrada. */

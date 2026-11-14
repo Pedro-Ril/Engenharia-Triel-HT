@@ -825,6 +825,96 @@ function limparProcessoControleCursorOrfao() {
   }
 }
 
+/*
+ * Recarregar a página quando o terminal fica parado ("Recarregar parado"
+ * em Dispositivos, colunas recarregar_inatividade/inatividade_segundos).
+ * Só Linux, como o VNC.
+ *
+ * "Parado" = nenhuma entrada no X: mouse, teclado, rolagem, toque, e
+ * também o acesso remoto por VNC (o x11vnc injeta no mesmo X). Quem diz
+ * há quanto tempo não há entrada é o "xprintidle"; quem aperta o F5 é o
+ * "xdotool" (os dois via apt, ver instalar.sh). Medir aqui, e não na
+ * página, pega também o uso dentro de conteúdo de outro site embutido na
+ * TV, que a página não enxerga.
+ *
+ * Uma vez por período parado: o próprio F5 sintético zera o contador do
+ * X, então sem cuidado a TV recarregaria a cada N segundos para sempre
+ * (piscando sem ninguém usar). Depois do F5, só volta a contar quando
+ * alguém mexer de verdade -- percebido porque o tempo parado fica menor
+ * que o tempo desde o nosso F5.
+ */
+const INTERVALO_CHECAR_INATIVIDADE_MS = 2000;
+/* Folga para o contador do X refletir o nosso próprio F5. */
+const FOLGA_F5_PROPRIO_MS = 3000;
+
+function lerTempoParadoMs() {
+  try {
+    const saida = execFileSync("xprintidle", { encoding: "utf8", timeout: 2000, stdio: ["ignore", "pipe", "ignore"] });
+    const ms = Number(saida.trim());
+    return Number.isFinite(ms) && ms >= 0 ? ms : null;
+  } catch {
+    return null;
+  }
+}
+
+function apertarF5() {
+  /* --clearmodifiers: se por acaso houver Ctrl/Shift preso, manda F5 puro (Ctrl+F5/Shift+F5 seriam outra coisa). */
+  execFileSync("xdotool", ["key", "--clearmodifiers", "F5"], { timeout: 3000, stdio: "ignore" });
+}
+
+/*
+ * Roda o tempo todo; `obterConfig()` devolve a configuração atual
+ * ({ ligado, segundos }), que verificarConfiguracaoAgente atualiza a
+ * cada poll -- ligar/desligar no portal não precisa reiniciar o agente.
+ */
+function iniciarMonitorInatividade(obterConfig) {
+  if (EH_WINDOWS) return;
+
+  let recarregouEm = null;
+  let avisouFaltaFerramenta = false;
+
+  setInterval(() => {
+    const { ligado, segundos } = obterConfig();
+    if (!ligado) {
+      recarregouEm = null;
+      return;
+    }
+
+    const paradoMs = lerTempoParadoMs();
+    if (paradoMs === null) {
+      if (!avisouFaltaFerramenta) {
+        avisouFaltaFerramenta = true;
+        console.error(
+          '"Recarregar parado" ligado, mas o "xprintidle" não está disponível -- rode "sudo apt-get install -y xprintidle xdotool".'
+        );
+      }
+      return;
+    }
+
+    if (recarregouEm !== null) {
+      /* Já recarregou neste período parado: espera alguém mexer de verdade. */
+      const desdeF5Ms = Date.now() - recarregouEm;
+      if (paradoMs + FOLGA_F5_PROPRIO_MS < desdeF5Ms) recarregouEm = null;
+      return;
+    }
+
+    if (paradoMs < segundos * 1000) return;
+
+    try {
+      apertarF5();
+      recarregouEm = Date.now();
+      console.log(`Terminal parado há ${Math.round(paradoMs / 1000)}s (limite ${segundos}s) -- F5 enviado.`);
+    } catch (error) {
+      if (!avisouFaltaFerramenta) {
+        avisouFaltaFerramenta = true;
+        console.error(
+          `Não foi possível enviar o F5 (${error.message}) -- confira se o "xdotool" está instalado: "sudo apt-get install -y xprintidle xdotool".`
+        );
+      }
+    }
+  }, INTERVALO_CHECAR_INATIVIDADE_MS);
+}
+
 async function main() {
   garantirDiretorioDados();
 
@@ -851,6 +941,9 @@ async function main() {
   /* Senha do VNC em uso agora (null = desligado) e o processo x11vnc correspondente. Ver iniciarProcessoVnc. */
   let vncSenhaAtual = null;
   let processoVnc = null;
+  /* "Recarregar parado" -- atualizado a cada poll de configuração, lido pelo monitor. */
+  let configInatividade = { ligado: false, segundos: 60 };
+  iniciarMonitorInatividade(() => configInatividade);
 
   /* Liga o x11vnc com a senha atual e, se ele cair sozinho, liga de novo -- a não ser que a senha tenha mudado/sumido nesse meio-tempo. */
   function ligarVnc() {
@@ -1011,6 +1104,21 @@ async function main() {
       }
 
       aplicarConfigVnc(corpo.data.vncSenha);
+
+      const novaInatividade = {
+        ligado: corpo.data.recarregarInatividade === true,
+        segundos: Number.isInteger(corpo.data.inatividadeSegundos) && corpo.data.inatividadeSegundos >= 10
+          ? corpo.data.inatividadeSegundos
+          : 60,
+      };
+      if (novaInatividade.ligado !== configInatividade.ligado || novaInatividade.segundos !== configInatividade.segundos) {
+        console.log(
+          novaInatividade.ligado
+            ? `Recarregar parado: ligado (${novaInatividade.segundos}s sem mexer -> F5).`
+            : "Recarregar parado: desligado."
+        );
+        configInatividade = novaInatividade;
+      }
     } catch (error) {
       console.error("Erro ao verificar atualização/configuração do agente:", error.message);
     }

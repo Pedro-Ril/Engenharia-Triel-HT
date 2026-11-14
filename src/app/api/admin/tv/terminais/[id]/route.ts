@@ -23,7 +23,13 @@ interface AtualizarTerminalBody {
   caminhoInicial?: unknown;
   empresa?: unknown;
   exibirCursor?: unknown;
+  recarregarInatividade?: unknown;
+  inatividadeSegundos?: unknown;
 }
+
+/* Tempo parado antes do F5: mesma faixa do CHECK da migração 0168. */
+const INATIVIDADE_MINIMA_S = 10;
+const INATIVIDADE_MAXIMA_S = 86400;
 
 async function handlePATCH(request: Request, context: RouteContext) {
   const acesso = await requireAdminApi();
@@ -93,6 +99,20 @@ async function handlePATCH(request: Request, context: RouteContext) {
 
     if (Object.prototype.hasOwnProperty.call(body, "exibirCursor")) {
       params.exibirCursor = optionalBoolean(body.exibirCursor, "exibirCursor", false);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "recarregarInatividade")) {
+      params.recarregarInatividade = optionalBoolean(body.recarregarInatividade, "recarregarInatividade", false);
+    }
+
+    if (body.inatividadeSegundos !== undefined) {
+      const segundos = optionalInteger(body.inatividadeSegundos, "inatividadeSegundos", 60);
+      if (segundos < INATIVIDADE_MINIMA_S || segundos > INATIVIDADE_MAXIMA_S) {
+        throw new ValidationError(
+          `O tempo parado deve ficar entre ${INATIVIDADE_MINIMA_S} segundos e 24 horas (${INATIVIDADE_MAXIMA_S} s).`
+        );
+      }
+      params.inatividadeSegundos = segundos;
     }
 
     const terminal = await atualizarTerminal(id, params);

@@ -40,6 +40,13 @@ export interface TerminalTv {
   empresa: string | null;
   /* Terminal com mouse de verdade, operado por alguém (ex: TLT01) -- ver tv-agente/agente.mjs, iniciarNudgeCursor. Padrão false: TV de sinalização passiva não precisa de cursor. */
   exibirCursor: boolean;
+  /*
+   * Recarregar a página (F5) quando o terminal ficar `inatividadeSegundos`
+   * sem nenhuma entrada (mouse, teclado, rolagem) -- quem mede e aperta o
+   * F5 é o agente (tv-agente/agente.mjs, iniciarMonitorInatividade).
+   */
+  recarregarInatividade: boolean;
+  inatividadeSegundos: number;
   /* "cabeada"/"wifi"/"desconectado" -- null em terminal Windows, ou Linux com agente ainda não atualizado (ver verificarConexaoRede em tv-agente/agente.mjs). */
   agenteTipoConexao: string | null;
   agenteWifiSsid: string | null;
@@ -66,6 +73,8 @@ const colunasTerminal = `
   [agente_sistema_operacional],
   [empresa],
   [exibir_cursor],
+  [recarregar_inatividade],
+  [inatividade_segundos],
   [agente_tipo_conexao],
   [agente_wifi_ssid],
   [agente_wifi_intensidade]
@@ -91,6 +100,8 @@ const colunasTerminalOutput = `
   INSERTED.[agente_sistema_operacional],
   INSERTED.[empresa],
   INSERTED.[exibir_cursor],
+  INSERTED.[recarregar_inatividade],
+  INSERTED.[inatividade_segundos],
   INSERTED.[agente_tipo_conexao],
   INSERTED.[agente_wifi_ssid],
   INSERTED.[agente_wifi_intensidade]
@@ -116,6 +127,8 @@ interface TerminalRow {
   agente_sistema_operacional?: string | null;
   empresa?: string | null;
   exibir_cursor: boolean;
+  recarregar_inatividade?: boolean;
+  inatividade_segundos?: number;
   agente_tipo_conexao?: string | null;
   agente_wifi_ssid?: string | null;
   agente_wifi_intensidade?: number | null;
@@ -142,6 +155,8 @@ function mapTerminalRow(row: TerminalRow): TerminalTv {
     agenteSistemaOperacional: row.agente_sistema_operacional ?? null,
     empresa: row.empresa ?? null,
     exibirCursor: row.exibir_cursor,
+    recarregarInatividade: row.recarregar_inatividade ?? false,
+    inatividadeSegundos: row.inatividade_segundos ?? 60,
     agenteTipoConexao: row.agente_tipo_conexao ?? null,
     agenteWifiSsid: row.agente_wifi_ssid ?? null,
     agenteWifiIntensidade: row.agente_wifi_intensidade ?? null,
@@ -397,6 +412,8 @@ export async function atualizarTerminal(
     caminhoInicial?: string | null;
     empresa?: string | null;
     exibirCursor?: boolean;
+    recarregarInatividade?: boolean;
+    inatividadeSegundos?: number;
   },
   codigoEmpresaExigida?: string
 ): Promise<TerminalTv | null> {
@@ -424,6 +441,8 @@ export async function atualizarTerminal(
   );
   request.input("empresa", sql.NVarChar(30), params.empresa ?? null);
   request.input("exibirCursor", sql.Bit, params.exibirCursor ?? null);
+  request.input("recarregarInatividade", sql.Bit, params.recarregarInatividade ?? null);
+  request.input("inatividadeSegundos", sql.Int, params.inatividadeSegundos ?? null);
   request.input("codigoEmpresaExigida", sql.NVarChar(30), codigoEmpresaExigida ?? null);
 
   const result = await request.query(`
@@ -435,6 +454,8 @@ export async function atualizarTerminal(
       [caminho_inicial] = CASE WHEN @caminhoInicialInformado = 1 THEN @caminhoInicial ELSE [caminho_inicial] END,
       [empresa] = CASE WHEN @empresaInformada = 1 THEN @empresa ELSE [empresa] END,
       [exibir_cursor] = COALESCE(@exibirCursor, [exibir_cursor]),
+      [recarregar_inatividade] = COALESCE(@recarregarInatividade, [recarregar_inatividade]),
+      [inatividade_segundos] = COALESCE(@inatividadeSegundos, [inatividade_segundos]),
       [atualizado_em] = SYSDATETIME()
     OUTPUT ${colunasTerminalOutput}
     WHERE [id] = @id
@@ -691,6 +712,8 @@ export async function validarTokenDeTerminal(token: string): Promise<TerminalTv 
     criado_em: string;
     revogado_em: string | null;
     exibir_cursor: boolean;
+    recarregar_inatividade: boolean;
+    inatividade_segundos: number;
   }>(`
     SELECT
       CONVERT(VARCHAR(36), [id]) AS [id],
@@ -703,7 +726,9 @@ export async function validarTokenDeTerminal(token: string): Promise<TerminalTv 
       [caminho_inicial],
       CONVERT(VARCHAR(33), [criado_em], 126) AS [criado_em],
       CONVERT(VARCHAR(33), [revogado_em], 126) AS [revogado_em],
-      [exibir_cursor]
+      [exibir_cursor],
+      [recarregar_inatividade],
+      [inatividade_segundos]
     FROM dbo.portal_tv_terminais
     WHERE [id] = @id AND [status] = 'pareado';
   `);
