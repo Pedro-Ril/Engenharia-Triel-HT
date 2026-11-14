@@ -3,6 +3,7 @@ import "server-only";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
 import type { PrioridadeChamado, StatusChamado } from "./chamados";
+import { encontrarSetorDaUrl, type SetorParaUrl } from "./setor-url-tv";
 
 /*
  * Dados do BI de chamados para TV (/chamados/dashboard/tv) -- rota
@@ -58,10 +59,26 @@ export interface PainelTvChamados {
   emAbertoTotal: number;
 }
 
-const PADRAO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/*
+ * ?setor= da URL -> id do setor. Aceita nome (?setor=ti), chave ou id (ver
+ * setor-url-tv.ts). Sem ?setor=: todos os setores. Com ?setor= que não
+ * bate com nenhum setor: `naoEncontrado` -- a TV avisa em vez de mostrar
+ * todos os setores calada (o que parecia certo e não era).
+ */
+export async function resolverSetorDaUrlTv(
+  valor: string | null
+): Promise<{ setorId: string | null; naoEncontrado: boolean }> {
+  if (!valor || !valor.trim()) return { setorId: null, naoEncontrado: false };
 
-export function setorDaUrlTv(valor: string | null): string | null {
-  return valor && PADRAO_UUID.test(valor) ? valor : null;
+  const pool = await getSqlServerPool();
+  const result = await pool.request().query<SetorParaUrl>(`
+    SELECT CONVERT(VARCHAR(36), [id]) AS [id], [chave], [nome]
+    FROM dbo.portal_setores
+    ORDER BY [ativo] DESC, [nome];
+  `);
+
+  const setor = encontrarSetorDaUrl(valor, result.recordset);
+  return setor ? { setorId: setor.id, naoEncontrado: false } : { setorId: null, naoEncontrado: true };
 }
 
 interface ChamadoTvRow {

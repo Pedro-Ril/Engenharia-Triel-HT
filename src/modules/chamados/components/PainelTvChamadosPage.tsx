@@ -48,7 +48,7 @@ import styles from "./PainelTvChamados.module.css";
  * BI de chamados para a TV da sala -- mesmo padrão do BI de Equipamentos
  * Usados: moldura que escala para a tela, cabeçalho com relógio, rodízio
  * de páginas (resumo + tabela de chamados em aberto) e atualização a cada
- * minuto. URL: ?setor=<id> (um setor só), ?tempo=60 (segundos por
+ * minuto. URL: ?setor=ti (um setor só: nome, chave ou id), ?tempo=60 (segundos por
  * página), ?linhas=12 (linhas por página da tabela), ?rodizio=0 (fica no
  * resumo), ?fullscreen=1 (sem o menu do portal).
  */
