@@ -23,8 +23,65 @@
     box-shadow 0.18s ease;
 }
 
+/* Gatilho com texto ("Exportar ▾"): mesmo visual do Button secundário. */
+.triggerTexto {
+  min-height: 44px;
+  padding: 0 14px 0 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+.triggerTexto:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.triggerTexto:focus-visible {
+  outline: 3px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.triggerTexto:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.triggerTexto svg {
+  width: 16px;
+  height: 16px;
+}
+
+.triggerSeta {
+  transition: transform 0.18s ease;
+}
+
+.triggerTexto.triggerOpen .triggerSeta {
+  transform: rotate(180deg);
+}
+
 .trigger:hover:not(:disabled),
-.triggerOpen {
+.triggerOpen,
+.triggerTexto:hover:not(:disabled) {
   color: var(--primary);
   border-color: var(--primary-soft-border);
   background: var(--primary-soft);

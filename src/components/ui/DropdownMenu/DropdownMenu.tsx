@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { MoreVertical } from "lucide-react";
+import { ChevronDown, MoreVertical } from "lucide-react";
 
 import styles from "./DropdownMenu.module.css";
 
@@ -33,6 +33,12 @@ interface DropdownMenuProps {
   align?: "start" | "end";
   disabled?: boolean;
   className?: string;
+  /*
+   * Gatilho com texto (ex: "Exportar"), no visual do botão secundário,
+   * com setinha. Sem isto, o gatilho é o ícone ⋮ de sempre.
+   */
+  triggerText?: ReactNode;
+  triggerIcon?: ReactNode;
 }
 
 interface MenuPosition {
@@ -46,7 +52,10 @@ export function DropdownMenu({
   align = "end",
   disabled = false,
   className = "",
+  triggerText,
+  triggerIcon,
 }: DropdownMenuProps) {
+  const comTexto = triggerText !== undefined;
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -298,14 +307,14 @@ export function DropdownMenu({
         ref={triggerRef}
         type="button"
         className={[
-          styles.trigger,
+          comTexto ? styles.triggerTexto : styles.trigger,
           open ? styles.triggerOpen : "",
           className,
         ]
           .filter(Boolean)
           .join(" ")}
         disabled={disabled}
-        aria-label={label}
+        aria-label={comTexto ? undefined : label}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -314,7 +323,15 @@ export function DropdownMenu({
           setOpen((current) => !current);
         }}
       >
-        <MoreVertical aria-hidden="true" />
+        {comTexto ? (
+          <>
+            {triggerIcon}
+            {triggerText}
+            <ChevronDown aria-hidden="true" className={styles.triggerSeta} />
+          </>
+        ) : (
+          <MoreVertical aria-hidden="true" />
+        )}
       </button>
 
       {mounted &&

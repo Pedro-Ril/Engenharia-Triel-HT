@@ -148,6 +148,7 @@ export function AbrirChamadoPage({
   }
 
   const precisaEscolherUnidade = opcoesUnidade.modo === "escolher" && !unidadeId;
+  const mostrarUnidade = carregandoUnidades || opcoesUnidade.modo !== "nenhuma";
 
   async function handleSubmit() {
     setErro(null);
@@ -407,29 +408,26 @@ export function AbrirChamadoPage({
             </FormGrid>
           )}
 
-          {(carregandoUnidades || opcoesUnidade.modo !== "nenhuma") && (
-            <FormGrid columns={3}>
-              {carregandoUnidades ? (
+          {/*
+            Classificação do chamado numa linha só: a Unidade (quando a
+            empresa tem unidades) entra como 1ª coluna, junto de Setor,
+            Categoria e Prioridade -- sozinha numa linha ficava solta.
+          */}
+          <FormGrid columns={mostrarUnidade ? 4 : 3}>
+            {mostrarUnidade &&
+              (carregandoUnidades ? (
                 <Field label="Unidade">
                   <Input value="Carregando unidades..." disabled readOnly />
                 </Field>
               ) : opcoesUnidade.modo === "fixa" ? (
                 <Field
                   label="Unidade"
-                  hint={solicitanteAlvo ? "a unidade cadastrada para essa pessoa" : "a unidade do seu cadastro"}
+                  hint={solicitanteAlvo ? "a cadastrada para essa pessoa" : "a do seu cadastro"}
                 >
                   <Input value={opcoesUnidade.unidades[0]?.nome ?? ""} disabled readOnly />
                 </Field>
               ) : (
-                <Field
-                  label="Unidade"
-                  required
-                  hint={
-                    solicitanteAlvo
-                      ? "de qual unidade é este chamado"
-                      : "você está em mais de uma unidade — de qual é este chamado?"
-                  }
-                >
+                <Field label="Unidade" required hint="de qual unidade é este chamado">
                   <Dropdown
                     value={unidadeId}
                     onValueChange={setUnidadeId}
@@ -440,11 +438,8 @@ export function AbrirChamadoPage({
                     }))}
                   />
                 </Field>
-              )}
-            </FormGrid>
-          )}
+              ))}
 
-          <FormGrid columns={3}>
             <Field label="Setor" required>
               {setores.length === 0 ? (
                 <Alert variant="warning">

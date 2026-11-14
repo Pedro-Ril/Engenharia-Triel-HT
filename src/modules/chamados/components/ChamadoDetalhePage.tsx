@@ -346,6 +346,12 @@ export function ChamadoDetalhePage({
 
   const podeTransferir = chamado.ehAtendente && chamado.status !== "fechado";
 
+  /*
+   * Botões de fluxo (aceitar, resolver, reabrir...) do card "Ações": mesma
+   * regra de antes -- o card agora aparece sempre por causa do "Exportar".
+   */
+  const acoesDeFluxo = ehAdministrador || podeResponder;
+
   const transferenciaSemAlteracao =
     novoSetorId === chamado.setorId &&
     (novoAtendenteId || null) === chamado.atendenteUsuarioId;
@@ -374,12 +380,9 @@ export function ChamadoDetalhePage({
           chamado.criadoPorNome ? ` (registrado por ${chamado.criadoPorNome})` : ""
         } em ${formatarData(chamado.criadoEm)}`}
         actions={
-          <Stack direction="row" gap={12} align="center" wrap>
-            <Stack direction="row" gap={8}>
-              <StatusBadge status={chamado.status} />
-              <PrioridadeBadge prioridade={chamado.prioridade} />
-            </Stack>
-            <ExportarChamadoAcoes numero={chamado.numero} chamado={chamado} aparencia="botoes" />
+          <Stack direction="row" gap={8}>
+            <StatusBadge status={chamado.status} />
+            <PrioridadeBadge prioridade={chamado.prioridade} />
           </Stack>
         }
       />
@@ -402,84 +405,78 @@ export function ChamadoDetalhePage({
         </Alert>
       )}
 
-      {(ehAdministrador ||
-        (podeResponder &&
-          (podeAceitar ||
-            podeMarcarResolvido ||
-            aguardandoConfirmacao ||
-            podeFechar ||
-            podeReabrir ||
-            podeTransferir))) && (
-        <Card title="Ações">
-          <Stack direction="row" gap={10} wrap>
-            {podeAceitar && (
-              <Button
-                onClick={() => executarAcao("aceitar", aceitarChamado)}
-                loading={executandoAcao === "aceitar"}
-              >
-                <UserCheck size={16} />
-                Aceitar chamado
-              </Button>
-            )}
+      {/* Sempre aparece: "Exportar" vale para qualquer pessoa que vê o chamado. */}
+      <Card title="Ações">
+        <Stack direction="row" gap={10} wrap>
+          {acoesDeFluxo && podeAceitar && (
+            <Button
+              onClick={() => executarAcao("aceitar", aceitarChamado)}
+              loading={executandoAcao === "aceitar"}
+            >
+              <UserCheck size={16} />
+              Aceitar chamado
+            </Button>
+          )}
 
-            {podeMarcarResolvido && (
-              <Button
-                variant="secondary"
-                onClick={() => executarAcao("marcar-resolvido", marcarChamadoComoResolvido)}
-                loading={executandoAcao === "marcar-resolvido"}
-              >
-                <CheckCircle2 size={16} />
-                Marcar como resolvido
-              </Button>
-            )}
+          {acoesDeFluxo && podeMarcarResolvido && (
+            <Button
+              variant="secondary"
+              onClick={() => executarAcao("marcar-resolvido", marcarChamadoComoResolvido)}
+              loading={executandoAcao === "marcar-resolvido"}
+            >
+              <CheckCircle2 size={16} />
+              Marcar como resolvido
+            </Button>
+          )}
 
-            {aguardandoConfirmacao && (
-              <Button
-                onClick={() => executarAcao("confirmar-resolucao", confirmarResolucaoChamado)}
-                loading={executandoAcao === "confirmar-resolucao"}
-              >
-                <CheckCircle2 size={16} />
-                Confirmar resolução
-              </Button>
-            )}
+          {acoesDeFluxo && aguardandoConfirmacao && (
+            <Button
+              onClick={() => executarAcao("confirmar-resolucao", confirmarResolucaoChamado)}
+              loading={executandoAcao === "confirmar-resolucao"}
+            >
+              <CheckCircle2 size={16} />
+              Confirmar resolução
+            </Button>
+          )}
 
-            {podeReabrir && (
-              <Button
-                variant="secondary"
-                onClick={() => setConfirmandoReabrir(true)}
-                loading={executandoAcao === "reabrir"}
-              >
-                <RotateCcw size={16} />
-                Reabrir chamado
-              </Button>
-            )}
+          {acoesDeFluxo && podeReabrir && (
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmandoReabrir(true)}
+              loading={executandoAcao === "reabrir"}
+            >
+              <RotateCcw size={16} />
+              Reabrir chamado
+            </Button>
+          )}
 
-            {podeFechar && (
-              <Button
-                variant="secondary"
-                onClick={() => executarAcao("fechar", fecharChamado)}
-                loading={executandoAcao === "fechar"}
-              >
-                Fechar chamado
-              </Button>
-            )}
+          {acoesDeFluxo && podeFechar && (
+            <Button
+              variant="secondary"
+              onClick={() => executarAcao("fechar", fecharChamado)}
+              loading={executandoAcao === "fechar"}
+            >
+              Fechar chamado
+            </Button>
+          )}
 
-            {podeTransferir && (
-              <Button variant="secondary" onClick={abrirTransferencia}>
-                <ArrowRightLeft size={16} />
-                Transferir chamado
-              </Button>
-            )}
+          {acoesDeFluxo && podeTransferir && (
+            <Button variant="secondary" onClick={abrirTransferencia}>
+              <ArrowRightLeft size={16} />
+              Transferir chamado
+            </Button>
+          )}
 
-            {ehAdministrador && (
-              <Button variant="danger" onClick={() => setConfirmandoExcluir(true)}>
-                <Trash2 size={16} />
-                Excluir chamado
-              </Button>
-            )}
-          </Stack>
-        </Card>
-      )}
+          <ExportarChamadoAcoes numero={chamado.numero} chamado={chamado} aparencia="botoes" />
+
+          {ehAdministrador && (
+            <Button variant="danger" onClick={() => setConfirmandoExcluir(true)}>
+              <Trash2 size={16} />
+              Excluir chamado
+            </Button>
+          )}
+        </Stack>
+      </Card>
 
       {chamado.ehAtendente && (
         <Card title="Atribuição e prioridade" allowOverflow>

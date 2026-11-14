@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Stack } from "@/components/ui/Stack";
 import { Toast } from "@/components/ui/Toast";
 
@@ -14,6 +14,7 @@ import {
   exportarChamadoExcel,
   exportarChamadoPdf,
 } from "../utils/exportarChamado";
+import styles from "./ExportarChamadoAcoes.module.css";
 
 type Formato = "pdf" | "excel";
 
@@ -21,7 +22,7 @@ interface ExportarChamadoAcoesProps {
   numero: number;
   /* Já carregado (tela do chamado) -- sem ele, busca pelo número (listas). */
   chamado?: Chamado;
-  /* "icones" na coluna de ação das tabelas; "botoes" no topo do chamado. */
+  /* "icones": menu ⋮ na coluna "Ações" das tabelas; "botoes": botão "Exportar" no card de ações do chamado. */
   aparencia?: "icones" | "botoes";
 }
 
@@ -54,44 +55,62 @@ export function ExportarChamadoAcoes({ numero, chamado, aparencia = "icones" }: 
     />
   );
 
+  const itens = [
+    {
+      value: "pdf",
+      label: "PDF",
+      icon: <FileText size={15} />,
+      onSelect: () => void exportar("pdf"),
+    },
+    {
+      value: "excel",
+      label: "Excel",
+      icon: <FileSpreadsheet size={15} />,
+      onSelect: () => void exportar("excel"),
+    },
+  ];
+
+  /* Card "Ações" do chamado: botão "Exportar" que abre PDF / Excel. */
   if (aparencia === "botoes") {
     return (
       <>
-        <Stack direction="row" gap={8}>
-          <Button variant="secondary" onClick={() => exportar("pdf")} loading={gerando === "pdf"} loadingLabel="Gerando...">
-            <FileText size={16} />
-            PDF
+        {gerando ? (
+          <Button variant="secondary" loading loadingLabel="Gerando...">
+            Exportar
           </Button>
-          <Button variant="secondary" onClick={() => exportar("excel")} loading={gerando === "excel"} loadingLabel="Gerando...">
-            <FileSpreadsheet size={16} />
-            Excel
-          </Button>
-        </Stack>
+        ) : (
+          <DropdownMenu
+            label={`Exportar chamado nº ${numero}`}
+            align="start"
+            triggerText="Exportar"
+            triggerIcon={<Download aria-hidden="true" />}
+            items={itens}
+          />
+        )}
         {aviso}
       </>
     );
   }
 
-  /* Dentro de linha clicável (fila): o clique no botão não pode abrir o chamado. */
+  /*
+   * Coluna "Ações" das listas: um botão só, que abre o menu para escolher.
+   * Dentro de linha clicável (fila): o clique não pode abrir o chamado --
+   * vale também para os itens do menu, que mesmo desenhados fora da tabela
+   * (portal) sobem o evento pela árvore do React até aqui.
+   */
   return (
     <>
-      <Stack direction="row" gap={4} onClick={(event) => event.stopPropagation()}>
-        <IconButton
-          icon={<FileText size={15} />}
-          label={`Exportar chamado nº ${numero} em PDF`}
-          size="small"
-          loading={gerando === "pdf"}
-          disabled={gerando !== null}
-          onClick={() => exportar("pdf")}
-        />
-        <IconButton
-          icon={<FileSpreadsheet size={15} />}
-          label={`Exportar chamado nº ${numero} em Excel`}
-          size="small"
-          loading={gerando === "excel"}
-          disabled={gerando !== null}
-          onClick={() => exportar("excel")}
-        />
+      <Stack direction="row" justify="center" onClick={(event) => event.stopPropagation()}>
+        {gerando ? (
+          <span className={styles.gerando} aria-live="polite">
+            <Loader2 size={15} className={styles.girando} /> Gerando...
+          </span>
+        ) : (
+          <DropdownMenu
+            label={`Ações do chamado nº ${numero}`}
+            items={itens.map((item) => ({ ...item, label: `Exportar ${item.label}` }))}
+          />
+        )}
       </Stack>
       {aviso}
     </>
