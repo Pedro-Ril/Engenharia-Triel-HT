@@ -323,6 +323,17 @@ troca de máquina pela espessura e pelo material (nesse caso, TRUMPF).
 - **Teste:** `escolha.test.ts`. A regra da planilha dá 0,610 min no caso
   acima (TRUMPF).
 
+**16/11/2026: total com 3 casas.** Padrão definido pelo usuário: todo
+tempo calculado sai com 3 casas depois da vírgula, em todos os métodos
+(peça 249830 no laser: 1,9799 → 1,980; guilhotina 0,3486 → 0,349).
+
+- **O total é arredondado no motor** (`arredondarTempo`, em
+  `src/lib/tempos-maquina/calculo.ts`): é o mesmo valor que aparece, que
+  fica registrado e que vai para o campo do Roteiro.
+- **Parcelas:** o cálculo segue exato e elas aparecem com 3 casas. A soma
+  delas pode diferir do total na última casa.
+- **As tabelas cadastradas** continuam com os valores originais.
+
 ## Anexo: tabelas das planilhas
 
 Pierce e espera estão em **segundos** (a planilha guarda em minutos, como `x/60`). Na tabela de corte e dobra, multiplique por 0,0498 para ter minutos; o valor em negrito é a célula digitada direto na planilha.

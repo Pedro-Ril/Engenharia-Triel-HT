@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { calcularTempo, geometriaManual, perimetroContorno } from "./calculo";
+import { arredondarTempo, calcularTempo, geometriaManual, perimetroContorno } from "./calculo";
 import { PERFIS_REFERENCIA_PLANILHAS as REF } from "./referencia-planilhas";
-import type { PerfilTabelaDimensao } from "./tipos";
+import type { PerfilTabelaDimensao, ResultadoTempo } from "./tipos";
+
+/* O total sai com 3 casas; a soma exata das parcelas confere com a planilha. */
+const somaParcelas = (r: ResultadoTempo) => r.parcelas.reduce((soma, p) => soma + p.minutos, 0);
 
 const parcela = (resultado: ReturnType<typeof calcularTempo>, chave: string) =>
   resultado.parcelas.find((p) => p.chave === chave)?.minutos;
@@ -29,7 +32,9 @@ describe("corte CNC: laser (planilha TEMPOS PLASMA CNC, aba Laser)", () => {
     const r = calcularTempo(REF.laserByspeed.perfil, dados);
 
     expect(r.ok).toBe(true);
-    expect(r.tempoMin).toBeCloseTo(0.796794770424681, 10);
+    /* A soma exata das parcelas; o total sai com 3 casas, como a planilha mostra. */
+    expect(r.parcelas.reduce((soma, p) => soma + p.minutos, 0)).toBeCloseTo(0.796794770424681, 10);
+    expect(r.tempoMin).toBe(0.797);
     expect(parcela(r, "corte")).toBeCloseTo(1994.159265 / 3200, 6); // L70
     expect(parcela(r, "perfuracao")).toBeCloseTo(0.08, 10); // L71 = 6 x (0,4 + 0,4)/60
     expect(parcela(r, "vazio")).toBeCloseTo(300 / 120000, 10); // L72
@@ -98,7 +103,8 @@ describe("corte CNC: plasma (aba Plasma OXIPIRA)", () => {
     });
 
     expect(r.ok).toBe(true);
-    expect(r.tempoMin).toBeCloseTo(1.155956800671485, 10);
+    expect(r.parcelas.reduce((soma, p) => soma + p.minutos, 0)).toBeCloseTo(1.155956800671485, 10);
+    expect(r.tempoMin).toBe(1.156);
     expect(parcela(r, "perfuracao")).toBeCloseTo(3 * (0.086 + 0.5 / 60), 10); // T47
     expect(parcela(r, "vazio")).toBeCloseTo(250 / 16000, 10); // T49
     expect(parcela(r, "entrada_saida")).toBeCloseTo((3 * 4.5) / 1810, 10); // T50
@@ -141,29 +147,34 @@ describe("tabela por dimensão (TEMPOS CORTE E DOBRA)", () => {
     const r = calcularTempo(REF.guilhotina.perfil, { espessuraMm: 2, geometria });
 
     expect(r.ok).toBe(true);
-    expect(r.tempoMin).toBeCloseTo(0.3486, 10);
+    expect(r.tempoMin).toBe(arredondarTempo(0.3486));
+    expect(somaParcelas(r)).toBeCloseTo(0.3486, 10);
   });
 
   it("dobradeira: tempo base x fator do perfil (planilha: 0,5926)", () => {
     const r = calcularTempo(REF.dobradeira.perfil, { espessuraMm: 2, geometria, dobra: { fator: "mais_de_tres" } });
 
     expect(r.ok).toBe(true);
-    expect(r.tempoMin).toBeCloseTo(0.3486 * 1.7, 10);
+    expect(r.tempoMin).toBe(arredondarTempo(0.3486 * 1.7));
+    expect(somaParcelas(r)).toBeCloseTo(0.3486 * 1.7, 10);
   });
 
   it("a ordem das medidas não importa e a medida sobe para o próximo degrau", () => {
     const invertida = calcularTempo(REF.guilhotina.perfil, { espessuraMm: 2, geometria: geometriaManual({ larguraMm: 700, comprimentoMm: 500 }) });
     const entreDegraus = calcularTempo(REF.guilhotina.perfil, { espessuraMm: 2, geometria: geometriaManual({ larguraMm: 450, comprimentoMm: 650 }) });
 
-    expect(invertida.tempoMin).toBeCloseTo(0.3486, 10);
-    expect(entreDegraus.tempoMin).toBeCloseTo(0.3486, 10);
+    expect(invertida.tempoMin).toBe(arredondarTempo(0.3486));
+    expect(somaParcelas(invertida)).toBeCloseTo(0.3486, 10);
+    expect(entreDegraus.tempoMin).toBe(arredondarTempo(0.3486));
+    expect(somaParcelas(entreDegraus)).toBeCloseTo(0.3486, 10);
   });
 
   it("acima da tabela usa o maior valor, com aviso", () => {
     const r = calcularTempo(REF.guilhotina.perfil, { espessuraMm: 2, geometria: geometriaManual({ larguraMm: 2000, comprimentoMm: 4000 }) });
 
     expect(r.ok).toBe(true);
-    expect(r.tempoMin).toBeCloseTo(40 * 0.0498, 10);
+    expect(r.tempoMin).toBe(arredondarTempo(40 * 0.0498));
+    expect(somaParcelas(r)).toBeCloseTo(40 * 0.0498, 10);
     expect(r.avisos[0]).toContain("acima da tabela");
   });
 
@@ -186,6 +197,17 @@ describe("tabela por dimensão (TEMPOS CORTE E DOBRA)", () => {
     const porDobra: PerfilTabelaDimensao = { ...REF.dobradeira.perfil, dobra: { regra: "por_dobra", acrescimoPorDobra: 0.1 } };
     const r = calcularTempo(porDobra, { espessuraMm: 2, geometria, dobra: { quantidade: 4 } });
 
-    expect(r.tempoMin).toBeCloseTo(0.3486 * 1.4, 10);
+    expect(r.tempoMin).toBe(arredondarTempo(0.3486 * 1.4));
+    expect(somaParcelas(r)).toBeCloseTo(0.3486 * 1.4, 10);
+  });
+});
+
+describe("arredondamento do total do corte CNC", () => {
+  it("3 casas, como a planilha (peça 249830: 1,9799 -> 1,980)", () => {
+    expect(arredondarTempo(1.9799)).toBe(1.98);
+    expect(arredondarTempo(0.61)).toBe(0.61);
+    expect(arredondarTempo(0.8239)).toBe(0.824);
+    /* Meio exato sobe, sem tropeçar no ponto flutuante (1,0005 vira 1,00049999...). */
+    expect(arredondarTempo(1.0005)).toBe(1.001);
   });
 });

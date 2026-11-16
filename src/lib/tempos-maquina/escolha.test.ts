@@ -77,7 +77,7 @@ describe("escolha da tabela pela espessura (célula N7 da aba Laser)", () => {
   it("perfil comum continua calculando como antes", () => {
     const r = calcularTempoCadastrado(REF.laserBysprint.perfil, peca(4.75), perfis);
     expect(r.perfilUsado).toBeNull();
-    expect(r.tempoMin).toBeCloseTo(0.8239, 4);
+    expect(r.tempoMin).toBe(0.824);
   });
 
   it("a validação aceita a escolha e devolve a mesma coisa", () => {

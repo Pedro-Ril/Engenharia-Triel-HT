@@ -34,6 +34,11 @@ import {
 import { textoDeNumero } from "@/modules/tempos-maquina/utils/perfil-form";
 
 import type { ComponenteEstrutura, RecursoForm, RoteiroTreeNode } from "../types/cadastroRoteiro.types";
+import roteiroStyles from "@/app/cadastro-roteiro/cadastro-roteiro.module.css";
+
+import { codigoDoPdf } from "../utils/codigo-pdf";
+import Abrir3DPlayButton from "./Abrir3DPlayButton";
+import AbrirPdfItemButton from "./AbrirPdfItemButton";
 
 const AUTOMATICA = "";
 /* Área do DXF x área pelo peso do 3DX: acima disto, avisa (espessura ou material errados no 3DX ou no ERP). */
@@ -94,6 +99,8 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
   const [verTabela, setVerTabela] = useState(false);
   const [usando, setUsando] = useState(false);
   const [erroUsar, setErroUsar] = useState<string | null>(null);
+  /* PDF ou 3D que não abriu (sem arquivo, pop-up bloqueado). */
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
 
   useEffect(() => {
     void buscarConfigTempos().then((r) =>
@@ -236,9 +243,19 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
           <Alert variant="warning">A unidade da operação é {unidade}; o cálculo dá minutos por peça.</Alert>
         )}
         {erroUsar && <Alert variant="danger">{erroUsar}</Alert>}
+        {erroArquivo && <Alert variant="warning">{erroArquivo}</Alert>}
 
         <div className={styles.simulador}>
-          <Card title="Peça">
+          <Card
+            title="Peça"
+            actions={
+              /* Os mesmos botões da árvore do Roteiro: conferir desenho e 3D sem fechar o cálculo. */
+              <div className={roteiroStyles.acoesNaLinha}>
+                <AbrirPdfItemButton codigo={codigoDoPdf(item)} onErro={setErroArquivo} />
+                <Abrir3DPlayButton item={item} onErro={setErroArquivo} />
+              </div>
+            }
+          >
             <Stack gap={16}>
               <FormGrid columns={2}>
                 <Field label="Máquina" hint={`Perfil: ${maquina.perfil.nome}`}>

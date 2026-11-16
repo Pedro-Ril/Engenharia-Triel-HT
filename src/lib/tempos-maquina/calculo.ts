@@ -31,6 +31,19 @@ function num(valor: number, casas = 2): string {
   return valor.toLocaleString("pt-BR", { maximumFractionDigits: casas });
 }
 
+/*
+ * Padrão do Portal: o total sai com 3 casas depois da vírgula (0,610;
+ * 1,980), em todo método -- é esse o tempo que aparece, que fica
+ * registrado e que vai para o campo do Roteiro. As parcelas ficam exatas
+ * (somadas podem diferir do total na 4ª casa).
+ */
+export const CASAS_TEMPO = 3;
+
+export function arredondarTempo(minutos: number, casas = CASAS_TEMPO): number {
+  const fator = 10 ** casas;
+  return Math.round((minutos + Number.EPSILON) * fator) / fator;
+}
+
 function resultadoComErro(erros: string[], avisos: string[] = []): ResultadoTempo {
   return { ok: false, tempoMin: null, parcelas: [], referencia: [], avisos, erros };
 }
@@ -207,7 +220,7 @@ export function calcularCorteCnc(perfil: PerfilCorteCnc, dados: DadosPeca): Resu
 
   return {
     ok: true,
-    tempoMin: parcelas.reduce((soma, p) => soma + p.minutos, 0),
+    tempoMin: arredondarTempo(parcelas.reduce((soma, p) => soma + p.minutos, 0)),
     parcelas,
     referencia: [
       { rotulo: "Variante", valor: rotuloVariante },
@@ -289,7 +302,7 @@ export function calcularTabelaDimensao(perfil: PerfilTabelaDimensao, dados: Dado
 
   return {
     ok: true,
-    tempoMin: parcelas.reduce((soma, p) => soma + p.minutos, 0),
+    tempoMin: arredondarTempo(parcelas.reduce((soma, p) => soma + p.minutos, 0)),
     parcelas,
     referencia,
     avisos,

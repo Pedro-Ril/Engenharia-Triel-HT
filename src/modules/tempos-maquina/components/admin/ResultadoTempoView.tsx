@@ -6,8 +6,9 @@ import type { ResultadoTempo } from "@/lib/tempos-maquina/tipos";
 
 import styles from "./TemposMaquina.module.css";
 
-export function formatarMinutos(minutos: number, casas = 4): string {
-  return minutos.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: casas });
+/* Padrão do cálculo de tempo: sempre 3 casas depois da vírgula (1,980; 0,647). */
+export function formatarMinutos(minutos: number, casas = 3): string {
+  return minutos.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
 }
 
 /* Resultado do cálculo de tempo: total, composição, o que foi usado, avisos e erros. */
