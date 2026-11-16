@@ -14,7 +14,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Stack } from "@/components/ui/Stack";
 import { Textarea } from "@/components/ui/Textarea";
 
-import type { PerfilTempo } from "@/lib/tempos-maquina/tipos";
+import type { PerfilCadastrado } from "@/lib/tempos-maquina/tipos";
 import { chaveDeRotulo } from "@/lib/tempos-maquina/validacao";
 
 import { atualizarPerfilTempo, criarPerfilTempo } from "../../services/temposMaquinaAdmin.service";
@@ -23,15 +23,20 @@ import {
   ajustarMatriz,
   CORTE_CNC_VAZIO,
   corteCncParaForm,
+  ESCOLHA_VAZIA,
+  escolhaParaForm,
   formParaCorteCnc,
+  formParaEscolha,
   formParaTabela,
   lerDegraus,
   TABELA_VAZIA,
   tabelaParaForm,
   type CorteCncForm,
+  type EscolhaForm,
   type RegraDobraForm,
   type TabelaForm,
 } from "../../utils/perfil-form";
+import { EditorEscolhaEspessura } from "./EditorEscolhaEspessura";
 import styles from "./TemposMaquina.module.css";
 
 export type PerfilEmEdicao = {
@@ -39,37 +44,44 @@ export type PerfilEmEdicao = {
   nome: string;
   metodo: MetodoTempo;
   observacao: string | null;
-  parametros: PerfilTempo | null;
+  parametros: PerfilCadastrado | null;
 };
 
 interface PerfilTempoEditorProps {
   inicial: PerfilEmEdicao;
+  /* Todos os perfis: a escolha por espessura aponta para os de corte CNC. */
+  perfis: PerfilTempoCadastro[];
   onClose: () => void;
   onSalvo: (perfil: PerfilTempoCadastro) => void;
 }
 
-function formCncInicial(p: PerfilTempo | null): CorteCncForm {
+function formCncInicial(p: PerfilCadastrado | null): CorteCncForm {
   return p?.metodo === "corte_cnc" ? corteCncParaForm(p) : structuredClone(CORTE_CNC_VAZIO);
 }
 
-function formTabelaInicial(p: PerfilTempo | null): TabelaForm {
+function formTabelaInicial(p: PerfilCadastrado | null): TabelaForm {
   return p?.metodo === "tabela_dimensao" ? tabelaParaForm(p) : structuredClone(TABELA_VAZIA);
 }
 
+function formEscolhaInicial(p: PerfilCadastrado | null): EscolhaForm {
+  return p?.metodo === "escolha_espessura" ? escolhaParaForm(p) : structuredClone(ESCOLHA_VAZIA);
+}
+
 /* Criar, duplicar ou editar um perfil (o método só se escolhe ao criar). */
-export function PerfilTempoEditor({ inicial, onClose, onSalvo }: PerfilTempoEditorProps) {
+export function PerfilTempoEditor({ inicial, perfis, onClose, onSalvo }: PerfilTempoEditorProps) {
   const [nome, setNome] = useState(inicial.nome);
   const [observacao, setObservacao] = useState(inicial.observacao ?? "");
   const [metodo, setMetodo] = useState<MetodoTempo>(inicial.metodo);
   const [cnc, setCnc] = useState<CorteCncForm>(() => formCncInicial(inicial.parametros));
   const [tabela, setTabela] = useState<TabelaForm>(() => formTabelaInicial(inicial.parametros));
+  const [escolha, setEscolha] = useState<EscolhaForm>(() => formEscolhaInicial(inicial.parametros));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function salvar() {
     setSalvando(true);
     setErro(null);
-    const parametros = metodo === "corte_cnc" ? formParaCorteCnc(cnc) : formParaTabela(tabela);
+    const parametros = metodo === "corte_cnc" ? formParaCorteCnc(cnc) : metodo === "escolha_espessura" ? formParaEscolha(escolha) : formParaTabela(tabela);
     const resposta = inicial.id
       ? await atualizarPerfilTempo(inicial.id, { nome, observacao: observacao.trim() || null, parametros })
       : await criarPerfilTempo({ nome, metodo, parametros, observacao: observacao.trim() || null });
@@ -126,7 +138,13 @@ export function PerfilTempoEditor({ inicial, onClose, onSalvo }: PerfilTempoEdit
           <Textarea id="tm-perfil-observacao" value={observacao} maxLength={1000} rows={2} onChange={(e) => setObservacao(e.target.value)} />
         </Field>
 
-        {metodo === "corte_cnc" ? <EditorCorteCnc form={cnc} onChange={setCnc} /> : <EditorTabela form={tabela} onChange={setTabela} />}
+        {metodo === "corte_cnc" ? (
+          <EditorCorteCnc form={cnc} onChange={setCnc} />
+        ) : metodo === "escolha_espessura" ? (
+          <EditorEscolhaEspessura form={escolha} onChange={setEscolha} perfis={perfis} />
+        ) : (
+          <EditorTabela form={tabela} onChange={setTabela} />
+        )}
       </Stack>
     </Modal>
   );

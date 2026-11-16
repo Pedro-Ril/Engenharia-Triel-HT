@@ -15,9 +15,9 @@ import { Modal } from "@/components/ui/Modal";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { Stack } from "@/components/ui/Stack";
 
-import { calcularTempo } from "@/lib/tempos-maquina/calculo";
+import { calcularTempoCadastrado } from "@/lib/tempos-maquina/escolha";
 import { identificarMaterial } from "@/lib/tempos-maquina/materiais";
-import type { ResultadoTempo } from "@/lib/tempos-maquina/tipos";
+import type { PerfilTempo, ResultadoTempo } from "@/lib/tempos-maquina/tipos";
 import { extrairEspessuraDaDescricaoMp } from "@/modules/integra-lantek-ve/utils/espessura";
 import { ResultadoTempoView } from "@/modules/tempos-maquina/components/admin/ResultadoTempoView";
 import styles from "@/modules/tempos-maquina/components/admin/TemposMaquina.module.css";
@@ -129,7 +129,7 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
   const espessura = numeroDoTexto(espessuraTexto);
   const material = cfg ? identificarMaterial(mp?.descricao, cfg.materiais) : null;
 
-  const variantesPerfil = perfil?.metodo === "corte_cnc" ? perfil.variantes : [];
+  const variantesPerfil = perfil?.metodo === "corte_cnc" || perfil?.metodo === "escolha_espessura" ? perfil.variantes : [];
   const variantePadrao = material?.variante && variantesPerfil.some((v) => v.chave === material.variante) ? material.variante : AUTOMATICA;
   const variante = escolhaVariante ?? variantePadrao;
 
@@ -150,11 +150,21 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
       }
     : null;
 
+  const calculo = perfil && dadosPeca && cfg ? calcularTempoCadastrado(perfil, dadosPeca, cfg.perfis) : null;
   const resultado: ResultadoTempo | null = !perfil
     ? null
-    : dadosPeca
-      ? calcularTempo(perfil, dadosPeca)
-      : { ok: false, tempoMin: null, parcelas: [], referencia: [], avisos: [], erros: ["Sem DXF do item: informe as medidas."] };
+    : (calculo ?? { ok: false, tempoMin: null, parcelas: [], referencia: [], avisos: [], erros: ["Sem DXF do item: informe as medidas."] });
+
+  /* "Consultar tempos": na escolha por espessura, a tabela que calculou (ou nenhuma, se não deu para escolher). */
+  const usado = calculo?.perfilUsado ? cfg?.perfis.find((p) => p.id === calculo.perfilUsado?.id) : null;
+  const tabelaConsulta: { nome: string; parametros: PerfilTempo } | null =
+    perfil?.metodo === "escolha_espessura"
+      ? usado && usado.parametros.metodo !== "escolha_espessura"
+        ? { nome: usado.nome, parametros: usado.parametros }
+        : null
+      : perfil && maquina
+        ? { nome: maquina.perfil.nome, parametros: perfil }
+        : null;
 
   const avisoArea = avisoDeEspessura(item.peso, origem === "dxf" ? (geometria?.areaMm2 ?? null) : null, espessura, material);
 
@@ -259,12 +269,18 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
                 <Field label="Espessura (mm)" htmlFor="tm-rot-espessura" hint={escolhaEspessura === null && espessuraTexto ? "Lida da descrição da matéria-prima." : undefined}>
                   <Input id="tm-rot-espessura" inputMode="decimal" value={espessuraTexto} onChange={(e) => setEscolhaEspessura(e.target.value)} />
                 </Field>
-                {perfil.metodo === "corte_cnc" && (
+                {variantesPerfil.length > 0 && (
                   <Field label="Variante" hint={variantePadrao ? `Pelo material: ${variantesPerfil.find((v) => v.chave === variantePadrao)?.rotulo}` : undefined}>
                     <Dropdown
                       value={variante}
                       onValueChange={setEscolhaVariante}
-                      options={[{ value: AUTOMATICA, label: "Automática (a primeira que cortar)" }, ...variantesPerfil.map((v) => ({ value: v.chave, label: v.rotulo }))]}
+                      options={[
+                        {
+                          value: AUTOMATICA,
+                          label: perfil.metodo === "escolha_espessura" ? `Automática (${variantesPerfil[0]?.rotulo ?? "a primeira"})` : "Automática (a primeira que cortar)",
+                        },
+                        ...variantesPerfil.map((v) => ({ value: v.chave, label: v.rotulo })),
+                      ]}
                     />
                   </Field>
                 )}
@@ -322,8 +338,19 @@ export function CalculoTempoModal({ item, recursos, componentes, alternativo, se
 
         {/* Na largura toda: a tabela tem colunas demais para a metade da janela. */}
         {verTabela && (
-          <Card title={`Tabela da máquina: ${maquina.perfil.nome}`} description="Somente consulta. Os valores são alterados em Administração > Tempos de Máquina.">
-            <PerfilTempoLeitura perfil={perfil} />
+          <Card
+            title={`Tabela da máquina: ${tabelaConsulta?.nome ?? maquina.perfil.nome}`}
+            description={
+              perfil.metodo === "escolha_espessura"
+                ? `${maquina.perfil.nome} escolhe a tabela pela espessura e pelo material. Somente consulta.`
+                : "Somente consulta. Os valores são alterados em Administração > Tempos de Máquina."
+            }
+          >
+            {tabelaConsulta ? (
+              <PerfilTempoLeitura perfil={tabelaConsulta.parametros} />
+            ) : (
+              <p className={styles.texto}>Nenhuma tabela vale para esta espessura e material: veja o motivo no tempo calculado.</p>
+            )}
           </Card>
         )}
       </Stack>

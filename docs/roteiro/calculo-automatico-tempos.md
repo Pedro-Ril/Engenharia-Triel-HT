@@ -301,6 +301,28 @@ chapa no ERP):
 **Para entrar em uso:** Processos atualiza os perfis; o admin liga cada
 máquina ao seu perfil e ativa.
 
+**16/11/2026: escolha da tabela pela espessura.** Teste com 500 × 300 mm,
+4,75 mm, 4 furos Ø20: a planilha dá 0,610 min; o sistema, com o LASERVE na
+BYSPRINT, 0,8239. A diferença era só a máquina: a célula N7 da aba Laser
+troca de máquina pela espessura e pelo material (nesse caso, TRUMPF).
+
+- **Novo método de perfil `escolha_espessura`** (migração 0169 amplia o
+  CHECK): grade espessura × variante → perfil de corte CNC; célula vazia =
+  não calcula. Não tem tabela própria.
+- **Botão "Preencher com a regra da planilha"** no editor: monta a grade da
+  N7 com os perfis de laser cujo nome tem BYSTAR, BYSPRINT, BYSPEED ou
+  TRUMPF (`escolhaDaPlanilhaLaser`, em `src/lib/tempos-maquina/escolha.ts`).
+- **Espessura:** usa a linha mais próxima da grade, e essa espessura segue
+  para o perfil escolhido. A variante também segue.
+- **Perfis apontados** não precisam estar ativos nem ligados a máquinas:
+  vão junto para o Roteiro quando a escolha está ativa. Não podem ser
+  excluídos enquanto a grade apontar para eles.
+- **Roteiro e simulador** mostram "Tabela usada". "Consultar tempos" mostra
+  a tabela escolhida. O registro grava `escolha → perfil usado` em
+  `perfil_nome`.
+- **Teste:** `escolha.test.ts`. A regra da planilha dá 0,610 min no caso
+  acima (TRUMPF).
+
 ## Anexo: tabelas das planilhas
 
 Pierce e espera estão em **segundos** (a planilha guarda em minutos, como `x/60`). Na tabela de corte e dobra, multiplique por 0,0498 para ter minutos; o valor em negrito é a célula digitada direto na planilha.

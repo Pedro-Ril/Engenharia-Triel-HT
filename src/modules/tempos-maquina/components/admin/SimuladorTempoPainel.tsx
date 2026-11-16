@@ -13,8 +13,8 @@ import { Loader } from "@/components/ui/Loader";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { Stack } from "@/components/ui/Stack";
 
-import { calcularTempo } from "@/lib/tempos-maquina/calculo";
 import { lerGeometriaDxf, type ResultadoGeometriaDxf } from "@/lib/tempos-maquina/dxf-geometria";
+import { calcularTempoCadastrado } from "@/lib/tempos-maquina/escolha";
 import type { ResultadoTempo } from "@/lib/tempos-maquina/tipos";
 import type { FeedbackHandler } from "@/modules/admin-permissoes/types/toast.types";
 
@@ -70,13 +70,17 @@ export function SimuladorTempoPainel({ onFeedback }: { onFeedback: FeedbackHandl
   const resultado = useMemo<ResultadoTempo | null>(() => {
     if (!perfil) return null;
     if (!geometria) return { ok: false, tempoMin: null, parcelas: [], referencia: [], avisos: [], erros: ["Carregue um DXF."] };
-    return calcularTempo(perfil.parametros, {
-      espessuraMm: numeroDoTexto(espessura) ?? 0,
-      geometria,
-      variante: variante || null,
-      dobra: { fator: dobraFator || null, quantidade: numeroDoTexto(dobraQuantidade) },
-    });
-  }, [perfil, geometria, espessura, variante, dobraFator, dobraQuantidade]);
+    return calcularTempoCadastrado(
+      perfil.parametros,
+      {
+        espessuraMm: numeroDoTexto(espessura) ?? 0,
+        geometria,
+        variante: variante || null,
+        dobra: { fator: dobraFator || null, quantidade: numeroDoTexto(dobraQuantidade) },
+      },
+      perfis ?? []
+    );
+  }, [perfil, perfis, geometria, espessura, variante, dobraFator, dobraQuantidade]);
 
   function escolherPerfil(id: string) {
     setPerfilId(id);
@@ -110,12 +114,15 @@ export function SimuladorTempoPainel({ onFeedback }: { onFeedback: FeedbackHandl
             <Field label="Espessura (mm)" htmlFor="tm-sim-espessura">
               <Input id="tm-sim-espessura" inputMode="decimal" value={espessura} onChange={(e) => setEspessura(e.target.value)} />
             </Field>
-            {p?.metodo === "corte_cnc" && (
+            {(p?.metodo === "corte_cnc" || p?.metodo === "escolha_espessura") && (
               <Field label="Variante">
                 <Dropdown
                   value={variante}
                   onValueChange={setVariante}
-                  options={[{ value: AUTOMATICA, label: "Automática (a primeira que cortar)" }, ...p.variantes.map((v) => ({ value: v.chave, label: v.rotulo }))]}
+                  options={[
+                    { value: AUTOMATICA, label: p.metodo === "corte_cnc" ? "Automática (a primeira que cortar)" : `Automática (${p.variantes[0]?.rotulo ?? "a primeira"})` },
+                    ...p.variantes.map((v) => ({ value: v.chave, label: v.rotulo })),
+                  ]}
                 />
               </Field>
             )}

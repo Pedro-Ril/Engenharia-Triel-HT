@@ -73,6 +73,25 @@ export type PerfilTabelaDimensao = {
 
 export type PerfilTempo = PerfilCorteCnc | PerfilTabelaDimensao;
 
+/*
+ * Escolha da tabela pela espessura (planilha TEMPOS PLASMA CNC, aba
+ * "Laser", célula N7): não calcula nada sozinho -- para cada espessura e
+ * variante (material padrão/especial), aponta para um perfil de corte CNC,
+ * e o cálculo segue com ele. Célula sem regra = não calcula (a planilha
+ * também não tem máquina para ela).
+ */
+export type PerfilEscolhaEspessura = {
+  metodo: "escolha_espessura";
+  /* Mesmas chaves das variantes dos perfis escolhidos (padrao/especial): a variante segue para eles. */
+  variantes: { chave: string; rotulo: string }[];
+  /* As linhas da grade, em ordem crescente. A espessura da peça usa a mais próxima. */
+  espessuras: number[];
+  regras: { variante: string; espessuraMm: number; perfilId: string }[];
+};
+
+/* O que um perfil cadastrado pode ser (eng_tempos_perfis.parametros). */
+export type PerfilCadastrado = PerfilTempo | PerfilEscolhaEspessura;
+
 /* ---------------- Dados da peça ---------------- */
 
 export type ContornoInterno =

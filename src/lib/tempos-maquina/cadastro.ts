@@ -4,7 +4,8 @@ import { ValidationError } from "@/lib/auth/errors";
 import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import type { MaquinaTempo, MaterialTempo, PerfilTempoCadastro } from "@/modules/tempos-maquina/types/temposMaquina.types";
 
-import type { PerfilTempo } from "./tipos";
+import { perfisUsadosPelaEscolha } from "./escolha";
+import type { PerfilCadastrado } from "./tipos";
 import { validarParametrosPerfil } from "./validacao";
 
 /*
@@ -16,7 +17,7 @@ import { validarParametrosPerfil } from "./validacao";
 type PerfilRow = {
   id: string;
   nome: string;
-  metodo: PerfilTempo["metodo"];
+  metodo: PerfilCadastrado["metodo"];
   parametros: string;
   ativo: boolean;
   observacao: string | null;
@@ -84,11 +85,27 @@ export async function listarPerfis(): Promise<PerfilTempoCadastro[]> {
     metodo: row.metodo,
     ativo: Boolean(row.ativo),
     observacao: row.observacao,
-    parametros: JSON.parse(row.parametros) as PerfilTempo,
+    parametros: JSON.parse(row.parametros) as PerfilCadastrado,
     maquinas: porPerfil.get(row.id.toLowerCase()) ?? [],
     atualizadoEm: row.atualizado_em.toISOString(),
     atualizadoPor: row.atualizado_por,
   }));
+}
+
+/*
+ * Escolha da tabela pela espessura: cada perfil apontado tem que existir,
+ * ser de corte CNC e não ser o próprio perfil.
+ */
+async function conferirPerfisDaEscolha(parametros: PerfilCadastrado, idProprio: string | null): Promise<void> {
+  const usados = perfisUsadosPelaEscolha(parametros);
+  if (usados.length === 0) return;
+
+  const perfis = await listarPerfis();
+  for (const id of usados) {
+    const perfil = perfis.find((p) => p.id === id);
+    if (!perfil || perfil.id === idProprio?.toLowerCase()) throw new ValidationError("Um dos perfis escolhidos na grade não existe mais. Recarregue a página.");
+    if (perfil.metodo !== "corte_cnc") throw new ValidationError(`"${perfil.nome}" não é de corte CNC: a grade só aponta para perfis de laser/plasma.`);
+  }
 }
 
 async function obterPerfil(id: string): Promise<PerfilTempoCadastro> {
@@ -102,6 +119,7 @@ export async function criarPerfil(
   usuario: string
 ): Promise<PerfilTempoCadastro> {
   const parametros = validarParametrosPerfil(dados.metodo, dados.parametros);
+  await conferirPerfisDaEscolha(parametros, null);
   const pool = await getSqlServerPool();
 
   try {
@@ -133,6 +151,7 @@ export async function atualizarPerfil(
   const atual = await obterPerfil(id);
   /* O método não muda: os parâmetros são validados contra o método do perfil. */
   const parametros = dados.parametros === undefined ? undefined : validarParametrosPerfil(atual.metodo, dados.parametros);
+  if (parametros) await conferirPerfisDaEscolha(parametros, id);
   const pool = await getSqlServerPool();
 
   try {
@@ -165,7 +184,13 @@ export async function atualizarPerfil(
 
 export async function excluirPerfil(id: string): Promise<void> {
   exigirUuid(id, "Perfil");
-  const perfil = await obterPerfil(id);
+  const perfis = await listarPerfis();
+  const perfil = perfis.find((p) => p.id === id.toLowerCase());
+  if (!perfil) throw new ValidationError("Perfil não encontrado.");
+  const escolhas = perfis.filter((p) => perfisUsadosPelaEscolha(p.parametros).includes(perfil.id));
+  if (escolhas.length > 0) {
+    throw new ValidationError(`O perfil é usado na escolha por espessura de ${escolhas.map((p) => `"${p.nome}"`).join(", ")}. Tire-o de lá antes de excluir.`);
+  }
   if (perfil.maquinas.length > 0) {
     throw new ValidationError(
       `O perfil está ligado a ${perfil.maquinas.map((m) => m.codRecurso).join(", ")}. Desligue as máquinas antes de excluir.`

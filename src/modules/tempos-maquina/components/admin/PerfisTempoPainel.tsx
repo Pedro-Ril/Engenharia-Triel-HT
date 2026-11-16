@@ -25,12 +25,16 @@ function formatarData(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-function resumoParametros(perfil: PerfilTempoCadastro): string {
+function resumoParametros(perfil: PerfilTempoCadastro, perfis: PerfilTempoCadastro[]): string {
   const p = perfil.parametros;
+  const mm = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   if (p.metodo === "corte_cnc") {
     const espessuras = p.linhas.map((l) => l.espessuraMm);
-    const mm = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
     return `${p.variantes.map((v) => v.rotulo).join(" / ")} · ${mm(Math.min(...espessuras))} a ${mm(Math.max(...espessuras))} mm`;
+  }
+  if (p.metodo === "escolha_espessura") {
+    const usados = [...new Set(p.regras.map((r) => r.perfilId))].map((id) => perfis.find((x) => x.id === id)?.nome ?? "perfil excluído");
+    return `${usados.length} ${usados.length === 1 ? "tabela" : "tabelas"}: ${usados.join(", ")}`;
   }
   const dobra = !p.dobra ? "sem dobra" : p.dobra.regra === "fator" ? `${p.dobra.fatores.length} tipos de dobra` : "acréscimo por dobra";
   return `${p.faixas.length} ${p.faixas.length === 1 ? "faixa" : "faixas"} · ${dobra}`;
@@ -122,11 +126,11 @@ export function PerfisTempoPainel({ onFeedback }: { onFeedback: FeedbackHandler 
                 <TableCell>
                   <Stack gap={2}>
                     <strong>{perfil.nome}</strong>
-                    <span className={styles.textoFraco}>{resumoParametros(perfil)}</span>
+                    <span className={styles.textoFraco}>{resumoParametros(perfil, perfis)}</span>
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={perfil.metodo === "corte_cnc" ? "info" : "neutral"}>{ROTULO_METODO[perfil.metodo]}</Badge>
+                  <Badge variant={perfil.metodo === "corte_cnc" ? "info" : perfil.metodo === "escolha_espessura" ? "warning" : "neutral"}>{ROTULO_METODO[perfil.metodo]}</Badge>
                 </TableCell>
                 <TableCell>
                   {perfil.maquinas.length ? perfil.maquinas.map((m) => m.codRecurso).join(", ") : <span className={styles.textoFraco}>Nenhuma</span>}
@@ -172,6 +176,7 @@ export function PerfisTempoPainel({ onFeedback }: { onFeedback: FeedbackHandler 
       {emEdicao && (
         <PerfilTempoEditor
           inicial={emEdicao}
+          perfis={perfis ?? []}
           onClose={() => setEmEdicao(null)}
           onSalvo={(perfil) => {
             substituir(perfil);

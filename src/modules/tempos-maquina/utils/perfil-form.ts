@@ -1,4 +1,4 @@
-import type { PerfilCorteCnc, PerfilTabelaDimensao } from "@/lib/tempos-maquina/tipos";
+import type { PerfilCorteCnc, PerfilEscolhaEspessura, PerfilTabelaDimensao } from "@/lib/tempos-maquina/tipos";
 import { ordenarLinhas } from "@/lib/tempos-maquina/validacao";
 
 /*
@@ -163,4 +163,45 @@ export function formParaTabela(f: TabelaForm): unknown {
           ? { regra: "fator", fatores: f.fatores.map((x) => ({ chave: x.chave, rotulo: x.rotulo, fator: valorNumerico(x.fator) })) }
           : { regra: "por_dobra", acrescimoPorDobra: valorNumerico(f.acrescimoPorDobra) },
   };
+}
+
+/* ---------------- Escolha da tabela pela espessura ---------------- */
+
+export type EscolhaForm = {
+  variantes: { chave: string; rotulo: string }[];
+  /* "1,5; 2; 2,65..." (como os degraus da tabela por dimensão). */
+  espessuras: string;
+  /* `${variante}|${espessura}` -> id do perfil ("" = não calcula). */
+  celulas: Record<string, string>;
+};
+
+export const chaveCelulaEscolha = (variante: string, espessuraMm: number) => `${variante}|${espessuraMm}`;
+
+export const ESCOLHA_VAZIA: EscolhaForm = {
+  variantes: [
+    { chave: "padrao", rotulo: "Material padrão" },
+    { chave: "especial", rotulo: "Material especial" },
+  ],
+  espessuras: "",
+  celulas: {},
+};
+
+export function escolhaParaForm(p: PerfilEscolhaEspessura): EscolhaForm {
+  return {
+    variantes: p.variantes.map((v) => ({ ...v })),
+    espessuras: p.espessuras.map((v) => textoDeNumero(v)).join("; "),
+    celulas: Object.fromEntries(p.regras.map((r) => [chaveCelulaEscolha(r.variante, r.espessuraMm), r.perfilId])),
+  };
+}
+
+/* Só as células preenchidas viram regra; célula de espessura que saiu da grade some. */
+export function formParaEscolha(f: EscolhaForm): unknown {
+  const espessuras = lerDegraus(f.espessuras);
+  const regras = f.variantes.flatMap((v) =>
+    espessuras
+      .filter((e): e is number => typeof e === "number")
+      .map((e) => ({ variante: v.chave, espessuraMm: e, perfilId: f.celulas[chaveCelulaEscolha(v.chave, e)] ?? "" }))
+      .filter((r) => r.perfilId)
+  );
+  return { metodo: "escolha_espessura", variantes: f.variantes, espessuras, regras };
 }

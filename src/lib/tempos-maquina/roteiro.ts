@@ -9,7 +9,7 @@ import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 import type { ConfigTemposRoteiro } from "@/modules/tempos-maquina/types/temposMaquina.types";
 
 import { listarMateriais, listarPerfis } from "./cadastro";
-import { calcularTempo } from "./calculo";
+import { calcularTempoCadastrado, perfisUsadosPelaEscolha } from "./escolha";
 import { lerGeometriaDxf, type ResultadoGeometriaDxf } from "./dxf-geometria";
 import type { DadosPeca, ResultadoTempo } from "./tipos";
 
@@ -19,13 +19,19 @@ import type { DadosPeca, ResultadoTempo } from "./tipos";
  * cada tempo usado (eng_tempos_calculos, migração 0161).
  */
 
-/* Só perfis ATIVOS e as máquinas ligadas a eles: é o que o Roteiro pode usar. */
+/*
+ * Só perfis ATIVOS e as máquinas ligadas a eles: é o que o Roteiro pode
+ * usar. Os perfis que uma escolha por espessura ativa usa vão junto, mesmo
+ * inativos -- quem decide é a escolha (ver escolha.ts).
+ */
 export async function carregarConfigRoteiro(): Promise<ConfigTemposRoteiro> {
   const [perfis, materiais] = await Promise.all([listarPerfis(), listarMateriais()]);
   const ativos = perfis.filter((p) => p.ativo);
+  const usados = new Set(ativos.flatMap((p) => perfisUsadosPelaEscolha(p.parametros)));
+  const enviados = perfis.filter((p) => p.ativo || usados.has(p.id));
 
   return {
-    perfis: ativos.map((p) => ({ id: p.id, nome: p.nome, parametros: p.parametros })),
+    perfis: enviados.map((p) => ({ id: p.id, nome: p.nome, ativo: p.ativo, parametros: p.parametros })),
     maquinas: ativos.flatMap((p) => p.maquinas.map((m) => ({ codRecurso: m.codRecurso.toUpperCase(), perfilId: p.id }))),
     materiais: materiais
       .filter((m) => m.ativo)
@@ -96,14 +102,16 @@ export async function registrarCalculo(params: {
   const config = await carregarConfigRoteiro();
   const codRecurso = params.codRecurso.trim().toUpperCase();
   const ligacao = config.maquinas.find((m) => m.codRecurso === codRecurso);
-  const perfil = ligacao && config.perfis.find((p) => p.id === ligacao.perfilId);
+  const perfil = ligacao && config.perfis.find((p) => p.id === ligacao.perfilId && p.ativo);
   if (!perfil) throw new ValidationError(`A máquina ${codRecurso} não tem perfil de cálculo ativo.`);
 
   /* Recalculado aqui: o que fica registrado (e vai para o campo) é o do servidor. */
-  const resultado = calcularTempo(perfil.parametros, params.dados);
+  const { perfilUsado, ...resultado } = calcularTempoCadastrado(perfil.parametros, params.dados, config.perfis);
   if (!resultado.ok || resultado.tempoMin === null) {
     throw new ValidationError(resultado.erros.join(" ") || "Não deu para calcular o tempo.");
   }
+  /* Na escolha por espessura, o registro diz também qual tabela calculou. */
+  const perfilNome = (perfilUsado ? `${perfil.nome} → ${perfilUsado.nome}` : perfil.nome).slice(0, 150);
 
   const pool = await getSqlServerPool();
   const r = await pool
@@ -114,7 +122,7 @@ export async function registrarCalculo(params: {
     .input("seq", sql.Int, params.seq)
     .input("codRecurso", sql.VarChar(30), codRecurso)
     .input("perfilId", sql.UniqueIdentifier, perfil.id)
-    .input("perfilNome", sql.NVarChar(150), perfil.nome)
+    .input("perfilNome", sql.NVarChar(150), perfilNome)
     .input("tempo", sql.Decimal(18, 6), Number(resultado.tempoMin.toFixed(6)))
     .input("origem", sql.VarChar(10), params.origemGeometria)
     .input("arquivo", sql.NVarChar(400), params.arquivoDxf)
@@ -131,5 +139,5 @@ export async function registrarCalculo(params: {
               @origem, @arquivo, @dados, @resultado, @usuarioId, @usuarioNome);
     `);
 
-  return { id: r.recordset[0].id.toLowerCase(), perfilNome: perfil.nome, resultado };
+  return { id: r.recordset[0].id.toLowerCase(), perfilNome, resultado };
 }

@@ -6,9 +6,10 @@ import type {
   DadosPeca,
   FaixaTabelaDimensao,
   LinhaCorteCnc,
+  PerfilCadastrado,
   PerfilCorteCnc,
+  PerfilEscolhaEspessura,
   PerfilTabelaDimensao,
-  PerfilTempo,
   RegraDobra,
 } from "./tipos";
 
@@ -207,10 +208,54 @@ function validarTabelaDimensao(p: Record<string, unknown>): PerfilTabelaDimensao
   };
 }
 
-export function validarParametrosPerfil(metodo: unknown, parametros: unknown): PerfilTempo {
+const UUID_OU_CHAVE = /^[0-9A-Za-z-]{1,40}$/;
+
+/*
+ * Escolha da tabela pela espessura. Aqui só a forma; se os perfis
+ * apontados existem e são de corte CNC, quem confere é o cadastro (precisa
+ * do banco).
+ */
+function validarEscolhaEspessura(p: Record<string, unknown>): PerfilEscolhaEspessura {
+  const variantesUsadas = new Set<string>();
+  const variantes = lista(p.variantes, "variantes").map((v, i) => {
+    const o = objeto(v, `a variante ${i + 1}`);
+    const rotulo = texto(o.rotulo, `o nome da variante ${i + 1}`, 60);
+    const chave = typeof o.chave === "string" && o.chave.trim() ? o.chave.trim().slice(0, 30) : chaveDeRotulo(rotulo).slice(0, 30);
+    if (variantesUsadas.has(chave)) throw new ValidationError(`Variante "${rotulo}" repetida.`);
+    variantesUsadas.add(chave);
+    return { chave, rotulo };
+  });
+
+  const espessuras = lista(p.espessuras, "as espessuras")
+    .map((v, i) => numero(v, `a ${i + 1}ª espessura`, { maiorQueZero: true }))
+    .sort((a, b) => a - b);
+  for (let i = 1; i < espessuras.length; i++) {
+    if (espessuras[i] === espessuras[i - 1]) throw new ValidationError(`Espessura ${espessuras[i]} mm repetida.`);
+  }
+
+  const vistas = new Set<string>();
+  const regras = lista(p.regras ?? [], "as regras", 0).map((r, i) => {
+    const o = objeto(r, `a regra ${i + 1}`);
+    const variante = typeof o.variante === "string" ? o.variante.trim() : "";
+    if (!variantesUsadas.has(variante)) throw new ValidationError(`Variante inválida na regra ${i + 1}.`);
+    const espessuraMm = numero(o.espessuraMm, `a espessura da regra ${i + 1}`, { maiorQueZero: true });
+    if (!espessuras.includes(espessuraMm)) throw new ValidationError(`A regra de ${espessuraMm} mm não está nas espessuras da grade.`);
+    const perfilId = typeof o.perfilId === "string" ? o.perfilId.trim().toLowerCase() : "";
+    if (!UUID_OU_CHAVE.test(perfilId)) throw new ValidationError(`Escolha o perfil de ${espessuraMm} mm.`);
+    const chave = `${variante}|${espessuraMm}`;
+    if (vistas.has(chave)) throw new ValidationError(`Duas regras para ${espessuraMm} mm na mesma variante.`);
+    vistas.add(chave);
+    return { variante, espessuraMm, perfilId };
+  });
+
+  return { metodo: "escolha_espessura", variantes, espessuras, regras: ordenarLinhas(regras, variantes) };
+}
+
+export function validarParametrosPerfil(metodo: unknown, parametros: unknown): PerfilCadastrado {
   const p = objeto(parametros, "Parâmetros do perfil");
   if (metodo === "corte_cnc") return validarCorteCnc(p);
   if (metodo === "tabela_dimensao") return validarTabelaDimensao(p);
+  if (metodo === "escolha_espessura") return validarEscolhaEspessura(p);
   throw new ValidationError("Método de cálculo inválido.");
 }
 

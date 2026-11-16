@@ -1,8 +1,8 @@
-import type { PerfilTempo } from "@/lib/tempos-maquina/tipos";
+import type { PerfilCadastrado } from "@/lib/tempos-maquina/tipos";
 
 /* Espelho do que src/lib/tempos-maquina/cadastro.ts devolve (eng_tempos_*). */
 
-export type MetodoTempo = PerfilTempo["metodo"];
+export type MetodoTempo = PerfilCadastrado["metodo"];
 
 export type PerfilTempoCadastro = {
   id: string;
@@ -10,7 +10,7 @@ export type PerfilTempoCadastro = {
   metodo: MetodoTempo;
   ativo: boolean;
   observacao: string | null;
-  parametros: PerfilTempo;
+  parametros: PerfilCadastrado;
   /* Máquinas do ERP ligadas a este perfil. */
   maquinas: { codRecurso: string; descRecurso: string | null }[];
   atualizadoEm: string;
@@ -40,11 +40,13 @@ export type MaterialTempo = {
 export const ROTULO_METODO: Record<MetodoTempo, string> = {
   corte_cnc: "Corte CNC (laser/plasma)",
   tabela_dimensao: "Tabela por dimensão (guilhotina/dobra)",
+  escolha_espessura: "Escolha da tabela pela espessura",
 };
 
 /* O que o Roteiro de Fabricação recebe (GET /api/cadastro-roteiro/tempos): só o que está ativo. */
 export type ConfigTemposRoteiro = {
-  perfis: { id: string; nome: string; parametros: PerfilTempo }[];
+  /* Os ativos e os que uma escolha por espessura ativa usa (ativo = false). */
+  perfis: { id: string; nome: string; ativo: boolean; parametros: PerfilCadastrado }[];
   /* COD_RECURSO (maiúsculo) -> perfil ativo. */
   maquinas: { codRecurso: string; perfilId: string }[];
   materiais: Omit<MaterialTempo, "id">[];
