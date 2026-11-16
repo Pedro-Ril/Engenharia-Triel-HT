@@ -1,19 +1,20 @@
 /*
- * Em qual app o botão 3D do Terminal de Fábrica abre -- escolhido por
+ * Em qual app o botão 3D abre. No Terminal de Fábrica é escolhido por
  * aparelho da TV Corporativa (Administração → Terminal de Fábrica →
- * Visualização). Puro (sem banco): a página do terminal usa no
- * navegador e a rota da grade usa no servidor. Testado em
- * visualizacao-3d.test.ts.
+ * Visualização); no Roteiro de Fabricação e no terminal fora da TV vale
+ * o padrão. Puro (sem banco): a página do terminal usa no navegador e a
+ * rota da grade usa no servidor. Testado em visualizacao-3d.test.ts.
  */
 
-export type Visualizacao3D = "3dplay" | "product-explorer";
+export type Visualizacao3D = "3d-navigate" | "3dplay" | "product-explorer";
 
-export const VISUALIZACAO_3D_PADRAO: Visualizacao3D = "3dplay";
+export const VISUALIZACAO_3D_PADRAO: Visualizacao3D = "3d-navigate";
 
 /* Parâmetro que a TV acrescenta na URL da página do terminal. */
 export const PARAMETRO_VISUALIZACAO_3D = "visualizacao3d";
 
 export const OPCOES_VISUALIZACAO_3D: { valor: Visualizacao3D; label: string; descricao: string }[] = [
+  { valor: "3d-navigate", label: "3D Navigate", descricao: "Abre o modelo no 3D Navigate (padrão)." },
   { valor: "3dplay", label: "3D Play", descricao: "Abre o modelo no 3DPlay." },
   {
     valor: "product-explorer",
@@ -23,7 +24,7 @@ export const OPCOES_VISUALIZACAO_3D: { valor: Visualizacao3D; label: string; des
 ];
 
 export function ehVisualizacao3D(valor: unknown): valor is Visualizacao3D {
-  return valor === "3dplay" || valor === "product-explorer";
+  return OPCOES_VISUALIZACAO_3D.some((opcao) => opcao.valor === valor);
 }
 
 /* Lê o parâmetro da URL; qualquer outra coisa (ou nada) é o padrão. */

@@ -558,7 +558,7 @@ export async function buscarBuscasTerminalFabrica(params: {
  * Impressão de desenho na Consulta 2D / 3D: quem pode (permissão por
  * usuário) e o que já foi pedido para imprimir.
  */
-/* Em qual app o 3D abre em cada aparelho do Terminal de Fábrica (3D Play ou Product Explorer). */
+/* Em qual app o 3D abre em cada aparelho do Terminal de Fábrica (3D Navigate, 3D Play ou Product Explorer). */
 export interface AparelhoTerminalFabrica {
   id: string;
   nome: string | null;

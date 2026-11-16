@@ -1,3 +1,5 @@
+import { VISUALIZACAO_3D_PADRAO, type Visualizacao3D } from "@/lib/terminal-fabrica/visualizacao-3d";
+
 import type { ModoAberturaArquivos } from "../constants/abertura-arquivos";
 import { abrirArquivo } from "../utils/abrir-arquivo";
 import { RoteiroTreeNode } from "../types/cadastroRoteiro.types";
@@ -29,6 +31,15 @@ const DASHBOARD_3DPLAY_URL =
  */
 const DASHBOARD_PRODUCT_EXPLORER_URL =
     "https://dashboard-prd.trielht.com.br/3ddashboard/#dashboard:3ea76c30-e6a4-4288-ab68-1214e947068c/tabId:ALtXQt70g02ipB6XdW0L/app:ENOSCEN_AP/content:X3DContentId=";
+
+/*
+ * 3D Navigate (ENXDISC_AP), na aba ...W0N do mesmo dashboard: o padrão de
+ * abertura do 3D (Roteiro e Terminal de Fábrica). Formato copiado de uma
+ * abertura real enviada pelo usuário (223847, 16/11/2026): versão 2.1,
+ * source ENOLCMI_AP e as taxonomias do VPMReference.
+ */
+const DASHBOARD_3DNAVIGATE_URL =
+    "https://dashboard-prd.trielht.com.br/3ddashboard/#dashboard:3ea76c30-e6a4-4288-ab68-1214e947068c/tabId:ALtXQt70g02ipB6XdW0N/app:ENXDISC_AP/content:X3DContentId=";
 
 const ICONES_3DSPACE = "https://space-prd.trielht.com.br/3dspace/snresources/images/icons";
 
@@ -185,10 +196,55 @@ export function montarUrlProductExplorer(modelo: Modelo3DPlay) {
     return `${DASHBOARD_PRODUCT_EXPLORER_URL}${encodeURIComponent(JSON.stringify(content))}`;
 }
 
-/* Devolve false se o navegador bloqueou a abertura. */
+export function montarUrl3DNavigate(modelo: Modelo3DPlay) {
+    const objectId = String(modelo.physicalId || "").trim();
+
+    if (!objectId) {
+        throw new Error("Modelo sem Physical ID para abrir no 3D Navigate.");
+    }
+
+    const content = {
+        protocol: "3DXContent",
+        version: "2.1",
+        source: "ENOLCMI_AP",
+        widgetId: `preview-${Date.now()}`,
+        data: {
+            items: [
+                {
+                    envId: "OnPremise",
+                    serviceId: "3DSpace",
+                    objectId,
+                    objectType: modelo.tipo || "VPMReference",
+                    objectTaxonomies: [
+                        "PHYSICALAbstractReference",
+                        "LPAbstractReference",
+                        "PLMCoreReference",
+                        "PLMReference",
+                        "PLMEntity",
+                        "VPMReference",
+                        "VPMReference",
+                    ],
+                    displayName: modelo.titulo || modelo.codigo || modelo.id3DX || "Item 3DEXPERIENCE",
+                    i3dx: "",
+                },
+            ],
+        },
+    };
+
+    return `${DASHBOARD_3DNAVIGATE_URL}${encodeURIComponent(JSON.stringify(content))}`;
+}
+
+/* A URL do modelo no app escolhido (padrão: 3D Navigate). */
+export function montarUrl3D(modelo: Modelo3DPlay, visualizacao: Visualizacao3D = VISUALIZACAO_3D_PADRAO) {
+    if (visualizacao === "3dplay") return montarUrl3DPlay(modelo);
+    if (visualizacao === "product-explorer") return montarUrlProductExplorer(modelo);
+    return montarUrl3DNavigate(modelo);
+}
+
+/* No app padrão (3D Navigate). Devolve false se o navegador bloqueou a abertura. */
 export function abrirModeloNo3DPlay(
     modelo: Modelo3DPlay,
     modo: ModoAberturaArquivos
 ): boolean {
-    return abrirArquivo(montarUrl3DPlay(modelo), "3d", modo);
+    return abrirArquivo(montarUrl3D(modelo), "3d", modo);
 }

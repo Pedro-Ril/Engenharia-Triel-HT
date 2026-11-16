@@ -18,9 +18,10 @@ describe("visualização do 3D no Terminal de Fábrica", () => {
     expect(aplicarVisualizacaoNaUrl("não é url", "product-explorer")).toBe("não é url");
   });
 
-  it("parâmetro ausente ou estranho é 3D Play", () => {
-    expect(lerVisualizacao3D(null)).toBe("3dplay");
-    expect(lerVisualizacao3D("qualquer")).toBe("3dplay");
+  it("parâmetro ausente ou estranho é 3D Navigate", () => {
+    expect(lerVisualizacao3D(null)).toBe("3d-navigate");
+    expect(lerVisualizacao3D("qualquer")).toBe("3d-navigate");
+    expect(lerVisualizacao3D("3dplay")).toBe("3dplay");
     expect(lerVisualizacao3D("product-explorer")).toBe("product-explorer");
   });
 });

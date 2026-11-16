@@ -64,7 +64,7 @@ export default function Abrir3DPlayButton({ item, onErro }: Props) {
             onErro(
                 error instanceof Error
                     ? error.message
-                    : "Não foi possível abrir o item no 3DPlay."
+                    : "Não foi possível abrir o item no 3D Navigate."
             );
         } finally {
             setLoading(false);
@@ -79,8 +79,8 @@ export default function Abrir3DPlayButton({ item, onErro }: Props) {
             <button
                 type="button"
                 className={styles.play3DButton}
-                title="Visualizar no 3DPlay"
-                aria-label="Visualizar no 3DPlay"
+                title="Visualizar no 3D Navigate"
+                aria-label="Visualizar no 3D Navigate"
                 onClick={handleAbrir3D}
                 disabled={loading}
             >

@@ -67,7 +67,7 @@ export async function definirVisualizacaoDoAparelho(
   visualizacao: unknown,
   admin: { nomeExibicao: string }
 ): Promise<void> {
-  if (!ehVisualizacao3D(visualizacao)) throw new ValidationError('Escolha "3dplay" ou "product-explorer".');
+  if (!ehVisualizacao3D(visualizacao)) throw new ValidationError('Escolha "3d-navigate", "3dplay" ou "product-explorer".');
 
   const aparelho = (await listarAparelhosTerminalFabrica()).find((a) => a.id.toUpperCase() === terminalId.toUpperCase());
   if (!aparelho) throw new ValidationError("Aparelho não encontrado entre os do Terminal de Fábrica.");

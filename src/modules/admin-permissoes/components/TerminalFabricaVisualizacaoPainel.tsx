@@ -77,9 +77,9 @@ export function TerminalFabricaVisualizacaoPainel({ onFeedback }: TerminalFabric
     >
       <Stack gap={16}>
         <Alert variant="info">
-          <strong>3D Play</strong> abre só o modelo. <strong>Product Explorer</strong> abre a árvore do produto ao lado do
-          3D Navigate. A troca vale quando o aparelho atualiza a grade (no intervalo de atualização dele). Fora da TV, o
-          terminal abre sempre no 3D Play.
+          <strong>3D Navigate</strong> (padrão) e <strong>3D Play</strong> abrem só o modelo. <strong>Product Explorer</strong>{" "}
+          abre a árvore do produto ao lado do 3D Navigate. A troca vale quando o aparelho atualiza a grade (no intervalo de
+          atualização dele). Fora da TV, e no Roteiro de Fabricação, o 3D abre sempre no 3D Navigate.
         </Alert>
 
         {erro && <Alert variant="danger">{erro}</Alert>}

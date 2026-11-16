@@ -18,8 +18,7 @@ import {
 
 import {
   buscarModelos3DPlay,
-  montarUrl3DPlay,
-  montarUrlProductExplorer,
+  montarUrl3D,
 } from "@/modules/cadastro-roteiro/services/threeDPlay.service";
 import { lerVisualizacao3D, PARAMETRO_VISUALIZACAO_3D } from "@/lib/terminal-fabrica/visualizacao-3d";
 import type { Modelo3DPlay } from "@/modules/cadastro-roteiro/services/threeDPlay.service";
@@ -61,7 +60,7 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
   /*
    * Em qual app o 3D abre: a TV Corporativa manda a escolha do aparelho
    * na URL (Administração → Terminal de Fábrica → Visualização). Fora da
-   * TV, sem o parâmetro, fica o 3DPlay de sempre.
+   * TV, sem o parâmetro, fica o padrão (3D Navigate).
    */
   const visualizacao3D = lerVisualizacao3D(searchParams.get(PARAMETRO_VISUALIZACAO_3D));
 
@@ -309,7 +308,7 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
    * confirmado.
    */
   function abrirModelo3D(modelo: Modelo3DPlay) {
-    const url = visualizacao3D === "product-explorer" ? montarUrlProductExplorer(modelo) : montarUrl3DPlay(modelo);
+    const url = montarUrl3D(modelo, visualizacao3D);
     setModelos3D([]);
 
     /*
