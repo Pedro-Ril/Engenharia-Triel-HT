@@ -82,18 +82,12 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
 
   const inputRef = useRef<HTMLInputElement>(null);
   const janela3DRef = useRef<Window | null>(null);
-  const timeoutFechar3DRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   function fecharJanela3DSeAberta() {
-    if (timeoutFechar3DRef.current) {
-      clearTimeout(timeoutFechar3DRef.current);
-      timeoutFechar3DRef.current = null;
-    }
-
     if (janela3DRef.current && !janela3DRef.current.closed) {
       janela3DRef.current.close();
     }
@@ -106,8 +100,14 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
    * abrirModelo3D) — abre numa aba própria. Pra não deixar essa
    * aba acumulando no kiosk, ela fecha sozinha assim que o
    * operador volta a atenção pro terminal (aba/janela original
-   * ganha foco de novo), e tem um limite de segurança caso esse
-   * evento não dispare por algum motivo.
+   * ganha foco de novo).
+   *
+   * Não há mais prazo fixo: o antigo "fecha em 5 minutos" fechava a
+   * aba no meio do uso, porque esta página não enxerga o que se faz
+   * dentro do 3D (outro site, outra aba). Aba esquecida aberta num
+   * aparelho da TV é caso de "Recarregar parado" (Dispositivos), que
+   * mede o tempo sem mouse, teclado e toque no aparelho inteiro e
+   * reabre o navegador só quando ninguém mexe mesmo.
    */
   useEffect(() => {
     function aoVoltarFoco() {
@@ -122,7 +122,6 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
     return () => {
       window.removeEventListener("focus", fecharJanela3DSeAberta);
       document.removeEventListener("visibilitychange", aoVoltarFoco);
-      if (timeoutFechar3DRef.current) clearTimeout(timeoutFechar3DRef.current);
     };
   }, []);
 
@@ -337,10 +336,7 @@ export default function TerminalFabrica({ podeImprimir = false }: TerminalFabric
      */
     if (!janela3DRef.current) {
       setLink3DBloqueado(url);
-      return;
     }
-
-    timeoutFechar3DRef.current = setTimeout(fecharJanela3DSeAberta, 5 * 60 * 1000);
   }
 
   function fecharOverlay() {
