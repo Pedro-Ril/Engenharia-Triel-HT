@@ -54,6 +54,11 @@ export async function register() {
   );
   iniciarAgendadorLiberacaoDesenhos();
 
+  const { iniciarAgendadorWorkstationsNvidia } = await import(
+    "@/lib/workstations-nvidia/scheduler"
+  );
+  iniciarAgendadorWorkstationsNvidia();
+
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );

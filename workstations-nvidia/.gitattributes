@@ -1,0 +1,5 @@
+# O hash do perfil-padrao.nip (comparado pelo portal e pelo script) depende
+# dos bytes exatos: UTF-8 com BOM e CRLF. Sem conversao de fim de linha.
+*.nip -text
+# PowerShell 5.1: manter CRLF no Windows.
+*.ps1 text eol=crlf

@@ -14,6 +14,7 @@ import {
   KeyRound,
   Layers,
   Megaphone,
+  MonitorCog,
   PenTool,
   Plug,
   Printer,
@@ -89,6 +90,7 @@ import { TransferenciasAdminPainel } from "./TransferenciasAdminPainel";
 import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
 import { TvCorporativaPainel } from "@/modules/tv-corporativa/components/TvCorporativaPainel";
+import { WorkstationsNvidiaPainel } from "@/modules/workstations-nvidia/components/WorkstationsNvidiaPainel";
 import { RotaAvulsaPainel } from "@/modules/rotas-avulsas/components/RotaAvulsaPainel";
 import { ROTAS_AVULSAS } from "@/lib/rotas-avulsas/catalogo";
 import { AssinaturasPainel } from "./AssinaturasPainel";
@@ -167,6 +169,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "transferencia-arquivos",
         label: "Transferência de Arquivos",
         icon: <Send size={16} />,
+      },
+      {
+        valor: "workstations-nvidia",
+        label: "Workstations NVIDIA",
+        icon: <MonitorCog size={16} />,
       },
       {
         valor: "desenho-aprovacao-templates",
@@ -567,6 +574,10 @@ export function AdminPermissoesPage() {
 
           {secao === "transferencia-arquivos" && (
             <TransferenciasAdminPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "workstations-nvidia" && (
+            <WorkstationsNvidiaPainel onFeedback={mostrarFeedback} />
           )}
 
           {secao === "desenho-aprovacao-templates" && (
