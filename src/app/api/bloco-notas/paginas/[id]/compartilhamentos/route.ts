@@ -4,7 +4,9 @@ import { verificarAcessoModuloApi } from "@/lib/auth/autorizacao";
 import { ValidationError } from "@/lib/auth/errors";
 import { isObject } from "@/lib/auth/validation";
 import { compartilharPagina, listarCompartilhamentos } from "@/lib/bloco-notas/compartilhamento";
+import { avisarCompartilhamentoSemFalhar } from "@/lib/bloco-notas/notificacao-email";
 import { ehUuid, idInvalido, MODULO_BLOCO_NOTAS, respostaDeErro } from "@/lib/bloco-notas/rota";
+import { origemPublicaEfetivaChamados } from "@/lib/chamados/chamados-config";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 
 export const runtime = "nodejs";
@@ -47,7 +49,24 @@ async function handlePOST(request: Request, context: RouteContext) {
       throw new ValidationError("Permissão inválida.");
     }
 
-    await compartilharPagina(acesso.usuario.id, id, corpo.usuarioId, corpo.permissao);
+    const { novo } = await compartilharPagina(acesso.usuario.id, id, corpo.usuarioId, corpo.permissao);
+
+    /*
+     * Quem acabou de ganhar acesso recebe um aviso por e-mail. Sem await:
+     * o SMTP não segura a resposta da tela, e a função nunca falha (erro
+     * vai para o log). Trocar a permissão de quem já tinha acesso não avisa.
+     */
+    if (novo) {
+      const origem = await origemPublicaEfetivaChamados(request);
+      void avisarCompartilhamentoSemFalhar({
+        paginaId: id,
+        usuarioAlvoId: corpo.usuarioId,
+        donoNome: acesso.usuario.nomeExibicao,
+        permissao: corpo.permissao,
+        origem,
+      });
+    }
+
     return NextResponse.json({ ok: true, data: await listarCompartilhamentos(acesso.usuario.id, id) });
   } catch (error) {
     return respostaDeErro(error, "compartilhar");

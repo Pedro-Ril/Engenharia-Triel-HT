@@ -108,13 +108,13 @@ export async function listarCompartilhamentos(donoId: string, paginaId: string):
   }));
 }
 
-/* Inclui ou muda a permissão de uma pessoa (upsert). */
+/* Inclui ou muda a permissão de uma pessoa (upsert). `novo` = a pessoa acabou de ganhar acesso (é quando se avisa por e-mail). */
 export async function compartilharPagina(
   donoId: string,
   paginaId: string,
   usuarioAlvoId: string,
   permissao: "ver" | "editar"
-): Promise<void> {
+): Promise<{ novo: boolean }> {
   await garantirDono(donoId, paginaId);
 
   if (usuarioAlvoId.toLowerCase() === donoId.toLowerCase()) {
@@ -151,9 +151,12 @@ export async function compartilharPagina(
     `);
 
   /* Passou de editar para só ver: quem está ao vivo reconecta já sem poder escrever. */
-  if (result.recordset[0]?.anterior === "editar" && permissao === "ver") {
+  const anterior = result.recordset[0]?.anterior ?? null;
+  if (anterior === "editar" && permissao === "ver") {
     revalidarAoVivo(donoId, paginaId);
   }
+
+  return { novo: anterior === null };
 }
 
 export async function removerCompartilhamento(donoId: string, paginaId: string, usuarioAlvoId: string): Promise<void> {
