@@ -7,6 +7,7 @@ import type {
   ModoPlugin3dx,
   NovoDestinatario3dx,
   PaginaExecucoes3dx,
+  Versao3dx,
   VisaoGeralPlugins3dx,
 } from "../types/plugins3dx.types";
 
@@ -89,4 +90,9 @@ export function alternarDestinatario(id: string, ativo: boolean) {
 
 export function removerDestinatario(id: string) {
   return chamar<null>(`/destinatarios/${id}`, { method: "DELETE" });
+}
+
+/* Notas de versão (todas, ou só de um componente: "core" ou a chave do plugin). */
+export function listarVersoes(componente?: string | null) {
+  return chamar<Versao3dx[]>(componente ? `/versoes?componente=${encodeURIComponent(componente)}` : "/versoes");
 }

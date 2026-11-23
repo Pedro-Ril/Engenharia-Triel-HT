@@ -29,7 +29,18 @@ import java.util.regex.Pattern;
 public final class Core {
 
     public static final Logger LOG = LoggerFactory.getLogger("br.com.trielht.plm.core");
-    public static final String VERSION = "1.1.1";
+    public static final String VERSION = "1.2.0";
+
+    /** Historico do nucleo (o mais novo primeiro). Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
+    public static final java.util.List<Release> RELEASES = java.util.List.of(
+            Release.of("1.2.0", "2026-11-23", "Notas de versão: o núcleo e cada plugin gravam no Portal o que mudou em "
+                    + "cada versão, na subida do nó."),
+            Release.of("1.1.1", "2026-11-23", "Textos gravados no Portal (resumo, mensagens, eventos) com acentuação."),
+            Release.of("1.1.0", "2026-11-22", "Ambiente (TESTE/PRODUCAO): modo, parâmetros, fila e registros separados por "
+                    + "ambiente; nó sem ambiente= no properties fica com os plugins desligados."),
+            Release.of("1.0.0", "2026-11-22", "Núcleo comum: entrada única no Collaborative Lifecycle, configuração vinda "
+                    + "do Portal, fila persistente no banco (sobrevive a reinício, sem trabalho repetido, cada trabalho "
+                    + "num só nó), registro assíncrono com spool em arquivo e heartbeat dos nós."));
     public static final String CONFIG_FILE = "/App/triel/triel-plugins.properties";
     public static final String SEP = "|~|";
 

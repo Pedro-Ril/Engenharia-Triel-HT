@@ -5,6 +5,7 @@ import br.com.trielht.plm.core.Job;
 import br.com.trielht.plm.core.JobQueue;
 import br.com.trielht.plm.core.PluginConfig;
 import br.com.trielht.plm.core.PluginModule;
+import br.com.trielht.plm.core.Release;
 import br.com.trielht.plm.core.Report;
 
 import com.dassault_systemes.lifecycle.itf.CompletionData;
@@ -39,7 +40,7 @@ import java.util.Set;
 public class DuplicateTitleModule implements PluginModule {
 
     public static final String KEY = "duplicate-title";
-    public static final String VERSION = "6.0.1";
+    public static final String VERSION = "6.0.2";
 
     private static final Set<String> DUPLICATE_COMMANDS = Set.of("Advance Duplicate", "Duplicate");
     private static final String TITLE_ATTR = "PLMEntity.V_Name";
@@ -75,6 +76,24 @@ public class DuplicateTitleModule implements PluginModule {
     @Override
     public String version() {
         return VERSION;
+    }
+
+    /** O mais novo primeiro. Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
+    @Override
+    public List<Release> releases() {
+        return List.of(
+                Release.of("6.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
+                Release.of("6.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
+                Release.of("6.0.0", "2026-11-22", "Passa a ser módulo do núcleo comum: liga/desliga e modo pelo Portal, "
+                        + "cada duplicação registrada com o título de cada objeto (de → para)."),
+                Release.of("5", "2026-11-17", "Peça com várias configurações recebe uma base única: o menor Nome novo; "
+                        + "com uma única peça, objetos de CAD com título fora do padrão também recebem a base nova."),
+                Release.of("4", "2026-11-17", "Objeto de CAD com o título igual ao nome da peça recebe a base nova; título "
+                        + "alterado por outra regra não é tratado como digitado."),
+                Release.of("3", "2026-11-14", "Base digitada pelo usuário vale para as outras configurações da mesma peça."),
+                Release.of("2", "2026-11-14", "Objetos SOLIDWORKS mantêm a configuração no título: base(configuração)."),
+                Release.of("1", "2026-11-14", "Na Duplicação, o item novo recebe o Nome novo como título quando o usuário "
+                        + "não digitou outro."));
     }
 
     @Override

@@ -18,6 +18,14 @@ public interface PluginModule {
     /** Versao do jar (aparece em Plugins 3DX > Saude dos nos). */
     String version();
 
+    /**
+     * Historico das versoes deste plugin (o mais novo primeiro), gravado no Portal na subida do no.
+     * Toda mudanca no jar sobe version() e ganha uma linha aqui.
+     */
+    default java.util.List<Release> releases() {
+        return java.util.List.of();
+    }
+
     /** Subida do 3DSpace (ex.: agendar rotina noturna). */
     default void start() {
     }

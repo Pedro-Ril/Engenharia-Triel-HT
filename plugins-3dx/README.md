@@ -64,17 +64,11 @@ Sem esse arquivo os plugins funcionam no modo `plugin.<chave>.modo` do próprio 
 
 Toda mudança em um jar sobe a versão **dele**: a constante `VERSION` do módulo, ou `Core.VERSION` no núcleo. O build grava essa versão no manifesto do jar, e a tela mostra versão e md5 por nó. Correção que não muda o comportamento sobe o último número (1.1.**1**); funcionalidade nova sobe o do meio (1.**1**.0).
 
-| Jar | Versão | O que mudou |
-|---|---|---|
-| núcleo | 1.0.0 | Núcleo comum: entrada única, configuração do Portal, fila persistente, registro no banco, heartbeat |
-| núcleo | 1.1.0 | Ambiente (TESTE/PRODUCAO): configuração, fila e registros separados por ambiente |
-| núcleo | 1.1.1 | Textos gravados no Portal com acento |
-| título (`duplicate-title`) | 6.0.0 | Módulo do núcleo (antes: plugin isolado, até a v5) |
-| título | 6.0.1 | Textos com acento |
-| revisão (`replace-revision`) | 7.0.0 | Módulo do núcleo (antes: plugin isolado, até a v6); quem liberou, um expand por revisão, itens por conjunto |
-| revisão | 7.0.1 | Textos com acento |
-| desenho (`drawing-config-link`) | 3.0.0 | Módulo do núcleo (antes: plugin isolado, até a v2); rotina noturna coordenada pelo banco |
-| desenho | 3.0.1 | Textos com acento |
+**Nota de cada versão:** fica no próprio código, ao lado da versão: `Core.RELEASES` no núcleo e `releases()` em cada módulo (o mais novo primeiro). Na subida do nó, o núcleo grava as notas que ainda não estão em `dbo.portal_3dx_plugins_versoes` (migração 0174; uma linha por componente + versão, nunca sobrescreve). No log aparece `[TRIEL-CORE] N nota(s) de versao registrada(s) no Portal`. O Portal lê em `GET /api/admin/plugins-3dx/versoes[?componente=core|<chave>]`.
+
+Ao mudar um jar: suba `VERSION` **e** acrescente a linha correspondente em `releases()`/`RELEASES`. Texto com acento, uma ou duas frases, do ponto de vista de quem usa.
+
+Versões atuais: núcleo 1.2.0, título (`duplicate-title`) 6.0.2, revisão (`replace-revision`) 7.0.2, desenho (`drawing-config-link`) 3.0.2.
 
 ## Compilar
 

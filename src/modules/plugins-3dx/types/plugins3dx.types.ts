@@ -200,3 +200,17 @@ export const EVENTOS_AVISO_3DX: Record<string, { plugins: string[]; label: strin
     descricao: "Execução terminou em falha ou parcial (algum objeto não foi tratado).",
   },
 };
+
+/*
+ * Nota de uma versão (migração 0174). Gravada pelo próprio jar na subida do nó: componente "core" (núcleo) ou a
+ * chave do plugin. A lista vem da versão mais nova para a mais antiga em cada componente.
+ */
+export interface Versao3dx {
+  componente: string;
+  versao: string;
+  lancadaEm: string | null;
+  notas: string;
+  registradoNo: string | null;
+  registradoAmbiente: Ambiente3dx | null;
+  registradoEm: string;
+}

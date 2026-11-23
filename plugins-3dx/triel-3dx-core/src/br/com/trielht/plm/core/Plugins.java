@@ -104,8 +104,25 @@ public final class Plugins implements ServletContextListener {
 
     // ------------------------------------------------------------------ heartbeat
 
+    /** Notas de versao ja gravadas desta subida (tenta de novo a cada heartbeat ate conseguir). */
+    private static volatile boolean releasesRegistered;
+
+    private static void registerReleases() {
+        try {
+            int n = Release.register("core", Core.RELEASES);
+            for (PluginModule m : all()) n += Release.register(m.key(), m.releases());
+            releasesRegistered = true;
+            if (n > 0) Core.LOG.info("[TRIEL-CORE] {} nota(s) de versao registrada(s) no Portal", n);
+        } catch (SQLException e) {
+            Core.LOG.debug("[TRIEL-CORE] Notas de versao: {}", e.getMessage());
+        } catch (Exception e) {
+            Core.LOG.warn("[TRIEL-CORE] Notas de versao: {}", e.getMessage());
+        }
+    }
+
     private static void heartbeat() {
         if (!Db.configured()) return;
+        if (!releasesRegistered) registerReleases();
         for (PluginModule m : all()) {
             try {
                 int pending = JobQueue.pendingInDb(m.key());

@@ -20,6 +20,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'triel_3dx_pl
 GO
 
 GRANT SELECT ON dbo.portal_3dx_plugins TO [triel_3dx_plugins];
+/* depois da migração 0174 (notas de versão gravadas pelo próprio jar) */
+IF OBJECT_ID(N'dbo.portal_3dx_plugins_versoes', N'U') IS NOT NULL
+  GRANT SELECT, INSERT ON dbo.portal_3dx_plugins_versoes TO [triel_3dx_plugins];
 /* depois da migração 0173 (modo/parâmetros por ambiente) */
 IF OBJECT_ID(N'dbo.portal_3dx_plugins_ambientes', N'U') IS NOT NULL
   GRANT SELECT ON dbo.portal_3dx_plugins_ambientes TO [triel_3dx_plugins];

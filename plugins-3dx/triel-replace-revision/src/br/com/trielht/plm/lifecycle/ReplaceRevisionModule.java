@@ -6,6 +6,7 @@ import br.com.trielht.plm.core.JobQueue;
 import br.com.trielht.plm.core.Mx;
 import br.com.trielht.plm.core.PluginConfig;
 import br.com.trielht.plm.core.PluginModule;
+import br.com.trielht.plm.core.Release;
 import br.com.trielht.plm.core.Report;
 
 import com.dassault_systemes.lifecycle.itf.CompletionData;
@@ -53,7 +54,7 @@ import java.util.TreeSet;
 public class ReplaceRevisionModule implements PluginModule {
 
     public static final String KEY = "replace-revision";
-    public static final String VERSION = "7.0.1";
+    public static final String VERSION = "7.0.2";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -94,6 +95,23 @@ public class ReplaceRevisionModule implements PluginModule {
     @Override
     public String version() {
         return VERSION;
+    }
+
+    /** O mais novo primeiro. Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
+    @Override
+    public List<Release> releases() {
+        return List.of(
+                Release.of("7.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
+                Release.of("7.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
+                Release.of("7.0.0", "2026-11-22", "Passa a ser módulo do núcleo comum: fila persistente (retoma após "
+                        + "reinício, sem trabalho repetido), grava quem liberou, um expand por revisão em vez de uma "
+                        + "consulta por instância, cada conjunto atualizado e cada revisão obsoletada registrados no "
+                        + "Portal (base dos avisos por e-mail); sem o código de diagnóstico."),
+                Release.of("6", "2026-11-15", "Revisões anteriores liberadas viram OBSOLETAS pelo serviço de maturidade "
+                        + "da própria tela (inclui os objetos de CAD)."),
+                Release.of("5", "2026-11-15", "Troca em lote por conjunto, com alternativa uma a uma se o lote falhar."),
+                Release.of("1", "2026-11-15", "Ao liberar a revisão nova de uma peça, os conjuntos LIBERADOS passam a usar "
+                        + "a revisão nova, em segundo plano, com comentário no histórico do conjunto."));
     }
 
     // ------------------------------------------------------------------ liberacao (thread do usuario)

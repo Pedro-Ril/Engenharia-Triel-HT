@@ -6,6 +6,7 @@ import br.com.trielht.plm.core.JobQueue;
 import br.com.trielht.plm.core.Mx;
 import br.com.trielht.plm.core.PluginConfig;
 import br.com.trielht.plm.core.PluginModule;
+import br.com.trielht.plm.core.Release;
 import br.com.trielht.plm.core.Report;
 
 import com.dassault_systemes.enovia.xapps.dsxcad.interfaces.IdsxcadAuthoring;
@@ -54,7 +55,7 @@ import java.util.concurrent.TimeUnit;
 public class DrawingConfigLinkModule implements PluginModule {
 
     public static final String KEY = "drawing-config-link";
-    public static final String VERSION = "3.0.1";
+    public static final String VERSION = "3.0.2";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -74,6 +75,20 @@ public class DrawingConfigLinkModule implements PluginModule {
     @Override
     public String version() {
         return VERSION;
+    }
+
+    /** O mais novo primeiro. Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
+    @Override
+    public List<Release> releases() {
+        return List.of(
+                Release.of("3.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
+                Release.of("3.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
+                Release.of("3.0.0", "2026-11-22", "Passa a ser módulo do núcleo comum: rotina noturna coordenada pelo "
+                        + "banco (uma só varredura entre os nós), reprocessar e varredura pelo Portal, cada vínculo "
+                        + "registrado; erro falso do serviço da Dassault conferido na hora."),
+                Release.of("2", "2026-11-17", "Carga do legado com nova tentativa quando a sessão do sistema está ocupada."),
+                Release.of("1", "2026-11-17", "Ao liberar um desenho SOLIDWORKS, ele é ligado a todas as configurações da "
+                        + "mesma peça (SOLIDWORKS e Duplicar com Desenhos acham o desenho por qualquer configuração)."));
     }
 
     // ------------------------------------------------------------------ rotina noturna

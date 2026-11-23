@@ -20,6 +20,7 @@ import type {
   NovoDestinatario3dx,
   PaginaExecucoes3dx,
   Plugin3dx,
+  Versao3dx,
   VisaoGeralPlugins3dx,
 } from "@/modules/plugins-3dx/types/plugins3dx.types";
 import { EVENTOS_AVISO_3DX } from "@/modules/plugins-3dx/types/plugins3dx.types";
@@ -747,4 +748,52 @@ export async function removerDestinatario(id: string): Promise<void> {
     .request()
     .input("id", sql.UniqueIdentifier, id)
     .query("DELETE FROM dbo.portal_3dx_plugins_destinatarios WHERE [id] = @id;");
+}
+
+// ------------------------------------------------------------------ notas de versão
+
+interface VersaoRow {
+  componente: string;
+  versao: string;
+  lancada_em: string | null;
+  notas: string;
+  registrado_no: string | null;
+  registrado_ambiente: Ambiente3dx | null;
+  registrado_em: string;
+}
+
+/* Ordena "1.10.0" depois de "1.9.0" e versões antigas sem ponto ("5") como 5.0.0. */
+function compararVersao(a: string, b: string): number {
+  const pa = a.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/* Gravadas pelos próprios jars (migração 0174). Mais nova primeiro, dentro de cada componente. */
+export async function listarVersoes(componente: string | null): Promise<Versao3dx[]> {
+  const pool = await getSqlServerPool();
+  const resultado = await pool
+    .request()
+    .input("componente", sql.VarChar(40), componente)
+    .query<VersaoRow>(`
+      SELECT [componente], [versao], CONVERT(VARCHAR(10), [lancada_em], 23) AS [lancada_em], [notas], [registrado_no],
+        [registrado_ambiente], CONVERT(VARCHAR(33), [registrado_em], 126) AS [registrado_em]
+      FROM dbo.portal_3dx_plugins_versoes
+      WHERE @componente IS NULL OR [componente] = @componente;
+    `);
+  return resultado.recordset
+    .map((row) => ({
+      componente: row.componente,
+      versao: row.versao,
+      lancadaEm: row.lancada_em,
+      notas: row.notas,
+      registradoNo: row.registrado_no,
+      registradoAmbiente: row.registrado_ambiente,
+      registradoEm: row.registrado_em,
+    }))
+    .sort((a, b) => a.componente.localeCompare(b.componente) || compararVersao(b.versao, a.versao));
 }
