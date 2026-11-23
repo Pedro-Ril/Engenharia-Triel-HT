@@ -59,6 +59,10 @@ export async function register() {
   );
   iniciarAgendadorWorkstationsNvidia();
 
+  /* Plugins 3DX: avisos por e-mail (revisão trocada, falhas) e limpeza diária dos registros antigos. */
+  const { iniciarAgendadorPlugins3dx } = await import("@/lib/plugins-3dx/notificacoes");
+  iniciarAgendadorPlugins3dx();
+
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );

@@ -17,6 +17,7 @@ import {
   MonitorCog,
   PenTool,
   Plug,
+  Puzzle,
   Printer,
   Send,
   Settings,
@@ -91,6 +92,7 @@ import { UsuariosPainel } from "./UsuariosPainel";
 import { WikiPainel } from "./WikiPainel";
 import { TvCorporativaPainel } from "@/modules/tv-corporativa/components/TvCorporativaPainel";
 import { WorkstationsNvidiaPainel } from "@/modules/workstations-nvidia/components/WorkstationsNvidiaPainel";
+import { Plugins3dxPainel } from "@/modules/plugins-3dx/components/Plugins3dxPainel";
 import { RotaAvulsaPainel } from "@/modules/rotas-avulsas/components/RotaAvulsaPainel";
 import { ROTAS_AVULSAS } from "@/lib/rotas-avulsas/catalogo";
 import { AssinaturasPainel } from "./AssinaturasPainel";
@@ -174,6 +176,11 @@ const GRUPOS_NAVEGACAO: GrupoNavegacaoAdmin[] = [
         valor: "workstations-nvidia",
         label: "Workstations NVIDIA",
         icon: <MonitorCog size={16} />,
+      },
+      {
+        valor: "plugins-3dx",
+        label: "Plugins 3DX",
+        icon: <Puzzle size={16} />,
       },
       {
         valor: "desenho-aprovacao-templates",
@@ -578,6 +585,10 @@ export function AdminPermissoesPage() {
 
           {secao === "workstations-nvidia" && (
             <WorkstationsNvidiaPainel onFeedback={mostrarFeedback} />
+          )}
+
+          {secao === "plugins-3dx" && (
+            <Plugins3dxPainel usuarios={usuarios} onFeedback={mostrarFeedback} />
           )}
 
           {secao === "desenho-aprovacao-templates" && (

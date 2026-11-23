@@ -46,6 +46,7 @@ const ORIGENS_POR_MODULO: { prefixo: string; chave: string; nome: string }[] = [
     nome: "Transferência de Arquivos",
   },
   { prefixo: "terminal-fabrica", chave: "terminal-fabrica", nome: "Terminal de Fábrica" },
+  { prefixo: "plugins-3dx", chave: "plugins-3dx", nome: "Plugins 3DX" },
   /* Sem log próprio em portal_logs ainda, mas já aparecem pelas
      chamadas externas que registram (ver fetchMonitorado). */
   { prefixo: "integra-lantek", chave: "integra-lantek", nome: "Integração Lantek" },

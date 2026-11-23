@@ -1,0 +1,425 @@
+.textoSecundario {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Grupo de opções (filtro de ambiente, modo do plugin): mesmo desenho do SegmentedTabs. */
+.grupoOpcoes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+}
+
+.opcao {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.opcao:hover:not(:disabled) {
+  background: var(--bg-hover-neutral);
+  color: var(--text);
+}
+
+.opcao:disabled {
+  cursor: default;
+}
+
+.opcaoAtiva,
+.opcaoAtiva:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--text-inverse);
+}
+
+.barraAmbiente {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+
+.barraAmbienteRotulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Modo por ambiente dentro do card do plugin: uma linha por ambiente. */
+.modosAmbiente {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linhaModo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  padding: 10px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.linhaModoInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.secaoAmbiente {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.secaoAmbiente + .secaoAmbiente {
+  padding-top: 20px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.modoAtivo_DESLIGADO {
+  background: var(--neutral-bg-strong);
+  color: var(--neutral-text);
+}
+
+.modoAtivo_SIMULACAO {
+  background: var(--info-bg-strong);
+  color: var(--info-text);
+}
+
+.modoAtivo_ATIVO {
+  background: var(--success-bg-strong);
+  color: var(--success-text);
+}
+
+.estatisticas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .estatisticas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tituloSecao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.nos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.no {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+  font-size: 13px;
+}
+
+.noIdentificacao {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.noIcone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+
+  border-radius: 8px;
+  background: var(--bg-surface-muted);
+  color: var(--text-muted);
+}
+
+.noInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.noNome {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.noErro {
+  color: var(--danger-text);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.noStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Filtros em duas linhas cheias: busca + período em cima, os três seletores embaixo. */
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.filtroBusca {
+  grid-column: span 6;
+}
+
+.filtroData {
+  grid-column: span 3;
+}
+
+.filtroCampo {
+  grid-column: span 4;
+}
+
+@media (max-width: 900px) {
+  .filtroBusca,
+  .filtroCampo {
+    grid-column: span 12;
+  }
+
+  .filtroData {
+    grid-column: span 6;
+  }
+}
+
+.linhaClicavel {
+  cursor: pointer;
+}
+
+.linhaClicavel:hover td {
+  background: var(--bg-hover-neutral);
+}
+
+.celulaObjeto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detalhes {
+  display: grid;
+  grid-template-columns: minmax(130px, 170px) 1fr;
+  gap: 10px 16px;
+  align-items: center;
+
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-surface-soft);
+  font-size: 14px;
+}
+
+.rotulo {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.valor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+
+  color: var(--text);
+  word-break: break-word;
+}
+
+.blocoErro {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.deParaSeta {
+  color: var(--text-faint);
+  margin: 0 6px;
+}
+
+.listaRelacionadas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.listaEventos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemEvento {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.itemEvento:first-child {
+  padding-top: 0;
+}
+
+.itemEvento:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.badgeEvento {
+  flex: 0 0 56px;
+  display: flex;
+}
+
+.mensagemEvento {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* Formulário curto com o botão na mesma linha dos campos (Ações, destinatários). */
+.formLinha {
+  display: grid;
+  gap: 12px;
+  align-items: end;
+}
+
+.formReprocessar {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+}
+
+.formVarredura {
+  grid-template-columns: minmax(0, 200px) minmax(0, 260px) auto;
+  justify-content: start;
+}
+
+/* Campo que ocupa a linha inteira do FormGrid (valor longo, ex.: contexto de segurança). */
+.campoLargo {
+  grid-column: 1 / -1;
+}
+
+.formDestinatario {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
+}
+
+@media (max-width: 900px) {
+  .formReprocessar,
+  .formDestinatario {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .formVarredura {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+  }
+}
+
+.switches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .switches {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
