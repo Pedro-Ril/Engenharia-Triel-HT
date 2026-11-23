@@ -70,6 +70,18 @@ Ao mudar um jar: suba `VERSION` **e** acrescente a linha correspondente em `rele
 
 Versões atuais: núcleo 1.2.0, título (`duplicate-title`) 6.0.2, revisão (`replace-revision`) 7.0.2, desenho (`drawing-config-link`) 3.0.2.
 
+## Depois de um hotfix ou atualização do 3DEXPERIENCE
+
+O Portal confere o ambiente a cada 15 minutos (Administração > Plugins 3DX; migração 0175), só lendo pela rede, sem login e sem instalar nada no 3DSpace:
+
+- **Versão do 3DSpace** em cada nó de `dbo.portal_3dx_servidores` (build lido de `webapps/3DPlayExperienceModule/.3DPlayExperienceModule.mkversion.mk`). Build mudou = a Dassault foi atualizada.
+- **Padrão de visualização** do "Abrir com" (os 4 arquivos de `triel-visualizacao/`), com a mesma regra do `aplicar_padrao_visualizacao.py --conferir`: *aplicado*, *perdido* (voltou ao original da Dassault: reaplicar o script) ou *mudou* (a Dassault alterou o arquivo: analisar no dev-plm antes). Mudou a regra no script? Mude também `src/lib/plugins-3dx/padrao-visualizacao.ts`.
+- **Nós dos plugins:** heartbeat parado há 10 min (3DSpace parado, jar apagado por redeploy, sem banco) ou **autoteste** com falha.
+
+**Autoteste** (núcleo 1.3.0+): na subida, o núcleo confere se as classes e métodos internos da Dassault que ele e cada plugin usam (`SelfTest.CORE_REQUIRES` e `requires()` de cada módulo) existem neste 3DSpace e grava `ok`/`falha` no heartbeat. Ao usar uma API nova da Dassault num plugin, acrescente-a em `requires()`.
+
+Toda **mudança** de estado (inclusive a volta ao normal) vira evento e um e-mail por ambiente para a lista do evento **Ambiente 3DX** (destinatário sem plugin). O nó sem resposta só vira erro na segunda verificação seguida, para um reinício não gerar aviso.
+
 ## Compilar
 
 No servidor (precisa do JDK do 3DSpace):

@@ -128,6 +128,8 @@ interface NoRow {
   ultimo_erro: string | null;
   ultimo_erro_em: string | null;
   segundos_sem_contato: number;
+  autoteste: "ok" | "falha" | null;
+  autoteste_detalhe: string | null;
 }
 
 interface EventoRow {
@@ -199,7 +201,8 @@ export async function buscarVisaoGeral(ambiente: Ambiente3dx | null): Promise<Vi
         CONVERT(VARCHAR(33), [iniciado_em], 126) AS [iniciado_em],
         CONVERT(VARCHAR(33), [ultimo_contato], 126) AS [ultimo_contato],
         [fila_pendente], [ultimo_erro], CONVERT(VARCHAR(33), [ultimo_erro_em], 126) AS [ultimo_erro_em],
-        DATEDIFF(SECOND, [ultimo_contato], SYSDATETIME()) AS [segundos_sem_contato]
+        DATEDIFF(SECOND, [ultimo_contato], SYSDATETIME()) AS [segundos_sem_contato],
+        [autoteste], [autoteste_detalhe]
       FROM dbo.portal_3dx_plugins_nos
       WHERE @ambiente IS NULL OR [ambiente] = @ambiente OR [ambiente] IS NULL
       ORDER BY [ambiente], [no];
@@ -240,6 +243,8 @@ export async function buscarVisaoGeral(ambiente: Ambiente3dx | null): Promise<Vi
         ultimoErro: n.ultimo_erro,
         ultimoErroEm: n.ultimo_erro_em,
         atrasado: n.segundos_sem_contato > SEGUNDOS_NO_ATRASADO,
+        autoteste: n.autoteste,
+        autotesteDetalhe: n.autoteste_detalhe,
       }));
     const configDe = (amb: Ambiente3dx): ConfigAmbiente3dx => {
       const linha = ambientes.recordset.find((a) => a.plugin_chave === row.chave && a.ambiente === amb);
@@ -668,7 +673,7 @@ export async function cancelarExecucao(id: string, usuario: PortalUsuario): Prom
 
 interface DestinatarioRow {
   id: string;
-  plugin_chave: string;
+  plugin_chave: string | null;
   evento: string;
   ambiente: Ambiente3dx | null;
   usuario_id: string | null;
@@ -708,7 +713,10 @@ export async function listarDestinatarios(): Promise<Destinatario3dx[]> {
 
 export async function criarDestinatario(dados: NovoDestinatario3dx, usuario: PortalUsuario): Promise<void> {
   const evento = EVENTOS_AVISO_3DX[dados.evento];
-  if (!evento || !evento.plugins.includes(dados.pluginChave)) {
+  if (!evento) throw new ValidationError("Evento inválido.");
+  /* evento geral (ambiente_3dx) não tem plugin; os demais exigem um plugin daquele evento */
+  const pluginChave = evento.geral ? null : dados.pluginChave;
+  if (!evento.geral && (!pluginChave || !evento.plugins.includes(pluginChave))) {
     throw new ValidationError("Evento inválido para este plugin.");
   }
   if (dados.ambiente != null && !ehAmbiente(dados.ambiente)) throw new ValidationError("Ambiente inválido.");
@@ -719,7 +727,7 @@ export async function criarDestinatario(dados: NovoDestinatario3dx, usuario: Por
   const pool = await getSqlServerPool();
   await pool
     .request()
-    .input("plugin", sql.VarChar(40), dados.pluginChave)
+    .input("plugin", sql.VarChar(40), pluginChave)
     .input("evento", sql.VarChar(40), dados.evento)
     .input("ambiente", sql.VarChar(10), dados.ambiente ?? null)
     .input("usuarioId", sql.UniqueIdentifier, dados.usuarioId ?? null)

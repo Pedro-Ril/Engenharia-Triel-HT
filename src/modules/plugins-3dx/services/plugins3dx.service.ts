@@ -7,6 +7,7 @@ import type {
   ModoPlugin3dx,
   NovoDestinatario3dx,
   PaginaExecucoes3dx,
+  VerificacaoAmbiente3dx,
   Versao3dx,
   VisaoGeralPlugins3dx,
 } from "../types/plugins3dx.types";
@@ -95,4 +96,14 @@ export function removerDestinatario(id: string) {
 /* Notas de versão (todas, ou só de um componente: "core" ou a chave do plugin). */
 export function listarVersoes(componente?: string | null) {
   return chamar<Versao3dx[]>(componente ? `/versoes?componente=${encodeURIComponent(componente)}` : "/versoes");
+}
+
+/* Verificação do ambiente 3DX (versão do 3DSpace e padrão de visualização em cada nó). */
+export function buscarVerificacaoAmbiente() {
+  return chamar<VerificacaoAmbiente3dx>("/ambiente");
+}
+
+/* Roda a verificação agora (com avisos, como o agendador) e devolve o estado novo. */
+export function verificarAmbienteAgora() {
+  return chamar<VerificacaoAmbiente3dx>("/ambiente", { method: "POST" });
 }

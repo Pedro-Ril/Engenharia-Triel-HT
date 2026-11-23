@@ -37,7 +37,8 @@ async function handlePOST(request: Request) {
 
     await criarDestinatario(
       {
-        pluginChave: requiredText(body.pluginChave, "plugin", 40),
+        /* ausente para eventos gerais (ambiente_3dx) */
+        pluginChave: optionalText(body.pluginChave, "plugin", 40) || null,
         evento: requiredText(body.evento, "evento", 40),
         ambiente: ehAmbiente(body.ambiente) ? body.ambiente : null,
         usuarioId: usuarioId || null,

@@ -26,6 +26,15 @@ public interface PluginModule {
         return java.util.List.of();
     }
 
+    /**
+     * Partes internas da Dassault que este plugin usa, conferidas pelo autoteste na subida (SelfTest):
+     * "pacote.Classe" ou "pacote.Classe#metodo". Inclua tudo o que um hotfix pode tirar -- principalmente o que e
+     * chamado por reflexao ou e API interna (nao documentada).
+     */
+    default java.util.List<String> requires() {
+        return java.util.List.of();
+    }
+
     /** Subida do 3DSpace (ex.: agendar rotina noturna). */
     default void start() {
     }

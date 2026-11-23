@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit;
 public class DrawingConfigLinkModule implements PluginModule {
 
     public static final String KEY = "drawing-config-link";
-    public static final String VERSION = "3.0.2";
+    public static final String VERSION = "3.1.0";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -77,10 +77,24 @@ public class DrawingConfigLinkModule implements PluginModule {
         return VERSION;
     }
 
+    /** Partes internas da Dassault que este plugin usa (autoteste na subida; ver PluginModule.requires). */
+    @Override
+    public List<String> requires() {
+        return List.of(
+                "com.dassault_systemes.lifecycle.itf.CompletionData",
+                "com.dassault_systemes.enovia.xapps.dsxcad.interfaces.dsxcadFactory#getAuthoringServices",
+                "com.dassault_systemes.enovia.xapps.dsxcad.interfaces.IdsxcadAuthoring#createDependencyLink",
+                "com.dassault_systemes.enovia.xapps.services.ER.implementations.ENOXERContext",
+                "com.dassault_systemes.enovia.xapps.services.context.ENOXContextManager#getContextManager",
+                "com.dassault_systemes.enovia.xapps.services.context.ENOXContextManager#addContext",
+                "com.dassault_systemes.enovia.xapps.services.context.ENOXContextManager#removeContext");
+    }
+
     /** O mais novo primeiro. Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("3.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
                 Release.of("3.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
                 Release.of("3.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
                 Release.of("3.0.0", "2026-11-22", "Passa a ser módulo do núcleo comum: rotina noturna coordenada pelo "

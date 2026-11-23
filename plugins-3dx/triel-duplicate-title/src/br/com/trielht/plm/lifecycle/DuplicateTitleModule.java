@@ -40,7 +40,7 @@ import java.util.Set;
 public class DuplicateTitleModule implements PluginModule {
 
     public static final String KEY = "duplicate-title";
-    public static final String VERSION = "6.0.2";
+    public static final String VERSION = "6.1.0";
 
     private static final Set<String> DUPLICATE_COMMANDS = Set.of("Advance Duplicate", "Duplicate");
     private static final String TITLE_ATTR = "PLMEntity.V_Name";
@@ -78,10 +78,18 @@ public class DuplicateTitleModule implements PluginModule {
         return VERSION;
     }
 
+    /** Partes internas da Dassault que este plugin usa (autoteste na subida; ver PluginModule.requires). */
+    @Override
+    public List<String> requires() {
+        return List.of(
+                "com.dassault_systemes.lifecycle.itf.CompletionData");
+    }
+
     /** O mais novo primeiro. Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("6.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
                 Release.of("6.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
                 Release.of("6.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
                 Release.of("6.0.0", "2026-11-22", "Passa a ser módulo do núcleo comum: liga/desliga e modo pelo Portal, "

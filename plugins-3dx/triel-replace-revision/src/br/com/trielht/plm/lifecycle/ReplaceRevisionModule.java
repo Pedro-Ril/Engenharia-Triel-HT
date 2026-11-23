@@ -54,7 +54,7 @@ import java.util.TreeSet;
 public class ReplaceRevisionModule implements PluginModule {
 
     public static final String KEY = "replace-revision";
-    public static final String VERSION = "7.0.2";
+    public static final String VERSION = "7.1.0";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -97,10 +97,26 @@ public class ReplaceRevisionModule implements PluginModule {
         return VERSION;
     }
 
+    /** Partes internas da Dassault que este plugin usa (autoteste na subida; ver PluginModule.requires). */
+    @Override
+    public List<String> requires() {
+        return List.of(
+                MATURITY_CLASS + "#maturityChange_internal",
+                "com.dassault_systemes.lifecycle.itf.CompletionData",
+                "com.dassault_systemes.platform.model.services.AuthoringServicesProvider#getConnectionAuthoringServices",
+                "com.dassault_systemes.platform.model.itf.IConnectionAuthoringServices#replace",
+                "com.dassault_systemes.platform.model.services.NavigationServicesProvider#getNavBusProvider",
+                "com.dassault_systemes.platform.model.itf.nav.INavBusProvider#createNavBusConnection",
+                "com.dassault_systemes.platform.model.itf.nav.INavBusProvider#createNavBusObject",
+                "com.dassault_systemes.platform.model.itf.nav.NavBusConnectionReplaceWrapperInfo",
+                "com.dassault_systemes.platform.model.services.IdentificationServicesProvider#getOxidService");
+    }
+
     /** O mais novo primeiro. Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("7.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
                 Release.of("7.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
                 Release.of("7.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
                 Release.of("7.0.0", "2026-11-22", "Passa a ser módulo do núcleo comum: fila persistente (retoma após "

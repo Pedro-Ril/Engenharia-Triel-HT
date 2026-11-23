@@ -63,6 +63,9 @@ export async function register() {
   const { iniciarAgendadorPlugins3dx } = await import("@/lib/plugins-3dx/notificacoes");
   iniciarAgendadorPlugins3dx();
 
+  const { iniciarAgendadorAmbiente3dx } = await import("@/lib/plugins-3dx/ambiente-3dx");
+  iniciarAgendadorAmbiente3dx();
+
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );

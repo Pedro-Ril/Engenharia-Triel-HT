@@ -132,13 +132,16 @@ public final class Plugins implements ServletContextListener {
                             + "USING (SELECT ? AS [plugin_chave], ? AS [no]) AS o "
                             + "ON d.[plugin_chave] = o.[plugin_chave] AND d.[no] = o.[no] "
                             + "WHEN MATCHED THEN UPDATE SET [ambiente] = ?, [versao] = ?, [jar_md5] = ?, [core_versao] = ?, [modo_em_uso] = ?, "
+                            + "[autoteste] = ?, [autoteste_detalhe] = ?, "
                             + "[iniciado_em] = ?, [ultimo_contato] = SYSDATETIME(), [fila_pendente] = ?, "
                             + "[ultimo_erro] = COALESCE(?, d.[ultimo_erro]), [ultimo_erro_em] = COALESCE(?, d.[ultimo_erro_em]) "
                             + "WHEN NOT MATCHED THEN INSERT ([plugin_chave], [no], [ambiente], [versao], [jar_md5], [core_versao], [modo_em_uso], "
+                            + "[autoteste], [autoteste_detalhe], "
                             + "[iniciado_em], [ultimo_contato], [fila_pendente], [ultimo_erro], [ultimo_erro_em]) "
-                            + "VALUES (o.[plugin_chave], o.[no], ?, ?, ?, ?, ?, ?, SYSDATETIME(), ?, ?, ?);")) {
+                            + "VALUES (o.[plugin_chave], o.[no], ?, ?, ?, ?, ?, ?, ?, ?, SYSDATETIME(), ?, ?, ?);")) {
                         String md5 = md5Of(m);
                         String mode = PluginConfig.of(m.key()).mode.name();
+                        String[] test = SelfTest.of(m);
                         Timestamp started = Timestamp.valueOf(STARTED);
                         Timestamp errAt = err == null ? null : Timestamp.valueOf(LocalDateTime.parse(err[1]));
                         int i = 1;
@@ -150,6 +153,8 @@ public final class Plugins implements ServletContextListener {
                             st.setString(i++, md5);
                             st.setString(i++, Core.VERSION);
                             st.setString(i++, mode);
+                            st.setString(i++, test[0]);
+                            st.setString(i++, test[1]);
                             st.setTimestamp(i++, started);
                             if (pending < 0) st.setNull(i++, java.sql.Types.INTEGER);
                             else st.setInt(i++, pending + JobQueue.localSize());

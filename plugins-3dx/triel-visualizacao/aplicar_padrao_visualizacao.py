@@ -22,6 +22,8 @@ Exemplos de <pasta webapps>:
 E idempotente: o que ja estiver aplicado e mantido. Se um trecho esperado nao for encontrado
 exatamente uma vez (ex.: hotfix mudou o arquivo), NADA e gravado naquele arquivo e o script
 termina com codigo 2 - nesse caso, analisar o arquivo novo no dev-plm antes de seguir.
+
+O Portal confere a mesma regra a cada 15 min (src/lib/plugins-3dx/padrao-visualizacao.ts): mudou aqui, mude la.
 """
 import json, os, re, shutil, sys, time
 
