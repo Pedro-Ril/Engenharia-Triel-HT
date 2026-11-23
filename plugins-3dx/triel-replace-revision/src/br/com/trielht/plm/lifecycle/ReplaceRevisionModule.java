@@ -53,7 +53,7 @@ import java.util.TreeSet;
 public class ReplaceRevisionModule implements PluginModule {
 
     public static final String KEY = "replace-revision";
-    public static final String VERSION = "7.0.0";
+    public static final String VERSION = "7.0.1";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";

@@ -54,7 +54,7 @@ import java.util.concurrent.TimeUnit;
 public class DrawingConfigLinkModule implements PluginModule {
 
     public static final String KEY = "drawing-config-link";
-    public static final String VERSION = "3.0.0";
+    public static final String VERSION = "3.0.1";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";

@@ -39,7 +39,7 @@ import java.util.Set;
 public class DuplicateTitleModule implements PluginModule {
 
     public static final String KEY = "duplicate-title";
-    public static final String VERSION = "6.0.0";
+    public static final String VERSION = "6.0.1";
 
     private static final Set<String> DUPLICATE_COMMANDS = Set.of("Advance Duplicate", "Duplicate");
     private static final String TITLE_ATTR = "PLMEntity.V_Name";

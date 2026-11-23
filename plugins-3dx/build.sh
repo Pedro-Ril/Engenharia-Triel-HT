@@ -24,10 +24,12 @@ build() { # <pasta> <jar> <classpath extra>
   rm -rf "$d/out" && mkdir -p "$d/out/classes"
   "$JDK/javac" --release 21 -encoding UTF-8 -Xlint:unchecked -cp "$CP$3" -d "$d/out/classes" $(find "$d/src" -name "*.java")
   cp -r "$d/resources/META-INF" "$d/out/classes/"
-  printf 'Implementation-Title: %s\nImplementation-Vendor: Triel-HT\n' "$2" > "$d/out/manifest.txt"
+  # a versao vem da constante VERSION do proprio fonte (a mesma que aparece em Plugins 3DX > Visao geral)
+  ver=$(grep -rhoE 'VERSION = "[0-9.]+"' "$d/src" | head -1 | grep -oE '[0-9.]+')
+  printf 'Implementation-Title: %s\nImplementation-Version: %s\nImplementation-Vendor: Triel-HT\n' "$2" "$ver" > "$d/out/manifest.txt"
   "$JDK/jar" cfm "$OUT/$2.jar" "$d/out/manifest.txt" -C "$d/out/classes" .
   rm -rf "$d/out"
-  echo "Gerado: $OUT/$2.jar ($(md5sum "$OUT/$2.jar" | cut -c1-32))"
+  echo "Gerado: $OUT/$2.jar v$ver ($(md5sum "$OUT/$2.jar" | cut -c1-32))"
 }
 
 build triel-3dx-core triel-3dx-core ""
