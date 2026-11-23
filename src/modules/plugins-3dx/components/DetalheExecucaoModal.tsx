@@ -5,16 +5,14 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Drawer } from "@/components/ui/Drawer";
 import { Loader } from "@/components/ui/Loader";
+import { Modal } from "@/components/ui/Modal";
 import { Stack } from "@/components/ui/Stack";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
 import type { FeedbackHandler } from "@/modules/admin-permissoes/types/toast.types";
 
 import { buscarExecucao, cancelarExecucao } from "../services/plugins3dx.service";
 import type { DetalheExecucao3dx } from "../types/plugins3dx.types";
 import {
-  ACAO_ITEM,
   AMBIENTE,
   formatarDataHora,
   formatarDuracao,
@@ -26,6 +24,7 @@ import {
   rotuloObjeto,
   STATUS_EXECUCAO,
 } from "../utils/exibicao";
+import { ItensExecucao } from "./ItensExecucao";
 import styles from "./Plugins3dx.module.css";
 
 interface DetalheProps {
@@ -36,7 +35,8 @@ interface DetalheProps {
   onAlterada: () => void;
 }
 
-export function DetalheExecucaoDrawer({ id, onFeedback, onAbrirOutra, onClose, onAlterada }: DetalheProps) {
+/* Detalhe de uma execução: modal largo (1200 px), porque a lista de objetos tem várias colunas. */
+export function DetalheExecucaoModal({ id, onFeedback, onAbrirOutra, onClose, onAlterada }: DetalheProps) {
   const [detalhe, setDetalhe] = useState<DetalheExecucao3dx | null>(null);
   const [erroId, setErroId] = useState<string | null>(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
@@ -80,7 +80,7 @@ export function DetalheExecucaoDrawer({ id, onFeedback, onAbrirOutra, onClose, o
   const carregando = id !== null && detalhe?.execucao.id !== id && erroId !== id;
 
   return (
-    <Drawer
+    <Modal
       open={id !== null}
       size="large"
       title={e ? rotuloObjeto(e.objetoNome, e.objetoRevisao, e.objetoTitulo) : "Execução"}
@@ -102,38 +102,53 @@ export function DetalheExecucaoDrawer({ id, onFeedback, onAbrirOutra, onClose, o
         <Loader label="Carregando..." />
       ) : (
         <Stack gap={20}>
-          <div className={styles.detalhes}>
-            <span className={styles.rotulo}>Status</span>
-            <span className={styles.valor}>
-              <Badge variant={STATUS_EXECUCAO[e.status].variante}>{STATUS_EXECUCAO[e.status].label}</Badge>
-              <Badge variant={MODO[e.modo].variante}>{MODO[e.modo].label}</Badge>
-              <Badge variant={AMBIENTE[e.ambiente].variante}>{AMBIENTE[e.ambiente].label}</Badge>
-            </span>
-            <span className={styles.rotulo}>Quem</span>
-            <span className={styles.valor}>
-              {e.atorNome ?? e.atorLogin ?? "—"}
-              {e.solicitadoPorNome && ` (pedido no Portal por ${e.solicitadoPorNome})`}
-            </span>
-            <span className={styles.rotulo}>Entrou na fila</span>
-            <span className={styles.valor}>{formatarDataHora(e.enfileiradoEm)}</span>
-            <span className={styles.rotulo}>Processado</span>
-            <span className={styles.valor}>
-              {formatarDataHora(e.iniciadoEm)} → {formatarDataHora(e.finalizadoEm)} ({formatarDuracao(e.duracaoMs)})
-            </span>
-            <span className={styles.rotulo}>Nó</span>
-            <span className={styles.valor}>
-              {rotuloNo(e.no)}
-              {e.tentativas > 1 && ` · ${e.tentativas} tentativas`}
-            </span>
-            <span className={styles.rotulo}>Totais</span>
-            <span className={styles.valor}>
-              {e.totalItens ?? 0} item(ns), {e.totalOk ?? 0} ok, {e.totalFalhas ?? 0} falha(s)
-            </span>
+          <div className={styles.resumoGrade}>
+            <div className={styles.resumoItem}>
+              <span className={styles.rotulo}>Status</span>
+              <span className={styles.valor}>
+                <Badge variant={STATUS_EXECUCAO[e.status].variante}>{STATUS_EXECUCAO[e.status].label}</Badge>
+                <Badge variant={MODO[e.modo].variante}>{MODO[e.modo].label}</Badge>
+                <Badge variant={AMBIENTE[e.ambiente].variante}>{AMBIENTE[e.ambiente].label}</Badge>
+              </span>
+            </div>
+            <div className={styles.resumoItem}>
+              <span className={styles.rotulo}>Quem</span>
+              <span className={styles.valor}>
+                {e.atorNome ?? e.atorLogin ?? "—"}
+                {e.solicitadoPorNome && ` (pedido no Portal por ${e.solicitadoPorNome})`}
+              </span>
+            </div>
+            <div className={styles.resumoItem}>
+              <span className={styles.rotulo}>Objetos</span>
+              <span className={styles.valor}>
+                {e.totalItens ?? 0} · {e.totalOk ?? 0} ok ·{" "}
+                <span className={(e.totalFalhas ?? 0) > 0 ? styles.noErro : undefined}>
+                  {e.totalFalhas ?? 0} falha(s)
+                </span>
+              </span>
+            </div>
+            <div className={styles.resumoItem}>
+              <span className={styles.rotulo}>Entrou na fila</span>
+              <span className={styles.valor}>{formatarDataHora(e.enfileiradoEm)}</span>
+            </div>
+            <div className={styles.resumoItem}>
+              <span className={styles.rotulo}>Processado</span>
+              <span className={styles.valor}>
+                {formatarDataHora(e.iniciadoEm)} → {formatarDataHora(e.finalizadoEm)}
+              </span>
+            </div>
+            <div className={styles.resumoItem}>
+              <span className={styles.rotulo}>Duração · nó</span>
+              <span className={styles.valor}>
+                {formatarDuracao(e.duracaoMs)} · {rotuloNo(e.no)}
+                {e.tentativas > 1 && ` · ${e.tentativas} tentativas`}
+              </span>
+            </div>
             {e.resumo && (
-              <>
+              <div className={`${styles.resumoItem} ${styles.resumoItemLargo}`}>
                 <span className={styles.rotulo}>Resumo</span>
                 <span className={styles.valor}>{e.resumo}</span>
-              </>
+              </div>
             )}
           </div>
 
@@ -155,51 +170,7 @@ export function DetalheExecucaoDrawer({ id, onFeedback, onAbrirOutra, onClose, o
             </Stack>
           )}
 
-          <Stack gap={8}>
-            <h4 className={styles.tituloSecao}>Objetos ({detalhe.itens.length})</h4>
-            {detalhe.itens.length === 0 ? (
-              <span className={styles.textoSecundario}>Nenhum objeto alterado nesta execução.</span>
-            ) : (
-              <Table minWidth={760}>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Ação</TableHeaderCell>
-                    <TableHeaderCell>Objeto</TableHeaderCell>
-                    <TableHeaderCell>De → para</TableHeaderCell>
-                    <TableHeaderCell>Resultado</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {detalhe.itens.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell style={{ whiteSpace: "nowrap" }}>{ACAO_ITEM[item.acao] ?? item.acao}</TableCell>
-                      <TableCell>
-                        <div className={styles.celulaObjeto}>
-                          <span>{rotuloObjeto(item.alvoNome, item.alvoRevisao, item.alvoTitulo)}</span>
-                          {(item.alvoEstado || item.alvoOwner) && (
-                            <span className={styles.textoSecundario}>
-                              {[item.alvoEstado, item.alvoOwner && `responsável: ${item.alvoOwner}`]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {item.valorAntes ?? "—"}
-                        <span className={styles.deParaSeta}>→</span>
-                        {item.valorDepois ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={item.sucesso ? "success" : "danger"}>{item.sucesso ? "OK" : "Falha"}</Badge>
-                        {item.mensagem && <div className={styles.textoSecundario}>{item.mensagem}</div>}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Stack>
+          <ItensExecucao key={e.id} itens={detalhe.itens} />
 
           {detalhe.eventos.length > 0 && (
             <Stack gap={8}>
@@ -232,6 +203,6 @@ export function DetalheExecucaoDrawer({ id, onFeedback, onAbrirOutra, onClose, o
         onConfirm={cancelar}
         onClose={() => setConfirmarCancelar(false)}
       />
-    </Drawer>
+    </Modal>
   );
 }

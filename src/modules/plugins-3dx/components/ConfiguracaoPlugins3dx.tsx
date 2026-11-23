@@ -187,7 +187,10 @@ function ParametrosAmbiente({
   return (
     <section className={styles.secaoAmbiente}>
       <div className={styles.linhaModoInfo}>
-        <Badge variant={AMBIENTE[ambiente].variante}>{AMBIENTE[ambiente].label}</Badge>
+        <span className={styles.ambienteNome}>
+          <span className={styles[`ponto_${ambiente}`]} aria-hidden="true" />
+          {AMBIENTE[ambiente].label}
+        </span>
         {config.atualizadoEm && (
           <span className={styles.textoSecundario}>
             alterado por {config.atualizadoPorNome ?? "—"} em {formatarDataHora(config.atualizadoEm)}

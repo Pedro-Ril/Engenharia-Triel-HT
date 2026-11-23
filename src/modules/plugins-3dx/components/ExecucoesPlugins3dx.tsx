@@ -34,7 +34,7 @@ import {
   rotuloObjeto,
   STATUS_EXECUCAO,
 } from "../utils/exibicao";
-import { DetalheExecucaoDrawer } from "./DetalheExecucaoDrawer";
+import { DetalheExecucaoModal } from "./DetalheExecucaoModal";
 import styles from "./Plugins3dx.module.css";
 
 interface ExecucoesProps {
@@ -185,49 +185,64 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
                   <TableHeaderCell>Objeto</TableHeaderCell>
                   <TableHeaderCell>Quem</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
-                  <TableHeaderCell>Itens</TableHeaderCell>
-                  <TableHeaderCell>Duração</TableHeaderCell>
+                  <TableHeaderCell align="right">Itens</TableHeaderCell>
+                  <TableHeaderCell align="right">Duração</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {resultado.execucoes.map((execucao) => (
                   <TableRow key={execucao.id} className={styles.linhaClicavel} onClick={() => setAberta(execucao.id)}>
                     <TableCell style={{ whiteSpace: "nowrap" }}>
-                      {formatarDataHora(execucao.enfileiradoEm)}
-                      <div className={styles.textoSecundario}>{GATILHO[execucao.gatilho]}</div>
+                      <div className={styles.celulaObjeto}>
+                        <span>{formatarDataHora(execucao.enfileiradoEm)}</span>
+                        <span className={styles.textoSecundario}>{GATILHO[execucao.gatilho]}</span>
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell style={{ whiteSpace: "nowrap" }}>
                       <div className={styles.celulaObjeto}>
                         <span>{nomeCurtoPlugin(execucao.pluginChave)}</span>
-                        <span className={styles.badges}>
-                          <Badge variant={AMBIENTE[execucao.ambiente].variante}>
-                            {AMBIENTE[execucao.ambiente].label}
-                          </Badge>
-                          {execucao.modo !== "ATIVO" && (
-                            <Badge variant={MODO[execucao.modo].variante}>{MODO[execucao.modo].label}</Badge>
-                          )}
+                        <span className={styles.ambienteMini}>
+                          <span className={styles[`ponto_${execucao.ambiente}`]} aria-hidden="true" />
+                          {AMBIENTE[execucao.ambiente].label}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className={styles.celulaObjeto}>
-                        <span>{rotuloObjeto(execucao.objetoNome, execucao.objetoRevisao, execucao.objetoTitulo)}</span>
-                        {execucao.resumo && <span className={styles.textoSecundario}>{execucao.resumo}</span>}
+                        <span className={styles.nomeObjeto}>
+                          {rotuloObjeto(execucao.objetoNome, execucao.objetoRevisao, execucao.objetoTitulo)}
+                        </span>
+                        {execucao.resumo && (
+                          <span className={styles.resumoLinha} title={execucao.resumo}>
+                            {execucao.resumo}
+                          </span>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>{execucao.atorNome ?? execucao.atorLogin ?? execucao.solicitadoPorNome ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_EXECUCAO[execucao.status].variante}>
-                        {STATUS_EXECUCAO[execucao.status].label}
-                      </Badge>
-                    </TableCell>
                     <TableCell style={{ whiteSpace: "nowrap" }}>
-                      {execucao.totalItens ?? "—"}
-                      {(execucao.totalFalhas ?? 0) > 0 && (
-                        <span className={styles.textoSecundario}> ({execucao.totalFalhas} falha(s))</span>
-                      )}
+                      {execucao.atorNome ?? execucao.atorLogin ?? execucao.solicitadoPorNome ?? "—"}
                     </TableCell>
-                    <TableCell style={{ whiteSpace: "nowrap" }}>{formatarDuracao(execucao.duracaoMs)}</TableCell>
+                    <TableCell>
+                      <div className={styles.badgesLinha}>
+                        <Badge variant={STATUS_EXECUCAO[execucao.status].variante}>
+                          {STATUS_EXECUCAO[execucao.status].label}
+                        </Badge>
+                        {execucao.modo !== "ATIVO" && (
+                          <Badge variant={MODO[execucao.modo].variante}>{MODO[execucao.modo].label}</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell align="right" style={{ whiteSpace: "nowrap" }}>
+                      <div className={styles.celulaObjeto}>
+                        <span>{execucao.totalItens ?? "—"}</span>
+                        {(execucao.totalFalhas ?? 0) > 0 && (
+                          <span className={styles.noErro}>{execucao.totalFalhas} falha(s)</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell align="right" style={{ whiteSpace: "nowrap" }}>
+                      {formatarDuracao(execucao.duracaoMs)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -237,7 +252,7 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
         )}
       </Stack>
 
-      <DetalheExecucaoDrawer
+      <DetalheExecucaoModal
         id={aberta}
         onFeedback={onFeedback}
         onAbrirOutra={setAberta}

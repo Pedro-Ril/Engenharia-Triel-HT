@@ -94,6 +94,14 @@ export function formatarDataHora(iso: string | null | undefined): string {
   });
 }
 
+/* Sem segundos: para textos curtos (quem alterou e quando). */
+export function formatarDataHoraCurta(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return iso;
+  return data.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 export function formatarDuracao(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return "—";
   if (ms < 1000) return `${ms} ms`;

@@ -22,7 +22,7 @@ import type {
   VisaoGeralPlugins3dx as VisaoGeral,
 } from "../types/plugins3dx.types";
 import { AMBIENTES_3DX } from "../types/plugins3dx.types";
-import { AMBIENTE, formatarDataHora, MODO, NIVEL_EVENTO, nomeCurtoPlugin, rotuloNo } from "../utils/exibicao";
+import { AMBIENTE, formatarDataHora, formatarDataHoraCurta, MODO, NIVEL_EVENTO, nomeCurtoPlugin, rotuloNo } from "../utils/exibicao";
 import styles from "./Plugins3dx.module.css";
 
 interface VisaoGeralProps {
@@ -217,13 +217,23 @@ function CardPlugin({
             const config = plugin.ambientes[amb];
             return (
               <div key={amb} className={styles.linhaModo}>
-                <div className={styles.linhaModoInfo}>
-                  <Badge variant={AMBIENTE[amb].variante}>{AMBIENTE[amb].label}</Badge>
-                  {config.atualizadoEm && (
-                    <span className={styles.textoSecundario}>
-                      alterado por {config.atualizadoPorNome ?? "—"} em {formatarDataHora(config.atualizadoEm)}
-                    </span>
-                  )}
+                <div className={styles.ambienteInfo}>
+                  <span className={styles.ambienteNome}>
+                    <span className={styles[`ponto_${amb}`]} aria-hidden="true" />
+                    {AMBIENTE[amb].label}
+                  </span>
+                  <span
+                    className={styles.textoSecundario}
+                    title={
+                      config.atualizadoEm
+                        ? `Alterado por ${config.atualizadoPorNome ?? "—"} em ${formatarDataHora(config.atualizadoEm)}`
+                        : undefined
+                    }
+                  >
+                    {config.atualizadoEm
+                      ? `${config.atualizadoPorNome ?? "—"} · ${formatarDataHoraCurta(config.atualizadoEm)}`
+                      : "sem alteração pela tela"}
+                  </span>
                 </div>
                 <div
                   className={styles.grupoOpcoes}
