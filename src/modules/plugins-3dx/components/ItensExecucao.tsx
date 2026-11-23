@@ -12,6 +12,13 @@ import { ACAO_ITEM, rotuloObjeto } from "../utils/exibicao";
 import styles from "./Plugins3dx.module.css";
 
 const POR_PAGINA = 20;
+/*
+ * Título (pode ser longo): antes em cima, depois embaixo. Demais ações (revisões: "rev F (6 instâncias) → G"):
+ * numa linha só. Decide pelo tipo de ação, não pelo tamanho, para a mesma tabela não misturar os dois jeitos.
+ */
+function deParaEmpilhado(acao: string): boolean {
+  return acao.includes("titulo");
+}
 const SO_FALHAS = "__falhas";
 
 /*
@@ -92,7 +99,7 @@ export function ItensExecucao({ itens }: { itens: ItemExecucao3dx[] }) {
                   {mostrarAcao && (
                     <TableCell className={styles.celulaAcaoItem}>{ACAO_ITEM[item.acao] ?? item.acao}</TableCell>
                   )}
-                  <TableCell>
+                  <TableCell className={styles.celulaObjetoItem}>
                     <div className={styles.celulaObjeto}>
                       <span className={styles.nomeObjeto}>
                         {rotuloObjeto(item.alvoNome, item.alvoRevisao, item.alvoTitulo)}
@@ -109,10 +116,14 @@ export function ItensExecucao({ itens }: { itens: ItemExecucao3dx[] }) {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell style={{ whiteSpace: "nowrap" }}>
-                    {item.valorAntes ?? "—"}
-                    <span className={styles.deParaSeta}>→</span>
-                    {item.valorDepois ?? "—"}
+                  <TableCell className={styles.celulaDePara}>
+                    <div className={deParaEmpilhado(item.acao) ? styles.dePara : styles.deParaLinha}>
+                      <span className={styles.deParaAntes}>{item.valorAntes ?? "—"}</span>
+                      <span className={styles.deParaDepois}>
+                        <span className={styles.deParaSeta}>→</span>
+                        {item.valorDepois ?? "—"}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell align="center">
                     <Badge variant={item.sucesso ? "success" : "danger"}>{item.sucesso ? "OK" : "Falha"}</Badge>

@@ -374,7 +374,46 @@
 
 .deParaSeta {
   color: var(--text-faint);
-  margin: 0 6px;
+  margin: 0 6px 0 0;
+}
+
+.celulaObjetoItem {
+  min-width: 240px;
+  width: 34%;
+}
+
+.celulaDePara {
+  min-width: 240px;
+}
+
+.dePara {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  word-break: break-word;
+  font-size: 13px;
+}
+
+/* Valores curtos (revisões): tudo numa linha. */
+.deParaLinha {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.deParaLinha .deParaSeta {
+  margin: 0 6px 0 0;
+}
+
+.deParaAntes {
+  color: var(--text-muted);
+}
+
+.deParaDepois {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .listaRelacionadas {
