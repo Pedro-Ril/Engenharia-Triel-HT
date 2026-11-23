@@ -119,9 +119,9 @@ public class DuplicateTitleModule implements PluginModule {
             }
         }
         rep.summary(dups.size() + " objeto(s) duplicado(s); " + (cfg.simulate()
-                ? newTitles.size() + " titulo(s) seriam alterados (simulacao)"
-                : changed + " titulo(s) alterado(s)") + " -- comando " + command);
-        if (newTitles.isEmpty()) rep.ignore("Nenhum titulo a alterar (" + dups.size() + " objeto(s) com titulo digitado)");
+                ? newTitles.size() + " título(s) seriam alterados (simulação)"
+                : changed + " título(s) alterado(s)") + " — comando " + command);
+        if (newTitles.isEmpty()) rep.ignore("Nenhum título a alterar (" + dups.size() + " objeto(s) com título digitado)");
         JobQueue.recordFinished(rep);
     }
 

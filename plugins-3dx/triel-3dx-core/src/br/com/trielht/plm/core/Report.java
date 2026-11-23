@@ -152,8 +152,8 @@ public final class Report {
         b.add("total_ok", ok);
         b.add("total_falhas", failed);
         String sum = summary;
-        if (dropped > 0) sum = Core.cut((sum == null ? "" : sum + " ") + "(" + dropped + " item(ns) alem de " + MAX_ITEMS
-                + " nao detalhado(s))", 1000);
+        if (dropped > 0) sum = Core.cut((sum == null ? "" : sum + " ") + "(" + dropped + " item(ns) além de " + MAX_ITEMS
+                + " não detalhado(s))", 1000);
         Json2.put(b, "resumo", sum);
         Json2.put(b, "erro", error);
         b.add("itens", arr);

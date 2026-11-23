@@ -115,7 +115,7 @@ public final class JobQueue {
         PluginModule module = Plugins.module(job.plugin);
         Report rep = new Report(job);
         if (module == null) {
-            rep.fail("Plugin " + job.plugin + " nao instalado neste no (" + Core.node() + ")");
+            rep.fail("Plugin " + job.plugin + " não instalado neste nó (" + Core.node() + ")");
             Writer.finish(rep);
             return;
         }
@@ -206,7 +206,7 @@ public final class JobQueue {
             int n = Db.with(c -> {
                 try (PreparedStatement st = c.prepareStatement("UPDATE dbo.portal_3dx_plugins_execucoes SET "
                         + "[status] = CASE WHEN [tentativas] >= 3 THEN 'falha' ELSE 'pendente' END, "
-                        + "[erro] = CASE WHEN [tentativas] >= 3 THEN N'Interrompido 3 vezes (no parou no meio do trabalho)' "
+                        + "[erro] = CASE WHEN [tentativas] >= 3 THEN N'Interrompido 3 vezes (o nó parou no meio do trabalho)' "
                         + "ELSE [erro] END, [finalizado_em] = CASE WHEN [tentativas] >= 3 THEN SYSDATETIME() ELSE NULL END "
                         + "WHERE [status] = 'processando' AND [ambiente] = ? AND ([ultimo_contato] < DATEADD(MINUTE, -10, SYSDATETIME()) "
                         + "OR ([no] = ? AND ? = 1))")) {
@@ -218,8 +218,8 @@ public final class JobQueue {
             });
             if (n > 0) {
                 Core.LOG.info("[TRIEL-CORE] {} trabalho(s) interrompido(s) devolvido(s) a fila", n);
-                Writer.event(null, "aviso", n + " trabalho(s) interrompido(s) devolvido(s) a fila"
-                        + (boot ? " na subida do no" : ""), null, null);
+                Writer.event(null, "aviso", n + " trabalho(s) interrompido(s) devolvido(s) à fila"
+                        + (boot ? " na subida do nó" : ""), null, null);
             }
         } catch (SQLException e) {
             Core.LOG.warn("[TRIEL-CORE] Nao foi possivel conferir trabalhos interrompidos: {}", e.getMessage());

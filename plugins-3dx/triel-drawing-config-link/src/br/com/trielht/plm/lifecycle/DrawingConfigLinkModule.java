@@ -179,7 +179,7 @@ public class DrawingConfigLinkModule implements PluginModule {
             job.objectRevision = f[2];
         }
         if (found == null) {
-            rep.fail("Desenho " + name + " sem revisao LIBERADA");
+            rep.fail("Desenho " + name + " sem revisão LIBERADA");
             return false;
         }
         job.objectId = found;
@@ -197,7 +197,7 @@ public class DrawingConfigLinkModule implements PluginModule {
 
         @Override
         public String toString() {
-            return label + " -> " + status + " (configuracoes ja ligadas: " + configsLigadas + ", faltando: " + faltando
+            return label + " → " + status + " (configurações já ligadas: " + configsLigadas + ", faltando: " + faltando
                     + ", criados: " + criados + ", falhas: " + falhas + ")";
         }
     }
@@ -211,7 +211,7 @@ public class DrawingConfigLinkModule implements PluginModule {
         String[] o = Core.split(Mx.mql(ctx, "print bus $1 select $2 $3 $4 $5 $6 $7 dump $8", drawingId,
                 "type.kindof[Drawing]", "current", "name", "revision", "physicalid", "attribute[PLMEntity.V_Name]", Core.SEP), 6);
         if (o.length < 6 || !"TRUE".equalsIgnoreCase(o[0])) {
-            r.status = "IGNORADO (nao e desenho)";
+            r.status = "IGNORADO (não é desenho)";
             return r;
         }
         r.label = o[2] + " " + o[3] + " '" + o[5] + "'";
@@ -242,7 +242,7 @@ public class DrawingConfigLinkModule implements PluginModule {
         }
         r.configsLigadas = configIds.size();
         if (configIds.isEmpty()) {
-            r.status = "IGNORADO (sem configuracao ligada)";
+            r.status = "IGNORADO (sem configuração ligada)";
             return r;
         }
         if (!"SOLIDWORKS".equalsIgnoreCase(origin)) {
@@ -275,7 +275,7 @@ public class DrawingConfigLinkModule implements PluginModule {
         }
         int max = cfg.integer("maxVinculosPorDesenho", 200);
         if (missing.size() > max) {
-            r.status = "IGNORADO (" + missing.size() + " configuracoes, acima do limite " + max + ")";
+            r.status = "IGNORADO (" + missing.size() + " configurações, acima do limite " + max + ")";
             rep.warn(r.label + ": " + r.status);
             return r;
         }
@@ -298,7 +298,7 @@ public class DrawingConfigLinkModule implements PluginModule {
                     r.criados++;
                     created.add(m[2] + " '" + m[4] + "'");
                     rep.item("vinculo_criado", true).target(m[0], m[1], m[2], m[3], m[4]).change(null, r.label)
-                            .message("Erro acusado pelo servico, mas o vinculo foi criado (conferido): "
+                            .message("Erro acusado pelo serviço, mas o vínculo foi criado (conferido): "
                                     + Core.rootMessage(ex)).add();
                 } else {
                     r.falhas++;
@@ -370,7 +370,7 @@ public class DrawingConfigLinkModule implements PluginModule {
         }
         rep.total(total);
         rep.summary("Varredura: " + total + " desenho(s) verificado(s), " + completos + " completo(s), " + ignorados
-                + " ignorado(s), " + comFalta + " com configuracao faltando, " + erros + " erro(s)");
+                + " ignorado(s), " + comFalta + " com configuração faltando, " + erros + " erro(s)");
     }
 
     /** O desenho ja esta ligado a esta configuracao (physicalid)? */

@@ -102,7 +102,7 @@ public final class PluginConfig {
                 warnedNoEnvironment = true;
                 Core.LOG.error("[TRIEL-CORE] ambiente= ausente ou invalido em {} (use TESTE ou PRODUCAO): todos os plugins "
                         + "ficam DESLIGADOS neste no", Core.CONFIG_FILE);
-                Writer.event(null, "erro", "No " + Core.node() + " sem ambiente (ambiente=TESTE|PRODUCAO em "
+                Writer.event(null, "erro", "Nó " + Core.node() + " sem ambiente (ambiente=TESTE|PRODUCAO em "
                         + Core.CONFIG_FILE + "): plugins desligados", null, null);
             }
             return;

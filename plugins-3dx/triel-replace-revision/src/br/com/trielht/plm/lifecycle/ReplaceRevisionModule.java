@@ -144,7 +144,7 @@ public class ReplaceRevisionModule implements PluginModule {
 
         String cur = Mx.waitState(ctx, job.objectId, RELEASED, cfg.integer("esperaLiberacaoSeg", 120) * 1000L);
         if (!RELEASED.equals(cur)) {
-            rep.ignore(job.label() + " nao ficou RELEASED (estado " + cur + "): liberacao cancelada?");
+            rep.ignore(job.label() + " não ficou RELEASED (estado " + cur + "): liberação cancelada?");
             return;
         }
         Map<String, Parent> parents = new LinkedHashMap<>();
@@ -152,7 +152,7 @@ public class ReplaceRevisionModule implements PluginModule {
         int total = parents.values().stream().mapToInt(p -> p.targets.size()).sum();
         int max = cfg.integer("maxInstancias", 5000);
         if (total > max) {
-            rep.fail(total + " instancias, acima do limite de " + max + ". Nada foi substituido nem obsoletado.");
+            rep.fail(total + " instâncias, acima do limite de " + max + ". Nada foi substituído nem obsoletado.");
             return;
         }
         String when = LocalDateTime.now().format(WHEN);
@@ -161,7 +161,7 @@ public class ReplaceRevisionModule implements PluginModule {
             if (sim) {
                 for (Parent p : parents.values()) {
                     rep.item("seria_instancia_substituida", true).target(p.pid, p.type, p.name, p.revision, p.title)
-                            .state(RELEASED, p.owner).change(revs(p) + " (" + p.targets.size() + " instancia(s))",
+                            .state(RELEASED, p.owner).change(revs(p) + " (" + p.targets.size() + " instância(s))",
                                     job.objectRevision).add();
                 }
             } else {
@@ -186,27 +186,27 @@ public class ReplaceRevisionModule implements PluginModule {
                     }
                     boolean all = done == p.targets.size();
                     rep.item("instancia_substituida", all).target(p.pid, p.type, p.name, p.revision, p.title)
-                            .state(RELEASED, p.owner).change(revs(p) + " (" + p.targets.size() + " instancia(s))",
+                            .state(RELEASED, p.owner).change(revs(p) + " (" + p.targets.size() + " instância(s))",
                                     job.objectRevision + " (" + done + " trocada(s))")
-                            .message(all ? note : (p.targets.size() - done) + " instancia(s) nao trocada(s)"
+                            .message(all ? note : (p.targets.size() - done) + " instância(s) não trocada(s)"
                                     + (note == null ? "" : "; " + note)).add();
                 }
             }
         }
         int obsoleted = cfg.flag("obsoletarAnteriores", true) ? obsoletePrevious(ctx, job, rep, sim, when) : 0;
         rep.summary(sim
-                ? "Simulacao: " + parents.size() + " conjunto(s) liberado(s) seriam atualizados (" + total
-                        + " instancia(s)); " + obsoleted + " revisao(oes) seriam obsoletadas; " + notReleased
-                        + " instancia(s) em conjuntos nao liberados ficam como estao"
-                : replaced + " instancia(s) trocada(s) em " + parentsOk + " conjunto(s); " + obsoleted
-                        + " revisao(oes) obsoleta(s); " + notReleased + " instancia(s) em conjuntos nao liberados mantidas");
+                ? "Simulação: " + parents.size() + " conjunto(s) liberado(s) seriam atualizados (" + total
+                        + " instância(s)); " + obsoleted + " revisão(ões) seriam obsoletadas; " + notReleased
+                        + " instância(s) em conjuntos não liberados ficam como estão"
+                : replaced + " instância(s) trocada(s) em " + parentsOk + " conjunto(s); " + obsoleted
+                        + " revisão(ões) obsoleta(s); " + notReleased + " instância(s) em conjuntos não liberados mantidas");
     }
 
     /** Acao manual: {"nome": ...} -> ultima revisao da peca. */
     private static boolean resolveByName(Context ctx, Job job, Report rep) throws Exception {
         String name = job.param("nome", job.objectName);
         if (name == null || name.isBlank()) {
-            rep.fail("Informe o nome da peca");
+            rep.fail("Informe o nome da peça");
             return false;
         }
         // ordem: type | name | revision | id | last.id | physicalid | isProduct | titulo
@@ -223,7 +223,7 @@ public class ReplaceRevisionModule implements PluginModule {
             job.objectTitle = f[7];
             return true;
         }
-        rep.fail("Peca " + name + " nao encontrada (Physical Product)");
+        rep.fail("Peça " + name + " não encontrada (Physical Product)");
         return false;
     }
 
@@ -249,7 +249,7 @@ public class ReplaceRevisionModule implements PluginModule {
                 if (!RELEASED.equals(p[8])) {
                     notReleased++;
                     rep.item("pai_nao_liberado", true).target(p[7], p[3], p[4], p[5], p[10]).state(p[8], p[9])
-                            .change("rev " + oldRev, null).message("Conjunto nao liberado: continua usando a rev "
+                            .change("rev " + oldRev, null).message("Conjunto não liberado: continua usando a rev "
                                     + oldRev).add();
                     continue;
                 }
@@ -320,7 +320,7 @@ public class ReplaceRevisionModule implements PluginModule {
                         // nada
                     }
                 }
-                rep.warn("Instancia " + t.instancePid + " (rev " + t.oldRev + ") no pai " + p.label() + " nao trocada: "
+                rep.warn("Instância " + t.instancePid + " (rev " + t.oldRev + ") no conjunto " + p.label() + " não trocada: "
                         + Core.rootMessage(e));
             }
         }

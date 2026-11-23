@@ -42,12 +42,12 @@ public class LifecycleDispatcher extends ENOLifecycleExtensionAdapter {
                 m.onPostprocess(context, command, completion, cfg);
             } catch (Throwable e) {
                 Core.LOG.warn("[TRIEL-{}] Falha no pos-processamento de '{}': {}", m.key(), command, Core.rootMessage(e), e);
-                Writer.event(m.key(), "erro", "Falha no pos-processamento de '" + command + "': " + Core.rootMessage(e),
+                Writer.event(m.key(), "erro", "Falha no pós-processamento de '" + command + "': " + Core.rootMessage(e),
                         null, null);
             }
             long ms = System.currentTimeMillis() - start;
             if (ms > 2_000) {
-                Writer.event(m.key(), "aviso", "Pos-processamento de '" + command + "' levou " + ms + " ms", null, null);
+                Writer.event(m.key(), "aviso", "Pós-processamento de '" + command + "' levou " + ms + " ms", null, null);
             }
         }
     }
