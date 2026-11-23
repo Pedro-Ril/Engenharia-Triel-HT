@@ -63,26 +63,25 @@ export function CampoDinamicoInput({ campo, value, onChange, id, highlighted = f
     );
   }
 
+  /*
+   * Sim/Não no mesmo formato dos outros campos (rótulo em cima + caixa da altura de um input), para a grade não
+   * desalinhar quando um liga/desliga fica ao lado de um campo comum (ex.: tipo Aves, com vários deles).
+   */
   if (campo.tipoDado === "booleano") {
+    const ligado = Boolean(value);
     return (
-      <div id={id} className={highlighted ? styles.destaque : undefined}>
-        <Switch
-          label={
-            campo.obrigatorio ? (
-              <>
-                {label}
-                <span className={styles.required} aria-hidden="true">
-                  *
-                </span>
-              </>
-            ) : (
-              label
-            )
-          }
-          checked={Boolean(value)}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-      </div>
+      <Field id={id} label={label} required={campo.obrigatorio} error={erro} highlighted={highlighted}>
+        <div className={styles.caixaSimNao}>
+          <span className={ligado ? styles.textoSim : styles.textoNao}>{ligado ? "Sim" : "Não"}</span>
+          <Switch
+            label=""
+            compact
+            aria-label={label}
+            checked={ligado}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+        </div>
+      </Field>
     );
   }
 

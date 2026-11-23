@@ -1,28 +1,24 @@
-.required {
-  margin-left: 3px;
-  color: var(--primary);
-}
+/* Caixa do Sim/Não: mesma altura, borda e raio do Input, para alinhar na grade com os outros campos. */
+.caixaSimNao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 
-.destaque {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-input);
   border-radius: 12px;
-  outline: 2px solid var(--primary);
-  outline-offset: 4px;
-  animation: destaquePulse 1.4s ease-in-out 2;
+  background: var(--bg-surface);
 }
 
-@keyframes destaquePulse {
-  0%,
-  100% {
-    outline-color: var(--primary);
-  }
-
-  50% {
-    outline-color: transparent;
-  }
+.textoSim {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .destaque {
-    animation: none;
-  }
+.textoNao {
+  font-size: 14px;
+  color: var(--text-muted);
 }
