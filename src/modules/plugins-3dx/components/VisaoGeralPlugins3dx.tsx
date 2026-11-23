@@ -35,6 +35,7 @@ import {
   rotuloNo,
   rotuloVersao,
 } from "../utils/exibicao";
+import { AmbienteDassault3dx, PadraoVisualizacao3dx, useVerificacaoAmbiente } from "./AmbienteDassault3dx";
 import { HistoricoVersoesModal } from "./HistoricoVersoesModal";
 import styles from "./Plugins3dx.module.css";
 
@@ -54,6 +55,8 @@ const MODOS: ModoPlugin3dx[] = ["DESLIGADO", "SIMULACAO", "ATIVO"];
 
 /* Componente do núcleo comum na tabela de versões (os plugins usam a própria chave). */
 const NUCLEO = "core";
+/* Padrão de visualização do "Abrir com": melhoria sem plugin (sem modo nem nós), só com histórico de versões. */
+const VISUALIZACAO = "visualizacao";
 
 interface HistoricoAberto {
   titulo: string;
@@ -75,6 +78,8 @@ export function VisaoGeralPlugins3dx({ ambiente, onFeedback, onAbrirExecucao }: 
   /* Notas de versão: null = indisponível (ex.: migração 0174 ainda não aplicada) -> a tela só esconde as notas. */
   const [versoes, setVersoes] = useState<Versao3dx[] | null>(null);
   const [historico, setHistorico] = useState<HistoricoAberto | null>(null);
+  /* Verificação do ambiente (versão da Dassault e padrão de visualização em cada nó), repartida entre dois cards. */
+  const verificacao = useVerificacaoAmbiente(onFeedback);
 
   /* Uma busca só (todas as notas), agrupada no cliente. Não muda com o ambiente nem a cada 30 s. */
   useEffect(() => {
@@ -158,6 +163,27 @@ export function VisaoGeralPlugins3dx({ ambiente, onFeedback, onAbrirExecucao }: 
 
   return (
     <Stack gap={20}>
+      <AmbienteDassault3dx ambiente={ambiente} estado={verificacao} />
+
+      {/* Tudo abaixo é o que a Triel-HT acrescentou ao 3DEXPERIENCE (o card acima é a infraestrutura da Dassault). */}
+      <div className={styles.grupoMelhorias}>
+        <h3 className={styles.tituloGrupo}>Melhorias da Triel-HT no 3DEXPERIENCE</h3>
+        <p className={styles.textoGrupo}>
+          <strong>Plugins</strong> rodam dentro do 3DSpace e têm modo por ambiente (Desligado, Simulação, Ativo).{" "}
+          <strong>Ajustes de arquivos</strong> são aplicados por script e só precisam continuar aplicados. Depois de um
+          hotfix da Dassault, confira o autoteste de cada plugin e o padrão de visualização.
+        </p>
+      </div>
+
+      <PadraoVisualizacao3dx
+        ambiente={ambiente}
+        estado={verificacao}
+        temVersoes={versoesDe(VISUALIZACAO).length > 0}
+        onVerVersoes={() =>
+          setHistorico({ titulo: 'Versões: padrão de visualização ("Abrir com")', componente: VISUALIZACAO, nos: [] })
+        }
+      />
+
       {dados.plugins.map((plugin) => (
         <CardPlugin
           key={plugin.chave}
@@ -238,7 +264,7 @@ export function VisaoGeralPlugins3dx({ ambiente, onFeedback, onAbrirExecucao }: 
                   <span className={styles.textoSecundario}>
                     {formatarDataHora(evento.criadoEm)} ·{" "}
                     {evento.ambiente ? AMBIENTE[evento.ambiente].label : "sem ambiente"} ·{" "}
-                    {evento.pluginChave ? nomeCurtoPlugin(evento.pluginChave) : "núcleo"} · {rotuloNo(evento.no)}
+                    {evento.pluginChave ? nomeCurtoPlugin(evento.pluginChave) : "núcleo / ambiente"} · {rotuloNo(evento.no)}
                     {evento.execucaoId && (
                       <>
                         {" · "}
@@ -490,6 +516,13 @@ function LinhaNo({
               /App/triel/triel-plugins.properties.
             </span>
           )}
+          {no.autoteste === "falha" && (
+            <span className={styles.noErro}>
+              Autoteste falhou: o 3DSpace não tem mais{" "}
+              {no.autotesteDetalhe ? <span className={styles.mono}>{no.autotesteDetalhe}</span> : "partes que o plugin usa"}
+              . O plugin vai falhar até ser ajustado para esta versão da Dassault.
+            </span>
+          )}
           {no.ultimoErro && (
             <span className={styles.noErro}>
               Último erro ({formatarDataHora(no.ultimoErroEm)}): {no.ultimoErro}
@@ -503,6 +536,12 @@ function LinhaNo({
         ) : (
           <Badge variant="danger">Sem ambiente</Badge>
         )}
+        {no.autoteste === "ok" && (
+          <Badge variant="success" title="As partes internas da Dassault que o plugin usa existem neste 3DSpace.">
+            Autoteste OK
+          </Badge>
+        )}
+        {no.autoteste === "falha" && <Badge variant="danger">Autoteste falhou</Badge>}
         {no.modoEmUso && no.modoEmUso !== modoEsperado && (
           <Badge variant="warning">usando {MODO[no.modoEmUso].label}</Badge>
         )}

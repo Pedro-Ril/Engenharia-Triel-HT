@@ -265,14 +265,19 @@ function DestinatariosAvisos({
 }) {
   const opcoesEvento = useMemo(
     () =>
-      Object.entries(EVENTOS_AVISO_3DX).flatMap(([evento, info]) =>
-        info.plugins
-          .filter((p) => plugins.some((pl) => pl.chave === p))
-          .map((p) => ({
-            value: `${p}|${evento}`,
-            label: `${info.label} (${nomeCurtoPlugin(p)})`,
-          }))
-      ),
+      Object.entries(EVENTOS_AVISO_3DX)
+        /* Avisos gerais (ambiente 3DX, sem plugin) primeiro: valor "|evento" = pluginChave vazio. */
+        .sort(([, a], [, b]) => Number(Boolean(b.geral)) - Number(Boolean(a.geral)))
+        .flatMap(([evento, info]) =>
+          info.geral
+            ? [{ value: `|${evento}`, label: info.label }]
+            : info.plugins
+                .filter((p) => plugins.some((pl) => pl.chave === p))
+                .map((p) => ({
+                  value: `${p}|${evento}`,
+                  label: `${info.label} (${nomeCurtoPlugin(p)})`,
+                }))
+        ),
     [plugins]
   );
   const opcoesUsuario = useMemo(
@@ -298,7 +303,7 @@ function DestinatariosAvisos({
     const [pluginChave, evento] = alvo.split("|");
     setAdicionando(true);
     const resposta = await adicionarDestinatario({
-      pluginChave,
+      pluginChave: pluginChave || null,
       evento,
       ambiente: (ambienteAviso || null) as Ambiente3dx | null,
       usuarioId: usuarioId || null,
@@ -332,7 +337,7 @@ function DestinatariosAvisos({
   return (
     <Card
       title="Quem recebe aviso"
-      description="E-mail enviado pelo Portal quando o evento acontece (revisão trocada em conjuntos liberados, falhas). Só para plugins no modo Ativo; simulação não avisa revisão."
+      description="E-mail enviado pelo Portal quando o evento acontece: atualização do 3DEXPERIENCE e problemas no ambiente (hotfix, padrão de visualização perdido, nó sem resposta), revisão trocada em conjuntos liberados e falhas dos plugins. Revisão trocada só avisa no modo Ativo."
     >
       <Stack gap={16}>
         <div className={`${styles.formLinha} ${styles.formDestinatario}`}>
@@ -377,7 +382,9 @@ function DestinatariosAvisos({
               {destinatarios.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell>
-                    {plugins.find((p) => p.chave === d.pluginChave)?.nome ?? d.pluginChave}
+                    {d.pluginChave
+                      ? (plugins.find((p) => p.chave === d.pluginChave)?.nome ?? d.pluginChave)
+                      : "Ambiente 3DEXPERIENCE"}
                     <div className={styles.textoSecundario}>{EVENTOS_AVISO_3DX[d.evento]?.label ?? d.evento}</div>
                   </TableCell>
                   <TableCell>

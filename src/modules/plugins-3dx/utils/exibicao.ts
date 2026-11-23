@@ -3,7 +3,9 @@ import type {
   GatilhoExecucao3dx,
   ModoPlugin3dx,
   NivelEvento3dx,
+  SituacaoArquivoVisualizacao3dx,
   StatusExecucao3dx,
+  StatusVerificacao3dx,
 } from "../types/plugins3dx.types";
 
 type VarianteBadge = "neutral" | "success" | "warning" | "danger" | "info" | "primary";
@@ -30,6 +32,21 @@ export const MODO: Record<ModoPlugin3dx, { label: string; variante: VarianteBadg
 export const AMBIENTE: Record<Ambiente3dx, { label: string; variante: VarianteBadge }> = {
   PRODUCAO: { label: "Produção", variante: "primary" },
   TESTE: { label: "Teste", variante: "info" },
+};
+
+/* Verificação do ambiente 3DX: status geral de cada item (versão do 3DSpace, padrão de visualização). */
+export const STATUS_VERIFICACAO: Record<StatusVerificacao3dx, { label: string; variante: VarianteBadge }> = {
+  ok: { label: "OK", variante: "success" },
+  alerta: { label: "Atenção", variante: "warning" },
+  erro: { label: "Erro", variante: "danger" },
+};
+
+/* Padrão de visualização ("Abrir com"): valor geral do nó e situação de cada arquivo. */
+export const SITUACAO_VISUALIZACAO: Record<SituacaoArquivoVisualizacao3dx, { label: string; variante: VarianteBadge }> = {
+  aplicado: { label: "Aplicado", variante: "success" },
+  perdido: { label: "Perdido: reaplicar", variante: "warning" },
+  mudou: { label: "Mudou: analisar no dev", variante: "danger" },
+  ausente: { label: "Arquivo ausente", variante: "danger" },
 };
 
 /* Nome curto de cada plugin, para tabela, fila e detalhe (o nome completo vem do banco). */

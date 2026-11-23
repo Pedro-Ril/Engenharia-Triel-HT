@@ -703,3 +703,96 @@
   line-height: 1.5;
   white-space: pre-line;
 }
+
+/* Ambiente 3DEXPERIENCE: ações do card, linha de servidor inativo e arquivos do padrão de visualização. */
+.linhaInativa td {
+  opacity: 0.6;
+}
+
+.noComArquivos {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.noComArquivos > .no {
+  border: none;
+  border-radius: 0;
+}
+
+.botaoArquivos {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.botaoArquivos:hover {
+  background: var(--bg-hover-neutral);
+  color: var(--text);
+}
+
+.listaArquivos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px 14px 56px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  list-style: none;
+}
+
+.itemArquivo {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  font-size: 13px;
+}
+
+.itemArquivo > :first-child {
+  justify-self: start;
+}
+
+@media (max-width: 700px) {
+  .itemArquivo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Título do grupo "Melhorias" na Visão geral (separa infraestrutura da Dassault do que a Triel-HT acrescentou). */
+.grupoMelhorias {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+
+.tituloGrupo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.textoGrupo {
+  margin: 0;
+  max-width: 980px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
