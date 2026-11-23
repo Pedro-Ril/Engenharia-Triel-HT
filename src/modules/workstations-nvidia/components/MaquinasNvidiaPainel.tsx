@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  Download,
   Eye,
+  FileSpreadsheet,
+  FileText,
   MonitorCog,
   Plus,
   RefreshCw,
@@ -17,6 +20,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { FormGrid } from "@/components/ui/FormGrid";
@@ -50,6 +54,13 @@ import type {
   StatusMaquinaNvidia,
 } from "../types/workstationsNvidia.types";
 import { formatarDataHora, formatarTempoRelativo, STATUS_MAQUINA } from "../utils/exibicao";
+import {
+  carregarEventosParaExportar,
+  exportarMaquinaExcel,
+  exportarMaquinaPdf,
+  exportarMaquinasExcel,
+  exportarMaquinasPdf,
+} from "../utils/exportarWorkstations";
 import { DetalheMaquinaNvidiaModal } from "./DetalheMaquinaNvidiaModal";
 import styles from "./WorkstationsNvidia.module.css";
 
@@ -83,6 +94,8 @@ export function MaquinasNvidiaPainel({ onFeedback }: MaquinasNvidiaPainelProps) 
   const [maquinaParaExcluir, setMaquinaParaExcluir] = useState<MaquinaNvidia | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [idDetalhe, setIdDetalhe] = useState<string | null>(null);
+  /* id da máquina sendo exportada (o relatório de uma máquina busca o histórico antes de gerar). */
+  const [exportandoId, setExportandoId] = useState<string | null>(null);
 
   async function recarregar() {
     const resposta = await buscarResumoMaquinas();
@@ -195,6 +208,38 @@ export function MaquinasNvidiaPainel({ onFeedback }: MaquinasNvidiaPainelProps) 
     }
   }
 
+  async function handleExportarMaquina(maquina: MaquinaNvidia, formato: "pdf" | "excel") {
+    setExportandoId(maquina.id);
+    try {
+      const eventos = await carregarEventosParaExportar(maquina.id);
+      const hashOficial = resumo?.perfil.hash ?? null;
+      if (formato === "pdf") exportarMaquinaPdf(maquina, hashOficial, eventos);
+      else exportarMaquinaExcel(maquina, hashOficial, eventos);
+    } catch (error) {
+      onFeedback(
+        "danger",
+        `Não foi possível exportar ${maquina.computador}`,
+        error instanceof Error ? error.message : "Tente novamente."
+      );
+    } finally {
+      setExportandoId(null);
+    }
+  }
+
+  function handleExportarTodas(formato: "pdf" | "excel") {
+    const lista = resumo?.maquinas ?? [];
+    try {
+      if (formato === "pdf") exportarMaquinasPdf(lista);
+      else exportarMaquinasExcel(lista, resumo?.perfil.hash ?? null);
+    } catch (error) {
+      onFeedback(
+        "danger",
+        "Não foi possível exportar as workstations",
+        error instanceof Error ? error.message : "Tente novamente."
+      );
+    }
+  }
+
   if (carregando) {
     return <Loader label="Carregando workstations..." />;
   }
@@ -238,6 +283,26 @@ export function MaquinasNvidiaPainel({ onFeedback }: MaquinasNvidiaPainelProps) 
               <RefreshCw size={15} />
               Atualizar
             </Button>
+            <DropdownMenu
+              label="Exportar todas as workstations"
+              triggerText="Exportar"
+              triggerIcon={<Download size={15} />}
+              disabled={maquinas.length === 0}
+              items={[
+                {
+                  value: "pdf",
+                  label: "Todas em PDF",
+                  icon: <FileText size={15} />,
+                  onSelect: () => handleExportarTodas("pdf"),
+                },
+                {
+                  value: "excel",
+                  label: "Todas em Excel",
+                  icon: <FileSpreadsheet size={15} />,
+                  onSelect: () => handleExportarTodas("excel"),
+                },
+              ]}
+            />
             <Button
               variant="secondary"
               onClick={handleColetarTodas}
@@ -342,29 +407,57 @@ export function MaquinasNvidiaPainel({ onFeedback }: MaquinasNvidiaPainelProps) 
                     </TableCell>
 
                     <TableCell align="center">
-                      <div className={styles.acoes}>
-                        <IconButton
-                          icon={<Eye size={15} />}
-                          label="Ver detalhes"
-                          size="small"
-                          onClick={() => setIdDetalhe(maquina.id)}
-                        />
+                      {/* Coletando ou gerando arquivo desta máquina: o ⋮ vira um indicador de andamento. */}
+                      {coletandoId === maquina.id || exportandoId === maquina.id ? (
                         <IconButton
                           icon={<ScanSearch size={15} />}
-                          label="Coletar esta máquina"
+                          label={coletandoId === maquina.id ? "Coletando..." : "Gerando arquivo..."}
                           size="small"
-                          loading={coletandoId === maquina.id}
-                          disabled={coletandoTodas || coletandoId !== null}
-                          onClick={() => handleColetarUma(maquina)}
+                          loading
                         />
-                        <IconButton
-                          icon={<Trash2 size={15} />}
-                          label="Remover do monitoramento"
-                          size="small"
-                          variant="danger"
-                          onClick={() => setMaquinaParaExcluir(maquina)}
+                      ) : (
+                        <DropdownMenu
+                          label={`Ações de ${maquina.computador}`}
+                          items={[
+                            {
+                              value: "detalhes",
+                              label: "Ver detalhes",
+                              icon: <Eye size={15} />,
+                              onSelect: () => setIdDetalhe(maquina.id),
+                            },
+                            {
+                              value: "coletar",
+                              label: "Coletar esta máquina",
+                              icon: <ScanSearch size={15} />,
+                              disabled: coletandoTodas || coletandoId !== null,
+                              onSelect: () => handleColetarUma(maquina),
+                            },
+                            {
+                              value: "pdf",
+                              label: "Exportar PDF",
+                              icon: <FileText size={15} />,
+                              separatorBefore: true,
+                              disabled: exportandoId !== null,
+                              onSelect: () => void handleExportarMaquina(maquina, "pdf"),
+                            },
+                            {
+                              value: "excel",
+                              label: "Exportar Excel",
+                              icon: <FileSpreadsheet size={15} />,
+                              disabled: exportandoId !== null,
+                              onSelect: () => void handleExportarMaquina(maquina, "excel"),
+                            },
+                            {
+                              value: "remover",
+                              label: "Remover do monitoramento",
+                              icon: <Trash2 size={15} />,
+                              danger: true,
+                              separatorBefore: true,
+                              onSelect: () => setMaquinaParaExcluir(maquina),
+                            },
+                          ]}
                         />
-                      </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
