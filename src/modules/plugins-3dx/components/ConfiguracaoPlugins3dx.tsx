@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Mail, Plus, Save, Trash2 } from "lucide-react";
 
+import { Autocomplete } from "@/components/ui/Autocomplete";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -280,14 +281,13 @@ function DestinatariosAvisos({
         ),
     [plugins]
   );
+  /* Busca por nome ou e-mail (o label tem os dois). Nenhum usuário escolhido = e-mail livre ao lado. */
   const opcoesUsuario = useMemo(
-    () => [
-      { value: "", label: "E-mail livre (digite ao lado)" },
-      ...usuarios
+    () =>
+      usuarios
         .filter((u) => u.ativo && u.email)
         .sort((a, b) => a.nomeExibicao.localeCompare(b.nomeExibicao, "pt-BR"))
         .map((u) => ({ value: u.id, label: `${u.nomeExibicao} (${u.email})` })),
-    ],
     [usuarios]
   );
 
@@ -348,13 +348,19 @@ function DestinatariosAvisos({
             <Dropdown value={ambienteAviso} options={OPCOES_AMBIENTE_AVISO} onValueChange={setAmbienteAviso} />
           </Field>
           <Field label="Usuário do Portal">
-            <Dropdown value={usuarioId} options={opcoesUsuario} onValueChange={setUsuarioId} />
+            <Autocomplete
+              options={opcoesUsuario}
+              selectedOption={opcoesUsuario.find((opcao) => opcao.value === usuarioId) ?? null}
+              onSelect={(opcao) => setUsuarioId(opcao?.value ?? "")}
+              placeholder="Pesquise por nome ou e-mail"
+              emptyMessage="Nenhum usuário ativo com e-mail encontrado."
+            />
           </Field>
           {/* Fica sempre na tela (só desabilita) para a linha não pular quando escolhe um usuário. */}
           <Field label="E-mail">
             <Input
               value={usuarioId ? "" : email}
-              placeholder={usuarioId ? "E-mail do usuário escolhido" : "pcp@trielht.com.br"}
+              placeholder={usuarioId ? "Usa o e-mail do usuário" : "ou digite um e-mail"}
               disabled={Boolean(usuarioId)}
               onChange={(e) => setEmail(e.target.value)}
             />
