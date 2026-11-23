@@ -587,3 +587,119 @@
   gap: 4px;
   white-space: nowrap;
 }
+
+/* Notas de versão: versão com nota no tooltip, card do núcleo e histórico. */
+.versaoComNota {
+  border-bottom: 1px dotted var(--text-faint);
+  cursor: help;
+}
+
+.versaoComNota:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.versaoAtual {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+}
+
+/* Histórico de versões em linha do tempo: ponto + linha vertical à esquerda, conteúdo à direita. */
+.linhaTempo {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marcoVersao {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 6px;
+}
+
+/* Linha que liga um ponto ao próximo (some no último). */
+.marcoVersao::before {
+  content: "";
+  position: absolute;
+  top: 22px;
+  bottom: -2px;
+  left: 9px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--border-soft);
+}
+
+.marcoVersao:last-child::before {
+  display: none;
+}
+
+.pontoTempo {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin: 14px 0 0 4px;
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-surface);
+}
+
+.marcoVersaoAtual .pontoTempo {
+  width: 14px;
+  height: 14px;
+  margin: 13px 0 0 3px;
+  border-color: var(--success-border);
+  background: var(--success-text);
+  box-shadow: 0 0 0 4px var(--success-bg);
+}
+
+.conteudoVersao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.marcoVersaoAtual .conteudoVersao {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.dataVersao {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cabecalhoVersao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.numeroVersao {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.notaVersao {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+}

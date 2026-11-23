@@ -102,6 +102,18 @@ export function formatarDataHoraCurta(iso: string | null | undefined): string {
   return data.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+/* Data de lançamento de uma versão vem como AAAA-MM-DD (sem hora): formata sem passar por Date (evita fuso). */
+export function formatarDataLancamento(data: string | null): string {
+  if (!data) return "";
+  const [ano, mes, dia] = data.split("-");
+  return ano && mes && dia ? `${dia}/${mes}/${ano}` : data;
+}
+
+/* Versões antigas dos plugins eram só "5", "4": mostra sempre com "v". */
+export function rotuloVersao(versao: string): string {
+  return `v${versao}`;
+}
+
 export function formatarDuracao(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return "—";
   if (ms < 1000) return `${ms} ms`;
