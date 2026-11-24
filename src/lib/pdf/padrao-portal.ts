@@ -28,6 +28,22 @@ export const TOPO_CONTEUDO = ALTURA_FAIXA + 12;
 /* Margem superior das páginas que uma tabela abre sozinha (a faixa é redesenhada por cima). */
 export const MARGEM_TOPO_TABELA = ALTURA_FAIXA + 6;
 
+/*
+ * Cores claras dos tokens de status (--success-bg/-text etc.) por variante de Badge, para selos e textos
+ * coloridos no PDF (o PDF não segue o tema do usuário).
+ */
+export const CORES_VARIANTE_PDF: Record<
+  "success" | "warning" | "danger" | "info" | "primary" | "neutral",
+  { fundo: CorRgb; cor: CorRgb }
+> = {
+  success: { fundo: [236, 253, 243], cor: [22, 101, 52] },
+  warning: { fundo: [255, 251, 235], cor: [180, 83, 9] },
+  danger: { fundo: [254, 242, 242], cor: [185, 28, 28] },
+  info: { fundo: [239, 246, 255], cor: [29, 78, 216] },
+  primary: { fundo: [254, 242, 242], cor: [183, 28, 28] },
+  neutral: { fundo: [243, 244, 246], cor: [75, 85, 99] },
+};
+
 export interface SeloPdf {
   texto: string;
   fundo: CorRgb;

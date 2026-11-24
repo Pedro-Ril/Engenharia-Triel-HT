@@ -6,6 +6,7 @@ import {
   COR_FUNDO_ALTERNADO,
   COR_PRIMARIA,
   COR_TEXTO_SUAVE,
+  CORES_VARIANTE_PDF,
   ESTILO_CABECALHO_TABELA,
   ESTILO_TABELA,
   MARGEM,
@@ -41,23 +42,13 @@ const MODULO = "Workstations NVIDIA";
 /* Mesma quantidade que o detalhe da máquina mostra. */
 const EVENTOS_NO_RELATORIO = 30;
 
-/* Cores claras dos tokens de status (--success-bg/-text etc.): o PDF não segue o tema do usuário. */
-const CORES_VARIANTE: Record<string, { fundo: CorRgb; cor: CorRgb }> = {
-  success: { fundo: [236, 253, 243], cor: [22, 101, 52] },
-  warning: { fundo: [255, 251, 235], cor: [180, 83, 9] },
-  danger: { fundo: [254, 242, 242], cor: [185, 28, 28] },
-  info: { fundo: [239, 246, 255], cor: [29, 78, 216] },
-  primary: { fundo: [254, 242, 242], cor: [183, 28, 28] },
-  neutral: { fundo: [243, 244, 246], cor: [75, 85, 99] },
-};
-
 function seloStatus(status: StatusMaquinaNvidia): SeloPdf {
   const info = STATUS_MAQUINA[status];
-  return { texto: info.label, ...CORES_VARIANTE[info.variante] };
+  return { texto: info.label, ...CORES_VARIANTE_PDF[info.variante] };
 }
 
 function corStatus(status: StatusMaquinaNvidia): CorRgb {
-  return CORES_VARIANTE[STATUS_MAQUINA[status].variante].cor;
+  return CORES_VARIANTE_PDF[STATUS_MAQUINA[status].variante].cor;
 }
 
 /* "AAAA-MM-DD" sem fuso: formata direto (new Date leria como UTC e mostraria o dia anterior). */

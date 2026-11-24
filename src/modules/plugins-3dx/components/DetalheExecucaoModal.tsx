@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 import { Stack } from "@/components/ui/Stack";
@@ -24,6 +26,7 @@ import {
   rotuloObjeto,
   STATUS_EXECUCAO,
 } from "../utils/exibicao";
+import { exportarExecucaoExcel, exportarExecucaoPdf } from "../utils/exportarPlugins3dx";
 import { ItensExecucao } from "./ItensExecucao";
 import styles from "./Plugins3dx.module.css";
 
@@ -79,6 +82,17 @@ export function DetalheExecucaoModal({ id, onFeedback, onAbrirOutra, onClose, on
   const e = detalhe?.execucao;
   const carregando = id !== null && detalhe?.execucao.id !== id && erroId !== id;
 
+  /* Gera no navegador a partir do detalhe já carregado (todos os objetos, sem a paginação da tela). */
+  function exportar(formato: "pdf" | "excel") {
+    if (!detalhe) return;
+    try {
+      if (formato === "pdf") exportarExecucaoPdf(detalhe);
+      else exportarExecucaoExcel(detalhe);
+    } catch (error) {
+      onFeedback("danger", "Não foi possível exportar", error instanceof Error ? error.message : "Tente novamente.");
+    }
+  }
+
   return (
     <Modal
       open={id !== null}
@@ -89,10 +103,33 @@ export function DetalheExecucaoModal({ id, onFeedback, onAbrirOutra, onClose, on
       }
       onClose={onClose}
       footer={
-        e?.status === "pendente" ? (
-          <Button variant="danger" onClick={() => setConfirmarCancelar(true)}>
-            Cancelar trabalho
-          </Button>
+        e && !carregando ? (
+          <>
+            <DropdownMenu
+              label="Exportar esta execução"
+              triggerText="Exportar"
+              triggerIcon={<Download size={15} />}
+              items={[
+                {
+                  value: "pdf",
+                  label: "Em PDF",
+                  icon: <FileText size={15} />,
+                  onSelect: () => exportar("pdf"),
+                },
+                {
+                  value: "excel",
+                  label: "Em Excel",
+                  icon: <FileSpreadsheet size={15} />,
+                  onSelect: () => exportar("excel"),
+                },
+              ]}
+            />
+            {e.status === "pendente" && (
+              <Button variant="danger" onClick={() => setConfirmarCancelar(true)}>
+                Cancelar trabalho
+              </Button>
+            )}
+          </>
         ) : undefined
       }
     >

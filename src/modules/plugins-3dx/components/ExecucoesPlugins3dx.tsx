@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ListChecks, RefreshCw, Search } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, ListChecks, RefreshCw, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Dropdown } from "@/components/ui/Dropdown";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
@@ -34,6 +35,13 @@ import {
   rotuloObjeto,
   STATUS_EXECUCAO,
 } from "../utils/exibicao";
+import {
+  carregarExecucoesParaExportar,
+  exportarExecucoesExcel,
+  exportarExecucoesPdf,
+  LIMITE_EXPORTACAO,
+} from "../utils/exportarPlugins3dx";
+import type { FiltroAplicado } from "../utils/exportarPlugins3dx";
 import { DetalheExecucaoModal } from "./DetalheExecucaoModal";
 import styles from "./Plugins3dx.module.css";
 
@@ -72,6 +80,7 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
   const [carregando, setCarregando] = useState(true);
   const [recarregar, setRecarregar] = useState(0);
   const [aberta, setAberta] = useState<string | null>(execucaoInicial);
+  const [exportando, setExportando] = useState(false);
   /* Trocar o ambiente no topo do painel volta para a página 1 (ajuste durante o render, sem efeito). */
   const [ambienteAnterior, setAmbienteAnterior] = useState(ambiente);
   if (ambiente !== ambienteAnterior) {
@@ -111,6 +120,53 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
 
   const totalPaginas = resultado ? Math.max(1, Math.ceil(resultado.total / resultado.tamanhoPagina)) : 1;
 
+  /* Filtros aplicados, em texto, para o relatório dizer o que foi exportado. */
+  function filtrosAplicados(): FiltroAplicado[] {
+    const lista: FiltroAplicado[] = [];
+    lista.push(["Ambiente", ambiente ? AMBIENTE[ambiente].label : "Produção e Teste"]);
+    if (busca) lista.push(["Busca", busca]);
+    if (de || ate) {
+      const data = (valor: string) => valor.split("-").reverse().join("/");
+      lista.push(["Período", de && ate ? `${data(de)} a ${data(ate)}` : de ? `a partir de ${data(de)}` : `até ${data(ate)}`]);
+    }
+    if (plugin) lista.push(["Plugin", nomeCurtoPlugin(plugin)]);
+    if (status) lista.push(["Status", STATUS_EXECUCAO[status as StatusExecucao3dx].label]);
+    if (gatilho) lista.push(["Gatilho", GATILHO[gatilho as GatilhoExecucao3dx]]);
+    return lista;
+  }
+
+  async function exportar(formato: "pdf" | "excel") {
+    setExportando(true);
+    try {
+      const lista = await carregarExecucoesParaExportar({
+        ambiente,
+        plugin: plugin || null,
+        status: (status || null) as StatusExecucao3dx | null,
+        gatilho: (gatilho || null) as GatilhoExecucao3dx | null,
+        busca: busca || null,
+        de: de || null,
+        ate: ate || null,
+      });
+      if (formato === "pdf") exportarExecucoesPdf(lista, filtrosAplicados());
+      else exportarExecucoesExcel(lista, filtrosAplicados());
+      if (lista.total > lista.execucoes.length) {
+        onFeedback(
+          "success",
+          "Exportado com limite",
+          `O filtro encontrou ${lista.total} execuções; o arquivo traz as ${LIMITE_EXPORTACAO} mais recentes. Use os filtros para reduzir.`
+        );
+      }
+    } catch (error) {
+      onFeedback(
+        "danger",
+        "Não foi possível exportar",
+        error instanceof Error ? error.message : "Tente novamente."
+      );
+    } finally {
+      setExportando(false);
+    }
+  }
+
   function mudar(setter: (valor: string) => void) {
     return (valor: string) => {
       setter(valor);
@@ -123,10 +179,33 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
       title="Execuções"
       description="Cada liberação, duplicação, rotina noturna ou ação manual tratada pelos plugins. Clique para ver o detalhe de cada objeto."
       actions={
-        <Button variant="secondary" onClick={() => setRecarregar((v) => v + 1)}>
-          <RefreshCw size={15} />
-          Atualizar
-        </Button>
+        <Stack direction="row" gap={8} wrap>
+          <Button variant="secondary" onClick={() => setRecarregar((v) => v + 1)}>
+            <RefreshCw size={15} />
+            Atualizar
+          </Button>
+          {/* Exporta a lista inteira com os filtros de baixo (todas as páginas), não só a página da tela. */}
+          <DropdownMenu
+            label="Exportar execuções com os filtros aplicados"
+            triggerText={exportando ? "Exportando..." : "Exportar"}
+            triggerIcon={<Download size={15} />}
+            disabled={exportando || !resultado || resultado.total === 0}
+            items={[
+              {
+                value: "pdf",
+                label: "Lista em PDF",
+                icon: <FileText size={15} />,
+                onSelect: () => void exportar("pdf"),
+              },
+              {
+                value: "excel",
+                label: "Lista em Excel",
+                icon: <FileSpreadsheet size={15} />,
+                onSelect: () => void exportar("excel"),
+              },
+            ]}
+          />
+        </Stack>
       }
     >
       <Stack gap={16}>
