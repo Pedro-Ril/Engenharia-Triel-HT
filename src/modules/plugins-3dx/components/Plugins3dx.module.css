@@ -286,15 +286,35 @@
   grid-column: span 4;
 }
 
+/* Relatório diário: botões na mesma linha do dia e do ambiente, encostados à direita. */
+.acoesRelatorio {
+  grid-column: span 6;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .filtroBusca,
-  .filtroCampo {
+  .filtroCampo,
+  .acoesRelatorio {
     grid-column: span 12;
+  }
+
+  .acoesRelatorio {
+    justify-content: flex-start;
   }
 
   .filtroData {
     grid-column: span 6;
   }
+}
+
+/* O Switch ocupa a largura da célula: o align="center" da célula não basta para centralizar. */
+.celulaCentro {
+  display: flex;
+  justify-content: center;
 }
 
 .linhaClicavel {

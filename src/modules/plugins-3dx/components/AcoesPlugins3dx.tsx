@@ -22,6 +22,7 @@ import type { AcaoManual3dx, Ambiente3dx, Execucao3dx } from "../types/plugins3d
 import { AMBIENTES_3DX } from "../types/plugins3dx.types";
 import { AMBIENTE, formatarDataHora, nomeCurtoPlugin, rotuloObjeto, STATUS_EXECUCAO } from "../utils/exibicao";
 import styles from "./Plugins3dx.module.css";
+import { RelatorioDiario3dx } from "./RelatorioDiario3dx";
 
 interface AcoesProps {
   /* Filtro do topo do painel: vira o ambiente padrão das ações e filtra a fila. */
@@ -230,6 +231,8 @@ export function AcoesPlugins3dx({ ambiente, onFeedback }: AcoesProps) {
           </Table>
         )}
       </Card>
+
+      <RelatorioDiario3dx ambiente={ambiente} onFeedback={onFeedback} />
 
       <ConfirmDialog
         open={confirmar !== null}

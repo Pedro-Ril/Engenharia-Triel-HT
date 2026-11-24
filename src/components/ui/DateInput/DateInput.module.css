@@ -284,6 +284,25 @@
   cursor: not-allowed;
 }
 
+/* Sem espaço embaixo do campo: abre para cima (decidido ao abrir, em DateInput.tsx). */
+.calendarAcima {
+  top: auto;
+  bottom: calc(100% + 8px);
+  animation-name: calendarEnterAcima;
+}
+
+@keyframes calendarEnterAcima {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes calendarEnter {
   from {
     opacity: 0;

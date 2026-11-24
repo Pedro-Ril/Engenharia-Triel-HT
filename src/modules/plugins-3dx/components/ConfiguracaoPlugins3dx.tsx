@@ -337,7 +337,7 @@ function DestinatariosAvisos({
   return (
     <Card
       title="Quem recebe aviso"
-      description="E-mail enviado pelo Portal quando o evento acontece: atualização do 3DEXPERIENCE e problemas no ambiente (hotfix, padrão de visualização perdido, nó sem resposta), revisão trocada em conjuntos liberados e falhas dos plugins. Revisão trocada só avisa no modo Ativo."
+      description="E-mail enviado pelo Portal quando o evento acontece: atualização do 3DEXPERIENCE e problemas no ambiente (hotfix, padrão de visualização perdido, nó sem resposta), revisão trocada em conjuntos liberados, falhas dos plugins e o relatório diário de uso (todo dia às 7h). Revisão trocada só avisa no modo Ativo."
     >
       <Stack gap={16}>
         <div className={`${styles.formLinha} ${styles.formDestinatario}`}>
@@ -390,7 +390,9 @@ function DestinatariosAvisos({
                   <TableCell>
                     {d.pluginChave
                       ? (plugins.find((p) => p.chave === d.pluginChave)?.nome ?? d.pluginChave)
-                      : "Ambiente 3DEXPERIENCE"}
+                      : d.evento === "relatorio_diario"
+                        ? "Plugins 3DX (todos)"
+                        : "Ambiente 3DEXPERIENCE"}
                     <div className={styles.textoSecundario}>{EVENTOS_AVISO_3DX[d.evento]?.label ?? d.evento}</div>
                   </TableCell>
                   <TableCell>
@@ -405,7 +407,9 @@ function DestinatariosAvisos({
                     <div className={styles.textoSecundario}>{d.emailEfetivo ?? "sem e-mail no AD"}</div>
                   </TableCell>
                   <TableCell align="center">
-                    <Switch compact label="" checked={d.ativo} onChange={() => alternar(d)} />
+                    <div className={styles.celulaCentro}>
+                      <Switch compact label="" checked={d.ativo} onChange={() => alternar(d)} />
+                    </div>
                   </TableCell>
                   <TableCell align="center">
                     <IconButton

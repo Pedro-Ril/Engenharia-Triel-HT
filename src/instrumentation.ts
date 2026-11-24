@@ -66,6 +66,10 @@ export async function register() {
   const { iniciarAgendadorAmbiente3dx } = await import("@/lib/plugins-3dx/ambiente-3dx");
   iniciarAgendadorAmbiente3dx();
 
+  /* Plugins 3DX: relatório diário de uso (dia anterior, às 7h) para a lista do evento "relatorio_diario". */
+  const { iniciarAgendadorRelatorioPlugins3dx } = await import("@/lib/plugins-3dx/relatorio-diario");
+  iniciarAgendadorRelatorioPlugins3dx();
+
   const { iniciarMediaMtxSeNecessario } = await import(
     "@/lib/semaforo/mediamtx-processo"
   );

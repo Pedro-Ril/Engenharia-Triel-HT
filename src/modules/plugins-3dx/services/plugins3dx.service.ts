@@ -3,6 +3,7 @@ import type {
   Ambiente3dx,
   Destinatario3dx,
   DetalheExecucao3dx,
+  EnviosRelatorio3dx,
   FiltrosExecucoes3dx,
   ModoPlugin3dx,
   NovoDestinatario3dx,
@@ -106,4 +107,43 @@ export function buscarVerificacaoAmbiente() {
 /* Roda a verificação agora (com avisos, como o agendador) e devolve o estado novo. */
 export function verificarAmbienteAgora() {
   return chamar<VerificacaoAmbiente3dx>("/ambiente", { method: "POST" });
+}
+
+/* ------------------------------------------------------------------ relatório diário */
+
+export function listarEnviosRelatorio() {
+  return chamar<EnviosRelatorio3dx>("/relatorio-diario");
+}
+
+/* Manda o relatório do dia só para o e-mail de quem pediu (conferir antes de ligar a lista). */
+export function enviarRelatorioParaMim(data: string, ambiente: Ambiente3dx | null) {
+  return chamar<null>("/relatorio-diario", json("POST", { data, ambiente }));
+}
+
+/* Gera no servidor (mesmo arquivo do e-mail) e baixa; erro volta no envelope de sempre. */
+export async function baixarRelatorioDiario(
+  data: string,
+  ambiente: Ambiente3dx | null,
+  formato: "pdf" | "xlsx"
+): Promise<ApiEnvelope<null>> {
+  const busca = new URLSearchParams({ data, formato });
+  if (ambiente) busca.set("ambiente", ambiente);
+  try {
+    const response = await fetch(`${BASE}/relatorio-diario?${busca.toString()}`);
+    if (!response.ok) return await parseResponse<null>(response);
+    const nome =
+      /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "")?.[1] ??
+      `plugins-3dx-relatorio-${data}.${formato}`;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nome;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Não foi possível baixar o relatório." };
+  }
 }

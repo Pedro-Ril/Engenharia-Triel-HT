@@ -219,7 +219,38 @@ export const EVENTOS_AVISO_3DX: Record<
       "3DEXPERIENCE atualizado (hotfix), padrão de visualização perdido, nó do 3DSpace sem resposta, plugin sem " +
       "contato ou incompatível com a versão da Dassault -- e quando volta ao normal.",
   },
+  relatorio_diario: {
+    plugins: [],
+    geral: true,
+    label: "Relatório diário de uso",
+    descricao:
+      "Todo dia às 7h, o uso do dia anterior: resumo gerencial no e-mail e o detalhado em PDF e Excel anexos. " +
+      "Destinatário com ambiente recebe só aquele ambiente; sem ambiente, os dois juntos.",
+  },
 };
+
+/* Relatório diário (migração 0176): AMBOS = destinatário sem ambiente (produção e teste no mesmo relatório). */
+export type EscopoRelatorio3dx = "AMBOS" | Ambiente3dx;
+
+export interface EnvioRelatorio3dx {
+  id: string;
+  /* AAAA-MM-DD: o dia que o relatório cobre (o envio é no dia seguinte) */
+  dataReferencia: string;
+  escopo: EscopoRelatorio3dx;
+  situacao: "pendente" | "enviado" | "falha";
+  tentativas: number;
+  destinatarios: string[];
+  totalExecucoes: number | null;
+  erro: string | null;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface EnviosRelatorio3dx {
+  /* hora local em que o agendador manda o relatório do dia anterior */
+  horaEnvio: number;
+  envios: EnvioRelatorio3dx[];
+}
 
 /*
  * Nota de uma versão (migração 0174). Gravada pelo próprio jar na subida do nó: componente "core" (núcleo) ou a

@@ -34,6 +34,9 @@ interface DateInputProps
 
 const weekdays = ["D", "S", "T", "Q", "Q", "S", "S"];
 
+/* Altura aproximada do calendário aberto (cabeçalho + 6 semanas + rodapé + espaço até o campo). */
+const ALTURA_CALENDARIO = 420;
+
 function parseDate(value?: string) {
   if (!value) {
     return null;
@@ -113,6 +116,17 @@ export function DateInput({
   const selectedDate = parseDate(selectedValue);
 
   const [open, setOpen] = useState(false);
+  /* Abre para cima quando não cabe embaixo do campo (ex.: último card da página) e cabe em cima. */
+  const [abrirParaCima, setAbrirParaCima] = useState(false);
+
+  function alternarCalendario() {
+    if (!open && wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const espacoAbaixo = window.innerHeight - rect.bottom;
+      setAbrirParaCima(espacoAbaixo < ALTURA_CALENDARIO && rect.top > espacoAbaixo);
+    }
+    setOpen((current) => !current);
+  }
 
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const initialDate = selectedDate ?? new Date();
@@ -278,7 +292,7 @@ export function DateInput({
           className={styles.input}
           onClick={() => {
             if (!disabled) {
-              setOpen((current) => !current);
+              alternarCalendario();
             }
           }}
         />
@@ -288,9 +302,7 @@ export function DateInput({
           className={styles.calendarButton}
           disabled={disabled}
           aria-label="Abrir calendário"
-          onClick={() => {
-            setOpen((current) => !current);
-          }}
+          onClick={alternarCalendario}
         >
           <CalendarDays aria-hidden="true" />
         </button>
@@ -306,7 +318,7 @@ export function DateInput({
 
       {open && (
         <div
-          className={styles.calendar}
+          className={`${styles.calendar} ${abrirParaCima ? styles.calendarAcima : ""}`}
           role="dialog"
           aria-label="Selecionar data"
         >
