@@ -33,6 +33,8 @@ import java.util.Set;
  *    a) a base que o usuario digitou em algum objeto da mesma peca, ou
  *    b) o MENOR Nome novo entre os Physical Products da mesma peca (uma base unica para a peca inteira).
  *  - com uma unica peca na duplicacao, objetos de CAD com titulo fora do padrao tambem recebem a base nova.
+ *  - 3D Shape de um Physical Product cujo titulo o usuario digitou acompanha o titulo digitado, quando no original
+ *    os dois tinham o mesmo titulo: objeto de CAD com titulo sem "(configuracao)" e item nativo.
  *
  * Roda na hora (dentro da duplicacao, sincrono). Com o plugin em SIMULACAO, so registra o que faria.
  * Cada duplicacao vira uma execucao no Portal com um item por titulo (de -> para).
@@ -40,14 +42,18 @@ import java.util.Set;
 public class DuplicateTitleModule implements PluginModule {
 
     public static final String KEY = "duplicate-title";
-    public static final String VERSION = "6.1.0";
+    public static final String VERSION = "6.2.1";
 
     private static final Set<String> DUPLICATE_COMMANDS = Set.of("Advance Duplicate", "Duplicate");
     private static final String TITLE_ATTR = "PLMEntity.V_Name";
 
     /** Dados de um objeto duplicado. */
-    private static final class Dup {
+    static final class Dup {
         String cloneId;
+        /** id interno do objeto novo (para achar o Physical Product dono de um 3D Shape). */
+        String oid;
+        /** 3D Shape: id do Physical Product que o agrega (VPMRepInstance); null nos demais. */
+        String parentOid;
         String sourceId;
         boolean isProduct;
         boolean isCad;
@@ -89,6 +95,10 @@ public class DuplicateTitleModule implements PluginModule {
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("6.2.1", "2026-11-24", "Vale também para peças SOLIDWORKS sem configuração no título (ex.: "
+                        + "229029): o 3D Shape acompanha o título digitado no Physical Product."),
+                Release.of("6.2.0", "2026-11-24", "3D Shape de item nativo acompanha o título digitado no Physical Product, "
+                        + "quando no original os dois tinham o mesmo título (antes recebia o próprio Nome)."),
                 Release.of("6.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
                 Release.of("6.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
                 Release.of("6.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
@@ -158,8 +168,19 @@ public class DuplicateTitleModule implements PluginModule {
         Map<String, String> newBaseByOldBase = new HashMap<>();
         for (Dup d : dups) {
             if (!d.isCad || d.title.equals(d.sourceTitle)) continue;
+            if (d.title.contains(" - COPIA - ")) continue; // original decorado pela regra antiga, nao digitado
             CadTitle old = CadTitle.parse(d.sourceTitle);
-            if (old == null) continue;
+            if (old == null) {
+                // titulo sem "(configuracao)" (ex.: 229029): a base e o titulo inteiro; vale o digitado no Physical
+                // Product, para o 3D Shape da mesma peca acompanhar
+                if (!d.isProduct) continue;
+                CadTitle now = CadTitle.parse(d.title);
+                String typedBase = (now != null ? now.base : d.title).trim();
+                if (!typedBase.isEmpty() && !typedBase.equals(d.sourceTitle)) {
+                    newBaseByOldBase.putIfAbsent(d.sourceTitle, typedBase);
+                }
+                continue;
+            }
             // titulo que ainda contem a base original nao foi digitado: e o original decorado por outra regra
             if (d.title.contains(old.base + "(") || d.title.contains(d.sourceTitle)) continue;
             // neste ponto a Dassault ainda nao recolocou "(configuracao)" no titulo digitado
@@ -177,12 +198,23 @@ public class DuplicateTitleModule implements PluginModule {
         productBase.forEach(newBaseByOldBase::putIfAbsent);
         String singleBase = newBaseByOldBase.size() == 1 ? newBaseByOldBase.values().iterator().next() : null;
 
+        // c) itens nativos: Physical Product com titulo digitado, para o 3D Shape acompanhar
+        Map<String, Dup> typedProductByOid = new HashMap<>();
+        for (Dup d : dups) {
+            if (!d.isCad && d.isProduct && d.oid != null && !d.title.equals(d.sourceTitle) && !d.title.isBlank()) {
+                typedProductByOid.put(d.oid, d);
+            }
+        }
+
         Map<String, String> out = new HashMap<>();
         for (Dup d : dups) {
             if (!d.title.equals(d.sourceTitle)) continue; // usuario digitou outro titulo
             String newTitle = d.name;
             CadTitle ct = d.isCad ? CadTitle.parse(d.title) : null;
-            if (ct != null && newBaseByOldBase.containsKey(ct.base)) {
+            Dup parent = !d.isCad && !d.isProduct && d.parentOid != null ? typedProductByOid.get(d.parentOid) : null;
+            if (parent != null && d.sourceTitle.equals(parent.sourceTitle)) {
+                newTitle = parent.title; // 3D Shape nativo acompanha o titulo digitado no seu Physical Product
+            } else if (ct != null && newBaseByOldBase.containsKey(ct.base)) {
                 newTitle = newBaseByOldBase.get(ct.base) + "(" + ct.config + ")";
             } else if (d.isCad && ct == null && newBaseByOldBase.containsKey(d.title)) {
                 newTitle = newBaseByOldBase.get(d.title);
@@ -203,11 +235,11 @@ public class DuplicateTitleModule implements PluginModule {
         String sourceId = sources.get(0);
         if (sourceId == null || sourceId.isEmpty() || sourceId.equals(cloneId)) return null;
         try {
-            // ordem: isProduct | isShape | type | name | revision | titulo (titulo por ultimo: qualquer caractere)
-            String[] c = Core.split(MQLCommand.exec(context, "print bus $1 select $2 $3 $4 $5 $6 $7 dump $8", cloneId,
-                    "type.kindof[VPMReference]", "type.kindof[VPMRepReference]", "type", "name", "revision",
-                    "attribute[" + TITLE_ATTR + "]", Core.SEP), 6);
-            if (c.length < 6) return null;
+            // ordem: isProduct | isShape | type | name | revision | id | titulo (titulo por ultimo: qualquer caractere)
+            String[] c = Core.split(MQLCommand.exec(context, "print bus $1 select $2 $3 $4 $5 $6 $7 $8 dump $9", cloneId,
+                    "type.kindof[VPMReference]", "type.kindof[VPMRepReference]", "type", "name", "revision", "id",
+                    "attribute[" + TITLE_ATTR + "]", Core.SEP), 7);
+            if (c.length < 7) return null;
             Dup d = new Dup();
             d.cloneId = cloneId;
             d.sourceId = sourceId;
@@ -216,7 +248,13 @@ public class DuplicateTitleModule implements PluginModule {
             d.type = c[2];
             d.name = c[3];
             d.revision = c[4];
-            d.title = c[5];
+            d.oid = c[5];
+            d.title = c[6];
+            if (!d.isProduct) {
+                String parents = MQLCommand.exec(context, "print bus $1 select $2 dump $3", cloneId,
+                        "to[VPMRepInstance].from.id", Core.SEP).trim();
+                if (!parents.isEmpty()) d.parentOid = Core.split(parents, 2)[0].trim();
+            }
             d.sourceTitle = MQLCommand.exec(context, "print bus $1 select $2 dump", sourceId,
                     "attribute[" + TITLE_ATTR + "]").trim();
             String interfaces = MQLCommand.exec(context, "print bus $1 select $2 dump $3", cloneId, "interface", Core.SEP);
