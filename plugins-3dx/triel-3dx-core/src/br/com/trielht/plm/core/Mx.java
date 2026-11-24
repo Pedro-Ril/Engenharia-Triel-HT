@@ -98,7 +98,54 @@ public final class Mx {
         }
     }
 
-    /** Espera o objeto chegar ao estado (a liberacao e gravada depois do Postprocess). */
+    /** Estado atual (current) do objeto. */
+    public static String state(Context ctx, String objectId) throws Exception {
+        return MQLCommand.exec(ctx, "print bus $1 select $2 dump", objectId, "current").trim();
+    }
+
+    /**
+     * Espera o objeto chegar ao estado SEM prender a fila (a liberacao e gravada depois do Postprocess).
+     *
+     * Se o objeto ja esta no estado, devolve o estado. Se nao, e ainda ha prazo, o trabalho volta para a fila
+     * agendado para conferir de novo (5 s, 10 s e depois a cada 15 s) e o metodo devolve null: quem chamou deve
+     * encerrar o trabalho na hora, sem registrar resultado. Esgotado o prazo (contado da primeira conferencia),
+     * devolve o estado atual, para quem chamou registrar que a liberacao nao se concretizou (regra do 3DX ou
+     * cancelamento). Enquanto isso a fila do no fica livre para os outros trabalhos.
+     */
+    public static String awaitState(Context ctx, Report rep, String objectId, String state, int maxSeconds)
+            throws Exception {
+        String cur = state(ctx, objectId);
+        if (state.equals(cur)) return cur;
+        Job job = rep.job();
+        long now = System.currentTimeMillis();
+        long since = job.paramLong(WAIT_SINCE, 0);
+        if (since <= 0 || since > now) since = now;
+        int checks = (int) job.paramLong(WAIT_CHECKS, 0) + 1;
+        long elapsed = (now - since) / 1000;
+        if (elapsed >= Math.max(0, maxSeconds)) return cur;
+        int next = checks == 1 ? 5 : checks == 2 ? 10 : 15;
+        next = (int) Math.max(1, Math.min(next, maxSeconds - elapsed));
+        job.putParam(WAIT_SINCE, since);
+        job.putParam(WAIT_CHECKS, checks);
+        rep.retryLater(next, "Aguardando " + state + " (estado " + cur + "; " + checks + "ª conferência, próxima em "
+                + next + " s)");
+        return null;
+    }
+
+    /** Parametros do trabalho usados pela espera (awaitState). */
+    static final String WAIT_SINCE = "esperaDesde";
+    static final String WAIT_CHECKS = "esperaConferencias";
+
+    /** Segundos esperados ate agora por awaitState (0 = nao esperou). */
+    public static long waitedSeconds(Job job) {
+        long since = job.paramLong(WAIT_SINCE, 0);
+        return since <= 0 ? 0 : Math.max(0, (System.currentTimeMillis() - since) / 1000);
+    }
+
+    /**
+     * Espera o objeto chegar ao estado PRENDENDO a thread (conferencia a cada 2 s). Prefira {@link #awaitState}
+     * nos trabalhos da fila: este fica so para uso fora dela.
+     */
     public static String waitState(Context ctx, String objectId, String state, long timeoutMs) throws Exception {
         long limit = System.currentTimeMillis() + timeoutMs;
         while (true) {

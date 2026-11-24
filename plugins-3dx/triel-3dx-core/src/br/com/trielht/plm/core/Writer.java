@@ -52,6 +52,37 @@ final class Writer {
         offer(op(kind).add("rep", rep.toJson(LocalDateTime.now())));
     }
 
+    /**
+     * Devolve o trabalho a fila para rodar de novo daqui a {@code seconds} s (ver Mx.awaitState). Sincrono, na
+     * thread da fila: so depois de gravado a fila segue. A tentativa nao conta (tentativas volta 1), os parametros
+     * levam o controle da espera e o resumo mostra no Portal o que ele aguarda.
+     *
+     * @return TRUE = reagendado; FALSE = o trabalho nao esta mais 'processando' (ex.: cancelado no Portal), nao
+     *         rodar de novo; null = banco indisponivel (quem chama espera e tenta neste mesmo no).
+     */
+    static Boolean reschedule(Job job, int seconds, String summary) {
+        if (!Db.configured()) return null;
+        try {
+            int n = Db.with(c -> {
+                try (PreparedStatement st = c.prepareStatement("UPDATE dbo.portal_3dx_plugins_execucoes SET "
+                        + "[status] = 'pendente', [executar_apos] = DATEADD(SECOND, ?, SYSDATETIME()), [parametros] = ?, "
+                        + "[tentativas] = CASE WHEN [tentativas] > 0 THEN [tentativas] - 1 ELSE 0 END, [no] = NULL, "
+                        + "[iniciado_em] = NULL, [ultimo_contato] = SYSDATETIME(), [resumo] = ? "
+                        + "WHERE [id] = ? AND [status] = 'processando'")) {
+                    st.setInt(1, Math.max(1, seconds));
+                    st.setString(2, job.params == null || job.params.isEmpty() ? null : job.params.toString());
+                    st.setString(3, Core.cut(summary, 1000));
+                    st.setString(4, job.id.toString());
+                    return st.executeUpdate();
+                }
+            });
+            return n == 1;
+        } catch (SQLException e) {
+            Core.LOG.warn("[TRIEL-CORE] Nao foi possivel reagendar {}: {}", job.label(), e.getMessage());
+            return null;
+        }
+    }
+
     static void touch(UUID execId) {
         offer(op("touch").add("id", execId.toString()));
     }

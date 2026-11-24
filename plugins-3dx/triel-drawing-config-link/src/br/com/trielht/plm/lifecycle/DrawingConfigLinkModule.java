@@ -55,10 +55,12 @@ import java.util.concurrent.TimeUnit;
 public class DrawingConfigLinkModule implements PluginModule {
 
     public static final String KEY = "drawing-config-link";
-    public static final String VERSION = "3.1.0";
+    public static final String VERSION = "3.2.0";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
+    /** Status interno de Result: o trabalho voltou para a fila esperando a liberacao ser gravada. */
+    private static final String AGUARDANDO = "AGUARDANDO";
     private static final String DEP_REL = "XCADBaseDependency";
     private static final String ITEM_REL = "XCADItem";
     private static final String LINK_TYPE = "CADDrawing";
@@ -94,6 +96,8 @@ public class DrawingConfigLinkModule implements PluginModule {
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("3.2.0", "2026-11-24", "Espera da liberação sem prender a fila (núcleo 1.4.0) e prazo padrão de "
+                        + "30 s; liberação que não se concretiza fica registrada como barrada por regra do 3DX ou cancelada."),
                 Release.of("3.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
                 Release.of("3.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
                 Release.of("3.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
@@ -184,6 +188,7 @@ public class DrawingConfigLinkModule implements PluginModule {
             }
             if (job.objectId == null && !resolveByName(ctx, job, rep)) return;
             Result r = processDrawing(ctx, job.objectId, rep, cfg, "liberacao".equals(job.trigger));
+            if (AGUARDANDO.equals(r.status)) return; // reagendado (Mx.awaitState): o resumo ja diz o que aguarda
             rep.summary(r.toString());
             if (r.status.startsWith("IGNORADO")) rep.ignore(r.toString());
         });
@@ -246,7 +251,16 @@ public class DrawingConfigLinkModule implements PluginModule {
         r.label = o[2] + " " + o[3] + " '" + o[5] + "'";
         String current = o[1];
         if (waitRelease && !RELEASED.equals(current)) {
-            current = Mx.waitState(ctx, drawingId, RELEASED, cfg.integer("esperaLiberacaoSeg", 120) * 1000L);
+            current = Mx.awaitState(ctx, rep, drawingId, RELEASED, cfg.integer("esperaLiberacaoSeg", 30));
+            if (current == null) { // ainda nao gravou: volta para a fila e confere de novo
+                r.status = AGUARDANDO;
+                return r;
+            }
+            if (!RELEASED.equals(current)) {
+                r.status = "IGNORADO (estado " + current + " após " + Mx.waitedSeconds(rep.job())
+                        + " s: liberação barrada por regra do 3DX ou cancelada)";
+                return r;
+            }
         }
         if (!RELEASED.equals(current)) {
             r.status = "IGNORADO (estado " + current + ")";

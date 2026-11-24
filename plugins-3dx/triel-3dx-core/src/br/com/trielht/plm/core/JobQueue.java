@@ -16,6 +16,8 @@ import java.util.concurrent.TimeUnit;
  * - Com dois nos, cada trabalho e pego por um so (UPDATE ... WITH (READPAST, UPDLOCK)).
  * - Um trabalho por vez por no: o 3DSpace nao fica disputando a mesma estrutura com ele mesmo.
  * - O mesmo trabalho nao entra duas vezes (chave_dedup unica entre pendente/processando).
+ * - Trabalho que precisa esperar (ex.: a liberacao ainda nao foi gravada) volta para a fila com executar_apos, em
+ *   vez de prender a thread: ver Mx.awaitState / Report.retryLater.
  */
 public final class JobQueue {
 
@@ -111,32 +113,52 @@ public final class JobQueue {
         Db.discard();
     }
 
-    private static void execute(Job job) {
-        PluginModule module = Plugins.module(job.plugin);
-        Report rep = new Report(job);
-        if (module == null) {
-            rep.fail("Plugin " + job.plugin + " não instalado neste nó (" + Core.node() + ")");
+    private static void execute(Job job) throws InterruptedException {
+        while (true) {
+            PluginModule module = Plugins.module(job.plugin);
+            Report rep = new Report(job);
+            if (module == null) {
+                rep.fail("Plugin " + job.plugin + " não instalado neste nó (" + Core.node() + ")");
+                Writer.finish(rep);
+                return;
+            }
+            PluginConfig.Settings cfg = PluginConfig.of(job.plugin);
+            if (cfg.off()) {
+                rep.ignore("Plugin desligado no Portal quando o trabalho ia rodar");
+                Writer.finish(rep);
+                return;
+            }
+            job.mode = cfg.mode; // vale o modo da hora em que roda (pode ter mudado desde o enfileiramento)
+            try {
+                module.run(job, rep, cfg);
+            } catch (Exception e) {
+                rep.fail(Core.rootMessage(e));
+                Writer.event(job.plugin, "erro", "Falha no trabalho " + job.label() + ": " + Core.rootMessage(e),
+                        stackTrace(e), job.local ? null : job.id);
+                Core.LOG.warn("[TRIEL-{}] Falha no trabalho {}: {}", job.plugin, job.label(), Core.rootMessage(e), e);
+            }
+            Integer retry = rep.pendingRetry();
+            if (retry != null) {
+                // volta para a fila (livre para os outros trabalhos); sem banco, espera aqui mesmo, como antes
+                Boolean saved = job.local ? null : Writer.reschedule(job, retry, rep.summary);
+                if (Boolean.TRUE.equals(saved)) {
+                    Core.LOG.info("[TRIEL-{}] Trabalho {} reagendado para daqui a {} s: {}", job.plugin, job.label(),
+                            retry, rep.summary);
+                    return;
+                }
+                if (Boolean.FALSE.equals(saved)) {
+                    Core.LOG.info("[TRIEL-{}] Trabalho {} não está mais em processamento (cancelado?): encerrado",
+                            job.plugin, job.label());
+                    return;
+                }
+                TimeUnit.SECONDS.sleep(retry);
+                continue;
+            }
             Writer.finish(rep);
+            Core.LOG.info("[TRIEL-{}] Trabalho {} ({}): {} -- {}", job.plugin, job.label(), job.mode, rep.finalStatus(),
+                    rep.summary == null ? "" : rep.summary);
             return;
         }
-        PluginConfig.Settings cfg = PluginConfig.of(job.plugin);
-        if (cfg.off()) {
-            rep.ignore("Plugin desligado no Portal quando o trabalho ia rodar");
-            Writer.finish(rep);
-            return;
-        }
-        job.mode = cfg.mode; // vale o modo da hora em que roda (pode ter mudado desde o enfileiramento)
-        try {
-            module.run(job, rep, cfg);
-        } catch (Exception e) {
-            rep.fail(Core.rootMessage(e));
-            Writer.event(job.plugin, "erro", "Falha no trabalho " + job.label() + ": " + Core.rootMessage(e),
-                    stackTrace(e), job.local ? null : job.id);
-            Core.LOG.warn("[TRIEL-{}] Falha no trabalho {}: {}", job.plugin, job.label(), Core.rootMessage(e), e);
-        }
-        Writer.finish(rep);
-        Core.LOG.info("[TRIEL-{}] Trabalho {} ({}): {} -- {}", job.plugin, job.label(), job.mode, rep.finalStatus(),
-                rep.summary == null ? "" : rep.summary);
     }
 
     private static String stackTrace(Throwable e) {

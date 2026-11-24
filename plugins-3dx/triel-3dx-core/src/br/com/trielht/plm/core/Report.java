@@ -118,6 +118,23 @@ public final class Report {
         error = Core.cut(reason, 4000);
     }
 
+    /** Segundos para conferir de novo (ver Mx.awaitState); null = o trabalho terminou. */
+    Integer retryAfter;
+
+    /**
+     * O trabalho ainda nao pode ser feito (ex.: liberacao ainda nao gravada): volta para a fila e roda de novo
+     * daqui a {@code seconds} segundos. Quem chama deve encerrar o trabalho logo em seguida.
+     */
+    public void retryLater(int seconds, String reason) {
+        retryAfter = Math.max(1, seconds);
+        summary = Core.cut(reason, 1000);
+    }
+
+    /** Segundos ate a nova tentativa, ou null se o trabalho terminou (inclusive com falha/ignorado). */
+    synchronized Integer pendingRetry() {
+        return status == null && failed == 0 && retryAfter != null ? retryAfter : null;
+    }
+
     public void info(String msg) {
         Writer.event(job.plugin, "info", msg, null, job.local ? null : job.id);
         Core.LOG.info("[TRIEL-{}] {} {}", job.plugin, job.label(), msg);

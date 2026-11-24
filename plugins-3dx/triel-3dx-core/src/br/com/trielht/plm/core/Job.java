@@ -71,6 +71,24 @@ public final class Job {
         return params.containsKey(name) && !params.isNull(name) ? params.getString(name, def) : def;
     }
 
+    public long paramLong(String name, long def) {
+        if (params == null || !params.containsKey(name) || params.isNull(name)) return def;
+        jakarta.json.JsonValue v = params.get(name);
+        if (v instanceof jakarta.json.JsonNumber n) return n.longValue();
+        try {
+            return Long.parseLong(v instanceof jakarta.json.JsonString s ? s.getString().trim() : v.toString());
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    /** Grava (ou troca) um parametro numerico do trabalho; vai para o banco quando o trabalho e reagendado. */
+    public void putParam(String name, long value) {
+        JsonObjectBuilder b = Json.createObjectBuilder(params == null ? JsonValue.EMPTY_JSON_OBJECT : params);
+        b.add(name, value);
+        params = b.build();
+    }
+
     JsonObject toJson() {
         JsonObjectBuilder b = Json.createObjectBuilder();
         Json2.put(b, "id", id.toString());

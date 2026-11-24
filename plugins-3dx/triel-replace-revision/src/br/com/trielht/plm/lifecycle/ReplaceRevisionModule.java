@@ -54,7 +54,7 @@ import java.util.TreeSet;
 public class ReplaceRevisionModule implements PluginModule {
 
     public static final String KEY = "replace-revision";
-    public static final String VERSION = "7.1.0";
+    public static final String VERSION = "7.2.0";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -116,6 +116,8 @@ public class ReplaceRevisionModule implements PluginModule {
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("7.2.0", "2026-11-24", "Espera da liberação sem prender a fila (núcleo 1.4.0) e prazo padrão de "
+                        + "30 s; liberação que não se concretiza fica registrada como barrada por regra do 3DX ou cancelada."),
                 Release.of("7.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
                 Release.of("7.0.2", "2026-11-23", "Notas de versão gravadas no Portal."),
                 Release.of("7.0.1", "2026-11-23", "Textos gravados no Portal com acentuação."),
@@ -176,9 +178,11 @@ public class ReplaceRevisionModule implements PluginModule {
         boolean sim = cfg.simulate();
         if (job.objectId == null && !resolveByName(ctx, job, rep)) return;
 
-        String cur = Mx.waitState(ctx, job.objectId, RELEASED, cfg.integer("esperaLiberacaoSeg", 120) * 1000L);
+        String cur = Mx.awaitState(ctx, rep, job.objectId, RELEASED, cfg.integer("esperaLiberacaoSeg", 30));
+        if (cur == null) return; // ainda nao gravou: volta para a fila e confere de novo
         if (!RELEASED.equals(cur)) {
-            rep.ignore(job.label() + " não ficou RELEASED (estado " + cur + "): liberação cancelada?");
+            rep.ignore(job.label() + " não ficou RELEASED em " + Mx.waitedSeconds(job) + " s (estado " + cur
+                    + "): liberação barrada por regra do 3DX ou cancelada");
             return;
         }
         Map<String, Parent> parents = new LinkedHashMap<>();

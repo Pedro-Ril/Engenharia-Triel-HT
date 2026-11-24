@@ -29,10 +29,13 @@ import java.util.regex.Pattern;
 public final class Core {
 
     public static final Logger LOG = LoggerFactory.getLogger("br.com.trielht.plm.core");
-    public static final String VERSION = "1.3.0";
+    public static final String VERSION = "1.4.0";
 
     /** Historico do nucleo (o mais novo primeiro). Toda mudanca neste jar sobe VERSION e ganha uma linha aqui. */
     public static final java.util.List<Release> RELEASES = java.util.List.of(
+            Release.of("1.4.0", "2026-11-24", "Espera sem prender a fila: trabalho que aguarda a liberação ser gravada "
+                    + "volta para a fila e é conferido de novo (5 s, 10 s e depois a cada 15 s), em vez de deixar a "
+                    + "fila do nó parada até o prazo acabar; os outros trabalhos seguem normalmente."),
             Release.of("1.3.0", "2026-11-23", "Autoteste de compatibilidade: na subida, confere se as partes internas da "
                     + "Dassault que o núcleo e cada plugin usam existem neste 3DEXPERIENCE (falha típica depois de um "
                     + "hotfix) e informa no heartbeat; o Portal avisa por e-mail."),
