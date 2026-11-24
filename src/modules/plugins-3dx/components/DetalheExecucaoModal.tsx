@@ -23,8 +23,10 @@ import {
   NIVEL_EVENTO,
   nomeCurtoPlugin,
   rotuloNo,
+  proximaTentativa,
   rotuloObjeto,
-  STATUS_EXECUCAO,
+  situacaoExecucao,
+  STATUS_BARRADA,
 } from "../utils/exibicao";
 import { exportarExecucaoExcel, exportarExecucaoPdf } from "../utils/exportarPlugins3dx";
 import { ItensExecucao } from "./ItensExecucao";
@@ -143,9 +145,14 @@ export function DetalheExecucaoModal({ id, onFeedback, onAbrirOutra, onClose, on
             <div className={styles.resumoItem}>
               <span className={styles.rotulo}>Status</span>
               <span className={styles.valor}>
-                <Badge variant={STATUS_EXECUCAO[e.status].variante}>{STATUS_EXECUCAO[e.status].label}</Badge>
+                <span title={e.barrada ? STATUS_BARRADA.descricao : undefined}>
+                  <Badge variant={situacaoExecucao(e).variante}>{situacaoExecucao(e).label}</Badge>
+                </span>
                 <Badge variant={MODO[e.modo].variante}>{MODO[e.modo].label}</Badge>
                 <Badge variant={AMBIENTE[e.ambiente].variante}>{AMBIENTE[e.ambiente].label}</Badge>
+                {proximaTentativa(e) && (
+                  <span className={styles.textoSecundario}>próxima conferência às {proximaTentativa(e)}</span>
+                )}
               </span>
             </div>
             <div className={styles.resumoItem}>
@@ -200,7 +207,7 @@ export function DetalheExecucaoModal({ id, onFeedback, onAbrirOutra, onClose, on
                     <button type="button" className={styles.link} onClick={() => onAbrirOutra(r.id)}>
                       {nomeCurtoPlugin(r.pluginChave)}: {rotuloObjeto(r.objetoNome, r.objetoRevisao, r.objetoTitulo)}
                     </button>{" "}
-                    <Badge variant={STATUS_EXECUCAO[r.status].variante}>{STATUS_EXECUCAO[r.status].label}</Badge>
+                    <Badge variant={situacaoExecucao(r).variante}>{situacaoExecucao(r).label}</Badge>
                   </li>
                 ))}
               </ul>

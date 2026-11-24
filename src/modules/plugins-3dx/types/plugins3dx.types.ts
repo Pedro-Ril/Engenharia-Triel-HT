@@ -19,6 +19,12 @@ export type StatusExecucao3dx =
   | "ignorada"
   | "cancelada";
 
+/*
+ * Filtro de status da tela: os status do banco + "barrada" (liberação que não se concretizou no 3DX: status
+ * ignorada, gatilho liberação, resumo do plugin dizendo que o objeto não ficou RELEASED). Não existe no banco.
+ */
+export type FiltroStatusExecucao3dx = StatusExecucao3dx | "barrada";
+
 export type GatilhoExecucao3dx = "liberacao" | "duplicacao" | "noturna" | "manual";
 
 export type NivelEvento3dx = "info" | "aviso" | "erro";
@@ -120,6 +126,10 @@ export interface Execucao3dx {
   totalFalhas: number | null;
   resumo: string | null;
   erro: string | null;
+  /* trabalho na fila esperando a hora de rodar (ex.: conferir de novo se a liberação já foi gravada) */
+  executarApos: string | null;
+  /* calculado: liberação que não se concretizou no 3DX (barrada por regra ou cancelada) */
+  barrada: boolean;
 }
 
 export interface ItemExecucao3dx {
@@ -155,7 +165,7 @@ export interface PaginaExecucoes3dx {
 export interface FiltrosExecucoes3dx {
   ambiente?: Ambiente3dx | null;
   plugin?: string | null;
-  status?: StatusExecucao3dx | null;
+  status?: FiltroStatusExecucao3dx | null;
   gatilho?: GatilhoExecucao3dx | null;
   busca?: string | null;
   de?: string | null;

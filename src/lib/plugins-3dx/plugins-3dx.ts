@@ -418,7 +418,21 @@ interface ExecucaoRow {
   total_falhas: number | null;
   resumo: string | null;
   erro: string | null;
+  executar_apos: string | null;
+  barrada: boolean;
 }
+
+/*
+ * Liberação barrada: o plugin esperou o objeto ficar RELEASED e ele não ficou (regra do 3DX ou cancelamento).
+ * Reconhecida pelo resumo que os plugins gravam -- o atual (núcleo 1.4.0+: "barrada por regra") e os anteriores
+ * ("não ficou RELEASED", do plugin de revisão, e "IGNORADO (estado X)", do de desenho). Alias "e.".
+ */
+export const SQL_LIBERACAO_BARRADA = `(e.[status] = 'ignorada' AND e.[gatilho] = 'liberacao' AND (
+  e.[resumo] LIKE N'%barrada por regra%' OR e.[resumo] LIKE N'%não ficou RELEASED%' OR e.[resumo] LIKE N'%IGNORADO (estado %'))`;
+
+/* Colunas extras de toda consulta de execução: a fila (executar_apos) e o selo "Barrada". */
+export const SELECT_EXECUCAO_EXTRAS = `CONVERT(VARCHAR(33), e.[executar_apos], 126) AS [executar_apos],
+  CAST(CASE WHEN ${SQL_LIBERACAO_BARRADA} THEN 1 ELSE 0 END AS BIT) AS [barrada]`;
 
 const SELECT_EXECUCAO = `
   CONVERT(VARCHAR(36), e.[id]) AS [id], e.[plugin_chave], e.[ambiente], e.[gatilho], e.[modo], e.[status],
@@ -427,7 +441,8 @@ const SELECT_EXECUCAO = `
   CONVERT(VARCHAR(33), e.[enfileirado_em], 126) AS [enfileirado_em],
   CONVERT(VARCHAR(33), e.[iniciado_em], 126) AS [iniciado_em],
   CONVERT(VARCHAR(33), e.[finalizado_em], 126) AS [finalizado_em],
-  e.[duracao_ms], e.[total_itens], e.[total_ok], e.[total_falhas], e.[resumo], e.[erro]`;
+  e.[duracao_ms], e.[total_itens], e.[total_ok], e.[total_falhas], e.[resumo], e.[erro],
+  ${SELECT_EXECUCAO_EXTRAS}`;
 
 const FROM_EXECUCAO = `
   FROM dbo.portal_3dx_plugins_execucoes e
@@ -460,6 +475,8 @@ function mapearExecucao(row: ExecucaoRow): Execucao3dx {
     totalFalhas: row.total_falhas,
     resumo: row.resumo,
     erro: row.erro,
+    executarApos: row.executar_apos,
+    barrada: Boolean(row.barrada),
   };
 }
 
@@ -471,7 +488,7 @@ export async function listarExecucoes(filtros: FiltrosExecucoes3dx): Promise<Pag
   function aplicar(request: ReturnType<typeof pool.request>) {
     if (filtros.ambiente) request.input("ambiente", sql.VarChar(10), filtros.ambiente);
     if (filtros.plugin) request.input("plugin", sql.VarChar(40), filtros.plugin);
-    if (filtros.status) request.input("status", sql.VarChar(12), filtros.status);
+    if (filtros.status && filtros.status !== "barrada") request.input("status", sql.VarChar(12), filtros.status);
     if (filtros.gatilho) request.input("gatilho", sql.VarChar(20), filtros.gatilho);
     if (filtros.busca) request.input("busca", sql.NVarChar(210), `%${filtros.busca}%`);
     if (filtros.de) request.input("de", sql.Date, filtros.de);
@@ -481,7 +498,10 @@ export async function listarExecucoes(filtros: FiltrosExecucoes3dx): Promise<Pag
 
   if (filtros.ambiente) condicoes.push("e.[ambiente] = @ambiente");
   if (filtros.plugin) condicoes.push("e.[plugin_chave] = @plugin");
-  if (filtros.status) condicoes.push("e.[status] = @status");
+  /* "Ignorada" e "Barrada" não se misturam: a barrada é uma ignorada com motivo próprio (selo à parte na tela). */
+  if (filtros.status === "barrada") condicoes.push(SQL_LIBERACAO_BARRADA);
+  else if (filtros.status === "ignorada") condicoes.push(`e.[status] = @status AND NOT ${SQL_LIBERACAO_BARRADA}`);
+  else if (filtros.status) condicoes.push("e.[status] = @status");
   if (filtros.gatilho) condicoes.push("e.[gatilho] = @gatilho");
   if (filtros.de) condicoes.push("e.[enfileirado_em] >= @de");
   if (filtros.ate) condicoes.push("e.[enfileirado_em] < DATEADD(DAY, 1, CAST(@ate AS DATETIME2))");

@@ -21,8 +21,8 @@ import { listarExecucoes } from "../services/plugins3dx.service";
 import type {
   Ambiente3dx,
   GatilhoExecucao3dx,
+  FiltroStatusExecucao3dx,
   PaginaExecucoes3dx,
-  StatusExecucao3dx,
 } from "../types/plugins3dx.types";
 import {
   AMBIENTE,
@@ -32,8 +32,10 @@ import {
   MODO,
   NOME_CURTO_PLUGIN,
   nomeCurtoPlugin,
+  OPCOES_FILTRO_STATUS,
+  rotuloFiltroStatus,
   rotuloObjeto,
-  STATUS_EXECUCAO,
+  situacaoExecucao,
 } from "../utils/exibicao";
 import {
   carregarExecucoesParaExportar,
@@ -59,7 +61,7 @@ const OPCOES_PLUGIN = [
 
 const OPCOES_STATUS = [
   { value: "", label: "Todos os status" },
-  ...Object.entries(STATUS_EXECUCAO).map(([valor, info]) => ({ value: valor, label: info.label })),
+  ...OPCOES_FILTRO_STATUS,
 ];
 
 const OPCOES_GATILHO = [
@@ -102,7 +104,7 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
     listarExecucoes({
       ambiente,
       plugin: plugin || null,
-      status: (status || null) as StatusExecucao3dx | null,
+      status: (status || null) as FiltroStatusExecucao3dx | null,
       gatilho: (gatilho || null) as GatilhoExecucao3dx | null,
       busca: busca || null,
       de: de || null,
@@ -130,7 +132,7 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
       lista.push(["Período", de && ate ? `${data(de)} a ${data(ate)}` : de ? `a partir de ${data(de)}` : `até ${data(ate)}`]);
     }
     if (plugin) lista.push(["Plugin", nomeCurtoPlugin(plugin)]);
-    if (status) lista.push(["Status", STATUS_EXECUCAO[status as StatusExecucao3dx].label]);
+    if (status) lista.push(["Status", rotuloFiltroStatus(status as FiltroStatusExecucao3dx)]);
     if (gatilho) lista.push(["Gatilho", GATILHO[gatilho as GatilhoExecucao3dx]]);
     return lista;
   }
@@ -141,7 +143,7 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
       const lista = await carregarExecucoesParaExportar({
         ambiente,
         plugin: plugin || null,
-        status: (status || null) as StatusExecucao3dx | null,
+        status: (status || null) as FiltroStatusExecucao3dx | null,
         gatilho: (gatilho || null) as GatilhoExecucao3dx | null,
         busca: busca || null,
         de: de || null,
@@ -303,9 +305,7 @@ export function ExecucoesPlugins3dx({ ambiente, onFeedback, execucaoInicial, onF
                     </TableCell>
                     <TableCell>
                       <div className={styles.badgesLinha}>
-                        <Badge variant={STATUS_EXECUCAO[execucao.status].variante}>
-                          {STATUS_EXECUCAO[execucao.status].label}
-                        </Badge>
+                        <Badge variant={situacaoExecucao(execucao).variante}>{situacaoExecucao(execucao).label}</Badge>
                         {execucao.modo !== "ATIVO" && (
                           <Badge variant={MODO[execucao.modo].variante}>{MODO[execucao.modo].label}</Badge>
                         )}

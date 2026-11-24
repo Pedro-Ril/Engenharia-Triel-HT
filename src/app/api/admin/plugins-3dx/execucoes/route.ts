@@ -4,14 +4,23 @@ import { requireAdminApi } from "@/lib/auth/autorizacao";
 import { comMetricasApi } from "@/lib/monitoramento/metricas";
 import { ehAmbiente, listarExecucoes } from "@/lib/plugins-3dx/plugins-3dx";
 import type {
+  FiltroStatusExecucao3dx,
   GatilhoExecucao3dx,
-  StatusExecucao3dx,
 } from "@/modules/plugins-3dx/types/plugins3dx.types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const STATUS: StatusExecucao3dx[] = ["pendente", "processando", "concluida", "parcial", "falha", "ignorada", "cancelada"];
+const STATUS: FiltroStatusExecucao3dx[] = [
+  "pendente",
+  "processando",
+  "concluida",
+  "parcial",
+  "falha",
+  "ignorada",
+  "barrada",
+  "cancelada",
+];
 const GATILHOS: GatilhoExecucao3dx[] = ["liberacao", "duplicacao", "noturna", "manual"];
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -31,7 +40,7 @@ async function handleGET(request: Request) {
     const resultado = await listarExecucoes({
       ambiente: ehAmbiente(ambiente) ? ambiente : null,
       plugin: url.searchParams.get("plugin")?.slice(0, 40) || null,
-      status: STATUS.includes(status as StatusExecucao3dx) ? (status as StatusExecucao3dx) : null,
+      status: STATUS.includes(status as FiltroStatusExecucao3dx) ? (status as FiltroStatusExecucao3dx) : null,
       gatilho: GATILHOS.includes(gatilho as GatilhoExecucao3dx) ? (gatilho as GatilhoExecucao3dx) : null,
       busca: url.searchParams.get("busca")?.trim().slice(0, 200) || null,
       de: de && DATA.test(de) ? de : null,

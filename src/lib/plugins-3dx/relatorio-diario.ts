@@ -14,6 +14,7 @@ import type {
   ModoPlugin3dx,
 } from "@/modules/plugins-3dx/types/plugins3dx.types";
 
+import { SELECT_EXECUCAO_EXTRAS } from "./plugins-3dx";
 import {
   assuntoEmail,
   gerarExcel,
@@ -101,6 +102,8 @@ interface ExecucaoRow {
   total_falhas: number | null;
   resumo: string | null;
   erro: string | null;
+  executar_apos: string | null;
+  barrada: boolean;
 }
 
 interface ItemRow {
@@ -138,7 +141,8 @@ export async function carregarDadosRelatorio(data: string, ambiente: Ambiente3dx
         CONVERT(VARCHAR(33), e.[enfileirado_em], 126) AS [enfileirado_em],
         CONVERT(VARCHAR(33), e.[iniciado_em], 126) AS [iniciado_em],
         CONVERT(VARCHAR(33), e.[finalizado_em], 126) AS [finalizado_em],
-        e.[duracao_ms], e.[total_itens], e.[total_ok], e.[total_falhas], e.[resumo], e.[erro]
+        e.[duracao_ms], e.[total_itens], e.[total_ok], e.[total_falhas], e.[resumo], e.[erro],
+        ${SELECT_EXECUCAO_EXTRAS}
       FROM dbo.portal_3dx_plugins_execucoes e
       LEFT JOIN dbo.portal_usuarios u ON u.[id] = e.[ator_usuario_id]
       WHERE ${FILTRO_DIA}
@@ -220,6 +224,8 @@ export async function carregarDadosRelatorio(data: string, ambiente: Ambiente3dx
         totalFalhas: row.total_falhas,
         resumo: row.resumo,
         erro: row.erro,
+        executarApos: row.executar_apos,
+        barrada: Boolean(row.barrada),
       })
     ),
     itens: itens.recordset.map(

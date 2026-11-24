@@ -20,7 +20,14 @@ import type { FeedbackHandler } from "@/modules/admin-permissoes/types/toast.typ
 import { cancelarExecucao, enviarAcao, listarExecucoes } from "../services/plugins3dx.service";
 import type { AcaoManual3dx, Ambiente3dx, Execucao3dx } from "../types/plugins3dx.types";
 import { AMBIENTES_3DX } from "../types/plugins3dx.types";
-import { AMBIENTE, formatarDataHora, nomeCurtoPlugin, rotuloObjeto, STATUS_EXECUCAO } from "../utils/exibicao";
+import {
+  AMBIENTE,
+  formatarDataHora,
+  nomeCurtoPlugin,
+  proximaTentativa,
+  rotuloObjeto,
+  STATUS_EXECUCAO,
+} from "../utils/exibicao";
 import styles from "./Plugins3dx.module.css";
 import { RelatorioDiario3dx } from "./RelatorioDiario3dx";
 
@@ -208,11 +215,30 @@ export function AcoesPlugins3dx({ ambiente, onFeedback }: AcoesProps) {
                     <Badge variant={AMBIENTE[execucao.ambiente].variante}>{AMBIENTE[execucao.ambiente].label}</Badge>
                   </TableCell>
                   <TableCell>{nomeCurtoPlugin(execucao.pluginChave)}</TableCell>
-                  <TableCell>{rotuloObjeto(execucao.objetoNome, execucao.objetoRevisao, execucao.objetoTitulo)}</TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_EXECUCAO[execucao.status].variante}>
-                      {STATUS_EXECUCAO[execucao.status].label}
-                    </Badge>
+                    <div className={styles.celulaObjeto}>
+                      <span className={styles.nomeObjeto}>
+                        {rotuloObjeto(execucao.objetoNome, execucao.objetoRevisao, execucao.objetoTitulo)}
+                      </span>
+                      {/* ex.: "Aguardando RELEASED (estado IN_WORK; 2ª conferência, próxima em 10 s)" */}
+                      {execucao.resumo && (
+                        <span className={styles.resumoLinha} title={execucao.resumo}>
+                          {execucao.resumo}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell style={{ whiteSpace: "nowrap" }}>
+                    <div className={styles.celulaObjeto}>
+                      <span>
+                        <Badge variant={STATUS_EXECUCAO[execucao.status].variante}>
+                          {STATUS_EXECUCAO[execucao.status].label}
+                        </Badge>
+                      </span>
+                      {proximaTentativa(execucao) && (
+                        <span className={styles.resumoLinha}>Próxima conferência às {proximaTentativa(execucao)}</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell align="center">
                     {execucao.status === "pendente" && (

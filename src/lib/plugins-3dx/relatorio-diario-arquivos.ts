@@ -40,6 +40,8 @@ import {
   NOME_CURTO_PLUGIN,
   nomeCurtoPlugin,
   rotuloObjeto,
+  situacaoExecucao,
+  STATUS_BARRADA,
   STATUS_EXECUCAO,
 } from "@/modules/plugins-3dx/utils/exibicao";
 
@@ -170,9 +172,14 @@ export function calcularResumo(dados: DadosRelatorio3dx): ResumoRelatorio3dx {
   });
   const totais = contarItens(itens);
 
-  const porStatus = Object.entries(STATUS_EXECUCAO)
-    .map(([status, info]): [string, number] => [info.label, execucoes.filter((e) => e.status === status).length])
-    .filter(([, n]) => n > 0);
+  /* "Barrada" (liberação que não se concretizou no 3DX) sai à parte de "Ignorada", como na tela. */
+  const porStatus = [
+    ...Object.entries(STATUS_EXECUCAO).map(([status, info]): [string, number] => [
+      info.label,
+      execucoes.filter((e) => e.status === status && !e.barrada).length,
+    ]),
+    [STATUS_BARRADA.label, execucoes.filter((e) => e.barrada).length] as [string, number],
+  ].filter(([, n]) => n > 0);
 
   const duracoes = execucoes.map((e) => e.duracaoMs).filter((d): d is number => d !== null);
 
@@ -286,7 +293,7 @@ function indicadores(resumo: ResumoRelatorio3dx): { rotulo: string; valor: strin
 // ------------------------------------------------------------------ linhas de detalhe (PDF e Excel)
 
 function linhaExecucao(execucao: Execucao3dx): string[] {
-  const status = STATUS_EXECUCAO[execucao.status].label;
+  const status = situacaoExecucao(execucao).label;
   return [
     hora(execucao.enfileiradoEm),
     AMBIENTE[execucao.ambiente].label,
@@ -595,7 +602,7 @@ export function gerarPdf(dados: DadosRelatorio3dx): Buffer {
         AMBIENTE[e.ambiente].label,
         nomeCurtoPlugin(e.pluginChave),
         rotuloObjeto(e.objetoNome, e.objetoRevisao, e.objetoTitulo),
-        STATUS_EXECUCAO[e.status].label,
+        situacaoExecucao(e).label,
         e.erro ?? e.resumo ?? "",
       ]),
       redesenharFaixa,
@@ -607,17 +614,17 @@ export function gerarPdf(dados: DadosRelatorio3dx): Buffer {
     );
   }
 
-  // ---- detalhado (página nova): só o que mudou, mudaria ou falhou; o resto está no Excel
+  // ---- detalhado (página nova): só o que mudou, mudaria, falhou ou teve a liberação barrada; o resto está no Excel
   const relevantes = dados.itens.filter(itemRelevante);
   const comItemRelevante = new Set(relevantes.map((item) => item.execucaoId));
   const execucoesPdf = dados.execucoes.filter(
-    (e) => comItemRelevante.has(e.id) || e.status === "falha" || e.status === "parcial"
+    (e) => comItemRelevante.has(e.id) || e.status === "falha" || e.status === "parcial" || e.barrada
   );
   doc.addPage();
   redesenharFaixa();
   y = tabelaPdf(
     doc,
-    `Execuções com alteração ou falha (${execucoesPdf.length} de ${dados.execucoes.length})`,
+    `Execuções com alteração, falha ou liberação barrada (${execucoesPdf.length} de ${dados.execucoes.length})`,
     CABECALHO_EXECUCOES,
     execucoesPdf.map((execucao) => {
       const linha = linhaExecucao(execucao);
@@ -634,7 +641,7 @@ export function gerarPdf(dados: DadosRelatorio3dx): Buffer {
         const execucao = execucoesPdf[linha];
         if (!execucao) return null;
         if (coluna === 0) return COR_TEXTO_SUAVE;
-        if (coluna === 6) return cores[STATUS_EXECUCAO[execucao.status].variante].cor;
+        if (coluna === 6) return cores[situacaoExecucao(execucao).variante].cor;
         return null;
       },
     }

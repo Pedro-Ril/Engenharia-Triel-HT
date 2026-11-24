@@ -28,7 +28,6 @@ import type {
   Execucao3dx,
   FiltrosExecucoes3dx,
   ItemExecucao3dx,
-  StatusExecucao3dx,
 } from "../types/plugins3dx.types";
 import {
   ACAO_ITEM,
@@ -41,6 +40,8 @@ import {
   nomeCurtoPlugin,
   rotuloNo,
   rotuloObjeto,
+  situacaoExecucao,
+  STATUS_BARRADA,
   STATUS_EXECUCAO,
 } from "./exibicao";
 
@@ -95,14 +96,14 @@ export async function carregarExecucoesParaExportar(
   return { execucoes: execucoes.slice(0, LIMITE_EXPORTACAO), total };
 }
 
-function seloStatus(status: StatusExecucao3dx): SeloPdf {
-  const info = STATUS_EXECUCAO[status];
+function seloStatus(execucao: Execucao3dx): SeloPdf {
+  const info = situacaoExecucao(execucao);
   return { texto: info.label, ...CORES_VARIANTE_PDF[info.variante] };
 }
 
 /* Status com o modo quando não é o normal (Simulação/Desligado), como os badges da tela. */
 function textoStatus(execucao: Execucao3dx): string {
-  const status = STATUS_EXECUCAO[execucao.status].label;
+  const status = situacaoExecucao(execucao).label;
   return execucao.modo === "ATIVO" ? status : `${status} (${MODO[execucao.modo].label})`;
 }
 
@@ -167,9 +168,11 @@ function resumoDaLista(lista: ListaParaExportar): [string, string][] {
     ],
   ];
   for (const [status, info] of Object.entries(STATUS_EXECUCAO)) {
-    const quantidade = lista.execucoes.filter((e) => e.status === status).length;
+    const quantidade = lista.execucoes.filter((e) => e.status === status && !e.barrada).length;
     if (quantidade > 0) linhas.push([info.label, String(quantidade)]);
   }
+  const barradas = lista.execucoes.filter((e) => e.barrada).length;
+  if (barradas > 0) linhas.push([STATUS_BARRADA.label, String(barradas)]);
   const objetos = lista.execucoes.reduce((soma, e) => soma + (e.totalItens ?? 0), 0);
   const falhas = lista.execucoes.reduce((soma, e) => soma + (e.totalFalhas ?? 0), 0);
   linhas.push(["Objetos tratados", `${objetos}${falhas > 0 ? ` (${plural(falhas, "falha", "falhas")})` : ""}`]);
@@ -254,7 +257,7 @@ ${execucao.resumo}`;
       if (!execucao) return;
       if (dados.column.index === 0) dados.cell.styles.textColor = COR_TEXTO_SUAVE;
       if (dados.column.index === 6) {
-        dados.cell.styles.textColor = CORES_VARIANTE_PDF[STATUS_EXECUCAO[execucao.status].variante].cor;
+        dados.cell.styles.textColor = CORES_VARIANTE_PDF[situacaoExecucao(execucao).variante].cor;
       }
       if (dados.column.index === 7 && (execucao.totalFalhas ?? 0) > 0) {
         dados.cell.styles.textColor = CORES_VARIANTE_PDF.danger.cor;
@@ -272,7 +275,7 @@ export function exportarExecucoesExcel(lista: ListaParaExportar, filtros: Filtro
     [...CABECALHO_LISTA, "Modo", "Falhas", "Iniciado", "Finalizado", "Nó", "Tentativas", "Resumo", "Erro"],
     ...lista.execucoes.map((execucao) => [
       ...linhaDaLista(execucao).slice(0, 6),
-      STATUS_EXECUCAO[execucao.status].label,
+      situacaoExecucao(execucao).label,
       execucao.totalItens ?? "",
       formatarDuracao(execucao.duracaoMs),
       MODO[execucao.modo].label,
@@ -328,7 +331,7 @@ function dadosDaExecucao(execucao: Execucao3dx): [string, string][] {
     ["Plugin", nomeCurtoPlugin(execucao.pluginChave)],
     ["Gatilho", GATILHO[execucao.gatilho]],
     ["Ambiente", AMBIENTE[execucao.ambiente].label],
-    ["Status", STATUS_EXECUCAO[execucao.status].label],
+    ["Status", situacaoExecucao(execucao).label],
     ["Modo", `${MODO[execucao.modo].label} — ${MODO[execucao.modo].descricao}`],
     ["Quem", quem(execucao)],
     [
@@ -383,7 +386,7 @@ export function exportarExecucaoPdf(detalhe: DetalheExecucao3dx): void {
     modulo: MODULO,
     titulo: `Execução: ${nomeCurtoPlugin(e.pluginChave)}`,
     chip: textoPdf([e.objetoNome, e.objetoRevisao].filter(Boolean).join(" ") || AMBIENTE[e.ambiente].label).slice(0, 24),
-    selo: seloStatus(e.status),
+    selo: seloStatus(e),
   };
   const redesenharFaixa = () => desenharFaixa(doc, cabecalho);
 
@@ -401,7 +404,7 @@ export function exportarExecucaoPdf(detalhe: DetalheExecucao3dx): void {
       body: detalhe.relacionadas.map((r) => [
         textoPdf(nomeCurtoPlugin(r.pluginChave)),
         textoPdf(rotuloObjeto(r.objetoNome, r.objetoRevisao, r.objetoTitulo)),
-        STATUS_EXECUCAO[r.status].label,
+        situacaoExecucao(r).label,
       ]),
       styles: { ...ESTILO_TABELA, valign: "top" },
       headStyles: ESTILO_CABECALHO_TABELA,
@@ -525,7 +528,7 @@ export function exportarExecucaoExcel(detalhe: DetalheExecucao3dx): void {
       ...detalhe.relacionadas.map((r) => [
         nomeCurtoPlugin(r.pluginChave),
         rotuloObjeto(r.objetoNome, r.objetoRevisao, r.objetoTitulo),
-        STATUS_EXECUCAO[r.status].label,
+        situacaoExecucao(r).label,
         formatarDataHora(r.enfileiradoEm),
       ]),
     ]);

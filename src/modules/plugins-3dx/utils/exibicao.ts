@@ -1,5 +1,6 @@
 import type {
   Ambiente3dx,
+  FiltroStatusExecucao3dx,
   GatilhoExecucao3dx,
   ModoPlugin3dx,
   NivelEvento3dx,
@@ -69,6 +70,48 @@ export const STATUS_EXECUCAO: Record<StatusExecucao3dx, { label: string; variant
   ignorada: { label: "Ignorada", variante: "neutral" },
   cancelada: { label: "Cancelada", variante: "neutral" },
 };
+
+/* Liberação que não se concretizou no 3DX: é uma "ignorada" com motivo próprio, mostrada à parte. */
+export const STATUS_BARRADA: { label: string; variante: VarianteBadge; descricao: string } = {
+  label: "Barrada",
+  variante: "warning",
+  descricao: "A liberação não se concretizou no 3DEXPERIENCE (barrada por regra, como filho não liberado, ou cancelada).",
+};
+
+/* Rótulo e cor da execução: o status do banco, ou "Barrada" quando é uma liberação que não se concretizou. */
+export function situacaoExecucao(execucao: { status: StatusExecucao3dx; barrada?: boolean }): {
+  label: string;
+  variante: VarianteBadge;
+} {
+  return execucao.barrada ? STATUS_BARRADA : STATUS_EXECUCAO[execucao.status];
+}
+
+/* Opções do filtro de status: os do banco, com "Barrada" logo depois de "Ignorada". */
+export const OPCOES_FILTRO_STATUS: { value: FiltroStatusExecucao3dx; label: string }[] = (
+  Object.entries(STATUS_EXECUCAO) as [StatusExecucao3dx, { label: string }][]
+).flatMap(([valor, info]): { value: FiltroStatusExecucao3dx; label: string }[] =>
+  valor === "ignorada"
+    ? [
+        { value: valor, label: info.label },
+        { value: "barrada" as const, label: STATUS_BARRADA.label },
+      ]
+    : [{ value: valor, label: info.label }]
+);
+
+export function rotuloFiltroStatus(status: FiltroStatusExecucao3dx): string {
+  return status === "barrada" ? STATUS_BARRADA.label : STATUS_EXECUCAO[status].label;
+}
+
+/*
+ * Trabalho na fila que espera a hora de rodar (ex.: conferir de novo se a liberação foi gravada):
+ * "próxima conferência às 18:20:35". null quando roda assim que um nó estiver livre.
+ */
+export function proximaTentativa(execucao: { status: StatusExecucao3dx; executarApos: string | null }): string | null {
+  if (execucao.status !== "pendente" || !execucao.executarApos) return null;
+  const data = new Date(execucao.executarApos);
+  if (Number.isNaN(data.getTime()) || data.getTime() <= Date.now()) return null;
+  return data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
 
 export const GATILHO: Record<GatilhoExecucao3dx, string> = {
   liberacao: "Liberação",
