@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 
@@ -54,7 +55,7 @@ import java.util.TreeSet;
 public class ReplaceRevisionModule implements PluginModule {
 
     public static final String KEY = "replace-revision";
-    public static final String VERSION = "7.2.0";
+    public static final String VERSION = "7.2.1";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -68,6 +69,19 @@ public class ReplaceRevisionModule implements PluginModule {
     private static final class Target {
         String instancePid;
         String oldRev;
+    }
+
+    /** Um conjunto pai NAO liberado: fica como esta (uma linha no registro, com quantas instancias). */
+    private static final class Kept {
+        String pid;
+        String type;
+        String name;
+        String revision;
+        String title;
+        String state;
+        String owner;
+        int instances;
+        final TreeSet<String> oldRevs = new TreeSet<>();
     }
 
     /** Um conjunto pai e as instancias dele a trocar. */
@@ -116,6 +130,10 @@ public class ReplaceRevisionModule implements PluginModule {
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("7.2.1", "2026-11-25", "Conjunto não liberado aparece uma vez só na execução, com quantas "
+                        + "instâncias continuam na revisão anterior, o estado e o responsável (antes era uma linha por "
+                        + "instância); o resumo conta também os conjuntos. Reprocessar pelo nome (Portal) usa a revisão "
+                        + "LIBERADA mais recente: em peça com ramo de revisão pegava uma revisão obsoleta."),
                 Release.of("7.2.0", "2026-11-24", "Espera da liberação sem prender a fila (núcleo 1.4.0) e prazo padrão de "
                         + "30 s; liberação que não se concretiza fica registrada como barrada por regra do 3DX ou cancelada."),
                 Release.of("7.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
@@ -186,7 +204,15 @@ public class ReplaceRevisionModule implements PluginModule {
             return;
         }
         Map<String, Parent> parents = new LinkedHashMap<>();
-        int notReleased = findTargets(ctx, job, rep, parents);
+        Map<String, Kept> kept = new LinkedHashMap<>();
+        findTargets(ctx, job, parents, kept);
+        int notReleased = kept.values().stream().mapToInt(k -> k.instances).sum();
+        for (Kept k : kept.values()) {
+            String revs = "rev " + String.join(", ", k.oldRevs);
+            rep.item("pai_nao_liberado", true).target(k.pid, k.type, k.name, k.revision, k.title).state(k.state, k.owner)
+                    .change(revs + " (" + k.instances + " instância(s))", null)
+                    .message("Conjunto não liberado: " + k.instances + " instância(s) continuam usando a " + revs).add();
+        }
         int total = parents.values().stream().mapToInt(p -> p.targets.size()).sum();
         int max = cfg.integer("maxInstancias", 5000);
         if (total > max) {
@@ -235,43 +261,75 @@ public class ReplaceRevisionModule implements PluginModule {
         rep.summary(sim
                 ? "Simulação: " + parents.size() + " conjunto(s) liberado(s) seriam atualizados (" + total
                         + " instância(s)); " + obsoleted + " revisão(ões) seriam obsoletadas; " + notReleased
-                        + " instância(s) em conjuntos não liberados ficam como estão"
+                        + " instância(s) em " + kept.size() + " conjunto(s) não liberado(s) ficam como estão"
                 : replaced + " instância(s) trocada(s) em " + parentsOk + " conjunto(s); " + obsoleted
-                        + " revisão(ões) obsoleta(s); " + notReleased + " instância(s) em conjuntos não liberados mantidas");
+                        + " revisão(ões) obsoleta(s); " + notReleased + " instância(s) em " + kept.size()
+                        + " conjunto(s) não liberado(s) mantidas");
     }
 
-    /** Acao manual: {"nome": ...} -> ultima revisao da peca. */
+    private static final DateTimeFormatter MQL_DATE = DateTimeFormatter.ofPattern("M/d/yyyy h:mm:ss a", Locale.US);
+
+    /**
+     * Acao manual: {"nome": ...} -> a revisao LIBERADA mais recente que e a ultima do seu ramo. Peca com ramo de
+     * revisao tem mais de uma revisao "ultima" (last.id == id): antes valia a primeira da consulta, que podia ser
+     * uma revisao obsoleta (25/11/2026, prd-52114233-00025998 no dev: pegou a A obsoleta em vez da I).
+     */
     private static boolean resolveByName(Context ctx, Job job, Report rep) throws Exception {
         String name = job.param("nome", job.objectName);
         if (name == null || name.isBlank()) {
             rep.fail("Informe o nome da peça");
             return false;
         }
-        // ordem: type | name | revision | id | last.id | physicalid | isProduct | titulo
+        // ordem: type | name | revision | id | last.id | isProduct | current | originated
+        // (o MQL do 3DX exige todo argumento parametrizado; physicalid e titulo vem depois, so da escolhida)
+        String[] best = null;
+        LocalDateTime bestWhen = null;
+        boolean found = false;
         for (String line : Core.lines(Mx.mql(ctx, "temp query bus $1 $2 $3 select $4 $5 $6 $7 $8 dump $9", "*",
-                name.trim(), "*", "id", "last.id", "physicalid", "type.kindof[VPMReference]", "attribute[PLMEntity.V_Name]",
-                Core.SEP))) {
+                name.trim(), "*", "id", "last.id", "type.kindof[VPMReference]", "current", "originated", Core.SEP))) {
             String[] f = Core.split(line, 8);
-            if (f.length < 8 || !"TRUE".equalsIgnoreCase(f[6]) || !f[3].equals(f[4])) continue;
-            job.objectType = f[0];
-            job.objectName = f[1];
-            job.objectRevision = f[2];
-            job.objectId = f[3];
-            job.objectPid = f[5];
-            job.objectTitle = f[7];
-            return true;
+            if (f.length < 8 || !"TRUE".equalsIgnoreCase(f[5])) continue;
+            found = true;
+            if (!f[3].equals(f[4]) || !RELEASED.equals(f[6])) continue;
+            LocalDateTime when = parseMqlDate(f[7]);
+            // a mais recente; sem data legivel, vale a ordem da consulta (a ultima)
+            if (best == null || when == null || bestWhen == null || !when.isBefore(bestWhen)) {
+                best = f;
+                bestWhen = when;
+            }
         }
-        rep.fail("Peça " + name + " não encontrada (Physical Product)");
-        return false;
+        if (best == null) {
+            rep.fail(found ? "Peça " + name + ": nenhuma revisão LIBERADA que seja a última do seu ramo"
+                    : "Peça " + name + " não encontrada (Physical Product)");
+            return false;
+        }
+        // ordem: physicalid | titulo
+        String[] o = Core.split(Mx.mql(ctx, "print bus $1 select $2 $3 dump $4", best[3], "physicalid",
+                "attribute[PLMEntity.V_Name]", Core.SEP), 2);
+        job.objectType = best[0];
+        job.objectName = best[1];
+        job.objectRevision = best[2];
+        job.objectId = best[3];
+        job.objectPid = o.length > 0 ? o[0].trim() : null;
+        job.objectTitle = o.length > 1 ? o[1].trim() : null;
+        return true;
+    }
+
+    private static LocalDateTime parseMqlDate(String text) {
+        try {
+            return LocalDateTime.parse(text.trim(), MQL_DATE);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static String revs(Parent p) {
         return "rev " + String.join(", ", p.oldRevs);
     }
 
-    /** Instancias de revisoes anteriores, agrupadas por pai RELEASED. Devolve quantas ficaram em pais nao liberados. */
-    private static int findTargets(Context ctx, Job job, Report rep, Map<String, Parent> parents) throws Exception {
-        int notReleased = 0;
+    /** Instancias de revisoes anteriores, agrupadas por pai: RELEASED (a trocar) e nao liberado (fica como esta). */
+    private static void findTargets(Context ctx, Job job, Map<String, Parent> parents, Map<String, Kept> kept)
+            throws Exception {
         for (String line : Core.lines(Mx.mql(ctx, "temp query bus $1 $2 $3 select $4 dump $5", job.objectType,
                 job.objectName, "*", "id", Core.SEP))) {
             String[] f = Core.split(line, 4); // type | name | revision | id
@@ -285,10 +343,19 @@ public class ReplaceRevisionModule implements PluginModule {
                 String[] p = Core.split(l, 12);
                 if (p.length < 12 || p[11].isEmpty()) continue;
                 if (!RELEASED.equals(p[8])) {
-                    notReleased++;
-                    rep.item("pai_nao_liberado", true).target(p[7], p[3], p[4], p[5], p[10]).state(p[8], p[9])
-                            .change("rev " + oldRev, null).message("Conjunto não liberado: continua usando a rev "
-                                    + oldRev).add();
+                    Kept k = kept.computeIfAbsent(p[6], key -> {
+                        Kept n = new Kept();
+                        n.pid = p[7];
+                        n.type = p[3];
+                        n.name = p[4];
+                        n.revision = p[5];
+                        n.title = p[10];
+                        n.state = p[8];
+                        n.owner = p[9];
+                        return n;
+                    });
+                    k.instances++;
+                    k.oldRevs.add(oldRev);
                     continue;
                 }
                 Parent parent = parents.computeIfAbsent(p[6], k -> {
@@ -309,7 +376,6 @@ public class ReplaceRevisionModule implements PluginModule {
                 parent.oldRevs.add(oldRev);
             }
         }
-        return notReleased;
     }
 
     /** Troca todas as instancias de um pai numa unica chamada e numa unica transacao. */
