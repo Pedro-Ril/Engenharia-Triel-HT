@@ -90,7 +90,7 @@ export function AvisosRecentes3dx({ ambiente, onAbrirExecucao }: AvisosRecentesP
   }
 
   const total = resultado?.total ?? 0;
-  const tamanho = resultado?.tamanhoPagina ?? 20;
+  const tamanho = resultado?.tamanhoPagina ?? 5;
   const totalPaginas = Math.max(1, Math.ceil(total / tamanho));
   const eventos = resultado?.eventos ?? [];
   /* A lista encolheu (limpeza de logs) com a página além do fim: volta para a última que existe. */

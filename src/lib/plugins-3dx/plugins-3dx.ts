@@ -39,7 +39,7 @@ export function ehAmbiente(valor: unknown): valor is Ambiente3dx {
   return valor === "PRODUCAO" || valor === "TESTE";
 }
 export const TAMANHO_PAGINA_EXECUCOES = 25;
-const TAMANHO_PAGINA_EVENTOS = 20;
+const TAMANHO_PAGINA_EVENTOS = 5;
 /* Nó sem heartbeat há mais que isso aparece como "atrasado" (o heartbeat é a cada 60 s). */
 const SEGUNDOS_NO_ATRASADO = 180;
 
