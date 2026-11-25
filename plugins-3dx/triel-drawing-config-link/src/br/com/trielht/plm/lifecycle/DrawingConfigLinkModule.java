@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit;
 public class DrawingConfigLinkModule implements PluginModule {
 
     public static final String KEY = "drawing-config-link";
-    public static final String VERSION = "3.2.0";
+    public static final String VERSION = "3.2.1";
 
     private static final String CHANGE_STATUS = "Change Status";
     private static final String RELEASED = "RELEASED";
@@ -96,6 +96,9 @@ public class DrawingConfigLinkModule implements PluginModule {
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("3.2.1", "2026-11-24", "Varredura: cada desenho ignorado vira um aviso na execução, com o nome e o "
+                        + "motivo (sem configuração ligada, origem que não é SOLIDWORKS, estado), e o resumo conta os "
+                        + "ignorados por motivo."),
                 Release.of("3.2.0", "2026-11-24", "Espera da liberação sem prender a fila (núcleo 1.4.0) e prazo padrão de "
                         + "30 s; liberação que não se concretiza fica registrada como barrada por regra do 3DX ou cancelada."),
                 Release.of("3.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
@@ -393,6 +396,7 @@ public class DrawingConfigLinkModule implements PluginModule {
         String[] lines = Core.lines(Mx.mql(ctx, "temp query bus $1 $2 $3 where $4 select $5 dump $6", "Drawing", "*", "*",
                 "current==RELEASED", "id", Core.SEP));
         int total = 0, completos = 0, ignorados = 0, comFalta = 0, erros = 0;
+        Map<String, Integer> motivos = new LinkedHashMap<>();
         rep.info("Varredura iniciada: " + lines.length + " desenho(s) liberado(s)" + (limit > 0 ? ", limite " + limit : ""));
         for (String line : lines) {
             if (limit > 0 && total >= limit) break;
@@ -402,8 +406,16 @@ public class DrawingConfigLinkModule implements PluginModule {
             try {
                 Result r = processDrawing(ctx, f[3], rep, cfg, false);
                 if (r.status.startsWith("COMPLETO")) completos++;
-                else if (r.status.startsWith("IGNORADO")) ignorados++;
-                else comFalta++;
+                else if (r.status.startsWith("IGNORADO")) {
+                    ignorados++;
+                    String motivo = ignoreReason(r.status);
+                    motivos.merge(motivo, 1, Integer::sum);
+                    // acima do limite ja gerou aviso em processDrawing; os demais ganham o aviso aqui (nome + motivo)
+                    if (!r.status.contains("acima do limite")) {
+                        String nome = r.label.isEmpty() ? f[1] + " " + f[2] : r.label;
+                        rep.warn("Desenho ignorado na varredura: " + nome + " → " + r.status);
+                    }
+                } else comFalta++;
             } catch (Exception e) {
                 erros++;
                 rep.count(false);
@@ -412,8 +424,23 @@ public class DrawingConfigLinkModule implements PluginModule {
             if (total % 200 == 0) rep.touch();
         }
         rep.total(total);
+        StringBuilder porMotivo = new StringBuilder();
+        for (Map.Entry<String, Integer> m : motivos.entrySet()) {
+            porMotivo.append(porMotivo.length() == 0 ? " (" : "; ").append(m.getValue()).append(' ').append(m.getKey());
+        }
+        if (porMotivo.length() > 0) porMotivo.append(')');
         rep.summary("Varredura: " + total + " desenho(s) verificado(s), " + completos + " completo(s), " + ignorados
-                + " ignorado(s), " + comFalta + " com configuração faltando, " + erros + " erro(s)");
+                + " ignorado(s)" + porMotivo + ", " + comFalta + " com configuração faltando, " + erros + " erro(s)");
+    }
+
+    /** Motivo de um "IGNORADO (...)" sem os numeros, para agrupar no resumo (ex.: "sem configuração ligada"). */
+    static String ignoreReason(String status) {
+        int a = status.indexOf('('), b = status.lastIndexOf(')');
+        String motivo = a >= 0 && b > a ? status.substring(a + 1, b) : status;
+        if (motivo.contains("acima do limite")) return "acima do limite de configurações";
+        if (motivo.startsWith("estado ")) return "não estava RELEASED";
+        if (motivo.startsWith("origem ")) return motivo; // ex.: "origem CATIA"
+        return motivo;
     }
 
     /** O desenho ja esta ligado a esta configuracao (physicalid)? */

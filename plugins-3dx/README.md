@@ -68,7 +68,7 @@ Toda mudança em um jar sobe a versão **dele**: a constante `VERSION` do módul
 
 Ao mudar um jar: suba `VERSION` **e** acrescente a linha correspondente em `releases()`/`RELEASES`. Texto com acento, uma ou duas frases, do ponto de vista de quem usa.
 
-Versões atuais: núcleo 1.4.0, título (`duplicate-title`) 6.2.1, revisão (`replace-revision`) 7.2.0, desenho (`drawing-config-link`) 3.2.0. Documentação completa: "Documentação Técnica - Plugins e melhorias do 3DEXPERIENCE" (pasta Portal Triel-HT).
+Versões atuais: núcleo 1.4.0, título (`duplicate-title`) 6.2.1, revisão (`replace-revision`) 7.2.0, desenho (`drawing-config-link`) 3.2.1. Documentação completa: "Documentação Técnica - Plugins e melhorias do 3DEXPERIENCE" (pasta Portal Triel-HT).
 
 ## Depois de um hotfix ou atualização do 3DEXPERIENCE
 
