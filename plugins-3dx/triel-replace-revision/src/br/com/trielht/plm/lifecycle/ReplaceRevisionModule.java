@@ -133,7 +133,8 @@ public class ReplaceRevisionModule implements PluginModule {
                 Release.of("7.2.1", "2026-11-25", "Conjunto não liberado aparece uma vez só na execução, com quantas "
                         + "instâncias continuam na revisão anterior, o estado e o responsável (antes era uma linha por "
                         + "instância); o resumo conta também os conjuntos. Reprocessar pelo nome (Portal) usa a revisão "
-                        + "LIBERADA mais recente: em peça com ramo de revisão pegava uma revisão obsoleta."),
+                        + "LIBERADA mais recente: quando mais de uma revisão se apresentava como a última, podia pegar "
+                        + "uma obsoleta."),
                 Release.of("7.2.0", "2026-11-24", "Espera da liberação sem prender a fila (núcleo 1.4.0) e prazo padrão de "
                         + "30 s; liberação que não se concretiza fica registrada como barrada por regra do 3DX ou cancelada."),
                 Release.of("7.1.0", "2026-11-23", "Autoteste: declara as partes internas da Dassault que usa, conferidas na subida (aviso no Portal se um hotfix tirar alguma)."),
@@ -270,9 +271,9 @@ public class ReplaceRevisionModule implements PluginModule {
     private static final DateTimeFormatter MQL_DATE = DateTimeFormatter.ofPattern("M/d/yyyy h:mm:ss a", Locale.US);
 
     /**
-     * Acao manual: {"nome": ...} -> a revisao LIBERADA mais recente que e a ultima do seu ramo. Peca com ramo de
-     * revisao tem mais de uma revisao "ultima" (last.id == id): antes valia a primeira da consulta, que podia ser
-     * uma revisao obsoleta (25/11/2026, prd-52114233-00025998 no dev: pegou a A obsoleta em vez da I).
+     * Acao manual: {"nome": ...} -> a revisao LIBERADA mais recente entre as que se dizem a ultima (last.id == id).
+     * Pode haver mais de uma: antes valia a primeira da consulta, que podia ser uma revisao obsoleta (25/11/2026,
+     * prd-52114233-00025998 no dev: pegou a A obsoleta em vez da I).
      */
     private static boolean resolveByName(Context ctx, Job job, Report rep) throws Exception {
         String name = job.param("nome", job.objectName);
@@ -299,7 +300,7 @@ public class ReplaceRevisionModule implements PluginModule {
             }
         }
         if (best == null) {
-            rep.fail(found ? "Peça " + name + ": nenhuma revisão LIBERADA que seja a última do seu ramo"
+            rep.fail(found ? "Peça " + name + ": nenhuma revisão LIBERADA que seja a última"
                     : "Peça " + name + " não encontrada (Physical Product)");
             return false;
         }
