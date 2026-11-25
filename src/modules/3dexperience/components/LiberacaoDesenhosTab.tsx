@@ -25,6 +25,7 @@ import { tituloDiferenteDoItem } from "@/lib/3dexperience/liberacao-regras";
 import {
   agendarLiberacao,
   buscarRodada,
+  buscarRodadaAtiva,
   cancelarAgendamento,
   iniciarSimulacao,
   iniciarSimulacaoLista,
@@ -33,6 +34,7 @@ import {
   type AcaoDesenho,
   type DesenhoDaRodada,
   type Rodada,
+  type RodadaAtiva,
   type StatusRodada,
   type TipoRodada,
 } from "../services/liberacaoDesenhos.service";
@@ -184,6 +186,42 @@ export function LiberacaoDesenhosTab({
   /* Contagem regressiva da agendada: quando começa (no relógio deste navegador) e o "agora", que anda de 1 em 1 s. */
   const [comecaEm, setComecaEm] = useState<number | null>(null);
   const [agora, setAgora] = useState(0);
+  /* A rodada em andamento no Portal (a da pessoa primeiro): aparece num aviso quando não é a que está aberta. */
+  const [ativa, setAtiva] = useState<RodadaAtiva | null>(null);
+
+  /*
+   * Voltou para a tela sem link de rodada: se a pessoa tem uma rodada em
+   * andamento (saiu no meio da simulação, por exemplo), abre nela.
+   */
+  useEffect(() => {
+    if (rodadaInicialId) return;
+    let ativo = true;
+    void buscarRodadaAtiva().then((resultado) => {
+      const minha = resultado.ok && resultado.data?.minha ? resultado.data.id : null;
+      if (ativo && minha) setRodadaId((atual) => atual ?? minha);
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [rodadaInicialId]);
+
+  /* Confere a rodada em andamento ao abrir e a cada mudança no histórico; enquanto houver uma, de 15 em 15 s. */
+  useEffect(() => {
+    let ativo = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function verificar() {
+      const resultado = await buscarRodadaAtiva();
+      if (!ativo) return;
+      const atual = resultado.ok ? (resultado.data ?? null) : null;
+      setAtiva(atual);
+      if (atual) timer = setTimeout(verificar, 15_000);
+    }
+    void verificar();
+    return () => {
+      ativo = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [recargaHistorico]);
 
   /* Busca no histórico com debounce de 400 ms: só consulta quando a pessoa para de digitar. */
   useEffect(() => {
@@ -300,6 +338,8 @@ export function LiberacaoDesenhosTab({
         setRecargaHistorico((n) => n + 1);
       } else {
         setErro(resultado.message ?? "Não foi possível iniciar a simulação.");
+        /* Ex.: "Já há uma rodada em andamento": o aviso com o link para ela aparece. */
+        setRecargaHistorico((n) => n + 1);
       }
     } finally {
       setIniciando(false);
@@ -327,6 +367,7 @@ export function LiberacaoDesenhosTab({
         setRecargaHistorico((n) => n + 1);
       } else {
         setErro(resultado.message ?? "Não foi possível iniciar a simulação.");
+        setRecargaHistorico((n) => n + 1);
       }
     } finally {
       setIniciando(false);
@@ -453,6 +494,8 @@ export function LiberacaoDesenhosTab({
   const comTituloDiferente = desenhos.filter(tituloDiferenteDoItem).length;
   const totalPaginasHistorico = historico ? Math.max(1, Math.ceil(historico.total / POR_PAGINA_HISTORICO)) : 1;
   const filtrandoHistorico = buscaAplicada !== "" || tipoHistorico !== "todas";
+  /* O aviso da rodada em andamento só quando ela não é a que já está aberta (nem a liberação que saiu dela). */
+  const avisoAtiva = ativa && ativa.id !== rodadaId && ativa.id !== rodada?.liberacaoId ? ativa : null;
 
   return (
     <Stack gap={20}>
@@ -551,6 +594,16 @@ export function LiberacaoDesenhosTab({
           )}
           {erro && <Alert variant="danger">{erro}</Alert>}
           {avisoAgendamento && <Alert variant="success">{avisoAgendamento}</Alert>}
+          {avisoAtiva && (
+            <Alert variant="warning">
+              {avisoAtiva.minha ? "Você tem uma rodada em andamento" : `Rodada em andamento de ${avisoAtiva.usuarioNome}`}:{" "}
+              <strong>{avisoAtiva.codigoPai}</strong> ({ETAPA[avisoAtiva.status].replace(/…$/, "").toLowerCase()}). O 3DX
+              atende uma rodada por vez.{" "}
+              <button type="button" className={styles.link} onClick={() => abrirRodada(avisoAtiva.id)}>
+                Acompanhar
+              </button>
+            </Alert>
+          )}
         </Stack>
       </Card>
 

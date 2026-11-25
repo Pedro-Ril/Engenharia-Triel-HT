@@ -8,16 +8,7 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-  const { iniciarAgendadorMateriaPrima } = await import(
-    "@/lib/materias-primas/scheduler"
-  );
-  iniciarAgendadorMateriaPrima();
-
-  const { iniciarMonitoramentoAd } = await import(
-    "@/lib/monitoramento/scheduler-apis"
-  );
-  iniciarMonitoramentoAd();
-
+  /* Processos locais (TV, Bloco de Notas, câmeras) sobem em qualquer ambiente; não disputam o banco. */
   const { iniciarSignalingSeNecessario } = await import(
     "@/lib/tv/signaling-processo"
   );
@@ -28,6 +19,38 @@ export async function register() {
     "@/lib/bloco-notas/colaboracao-processo"
   );
   iniciarColaboracaoSeNecessario();
+
+  const { iniciarMediaMtxSeNecessario } = await import(
+    "@/lib/semaforo/mediamtx-processo"
+  );
+  iniciarMediaMtxSeNecessario().then(async (online) => {
+    if (!online) return;
+
+    const { registrarTodasCamerasAtivasNoMediaMtx } = await import(
+      "@/lib/semaforo/cameras"
+    );
+    await registrarTodasCamerasAtivasNoMediaMtx();
+  });
+
+  /* Agendadores só no Portal de produção (ver agendadoresLigados). */
+  const { agendadoresLigados } = await import("@/lib/agendadores");
+  if (!agendadoresLigados()) {
+    console.warn(
+      "[agendadores] Desligados neste servidor (NODE_ENV=%s). Para ligar num teste: AGENDADORES_ATIVOS=1.",
+      process.env.NODE_ENV
+    );
+    return;
+  }
+
+  const { iniciarAgendadorMateriaPrima } = await import(
+    "@/lib/materias-primas/scheduler"
+  );
+  iniciarAgendadorMateriaPrima();
+
+  const { iniciarMonitoramentoAd } = await import(
+    "@/lib/monitoramento/scheduler-apis"
+  );
+  iniciarMonitoramentoAd();
 
   const { iniciarLimpezaTransferencias } = await import(
     "@/lib/transferencia/scheduler"
@@ -69,18 +92,6 @@ export async function register() {
   /* Plugins 3DX: relatório diário de uso (dia anterior, às 7h) para a lista do evento "relatorio_diario". */
   const { iniciarAgendadorRelatorioPlugins3dx } = await import("@/lib/plugins-3dx/relatorio-diario");
   iniciarAgendadorRelatorioPlugins3dx();
-
-  const { iniciarMediaMtxSeNecessario } = await import(
-    "@/lib/semaforo/mediamtx-processo"
-  );
-  iniciarMediaMtxSeNecessario().then(async (online) => {
-    if (!online) return;
-
-    const { registrarTodasCamerasAtivasNoMediaMtx } = await import(
-      "@/lib/semaforo/cameras"
-    );
-    await registrarTodasCamerasAtivasNoMediaMtx();
-  });
 }
 
 /*

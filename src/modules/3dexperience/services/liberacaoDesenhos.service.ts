@@ -87,6 +87,20 @@ export async function buscarRodada(id: string): Promise<ApiEnvelope<{ rodada: Ro
   return parseResponse(response);
 }
 
+/* A rodada em andamento (ou agendada): a da própria pessoa primeiro (minha), senão a que ocupa o 3DX agora. */
+export interface RodadaAtiva {
+  id: string;
+  codigoPai: string;
+  status: StatusRodada;
+  usuarioNome: string;
+  minha: boolean;
+}
+
+export async function buscarRodadaAtiva(): Promise<ApiEnvelope<RodadaAtiva | null>> {
+  const response = await fetch("/api/3dexperience/liberacao/ativa", { cache: "no-store" });
+  return parseResponse(response);
+}
+
 export async function liberarSimulacao(id: string, desenhos: string[], senha: string | null): Promise<ApiEnvelope<{ id: string }>> {
   const response = await fetch(`/api/3dexperience/liberacao/${id}/liberar`, {
     method: "POST",

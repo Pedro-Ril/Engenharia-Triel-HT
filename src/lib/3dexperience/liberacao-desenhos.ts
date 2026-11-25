@@ -295,6 +295,74 @@ async function garantirNenhumaEmAndamento() {
   }
 }
 
+/*
+ * Acompanha TODA rodada em andamento, mesmo sem ninguém na tela (chamada
+ * pelo agendador a cada 15 s). Antes, só a tela aberta perguntava ao 3DX
+ * pelo job: quem saía no meio deixava a rodada "processando" -- bloqueando
+ * as outras por até 30 min e, depois que o 3DX descartava o resultado
+ * (1 h), para sempre (294441, 10/11/2026).
+ * - processando: pergunta pelo job (buscarRodada grava o resultado);
+ * - explodindo/buscando_desenhos parada além do prazo (o Portal reiniciou
+ *   no meio e o trabalho morreu): encerra com erro. A agendada tem o
+ *   prazo dela, no agendador (liberacao-agendada.ts).
+ */
+export async function acompanharRodadasAbertas() {
+  const pool = await getSqlServerPool();
+  const result = await pool
+    .request()
+    .input("minutos", sql.Int, MINUTOS_RODADA_TRAVADA)
+    .input("segundosPorDesenho", sql.Int, SEGUNDOS_POR_DESENHO_TRAVADA)
+    .query<{ id: string; status: StatusRodada; parada: number }>(`
+      SELECT CONVERT(VARCHAR(36), [id]) AS [id], [status],
+             CASE WHEN COALESCE([agendada_para], [criado_em]) <=
+                       DATEADD(SECOND, -(@minutos * 60 + ISNULL([total_em_trabalho], 0) * @segundosPorDesenho), SYSDATETIME())
+                  THEN 1 ELSE 0 END AS [parada]
+      FROM dbo.portal_3dx_liberacoes
+      WHERE ([status] = 'processando' AND [job_id] IS NOT NULL)
+         OR ([status] IN ('explodindo', 'buscando_desenhos') AND [automatica] = 0);
+    `);
+  for (const r of result.recordset) {
+    try {
+      if (r.status === "processando") {
+        await buscarRodada(r.id);
+      } else if (r.parada) {
+        await falhar(r.id, new Error("A simulação parou no meio (o Portal pode ter sido reiniciado). Simule de novo."));
+      }
+    } catch (erro) {
+      console.error(`Erro ao acompanhar a rodada de liberação ${r.id}:`, erro);
+    }
+  }
+}
+
+/*
+ * A rodada em andamento (ou agendada) para mostrar a quem abre a tela:
+ * a da própria pessoa primeiro (a tela já abre nela), senão a de quem
+ * estiver usando o 3DX agora -- é ela que bloqueia uma rodada nova.
+ */
+export async function rodadaAtiva(usuarioId: string): Promise<{
+  id: string;
+  codigoPai: string;
+  status: StatusRodada;
+  usuarioNome: string;
+  minha: boolean;
+} | null> {
+  const pool = await getSqlServerPool();
+  const result = await pool
+    .request()
+    .input("usuarioId", sql.UniqueIdentifier, usuarioId)
+    .query<{ id: string; codigo_pai: string; status: StatusRodada; usuario_nome: string; minha: number }>(`
+      SELECT TOP 1 CONVERT(VARCHAR(36), [id]) AS [id], [codigo_pai], [status], [usuario_nome],
+             CASE WHEN [usuario_id] = @usuarioId THEN 1 ELSE 0 END AS [minha]
+      FROM dbo.portal_3dx_liberacoes
+      WHERE [status] IN ('agendada', 'explodindo', 'buscando_desenhos', 'processando')
+      ORDER BY CASE WHEN [usuario_id] = @usuarioId THEN 0 ELSE 1 END, [criado_em] DESC;
+    `);
+  const linha = result.recordset[0];
+  return linha
+    ? { id: linha.id, codigoPai: linha.codigo_pai, status: linha.status, usuarioNome: linha.usuario_nome, minha: Boolean(linha.minha) }
+    : null;
+}
+
 async function criarRodada(params: {
   codigoPai: string;
   dryRun: boolean;
@@ -721,15 +789,55 @@ const ACOES_DO_JOB: Record<string, AcaoDesenho> = {
 };
 
 /*
- * Rodada em processamento: pergunta ao 3DX como está o job e, quando
- * termina, grava o resultado de cada desenho no registro. A tela chama
- * isso a cada poucos segundos (via buscarRodada).
+ * O 3DX não tem mais o job (a API foi reiniciada no meio, ou o resultado
+ * passou da hora em que ela o guarda): sem isso a rodada ficava
+ * "processando" para sempre. Simulação: é só simular de novo. Liberação:
+ * parte pode ter sido liberada -- os desenhos sem resultado ficam como erro
+ * "sem confirmação", para a pessoa conferir antes de liberar de novo.
  */
-async function acompanharJob(rodadaId: string, jobId: string) {
+async function encerrarJobPerdido(rodadaId: string, dryRun: boolean) {
+  if (dryRun) {
+    await falhar(
+      rodadaId,
+      new Error("O 3DX não tem mais o resultado desta simulação (a API foi reiniciada ou o resultado expirou). Simule de novo.")
+    );
+    return;
+  }
+  const pool = await getSqlServerPool();
+  await pool
+    .request()
+    .input("liberacaoId", sql.UniqueIdentifier, rodadaId)
+    .query(`
+      UPDATE dbo.portal_3dx_liberacoes_desenhos
+      SET [acao] = 'erro', [mensagem] = N'Sem confirmação do 3DX: confira no 3DEXPERIENCE se este desenho foi liberado antes de liberar de novo.'
+      WHERE [liberacao_id] = @liberacaoId AND [acao] = 'pendente';
+    `);
+  await atualizarRodada(
+    rodadaId,
+    {
+      status: "erro",
+      mensagem:
+        "O 3DX não devolveu o resultado desta liberação (a API foi reiniciada ou o resultado expirou). Parte dos desenhos pode ter sido liberada: confira no 3DEXPERIENCE antes de liberar de novo.",
+    },
+    true
+  );
+}
+
+/*
+ * Rodada em processamento: pergunta ao 3DX como está o job e, quando
+ * termina, grava o resultado de cada desenho no registro. Quem chama
+ * (via buscarRodada) é a tela, a cada poucos segundos, e o agendador, a
+ * cada 15 s (acompanharRodadasAbertas) -- mesmo com a tela fechada.
+ */
+async function acompanharJob(rodadaId: string, jobId: string, dryRun: boolean) {
   let job: ResultadoJob;
   try {
     job = await consultarJob(jobId);
   } catch (erro) {
+    if (erro instanceof Erro3dx && erro.status === 404) {
+      await encerrarJobPerdido(rodadaId, dryRun);
+      return;
+    }
     /* O 3DX não respondeu agora: tenta de novo na próxima consulta, sem derrubar a rodada. */
     console.error("Erro ao consultar o job de liberação no 3DX:", erro);
     return;
@@ -850,7 +958,7 @@ export async function buscarRodada(id: string): Promise<{ rodada: Rodada; desenh
   if (!linha) return null;
 
   if (linha.status === "processando" && linha.job_id) {
-    await acompanharJob(id, linha.job_id);
+    await acompanharJob(id, linha.job_id, Boolean(linha.dry_run));
     linha = (await ler()).recordset[0];
   }
 

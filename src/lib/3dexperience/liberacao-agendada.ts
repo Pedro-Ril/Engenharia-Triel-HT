@@ -1,5 +1,7 @@
 import "server-only";
 
+import { hostname } from "node:os";
+
 import { ValidationError } from "@/lib/auth/errors";
 import { buscarUsuarioPorId } from "@/lib/auth/usuarios";
 import { buscarConfigChamados } from "@/lib/chamados/chamados-config";
@@ -13,7 +15,15 @@ import {
   montarLinkEmailHtml,
 } from "@/lib/smtp/template-email";
 
-import { buscarRodada, executarSimulacao, iniciarLiberacao, rodadaEmAndamento, type DesenhoDaRodada, type Rodada } from "./liberacao-desenhos";
+import {
+  acompanharRodadasAbertas,
+  buscarRodada,
+  executarSimulacao,
+  iniciarLiberacao,
+  rodadaEmAndamento,
+  type DesenhoDaRodada,
+  type Rodada,
+} from "./liberacao-desenhos";
 import { escolherDesenhosAutomaticos, tituloDiferenteDoItem } from "./liberacao-regras";
 
 /*
@@ -31,6 +41,12 @@ import { escolherDesenhosAutomaticos, tituloDiferenteDoItem } from "./liberacao-
  * e-mail dizendo que nada foi liberado e que dá para liberar pela tela.
  * Administrador do Portal não manda senha (vai com o admin da plataforma).
  *
+ * Mais de um servidor do Portal no mesmo banco (ex.: produção e um
+ * `next dev` com AGENDADORES_ATIVOS=1): só quem tem a senha libera, e
+ * reserva a liberação no banco antes (reservarLiberacao). Quem não tem a
+ * senha espera SEGUNDOS_ESPERA_SENHA depois do fim da simulação antes de
+ * desistir, e nunca avisa "nada foi liberado" se a liberação já existe.
+ *
  * Tudo o mais fica no banco (status/agendada_para/notificado_em em
  * portal_3dx_liberacoes): o agendador retoma de onde parou depois de um
  * reinício e o e-mail final sai uma vez só.
@@ -46,6 +62,11 @@ const MINUTOS_MAX_ETAPA = 120;
 const MINUTOS_MAX_SENHA = MINUTOS_ESPERA_INDEXACAO + MINUTOS_MAX_NA_FILA + MINUTOS_MAX_ETAPA + 5;
 /* Quantos desenhos o e-mail lista (o resto fica no Portal). */
 const MAX_DESENHOS_NO_EMAIL = 40;
+/* Sem a senha aqui: espera isso depois do fim da simulação (outro servidor do Portal pode tê-la) antes de desistir. */
+const SEGUNDOS_ESPERA_SENHA = 180;
+/* Reserva de quem foi liberar: vence se o servidor cair antes de mandar o job ao 3DX. */
+const MINUTOS_RESERVA = 10;
+const ESTE_SERVIDOR = `${hostname()}:${process.pid}`.slice(0, 120);
 
 /* ------------------------------------------------------------------ senha em memória */
 
@@ -74,6 +95,10 @@ export function descartarSenhaAgendada(rodadaId: string) {
 }
 
 /* Lê e já apaga: a senha serve para uma tentativa só. */
+function temSenha(rodadaId: string): boolean {
+  return senhas().has(rodadaId);
+}
+
 function retirarSenha(rodadaId: string): string | null {
   const guardada = senhas().get(rodadaId);
   senhas().delete(rodadaId);
@@ -97,6 +122,8 @@ interface LinhaFluxo {
   liberacao_id: string | null;
   na_hora: number;
   minutos_desde_inicio: number;
+  /* Segundos desde que a simulação terminou (null enquanto não terminou). */
+  segundos_desde_fim: number | null;
 }
 
 /* As raízes (simulações agendadas) cujo fluxo ainda não terminou -- o e-mail final é o que encerra. */
@@ -106,7 +133,8 @@ async function listarFluxosAbertos(): Promise<LinhaFluxo[]> {
     SELECT CONVERT(VARCHAR(36), r.[id]) AS [id], r.[codigo_pai], r.[status], CONVERT(VARCHAR(36), r.[usuario_id]) AS [usuario_id],
            (SELECT TOP 1 CONVERT(VARCHAR(36), l.[id]) FROM dbo.portal_3dx_liberacoes AS l WHERE l.[simulacao_id] = r.[id]) AS [liberacao_id],
            CASE WHEN r.[agendada_para] <= SYSDATETIME() THEN 1 ELSE 0 END AS [na_hora],
-           DATEDIFF(MINUTE, COALESCE(r.[agendada_para], r.[criado_em]), SYSDATETIME()) AS [minutos_desde_inicio]
+           DATEDIFF(MINUTE, COALESCE(r.[agendada_para], r.[criado_em]), SYSDATETIME()) AS [minutos_desde_inicio],
+           DATEDIFF(SECOND, r.[finalizado_em], SYSDATETIME()) AS [segundos_desde_fim]
     FROM dbo.portal_3dx_liberacoes AS r
     WHERE r.[automatica] = 1 AND r.[dry_run] = 1 AND r.[notificado_em] IS NULL AND r.[status] <> 'cancelada'
     ORDER BY COALESCE(r.[agendada_para], r.[criado_em]);
@@ -121,6 +149,33 @@ async function reivindicarInicio(id: string): Promise<boolean> {
     UPDATE dbo.portal_3dx_liberacoes SET [status] = 'explodindo' WHERE [id] = @id AND [status] = 'agendada';
   `);
   return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/*
+ * Reserva a liberação para ESTE servidor; devolve false se outro já
+ * reservou (e a reserva ainda vale). Só quem vai mesmo liberar reserva.
+ */
+async function reservarLiberacao(id: string): Promise<boolean> {
+  const pool = await getSqlServerPool();
+  const result = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .input("servidor", sql.NVarChar(120), ESTE_SERVIDOR)
+    .input("minutos", sql.Int, MINUTOS_RESERVA)
+    .query(`
+      UPDATE dbo.portal_3dx_liberacoes SET [reservada_em] = SYSDATETIME(), [reservada_por] = @servidor
+      WHERE [id] = @id AND ([reservada_em] IS NULL OR [reservada_em] < DATEADD(MINUTE, -@minutos, SYSDATETIME()));
+    `);
+  return (result.rowsAffected[0] ?? 0) > 0;
+}
+
+/* A liberação que saiu desta simulação, se já existe (outro servidor pode tê-la criado agora há pouco). */
+async function liberacaoDaSimulacao(id: string): Promise<string | null> {
+  const pool = await getSqlServerPool();
+  const result = await pool.request().input("id", sql.UniqueIdentifier, id).query<{ id: string }>(`
+    SELECT TOP 1 CONVERT(VARCHAR(36), [id]) AS [id] FROM dbo.portal_3dx_liberacoes WHERE [simulacao_id] = @id;
+  `);
+  return result.recordset?.[0]?.id ?? null;
 }
 
 /* Marca o fluxo como avisado; devolve false se outro tick já marcou (o e-mail sai uma vez só). */
@@ -263,6 +318,8 @@ async function avisarPorEmail(simulacao: { rodada: Rodada; desenhos: DesenhoDaRo
  */
 async function pararSemLiberar(fluxo: LinhaFluxo, motivo: string, falhar: boolean, listarDeFora = false) {
   descartarSenhaAgendada(fluxo.id);
+  /* A liberação já saiu (outro servidor do Portal, agora há pouco): o fluxo segue e o e-mail será o do resultado. */
+  if (await liberacaoDaSimulacao(fluxo.id)) return;
   await anotarMotivo(fluxo.id, motivo, falhar);
   const simulacao = await buscarRodada(fluxo.id);
   if (!simulacao) return;
@@ -310,10 +367,14 @@ async function liberarAPartirDaSimulacao(
     }
     return;
   }
-  podeComecarNova.valor = false;
-
-  const senha = usuario.ehAdministrador ? null : retirarSenha(fluxo.id);
-  if (!usuario.ehAdministrador && !senha) {
+  /*
+   * Sem a senha neste servidor: outro servidor do Portal no mesmo banco pode
+   * tê-la (foi ele que recebeu o pedido). Espera ele liberar; só desiste
+   * depois de SEGUNDOS_ESPERA_SENHA do fim da simulação.
+   */
+  if (!usuario.ehAdministrador && !temSenha(fluxo.id)) {
+    if ((fluxo.segundos_desde_fim ?? 0) < SEGUNDOS_ESPERA_SENHA) return;
+    podeComecarNova.valor = false;
     await pararSemLiberar(
       fluxo,
       "A sua senha não estava mais na memória do Portal (ele pode ter sido reiniciado durante a espera; a senha nunca é gravada). A simulação está pronta: libere pela tela.",
@@ -321,6 +382,11 @@ async function liberarAPartirDaSimulacao(
     );
     return;
   }
+
+  /* Um servidor só libera: o que conseguir a reserva. */
+  if (!(await reservarLiberacao(fluxo.id))) return;
+  podeComecarNova.valor = false;
+  const senha = usuario.ehAdministrador ? null : retirarSenha(fluxo.id);
 
   try {
     const liberacaoId = await iniciarLiberacao(fluxo.id, escolha.liberar, usuario, senha, { automatica: true });
@@ -418,6 +484,10 @@ export async function processarLiberacoesAgendadas() {
   globalThis.portal3dxAgendadorRodando = true;
   try {
     limparSenhasVencidas();
+    /* Toda rodada em andamento, agendada ou não, é acompanhada aqui -- mesmo com a tela fechada. */
+    await acompanharRodadasAbertas().catch((erro) => {
+      console.error("Erro ao acompanhar as rodadas de liberação em andamento:", erro);
+    });
     const fluxos = await listarFluxosAbertos();
     const podeComecarNova = { valor: true };
     for (const fluxo of fluxos) {
