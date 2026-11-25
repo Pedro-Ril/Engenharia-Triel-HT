@@ -94,7 +94,7 @@ function marcadosPorPadrao(desenhos: DesenhoDaRodada[]): Set<string> {
 }
 
 /* Liberação por lista: mesmo limite do servidor (MAX_CODIGOS_LISTA em liberacao-desenhos.ts). */
-const MAX_CODIGOS_LISTA = 500;
+const MAX_CODIGOS_LISTA = 5000;
 const PREFIXO_RODADA_LISTA = "Lista de ";
 
 type ModoLiberacao = "pai" | "lista";

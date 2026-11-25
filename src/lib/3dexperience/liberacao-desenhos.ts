@@ -33,6 +33,8 @@ const API_3DX = process.env.API_3DX_URL || "http://proserver.trielht.com.br:1001
 const LOTE_DESENHOS = 300;
 /* Rodada parada há mais tempo que isso não bloqueia outra (servidor reiniciado no meio, por exemplo). */
 const MINUTOS_RODADA_TRAVADA = 30;
+/* ...mais este tanto por desenho da rodada (ver rodadaEmAndamento). */
+const SEGUNDOS_POR_DESENHO_TRAVADA = 2;
 
 /* "agendada": esperando a hora de começar (liberação agendada); "cancelada": o usuário desistiu antes. */
 export type StatusRodada =
@@ -265,10 +267,20 @@ async function falhar(id: string, erro: unknown) {
  */
 export async function rodadaEmAndamento(): Promise<{ codigo_pai: string; usuario_nome: string } | null> {
   const pool = await getSqlServerPool();
-  const result = await pool.request().input("minutos", sql.Int, MINUTOS_RODADA_TRAVADA).query<{ codigo_pai: string; usuario_nome: string }>(`
+  /*
+   * O prazo cresce com o tamanho da rodada (liberação por lista: milhares de desenhos, cerca de 0,5 s cada no
+   * 3DX): 30 min + 2 s por desenho. Sem isso, uma liberação grande ainda rodando no 3DX seria dada como travada
+   * e outra rodada começaria junto -- e a sessão da API do 3DX é uma só.
+   */
+  const result = await pool
+    .request()
+    .input("minutos", sql.Int, MINUTOS_RODADA_TRAVADA)
+    .input("segundosPorDesenho", sql.Int, SEGUNDOS_POR_DESENHO_TRAVADA)
+    .query<{ codigo_pai: string; usuario_nome: string }>(`
     SELECT TOP 1 [codigo_pai], [usuario_nome] FROM dbo.portal_3dx_liberacoes
     WHERE [status] IN ('explodindo', 'buscando_desenhos', 'processando')
-      AND COALESCE([agendada_para], [criado_em]) > DATEADD(MINUTE, -@minutos, SYSDATETIME());
+      AND COALESCE([agendada_para], [criado_em]) >
+          DATEADD(SECOND, -(@minutos * 60 + ISNULL([total_em_trabalho], 0) * @segundosPorDesenho), SYSDATETIME());
   `);
   return result.recordset[0] ?? null;
 }
@@ -458,7 +470,7 @@ export async function executarSimulacao(rodadaId: string, codigoPai: string) {
 /* ------------------------------------------------------------------ simulação por lista de modelos */
 
 /* Liberação por lista: quantos códigos de modelo cabem numa rodada (o job do 3DX libera um desenho por vez). */
-export const MAX_CODIGOS_LISTA = 500;
+export const MAX_CODIGOS_LISTA = 5000;
 /* Consultas simultâneas à API do 3DX ao montar a lista (leitura; a sessão de liberação continua uma por vez). */
 const PARALELO_LISTA = 4;
 const PREFIXO_RODADA_LISTA = "Lista de ";
