@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   achatarEstrutura,
+  classificarDesenhoDaLista,
+  configuracoesDoCodigo,
   emTrabalho,
   escolherDesenhosAutomaticos,
   montarFila,
@@ -110,5 +112,49 @@ describe("montarFila", () => {
     expect(emTrabalho({ status: "in_work" })).toBe(true);
     expect(emTrabalho({ status: "RELEASED" })).toBe(false);
     expect(emTrabalho({ status: null })).toBe(false);
+  });
+});
+
+describe("liberação por lista: classificarDesenhoDaLista", () => {
+  it("libera o desenho em trabalho de modelo liberado", () => {
+    expect(classificarDesenhoDaLista({ status: "IN_WORK" }, "RELEASED")).toEqual({ acao: "pendente", mensagem: null });
+  });
+  it("desenho já liberado só fica registrado", () => {
+    expect(classificarDesenhoDaLista({ status: "RELEASED" }, "RELEASED").acao).toBe("ja_liberado");
+    expect(classificarDesenhoDaLista({ status: "released" }, "IN_WORK").acao).toBe("ja_liberado");
+  });
+  it("modelo não liberado: desenho em trabalho fica de fora, com o motivo", () => {
+    const r = classificarDesenhoDaLista({ status: "IN_WORK" }, "IN_WORK");
+    expect(r.acao).toBe("ignorado");
+    expect(r.mensagem).toContain("Modelo em IN_WORK");
+    expect(classificarDesenhoDaLista({ status: "IN_WORK" }, null).acao).toBe("ignorado");
+  });
+  it("desenho congelado ou privado não é liberado pela lista", () => {
+    const r = classificarDesenhoDaLista({ status: "FROZEN" }, "RELEASED");
+    expect(r.acao).toBe("ignorado");
+    expect(r.mensagem).toContain("Desenho em FROZEN");
+    expect(classificarDesenhoDaLista({ status: "PRIVATE" }, "RELEASED").acao).toBe("ignorado");
+  });
+});
+
+describe("liberação por lista: configuracoesDoCodigo", () => {
+  it("pega todas as configurações pelo título e ignora o código achado no nome", () => {
+    const itens = [
+      { physicalId: "A", titulo: "54863(Valor predeterminado)", estado: "RELEASED" },
+      { physicalId: "B", titulo: "54863(Valor predeterminadoSM-FLAT-PATTERN)", estado: "RELEASED" },
+      { physicalId: "C", titulo: "281132", estado: "RELEASED" },
+      { physicalId: "D", titulo: "281132", estado: "RELEASED" },
+    ];
+    expect(configuracoesDoCodigo("54863", itens).map((r) => r.physicalId)).toEqual(["A", "B"]);
+  });
+  it("título sem configuração e código com letra", () => {
+    expect(configuracoesDoCodigo("f0513824", [{ physicalId: "X", titulo: "F0513824" }]).map((r) => r.physicalId)).toEqual(["X"]);
+  });
+  it("não repete o mesmo item nem aceita item sem physicalId", () => {
+    const itens = [{ physicalId: "A", titulo: "287200" }, { physicalId: "A", titulo: "287200" }, { titulo: "287200" }];
+    expect(configuracoesDoCodigo("287200", itens)).toHaveLength(1);
+  });
+  it("não confunde código que é prefixo de outro", () => {
+    expect(configuracoesDoCodigo("2872", [{ physicalId: "A", titulo: "287200" }])).toHaveLength(0);
   });
 });

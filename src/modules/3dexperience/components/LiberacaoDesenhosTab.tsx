@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, FileCheck2, GitCompare, History, PlayCircle, Timer } from "lucide-react";
+import { AlertTriangle, FileCheck2, GitCompare, History, ListChecks, PlayCircle, Timer } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -15,9 +15,11 @@ import { Input } from "@/components/ui/Input";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
+import { RadioGroup } from "@/components/ui/RadioGroup";
 import { Stack } from "@/components/ui/Stack";
 import { StatCard } from "@/components/ui/StatCard";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/Table";
+import { Textarea } from "@/components/ui/Textarea";
 import { tituloDiferenteDoItem } from "@/lib/3dexperience/liberacao-regras";
 
 import {
@@ -25,6 +27,7 @@ import {
   buscarRodada,
   cancelarAgendamento,
   iniciarSimulacao,
+  iniciarSimulacaoLista,
   liberarSimulacao,
   listarRodadas,
   type AcaoDesenho,
@@ -90,6 +93,34 @@ function marcadosPorPadrao(desenhos: DesenhoDaRodada[]): Set<string> {
   );
 }
 
+/* Liberação por lista: mesmo limite do servidor (MAX_CODIGOS_LISTA em liberacao-desenhos.ts). */
+const MAX_CODIGOS_LISTA = 500;
+const PREFIXO_RODADA_LISTA = "Lista de ";
+
+type ModoLiberacao = "pai" | "lista";
+
+const OPCOES_MODO = [
+  { value: "pai", label: "Estrutura de um item pai", description: "Explode a estrutura e libera de baixo para cima." },
+  {
+    value: "lista",
+    label: "Lista de códigos de modelo",
+    description: "Libera o desenho em trabalho de cada modelo já liberado da lista.",
+  },
+];
+
+/* Os códigos colados (um por linha, vírgula, espaço ou ponto e vírgula), sem repetidos. */
+function separarCodigos(texto: string): string[] {
+  const vistos = new Set<string>();
+  const codigos: string[] = [];
+  for (const parte of texto.split(/[\s,;]+/)) {
+    const codigo = parte.trim();
+    if (!codigo || vistos.has(codigo.toUpperCase())) continue;
+    vistos.add(codigo.toUpperCase());
+    codigos.push(codigo);
+  }
+  return codigos;
+}
+
 function formatarData(valorIso: string | null): string {
   return valorIso ? new Date(valorIso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "-";
 }
@@ -124,6 +155,8 @@ export function LiberacaoDesenhosTab({
   liberaComoAdminPlataforma = false,
 }: LiberacaoDesenhosTabProps = {}) {
   const [codigo, setCodigo] = useState(codigoInicial);
+  const [modo, setModo] = useState<ModoLiberacao>("pai");
+  const [listaTexto, setListaTexto] = useState("");
   const [erro, setErro] = useState<string | null>(erroInicial);
   const [iniciando, setIniciando] = useState(false);
   const [rodadaId, setRodadaId] = useState<string | null>(rodadaInicialId);
@@ -202,7 +235,7 @@ export function LiberacaoDesenhosTab({
         esperandoLiberacaoAutomatica = aguardandoLiberacaoAutomatica(rodada) || (rodada.automatica && EM_ANDAMENTO.includes(rodada.status));
         setDados(resultado.data);
         /* Aberta pelo link do e-mail (ou pelo histórico) com o campo vazio: preenche com o pai da rodada. */
-        setCodigo((atual) => atual || rodada.codigoPai);
+        if (!rodada.codigoPai.startsWith(PREFIXO_RODADA_LISTA)) setCodigo((atual) => atual || rodada.codigoPai);
         if (rodada.status === "agendada" && rodada.segundosParaInicio !== null) {
           const agoraLocal = Date.now();
           setAgora(agoraLocal);
@@ -261,6 +294,33 @@ export function LiberacaoDesenhosTab({
     setIniciando(true);
     try {
       const resultado = await iniciarSimulacao(codigoLimpo);
+      if (resultado.ok && resultado.data) {
+        setDados(null);
+        abrirRodada(resultado.data.id);
+        setRecargaHistorico((n) => n + 1);
+      } else {
+        setErro(resultado.message ?? "Não foi possível iniciar a simulação.");
+      }
+    } finally {
+      setIniciando(false);
+    }
+  }
+
+  async function simularLista() {
+    const codigos = separarCodigos(listaTexto);
+    if (codigos.length === 0) {
+      setErro("Cole os códigos dos modelos (um por linha).");
+      return;
+    }
+    if (codigos.length > MAX_CODIGOS_LISTA) {
+      setErro(`No máximo ${MAX_CODIGOS_LISTA} códigos por lista (há ${codigos.length}). Divida em partes.`);
+      return;
+    }
+    setErro(null);
+    setAvisoAgendamento(null);
+    setIniciando(true);
+    try {
+      const resultado = await iniciarSimulacaoLista(codigos);
       if (resultado.ok && resultado.data) {
         setDados(null);
         abrirRodada(resultado.data.id);
@@ -398,15 +458,65 @@ export function LiberacaoDesenhosTab({
     <Stack gap={20}>
       <Card
         title="Liberação de desenhos em trabalho"
-        description="Explode a estrutura do item pai no 3DX (todos os níveis, incluindo o pai) e libera os desenhos que estão em trabalho, de baixo para cima."
+        description={
+          modo === "pai"
+            ? "Explode a estrutura do item pai no 3DX (todos os níveis, incluindo o pai) e libera os desenhos que estão em trabalho, de baixo para cima."
+            : "Para cada código de modelo da lista, libera o desenho que está em trabalho quando o modelo já está liberado."
+        }
       >
         <Stack gap={16}>
-          <Alert variant="info">
-            <strong>Simular</strong> mostra na hora o que seria liberado, sem mudar nada no 3DX; a liberação de verdade só
-            acontece quando você confirmar. <strong>Liberar em {MINUTOS_AGENDAMENTO} min</strong> espera o 3DX indexar
-            a estrutura (use logo depois de mexer nela), simula e libera sozinho tudo o que estiver em trabalho, e avisa
-            por e-mail. O 3DX atende uma rodada por vez.
-          </Alert>
+          <RadioGroup
+            name="liberacaoModo"
+            label="Origem dos desenhos"
+            orientation="horizontal"
+            options={OPCOES_MODO}
+            value={modo}
+            disabled={iniciando || emAndamento}
+            onValueChange={(valor) => {
+              setModo(valor as ModoLiberacao);
+              setErro(null);
+            }}
+          />
+          {modo === "pai" ? (
+            <Alert variant="info">
+              <strong>Simular</strong> mostra na hora o que seria liberado, sem mudar nada no 3DX; a liberação de verdade só
+              acontece quando você confirmar. <strong>Liberar em {MINUTOS_AGENDAMENTO} min</strong> espera o 3DX indexar
+              a estrutura (use logo depois de mexer nela), simula e libera sozinho tudo o que estiver em trabalho, e avisa
+              por e-mail. O 3DX atende uma rodada por vez.
+            </Alert>
+          ) : (
+            <Alert variant="info">
+              Cole os <strong>códigos dos modelos</strong> (ex.: a coluna &quot;Modelo&quot; da planilha de modelos liberados
+              com desenho em trabalho), até {MAX_CODIGOS_LISTA} por vez. <strong>Simular</strong> confere cada um no 3DX:
+              entra o desenho <strong>em trabalho</strong> de modelo <strong>liberado</strong>; modelo em trabalho, desenho
+              já liberado e código não encontrado ficam de fora e aparecem no resultado. Nada muda no 3DX até você
+              confirmar a liberação.
+            </Alert>
+          )}
+          {modo === "lista" && (
+            <Stack gap={12}>
+              <Field
+                label={`Códigos dos modelos (${separarCodigos(listaTexto).length} de até ${MAX_CODIGOS_LISTA})`}
+                htmlFor="liberacaoLista"
+              >
+                <Textarea
+                  id="liberacaoLista"
+                  rows={8}
+                  value={listaTexto}
+                  placeholder={"Um código por linha. Ex.:\n252336\n295178\n300415"}
+                  disabled={iniciando || emAndamento}
+                  onChange={(evento) => setListaTexto(evento.target.value)}
+                />
+              </Field>
+              <Stack direction="row" gap={12} wrap>
+                <Button onClick={() => void simularLista()} loading={iniciando} disabled={emAndamento}>
+                  <ListChecks size={16} />
+                  Simular lista
+                </Button>
+              </Stack>
+            </Stack>
+          )}
+          {modo === "pai" && (
           <Stack direction="row" gap={12} align="end" wrap>
             <Field label="Código do item pai" htmlFor="liberacaoCodigo">
               <Input
@@ -438,6 +548,7 @@ export function LiberacaoDesenhosTab({
               </Button>
             )}
           </Stack>
+          )}
           {erro && <Alert variant="danger">{erro}</Alert>}
           {avisoAgendamento && <Alert variant="success">{avisoAgendamento}</Alert>}
         </Stack>
@@ -492,7 +603,10 @@ export function LiberacaoDesenhosTab({
 
               {!agendada && rodada.status !== "cancelada" && (
                 <div className={styles.totais}>
-                  <StatCard label="Itens na estrutura" value={rodada.totalItens ?? "-"} />
+                  <StatCard
+                    label={rodada.codigoPai.startsWith(PREFIXO_RODADA_LISTA) ? "Modelos na lista" : "Itens na estrutura"}
+                    value={rodada.totalItens ?? "-"}
+                  />
                   <StatCard label="Desenhos" value={rodada.totalDesenhos ?? "-"} />
                   <StatCard label="Em trabalho" value={rodada.totalEmTrabalho ?? "-"} variant="warning" />
                   <StatCard
@@ -526,8 +640,8 @@ export function LiberacaoDesenhosTab({
 
               {rodada.dryRun && rodada.status === "concluida" && foraDaLista > 0 && (
                 <span className={styles.secundario}>
-                  {foraDaLista} desenho(s) da estrutura não aparecem aqui porque não podem ser liberados (já
-                  liberados, fora de trabalho ou com erro).
+                  {foraDaLista} desenho(s) não aparecem aqui porque não podem ser liberados (já liberados, fora de
+                  trabalho, modelo ainda não liberado ou com erro).
                 </span>
               )}
 

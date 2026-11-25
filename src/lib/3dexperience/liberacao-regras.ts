@@ -160,3 +160,52 @@ export function escolherDesenhosAutomaticos<T extends DesenhoParaEscolha>(
 
   return { liberar: bloqueio ? [] : liberar, deFora, bloqueio };
 }
+
+/*
+ * Liberação por lista de modelos: o que fazer com cada desenho de um
+ * modelo da lista. Só entra (pendente → simulação) o desenho EM TRABALHO
+ * de modelo LIBERADO; desenho em trabalho de modelo não liberado fica de
+ * fora, porque a regra do 3DX barraria (filho não liberado).
+ */
+export function classificarDesenhoDaLista(
+  desenho: Pick<Desenho3DX, "status">,
+  estadoModelo: string | null
+): { acao: "pendente" | "ja_liberado" | "ignorado"; mensagem: string | null } {
+  if ((desenho.status ?? "").toUpperCase() === "RELEASED") return { acao: "ja_liberado", mensagem: null };
+  if (!emTrabalho(desenho)) {
+    return { acao: "ignorado", mensagem: `Desenho em ${desenho.status ?? "estado desconhecido"}: só desenho em trabalho é liberado.` };
+  }
+  if ((estadoModelo ?? "").toUpperCase() !== "RELEASED") {
+    return { acao: "ignorado", mensagem: `Modelo em ${estadoModelo ?? "estado desconhecido"}: libere o modelo antes do desenho.` };
+  }
+  return { acao: "pendente", mensagem: null };
+}
+
+/* Um resultado da busca de item por código na API do 3DX (/item/{código}). */
+export interface ItemDaBusca {
+  physicalId?: string;
+  titulo?: string;
+  revisao?: string;
+  estado?: string;
+}
+
+/*
+ * As configurações de um código de modelo: os itens cujo TÍTULO é o código,
+ * com ou sem "(configuração)" -- ex.: 287200, 287200(Sem Furo),
+ * 287200(Valor predeterminadoSM-FLAT-PATTERN). A busca da API também acha
+ * o código no NOME (prd-…00054863 para 54863); esses ficam de fora.
+ */
+export function configuracoesDoCodigo(
+  codigo: string,
+  itens: ItemDaBusca[]
+): (ItemDaBusca & { physicalId: string })[] {
+  const alvo = codigo.trim().toUpperCase();
+  const vistos = new Set<string>();
+  return itens.filter((r): r is ItemDaBusca & { physicalId: string } => {
+    if (!r.physicalId || vistos.has(r.physicalId)) return false;
+    const base = (r.titulo ?? "").split("(")[0].trim().toUpperCase();
+    if (base !== alvo) return false;
+    vistos.add(r.physicalId);
+    return true;
+  });
+}

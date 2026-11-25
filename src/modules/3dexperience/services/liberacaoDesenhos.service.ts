@@ -72,6 +72,16 @@ export async function iniciarSimulacao(codigo: string): Promise<ApiEnvelope<{ id
   return parseResponse(response);
 }
 
+/* Simulação a partir de uma lista de códigos de modelo (o servidor separa, limpa e tira repetidos). */
+export async function iniciarSimulacaoLista(codigos: string[]): Promise<ApiEnvelope<{ id: string }>> {
+  const response = await fetch("/api/3dexperience/liberacao", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codigos }),
+  });
+  return parseResponse(response);
+}
+
 export async function buscarRodada(id: string): Promise<ApiEnvelope<{ rodada: Rodada; desenhos: DesenhoDaRodada[] }>> {
   const response = await fetch(`/api/3dexperience/liberacao/${id}`, { cache: "no-store" });
   return parseResponse(response);

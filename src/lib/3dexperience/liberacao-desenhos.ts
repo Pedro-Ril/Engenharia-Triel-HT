@@ -5,9 +5,12 @@ import { getSqlServerPool, sql } from "@/lib/database/sql-server";
 
 import {
   achatarEstrutura,
+  classificarDesenhoDaLista,
+  configuracoesDoCodigo,
   emTrabalho,
   montarFila,
   type Desenho3DX,
+  type ItemDaBusca,
   type NoEstrutura3DX,
 } from "./liberacao-regras";
 
@@ -446,6 +449,156 @@ export async function executarSimulacao(rodadaId: string, codigoPai: string) {
     }
 
     const { jobId } = await iniciarJobLiberacao(paraLiberar.map((f) => f.desenho), true);
+    await atualizarRodada(rodadaId, { status: "processando", job_id: jobId });
+  } catch (erro) {
+    await falhar(rodadaId, erro);
+  }
+}
+
+/* ------------------------------------------------------------------ simulação por lista de modelos */
+
+/* Liberação por lista: quantos códigos de modelo cabem numa rodada (o job do 3DX libera um desenho por vez). */
+export const MAX_CODIGOS_LISTA = 500;
+/* Consultas simultâneas à API do 3DX ao montar a lista (leitura; a sessão de liberação continua uma por vez). */
+const PARALELO_LISTA = 4;
+const PREFIXO_RODADA_LISTA = "Lista de ";
+
+/* A rodada veio de uma lista de modelos (e não da estrutura de um item pai)? */
+export function ehRodadaDeLista(codigoPai: string): boolean {
+  return codigoPai.startsWith(PREFIXO_RODADA_LISTA);
+}
+
+/*
+ * Começa a SIMULAÇÃO a partir de uma LISTA de códigos de modelo (ex.: os
+ * modelos liberados cujo desenho ficou em trabalho). Mesma rodada da
+ * simulação por item pai: a liberação real, o registro e o histórico são
+ * os mesmos; só a origem dos desenhos muda.
+ */
+export async function iniciarSimulacaoLista(codigos: string[], usuario: { id: string; nomeExibicao: string }) {
+  if (codigos.length === 0) throw new ValidationError("Informe pelo menos um código de modelo.");
+  if (codigos.length > MAX_CODIGOS_LISTA) {
+    throw new ValidationError(`No máximo ${MAX_CODIGOS_LISTA} códigos por lista (foram ${codigos.length}). Divida em partes.`);
+  }
+  await garantirNenhumaEmAndamento();
+  return criarRodada({
+    codigoPai: `${PREFIXO_RODADA_LISTA}${codigos.length} modelo(s)`,
+    dryRun: true,
+    status: "buscando_desenhos",
+    usuario,
+  });
+}
+
+async function emParalelo<T, R>(itens: T[], limite: number, fazer: (item: T) => Promise<R>): Promise<R[]> {
+  const resultado: R[] = new Array(itens.length);
+  let proximo = 0;
+  async function trabalhar() {
+    while (proximo < itens.length) {
+      const i = proximo++;
+      resultado[i] = await fazer(itens[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, trabalhar));
+  return resultado;
+}
+
+interface ConfiguracaoDaLista {
+  physicalId: string;
+  revisao: string | null;
+  estado: string | null;
+}
+
+interface ModeloDaLista {
+  codigo: string;
+  erro: string | null;
+  /* Todas as configurações (Physical Products) do modelo: o desenho pode estar ligado a qualquer uma. */
+  configuracoes: ConfiguracaoDaLista[];
+}
+
+/* As configurações do código no 3DX (título exato, com ou sem "(configuração)"). */
+async function buscarModeloDaLista(codigo: string): Promise<ModeloDaLista> {
+  try {
+    const item = await chamar3dx<{ success?: boolean; message?: string; results?: ItemDaBusca[] }>(
+      `/item/${encodeURIComponent(codigo)}`,
+      undefined,
+      60_000
+    );
+    const configuracoes = configuracoesDoCodigo(codigo, item.results ?? []).map((r) => ({
+      physicalId: r.physicalId,
+      revisao: r.revisao ?? null,
+      estado: r.estado ?? null,
+    }));
+    return { codigo, erro: configuracoes.length ? null : "não encontrado no 3DX", configuracoes };
+  } catch (erro) {
+    const mensagem = erro instanceof Error ? erro.message : String(erro);
+    return { codigo, erro: /nenhum item encontrado/i.test(mensagem) ? "não encontrado no 3DX" : mensagem, configuracoes: [] };
+  }
+}
+
+/*
+ * Regras da lista: libera o desenho EM TRABALHO ligado a uma configuração
+ * LIBERADA do modelo. Desenho já liberado fica registrado como tal;
+ * desenho em trabalho cujo modelo não está liberado fica de fora (a regra
+ * do 3DX barraria); código que o 3DX não achou vai na mensagem da rodada.
+ */
+export async function executarSimulacaoLista(rodadaId: string, codigos: string[]) {
+  try {
+    const modelos = await emParalelo(codigos, PARALELO_LISTA, buscarModeloDaLista);
+    const naoEncontrados = modelos.filter((m) => m.erro);
+    const encontrados = modelos
+      .filter((m) => !m.erro)
+      .sort((a, b) => a.codigo.localeCompare(b.codigo, "pt-BR", { numeric: true }));
+    await atualizarRodada(rodadaId, { total_itens: codigos.length });
+
+    /* Os desenhos de todas as configurações, em lote (o mesmo serviço da liberação por item pai). */
+    const { desenhos: porConfiguracao, erros } = await buscarDesenhosEmLote(
+      encontrados.flatMap((m) => m.configuracoes.map((c) => c.physicalId))
+    );
+
+    /* Um desenho, uma linha: se ele está ligado a mais de uma configuração, vale a que deixa liberar. */
+    const porDesenho = new Map<string, Parameters<typeof gravarDesenhos>[1][number]>();
+    const semDesenho: string[] = [];
+    for (const m of encontrados) {
+      let achou = false;
+      for (const c of m.configuracoes) {
+        for (const d of porConfiguracao.get(c.physicalId) ?? []) {
+          achou = true;
+          const { acao, mensagem } = classificarDesenhoDaLista(d, c.estado);
+          const atual = porDesenho.get(d.physicalId);
+          if (atual && !(atual.acao === "ignorado" && acao === "pendente")) continue;
+          porDesenho.set(d.physicalId, {
+            itemCodigo: m.codigo,
+            itemPhysicalId: c.physicalId,
+            itemRevisao: c.revisao,
+            itemStatus: c.estado,
+            itemNivel: 0,
+            desenho: d,
+            acao,
+            mensagem,
+          });
+        }
+      }
+      if (!achou) semDesenho.push(m.codigo);
+    }
+    const linhas = [...porDesenho.values()];
+    await gravarDesenhos(rodadaId, linhas);
+
+    const paraLiberar = linhas.filter((l) => l.acao === "pendente").map((l) => l.desenho);
+    const avisos = [
+      naoEncontrados.length ? `Não encontrados no 3DX (${naoEncontrados.length}): ${naoEncontrados.map((m) => m.codigo).join(", ")}.` : "",
+      semDesenho.length ? `Sem desenho (${semDesenho.length}): ${semDesenho.join(", ")}.` : "",
+      erros.length ? `Erro na busca de desenhos: ${erros.join("; ")}` : "",
+    ].filter(Boolean);
+    await atualizarRodada(rodadaId, {
+      total_desenhos: linhas.length,
+      total_em_trabalho: paraLiberar.length,
+      mensagem: avisos.length ? avisos.join(" ").slice(0, 2000) : null,
+    });
+
+    if (paraLiberar.length === 0) {
+      await atualizarRodada(rodadaId, { status: "concluida", total_liberados: 0, total_erros: 0 }, true);
+      return;
+    }
+    const { jobId } = await iniciarJobLiberacao(paraLiberar, true);
     await atualizarRodada(rodadaId, { status: "processando", job_id: jobId });
   } catch (erro) {
     await falhar(rodadaId, erro);
