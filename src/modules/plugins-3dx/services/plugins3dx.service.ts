@@ -6,7 +6,9 @@ import type {
   EnviosRelatorio3dx,
   FiltrosExecucoes3dx,
   ModoPlugin3dx,
+  NivelAviso3dx,
   NovoDestinatario3dx,
+  PaginaEventos3dx,
   PaginaExecucoes3dx,
   VerificacaoAmbiente3dx,
   Versao3dx,
@@ -45,6 +47,14 @@ function json(method: string, corpo: unknown): RequestInit {
 /* Sem ambiente = os dois. */
 export function buscarVisaoGeral(ambiente?: Ambiente3dx | null) {
   return chamar<VisaoGeralPlugins3dx>(ambiente ? `?ambiente=${ambiente}` : "");
+}
+
+/* Avisos e erros do log técnico (nivel null = os dois). */
+export function listarAvisosRecentes(filtros: { ambiente: Ambiente3dx | null; nivel: NivelAviso3dx | null; pagina: number }) {
+  const busca = new URLSearchParams({ pagina: String(filtros.pagina) });
+  if (filtros.ambiente) busca.set("ambiente", filtros.ambiente);
+  if (filtros.nivel) busca.set("nivel", filtros.nivel);
+  return chamar<PaginaEventos3dx>(`/eventos?${busca.toString()}`);
 }
 
 export function salvarPlugin(

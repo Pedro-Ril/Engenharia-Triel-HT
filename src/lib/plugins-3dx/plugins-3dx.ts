@@ -16,8 +16,10 @@ import type {
   FiltrosExecucoes3dx,
   ItemExecucao3dx,
   ModoPlugin3dx,
+  NivelAviso3dx,
   NoPlugin3dx,
   NovoDestinatario3dx,
+  PaginaEventos3dx,
   PaginaExecucoes3dx,
   Plugin3dx,
   Versao3dx,
@@ -37,6 +39,7 @@ export function ehAmbiente(valor: unknown): valor is Ambiente3dx {
   return valor === "PRODUCAO" || valor === "TESTE";
 }
 export const TAMANHO_PAGINA_EXECUCOES = 25;
+const TAMANHO_PAGINA_EVENTOS = 20;
 /* Nó sem heartbeat há mais que isso aparece como "atrasado" (o heartbeat é a cada 60 s). */
 const SEGUNDOS_NO_ATRASADO = 180;
 
@@ -170,7 +173,7 @@ export async function buscarVisaoGeral(ambiente: Ambiente3dx | null): Promise<Vi
   const pool = await getSqlServerPool();
   const req = () => pool.request().input("ambiente", sql.VarChar(10), ambiente);
 
-  const [plugins, ambientes, estatisticas, nos, eventos] = await Promise.all([
+  const [plugins, ambientes, estatisticas, nos] = await Promise.all([
     pool.request().query<PluginRow>(`
       SELECT [chave], [nome], [descricao]
       FROM dbo.portal_3dx_plugins
@@ -206,12 +209,6 @@ export async function buscarVisaoGeral(ambiente: Ambiente3dx | null): Promise<Vi
       FROM dbo.portal_3dx_plugins_nos
       WHERE @ambiente IS NULL OR [ambiente] = @ambiente OR [ambiente] IS NULL
       ORDER BY [ambiente], [no];
-    `),
-    req().query<EventoRow>(`
-      SELECT TOP (20) ${SELECT_EVENTO}
-      FROM dbo.portal_3dx_plugins_eventos
-      WHERE [nivel] IN ('aviso', 'erro') AND (@ambiente IS NULL OR [ambiente] = @ambiente OR [ambiente] IS NULL)
-      ORDER BY [criado_em] DESC;
     `),
   ]);
 
@@ -278,7 +275,49 @@ export async function buscarVisaoGeral(ambiente: Ambiente3dx | null): Promise<Vi
     };
   });
 
-  return { plugins: lista, eventosRecentes: eventos.recordset.map(mapearEvento) };
+  return { plugins: lista };
+}
+
+/*
+ * Avisos e erros do log técnico dos nós (card "Avisos e erros recentes" da Visão geral), paginados: o plugin de
+ * desenho grava um aviso por desenho ignorado na varredura, então o volume cresce. nivel null = avisos e erros.
+ * Eventos sem ambiente entram em qualquer filtro, como na visão geral (nó sem ambiente é o que pede atenção).
+ */
+export async function listarAvisosRecentes(filtros: {
+  ambiente: Ambiente3dx | null;
+  nivel: NivelAviso3dx | null;
+  pagina: number;
+}): Promise<PaginaEventos3dx> {
+  const pagina = Math.max(1, filtros.pagina);
+  const pool = await getSqlServerPool();
+  const req = () =>
+    pool
+      .request()
+      .input("ambiente", sql.VarChar(10), filtros.ambiente)
+      .input("nivel", sql.VarChar(10), filtros.nivel);
+  const where = `
+    WHERE [nivel] IN ('aviso', 'erro') AND (@nivel IS NULL OR [nivel] = @nivel)
+      AND (@ambiente IS NULL OR [ambiente] = @ambiente OR [ambiente] IS NULL)`;
+
+  const [total, eventos] = await Promise.all([
+    req().query<{ total: number }>(`SELECT COUNT(*) AS [total] FROM dbo.portal_3dx_plugins_eventos ${where};`),
+    req()
+      .input("offset", sql.Int, (pagina - 1) * TAMANHO_PAGINA_EVENTOS)
+      .input("tamanho", sql.Int, TAMANHO_PAGINA_EVENTOS)
+      .query<EventoRow>(`
+        SELECT ${SELECT_EVENTO}
+        FROM dbo.portal_3dx_plugins_eventos ${where}
+        ORDER BY [criado_em] DESC
+        OFFSET @offset ROWS FETCH NEXT @tamanho ROWS ONLY;
+      `),
+  ]);
+
+  return {
+    eventos: eventos.recordset.map(mapearEvento),
+    total: total.recordset[0]?.total ?? 0,
+    pagina,
+    tamanhoPagina: TAMANHO_PAGINA_EVENTOS,
+  };
 }
 
 // ------------------------------------------------------------------ configuração

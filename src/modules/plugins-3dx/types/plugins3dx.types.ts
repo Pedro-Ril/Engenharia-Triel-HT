@@ -97,7 +97,16 @@ export interface EventoPlugin3dx {
 
 export interface VisaoGeralPlugins3dx {
   plugins: Plugin3dx[];
-  eventosRecentes: EventoPlugin3dx[];
+}
+
+/* Filtro do card "Avisos e erros recentes" (null = os dois). */
+export type NivelAviso3dx = Extract<NivelEvento3dx, "aviso" | "erro">;
+
+export interface PaginaEventos3dx {
+  eventos: EventoPlugin3dx[];
+  total: number;
+  pagina: number;
+  tamanhoPagina: number;
 }
 
 export interface Execucao3dx {

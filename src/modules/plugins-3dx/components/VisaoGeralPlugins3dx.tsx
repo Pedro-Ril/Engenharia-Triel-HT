@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, Boxes, Cpu, History, Hourglass, ListChecks, Puzzle, RefreshCw, Server } from "lucide-react";
+import { AlertTriangle, Boxes, Cpu, History, Hourglass, ListChecks, Puzzle, Server } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -30,12 +30,11 @@ import {
   formatarDataHoraCurta,
   formatarDataLancamento,
   MODO,
-  NIVEL_EVENTO,
-  nomeCurtoPlugin,
   rotuloNo,
   rotuloVersao,
 } from "../utils/exibicao";
 import { AmbienteDassault3dx, PadraoVisualizacao3dx, useVerificacaoAmbiente } from "./AmbienteDassault3dx";
+import { AvisosRecentes3dx } from "./AvisosRecentes3dx";
 import { HistoricoVersoesModal } from "./HistoricoVersoesModal";
 import styles from "./Plugins3dx.module.css";
 
@@ -240,50 +239,7 @@ export function VisaoGeralPlugins3dx({ ambiente, onFeedback, onAbrirExecucao }: 
         </Card>
       )}
 
-      <Card
-        title="Avisos e erros recentes"
-        description="O que os plugins registraram como aviso ou erro (log técnico dos nós do 3DSpace)."
-        actions={
-          <Button variant="secondary" onClick={() => carregar()}>
-            <RefreshCw size={15} />
-            Atualizar
-          </Button>
-        }
-      >
-        {dados.eventosRecentes.length === 0 ? (
-          <EmptyState icon={<Activity size={26} />} title="Nada por aqui" description="Nenhum aviso ou erro registrado." />
-        ) : (
-          <ul className={styles.listaEventos}>
-            {dados.eventosRecentes.map((evento) => (
-              <li key={evento.id} className={styles.itemEvento}>
-                <span className={styles.badgeEvento}>
-                  <Badge variant={NIVEL_EVENTO[evento.nivel].variante}>{NIVEL_EVENTO[evento.nivel].label}</Badge>
-                </span>
-                <div className={styles.mensagemEvento}>
-                  <span>{evento.mensagem}</span>
-                  <span className={styles.textoSecundario}>
-                    {formatarDataHora(evento.criadoEm)} ·{" "}
-                    {evento.ambiente ? AMBIENTE[evento.ambiente].label : "sem ambiente"} ·{" "}
-                    {evento.pluginChave ? nomeCurtoPlugin(evento.pluginChave) : "núcleo / ambiente"} · {rotuloNo(evento.no)}
-                    {evento.execucaoId && (
-                      <>
-                        {" · "}
-                        <button
-                          type="button"
-                          className={styles.link}
-                          onClick={() => onAbrirExecucao(evento.execucaoId as string)}
-                        >
-                          ver execução
-                        </button>
-                      </>
-                    )}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <AvisosRecentes3dx ambiente={ambiente} onAbrirExecucao={onAbrirExecucao} />
 
       <ConfirmDialog
         open={mudanca !== null}
