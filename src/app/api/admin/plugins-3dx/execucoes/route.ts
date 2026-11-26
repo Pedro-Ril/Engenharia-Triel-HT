@@ -21,7 +21,7 @@ const STATUS: FiltroStatusExecucao3dx[] = [
   "barrada",
   "cancelada",
 ];
-const GATILHOS: GatilhoExecucao3dx[] = ["liberacao", "duplicacao", "noturna", "manual"];
+const GATILHOS: GatilhoExecucao3dx[] = ["liberacao", "duplicacao", "noturna", "manual", "consulta"];
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 async function handleGET(request: Request) {

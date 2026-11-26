@@ -36,13 +36,16 @@ final class StateRewriter {
     static final Set<String> STATE_KEYS = Set.of("state", "current", "ds6w:status");
     private static final Pattern HEX32 = Pattern.compile("[0-9A-Fa-f]{32}");
 
-    /** Um objeto encontrado: id e o estado como veio do indice (sem a politica). */
-    record Found(String id, String indexState) {
+    /** Um objeto encontrado: id, o estado como veio do indice (sem a politica), titulo e revisao (se vierem). */
+    record Found(String id, String indexState, String label, String revision) {
     }
 
     /** Divergencia corrigida (ou que seria, na simulacao). */
-    record Diff(String id, String index, String db) {
+    record Diff(String id, String index, String db, String label, String revision) {
     }
+
+    static final java.util.List<String> LABEL_KEYS = java.util.List.of("title", "ds6w:label", "name");
+    static final java.util.List<String> REVISION_KEYS = java.util.List.of("revision", "ds6wg:revision");
 
     private StateRewriter() {
     }
@@ -74,11 +77,13 @@ final class StateRewriter {
         if (v instanceof JsonObject o) {
             String id = idOf(o);
             String state = stateOf(o);
-            if (id != null && state != null) out.putIfAbsent(id, new Found(id, bare(state)));
+            if (id != null && state != null) {
+                out.putIfAbsent(id, new Found(id, bare(state), first(o, LABEL_KEYS), first(o, REVISION_KEYS)));
+            }
             for (JsonValue child : o.values()) walk(child, out);
         } else if (v instanceof JsonArray a) {
             String[] attr = fromAttributeList(a);
-            if (attr != null) out.putIfAbsent(attr[0], new Found(attr[0], bare(attr[1])));
+            if (attr != null) out.putIfAbsent(attr[0], new Found(attr[0], bare(attr[1]), attr[2], attr[3]));
             for (JsonValue child : a) walk(child, out);
         }
     }
@@ -98,17 +103,24 @@ final class StateRewriter {
         return null;
     }
 
-    /** [{"name":"physicalid","value":...},{"name":"ds6w:status","value":...}] -> {id, estado}; senao null. */
+    private static String first(JsonObject o, java.util.List<String> keys) {
+        for (String k : keys) if (o.get(k) instanceof JsonString s && !s.getString().isBlank()) return s.getString();
+        return null;
+    }
+
+    /** [{"name":"physicalid","value":...},{"name":"ds6w:status","value":...}] -> {id, estado, titulo, revisao}; senao null. */
     static String[] fromAttributeList(JsonArray a) {
-        String id = null, state = null;
+        String id = null, state = null, label = null, revision = null;
         for (JsonValue e : a) {
             if (!(e instanceof JsonObject o) || !(o.get("name") instanceof JsonString n)) return null;
             if (!(o.get("value") instanceof JsonString val)) continue;
             String name = n.getString();
             if ((ID_KEYS.contains(name) || "id".equals(name)) && HEX32.matcher(val.getString()).matches()) id = val.getString();
             else if (STATE_KEYS.contains(name) && state == null) state = val.getString();
+            else if (LABEL_KEYS.contains(name) && label == null) label = val.getString();
+            else if (REVISION_KEYS.contains(name) && revision == null) revision = val.getString();
         }
-        return id != null && state != null ? new String[] {id, state} : null;
+        return id != null && state != null ? new String[] {id, state, label, revision} : null;
     }
 
     /** "VPLM_SMB_Definition_MajorRev.RELEASED" -> "RELEASED"; "RELEASED" -> "RELEASED". */
@@ -130,7 +142,9 @@ final class StateRewriter {
         List<Diff> out = new ArrayList<>();
         for (Found f : found.values()) {
             String s = db.get(f.id().toUpperCase());
-            if (s != null && !s.isBlank() && !s.equals(f.indexState())) out.add(new Diff(f.id(), f.indexState(), s));
+            if (s != null && !s.isBlank() && !s.equals(f.indexState())) {
+                out.add(new Diff(f.id(), f.indexState(), s, f.label(), f.revision()));
+            }
         }
         return out;
     }

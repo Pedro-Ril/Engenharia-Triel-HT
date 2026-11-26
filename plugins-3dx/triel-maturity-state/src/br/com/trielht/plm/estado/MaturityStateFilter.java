@@ -2,7 +2,10 @@ package br.com.trielht.plm.estado;
 
 import br.com.trielht.plm.core.Core;
 import br.com.trielht.plm.core.EventBridge;
+import br.com.trielht.plm.core.Job;
+import br.com.trielht.plm.core.JobQueue;
 import br.com.trielht.plm.core.PluginConfig;
+import br.com.trielht.plm.core.Report;
 
 import jakarta.json.Json;
 import jakarta.json.JsonArrayBuilder;
@@ -129,8 +132,40 @@ public class MaturityStateFilter implements Filter {
                     + (db.error() != null ? ", erro: " + db.error() : "") + "; 3DSpace " + servletMs + " ms, "
                     + original.length + " bytes";
             log(cfg, kind, msg, detail(kind, req, cached, text, root, found, db, diffs, servletMs, db.millis(), sample));
+            if (!diffs.isEmpty()) recordExecution(kind, req, cfg, found, diffs, applied, msg);
         }
         return changed;
+    }
+
+    /**
+     * Divergencia vira EXECUCAO no Portal (gatilho "consulta"): o objeto e o item raiz da estrutura (o primeiro da
+     * resposta) ou, na busca, o primeiro divergente; um item por objeto divergente (indice -> banco). Sem
+     * divergencia nao grava execucao (o custo de cada estrutura fica so nos eventos).
+     */
+    private static void recordExecution(String kind, HttpServletRequest req, PluginConfig.Settings cfg,
+                                        Map<String, StateRewriter.Found> found, List<StateRewriter.Diff> diffs,
+                                        boolean applied, String summary) {
+        try {
+            StateRewriter.Found main = "estrutura".equals(kind) ? found.values().iterator().next()
+                    : found.get(diffs.get(0).id());
+            Job job = Job.of(MaturityStateModule.KEY, "consulta", cfg.mode)
+                    .object(main.id(), null, null, null, main.revision(), main.label());
+            job.objectName = main.label();
+            job.actorLogin = req.getRemoteUser();
+            Report rep = JobQueue.startInline(job);
+            rep.total(found.size());
+            for (StateRewriter.Diff d : diffs) {
+                rep.item(applied ? "estado_corrigido" : "seria_estado_corrigido", true)
+                        .target(d.id(), null, d.label(), d.revision(), d.label())
+                        .change(d.index(), d.db())
+                        .message(applied ? "Entregue com o estado do banco" : "Simulação: o integrador recebeu o do índice")
+                        .add();
+            }
+            rep.summary(summary);
+            JobQueue.recordFinished(rep);
+        } catch (RuntimeException e) {
+            Core.LOG.warn("[TRIEL-{}] Execução não registrada: {}", MaturityStateModule.KEY, e.getMessage());
+        }
     }
 
     private static String query(HttpServletRequest req) {

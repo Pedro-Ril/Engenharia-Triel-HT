@@ -25,7 +25,8 @@ export type StatusExecucao3dx =
  */
 export type FiltroStatusExecucao3dx = StatusExecucao3dx | "barrada";
 
-export type GatilhoExecucao3dx = "liberacao" | "duplicacao" | "noturna" | "manual";
+/* consulta: o plugin maturity-state achou estado divergente na busca/estrutura que o integrador lê. */
+export type GatilhoExecucao3dx = "liberacao" | "duplicacao" | "noturna" | "manual" | "consulta";
 
 export type NivelEvento3dx = "info" | "aviso" | "erro";
 

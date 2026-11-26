@@ -15,7 +15,7 @@ import java.util.List;
 public class MaturityStateModule implements PluginModule {
 
     public static final String KEY = "maturity-state";
-    public static final String VERSION = "1.1.1";
+    public static final String VERSION = "1.2.0";
 
     @Override
     public String key() {
@@ -38,6 +38,9 @@ public class MaturityStateModule implements PluginModule {
     @Override
     public List<Release> releases() {
         return List.of(
+                Release.of("1.2.0", "2026-11-25", "Divergência entre o índice e o banco vira execução no Portal "
+                        + "(gatilho Consulta, um item por objeto: estado no índice → no banco). Sem divergência, o custo "
+                        + "de cada estrutura continua só no registro de eventos."),
                 Release.of("1.1.1", "2026-11-25", "Toda estrutura fica registrada (objetos, consultas ao banco e tempo), "
                         + "também no modo Ativo sem divergência: mostra o custo real por tamanho de estrutura."),
                 Release.of("1.1.0", "2026-11-25", "Estado lido no banco em lote (uma consulta por grupo de objetos, "

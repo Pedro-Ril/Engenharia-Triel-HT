@@ -119,6 +119,7 @@ export const GATILHO: Record<GatilhoExecucao3dx, string> = {
   duplicacao: "Duplicação",
   noturna: "Rotina noturna",
   manual: "Manual (Portal)",
+  consulta: "Consulta (integrador)",
 };
 
 export const NIVEL_EVENTO: Record<NivelEvento3dx, { label: string; variante: VarianteBadge }> = {
@@ -138,6 +139,8 @@ export const ACAO_ITEM: Record<string, string> = {
   pai_nao_liberado: "Conjunto não liberado (mantido)",
   vinculo_criado: "Vínculo criado",
   seria_vinculo_criado: "Vínculo seria criado",
+  estado_corrigido: "Estado entregue do banco",
+  seria_estado_corrigido: "Estado seria entregue do banco",
 };
 
 export function formatarDataHora(iso: string | null | undefined): string {
