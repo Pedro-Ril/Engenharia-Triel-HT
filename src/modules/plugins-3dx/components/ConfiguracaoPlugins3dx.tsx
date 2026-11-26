@@ -65,6 +65,14 @@ const CAMPOS: Record<string, CampoParametro[]> = {
     { nome: "papel", tipo: "texto", label: "Contexto de segurança", dica: "ctx::papel.organização.projeto", largo: true },
     { nome: "noturnoAtivo", tipo: "booleano", label: "Rotina noturna ativa" },
   ],
+  "maturity-state": [
+    { nome: "prazoMs", tipo: "numero", label: "Prazo da conferência por resposta (ms)", dica: "Passou disso, o resto fica com o estado do índice" },
+    { nome: "maxObjetos", tipo: "numero", label: "Máximo de objetos conferidos por resposta" },
+    { nome: "loteBanco", tipo: "numero", label: "Objetos por consulta ao banco" },
+    { nome: "maxBytes", tipo: "numero", label: "Resposta maior que isso passa direto (bytes)" },
+    { nome: "amostrasPorDia", tipo: "numero", label: "Amostras do formato por dia", dica: "Primeiras respostas do dia com o formato completo no registro" },
+    { nome: "papel", tipo: "texto", label: "Contexto de segurança (leitura)", dica: "ctx::papel.organização.projeto", largo: true },
+  ],
 };
 
 export function ConfiguracaoPlugins3dx({ ambiente, usuarios, onFeedback }: ConfiguracaoProps) {

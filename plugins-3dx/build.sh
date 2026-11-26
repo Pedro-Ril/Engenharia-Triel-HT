@@ -1,8 +1,8 @@
 #!/bin/sh
-# Compila o nucleo (triel-3dx-core) e os 3 plugins contra as bibliotecas do 3DSpace instalado.
+# Compila o nucleo (triel-3dx-core) e os plugins contra as bibliotecas do 3DSpace instalado.
 # Uso: ./build.sh <pasta WEB-INF/lib do 3dspace> [pasta lib do TomEE]
 # Ex.: ./build.sh /App/Tomee/Tomee3DSpace/webapps/3dspace/WEB-INF/lib /App/Tomee/Tomee3DSpace/lib
-# Saida: out/*.jar (4 jars) -- copiar para o WEB-INF/lib de cada no, junto com o mssql-jdbc (ver README.md).
+# Saida: out/*.jar (nucleo + plugins) -- copiar para o WEB-INF/lib de cada no, junto com o mssql-jdbc (ver README.md).
 set -e
 LIB="${1:?informe a pasta WEB-INF/lib do 3dspace}"
 TLIB="${2:-$(dirname "$(dirname "$(dirname "$(dirname "$LIB")")")")/lib}"
@@ -36,3 +36,4 @@ build triel-3dx-core triel-3dx-core ""
 build triel-duplicate-title TrielDuplicateTitle ":$OUT/triel-3dx-core.jar"
 build triel-replace-revision TrielReplaceRevision ":$OUT/triel-3dx-core.jar"
 build triel-drawing-config-link TrielDrawingConfigLink ":$OUT/triel-3dx-core.jar"
+build triel-maturity-state TrielMaturityState ":$OUT/triel-3dx-core.jar"

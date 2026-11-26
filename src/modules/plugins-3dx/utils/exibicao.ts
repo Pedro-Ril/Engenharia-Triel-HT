@@ -55,6 +55,7 @@ export const NOME_CURTO_PLUGIN: Record<string, string> = {
   "duplicate-title": "Título na duplicação",
   "replace-revision": "Revisão nos conjuntos",
   "drawing-config-link": "Desenho por configuração",
+  "maturity-state": "Estado pelo banco",
 };
 
 export function nomeCurtoPlugin(chave: string): string {

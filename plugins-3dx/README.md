@@ -9,6 +9,7 @@ administrar fica em **Administração → Plugins 3DX**.
 | `TrielDuplicateTitle.jar` | `triel-duplicate-title/` | `duplicate-title`: título automático na Duplicação |
 | `TrielReplaceRevision.jar` | `triel-replace-revision/` | `replace-revision`: atualização da revisão nos conjuntos liberados e obsolescência das revisões anteriores |
 | `TrielDrawingConfigLink.jar` | `triel-drawing-config-link/` | `drawing-config-link`: desenho ligado a todas as configurações da peça SOLIDWORKS (liberação, rotina noturna e ação manual) |
+| `TrielMaturityState.jar` | `triel-maturity-state/` | `maturity-state`: filtro web (próprio `web-fragment.xml`) na busca `dseng:EngItem/search` e na estrutura `cvservlet/zonequeries` que o integrador do SOLIDWORKS lê: o estado de maturidade de cada objeto é conferido no **banco** (o índice de busca atrasa até ~1,5 min) e, em Ativo, só esse campo é trocado. Em Simulação só registra divergências e custo; qualquer problema devolve a resposta como veio |
 
 `triel-visualizacao/` é outra coisa: o script que aplica o padrão de visualização do "Abrir com" (3DPlay/3D Navigate). Não é plugin.
 
@@ -68,7 +69,7 @@ Toda mudança em um jar sobe a versão **dele**: a constante `VERSION` do módul
 
 Ao mudar um jar: suba `VERSION` **e** acrescente a linha correspondente em `releases()`/`RELEASES`. Texto com acento, uma ou duas frases, do ponto de vista de quem usa.
 
-Versões atuais: núcleo 1.4.0, título (`duplicate-title`) 6.2.1, revisão (`replace-revision`) 7.2.1, desenho (`drawing-config-link`) 3.2.1. Documentação completa: "Documentação Técnica - Plugins e melhorias do 3DEXPERIENCE" (pasta Portal Triel-HT).
+Versões atuais: núcleo 1.4.0, título (`duplicate-title`) 6.2.1, revisão (`replace-revision`) 7.2.1, desenho (`drawing-config-link`) 3.2.1, estado pelo banco (`maturity-state`) 1.1.1. Documentação completa: "Documentação Técnica - Plugins e melhorias do 3DEXPERIENCE" (pasta Portal Triel-HT).
 
 ## Depois de um hotfix ou atualização do 3DEXPERIENCE
 

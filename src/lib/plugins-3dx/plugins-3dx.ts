@@ -67,6 +67,14 @@ export const PARAMETROS_PLUGIN: Record<
     noturnoAtivo: { tipo: "booleano", label: "Rotina noturna ativa" },
     noturnoHora: { tipo: "texto", label: "Hora da rotina noturna (HH:MM)" },
   },
+  "maturity-state": {
+    papel: { tipo: "texto", label: "Contexto de segurança (leitura do estado)" },
+    maxObjetos: { tipo: "numero", label: "Máximo de objetos conferidos por resposta", min: 1, max: 100000 },
+    prazoMs: { tipo: "numero", label: "Prazo da conferência por resposta (ms)", min: 100, max: 60000 },
+    loteBanco: { tipo: "numero", label: "Objetos por consulta ao banco", min: 1, max: 2000 },
+    maxBytes: { tipo: "numero", label: "Resposta maior que isso passa direto (bytes)", min: 100000, max: 500000000 },
+    amostrasPorDia: { tipo: "numero", label: "Amostras do formato por dia", min: 0, max: 100 },
+  },
 };
 
 function ehChaveDuplicada(erro: unknown): boolean {

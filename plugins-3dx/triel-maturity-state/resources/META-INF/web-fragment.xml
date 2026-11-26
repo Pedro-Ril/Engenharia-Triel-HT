@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Estado de maturidade pelo banco (plugin "maturity-state"): o filtro so age nestas duas URLs; qualquer outra
+  passa direto. Ordenado depois dos fragmentos da Dassault, para ficar o mais perto possivel do servlet (ja com a
+  autenticacao feita e a resposta ainda sem compressao).
+-->
+<web-fragment xmlns="https://jakarta.ee/xml/ns/jakartaee"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-fragment_5_0.xsd"
+              version="5.0" metadata-complete="true">
+    <name>TrielMaturityState</name>
+    <ordering>
+        <after>
+            <others/>
+        </after>
+    </ordering>
+    <filter>
+        <filter-name>TrielMaturityStateFilter</filter-name>
+        <filter-class>br.com.trielht.plm.estado.MaturityStateFilter</filter-class>
+        <async-supported>true</async-supported>
+    </filter>
+    <filter-mapping>
+        <filter-name>TrielMaturityStateFilter</filter-name>
+        <url-pattern>/resources/v1/modeler/dseng/dseng:EngItem/search</url-pattern>
+        <url-pattern>/cvservlet/zonequeries</url-pattern>
+    </filter-mapping>
+</web-fragment>
