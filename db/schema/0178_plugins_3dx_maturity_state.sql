@@ -14,7 +14,7 @@ BEGIN TRANSACTION;
 IF NOT EXISTS (SELECT 1 FROM dbo.portal_3dx_plugins WHERE [chave] = 'maturity-state')
   INSERT INTO dbo.portal_3dx_plugins ([chave], [nome], [descricao], [ordem])
   VALUES ('maturity-state', N'Estado de maturidade pelo banco',
-          N'Na busca de item e na estrutura que o integrador do SOLIDWORKS lê, o estado de maturidade vem do banco, e não do índice de busca (que atrasa até ~1,5 min depois de cada mudança).',
+          N'Na busca de item e na estrutura que o integrador do SOLIDWORKS lê, o estado de maturidade vem do banco, e não do índice de busca.',
           4);
 
 DECLARE @parametros NVARCHAR(MAX) =

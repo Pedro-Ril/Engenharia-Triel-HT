@@ -227,7 +227,7 @@ export const EVENTOS_AVISO_3DX: Record<
     descricao: "Resumo: peça liberada, conjuntos atualizados e revisões que viraram obsoletas.",
   },
   falha: {
-    plugins: ["duplicate-title", "replace-revision", "drawing-config-link"],
+    plugins: ["duplicate-title", "replace-revision", "drawing-config-link", "maturity-state"],
     label: "Falha do plugin",
     descricao: "Execução terminou em falha ou parcial (algum objeto não foi tratado).",
   },

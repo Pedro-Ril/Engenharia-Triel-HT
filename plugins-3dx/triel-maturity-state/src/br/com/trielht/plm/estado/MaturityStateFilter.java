@@ -93,6 +93,8 @@ public class MaturityStateFilter implements Filter {
                     Core.rootMessage(e));
             EventBridge.event(MaturityStateModule.KEY, "aviso", kind + ": resposta devolvida como veio ("
                     + Core.rootMessage(e) + ")", null);
+            recordFailure(kind, req, cfg, "Erro ao conferir o estado (" + Core.rootMessage(e)
+                    + "): a resposta foi entregue como veio do índice.");
         }
         res.setContentLength(out.length);
         res.getOutputStream().write(out);
@@ -132,21 +134,26 @@ public class MaturityStateFilter implements Filter {
                     + (db.error() != null ? ", erro: " + db.error() : "") + "; 3DSpace " + servletMs + " ms, "
                     + original.length + " bytes";
             log(cfg, kind, msg, detail(kind, req, cached, text, root, found, db, diffs, servletMs, db.millis(), sample));
-            if (!diffs.isEmpty()) recordExecution(kind, req, cfg, found, diffs, applied, msg);
+            String failure = db.error() != null
+                    ? "Não foi possível ler o estado no banco (" + db.error() + "): entregue o estado do índice."
+                    : db.cut() ? "Conferência cortada no prazo/limite: " + db.read() + " de " + found.size()
+                            + " objeto(s) conferidos; o resto foi entregue com o estado do índice." : null;
+            if (!diffs.isEmpty() || failure != null) recordExecution(kind, req, cfg, found, diffs, applied, msg, failure);
         }
         return changed;
     }
 
     /**
-     * Divergencia vira EXECUCAO no Portal (gatilho "consulta"): o objeto e o item raiz da estrutura (o primeiro da
-     * resposta) ou, na busca, o primeiro divergente; um item por objeto divergente (indice -> banco). Sem
-     * divergencia nao grava execucao (o custo de cada estrutura fica so nos eventos).
+     * Divergencia ou falha vira EXECUCAO no Portal (gatilho "consulta"): o objeto e o item raiz da estrutura (o
+     * primeiro da resposta) ou, na busca, o primeiro divergente; um item por objeto divergente (indice -> banco).
+     * Falha (banco sem resposta, conferencia cortada): execucao em falha, que entra no aviso "Falha do plugin".
+     * Sem divergencia nem falha nao grava execucao (o custo de cada estrutura fica so nos eventos).
      */
     private static void recordExecution(String kind, HttpServletRequest req, PluginConfig.Settings cfg,
                                         Map<String, StateRewriter.Found> found, List<StateRewriter.Diff> diffs,
-                                        boolean applied, String summary) {
+                                        boolean applied, String summary, String failure) {
         try {
-            StateRewriter.Found main = "estrutura".equals(kind) ? found.values().iterator().next()
+            StateRewriter.Found main = "estrutura".equals(kind) || diffs.isEmpty() ? found.values().iterator().next()
                     : found.get(diffs.get(0).id());
             Job job = Job.of(MaturityStateModule.KEY, "consulta", cfg.mode)
                     .object(main.id(), null, null, null, main.revision(), main.label());
@@ -162,9 +169,25 @@ public class MaturityStateFilter implements Filter {
                         .add();
             }
             rep.summary(summary);
+            if (failure != null) rep.fail(failure);
             JobQueue.recordFinished(rep);
         } catch (RuntimeException e) {
             Core.LOG.warn("[TRIEL-{}] Execução não registrada: {}", MaturityStateModule.KEY, e.getMessage());
+        }
+    }
+
+    /** Erro ao tratar a resposta (antes de saber os objetos): execucao em falha, sem objeto. */
+    private static void recordFailure(String kind, HttpServletRequest req, PluginConfig.Settings cfg, String failure) {
+        try {
+            Job job = Job.of(MaturityStateModule.KEY, "consulta", cfg.mode);
+            job.objectName = "busca".equals(kind) ? Core.cut(String.valueOf(req.getParameter("$searchStr")), 100) : "estrutura";
+            job.actorLogin = req.getRemoteUser();
+            Report rep = JobQueue.startInline(job);
+            rep.summary(kind + ": " + failure);
+            rep.fail(failure);
+            JobQueue.recordFinished(rep);
+        } catch (RuntimeException e) {
+            Core.LOG.warn("[TRIEL-{}] Falha não registrada: {}", MaturityStateModule.KEY, e.getMessage());
         }
     }
 
