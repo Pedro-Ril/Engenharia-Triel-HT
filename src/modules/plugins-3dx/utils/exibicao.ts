@@ -56,6 +56,7 @@ export const NOME_CURTO_PLUGIN: Record<string, string> = {
   "replace-revision": "Revisão nos conjuntos",
   "drawing-config-link": "Desenho por configuração",
   "maturity-state": "Estado pelo banco",
+  "ief-checkin": "Salvamento do conector",
 };
 
 export function nomeCurtoPlugin(chave: string): string {
@@ -120,6 +121,7 @@ export const GATILHO: Record<GatilhoExecucao3dx, string> = {
   noturna: "Rotina noturna",
   manual: "Manual (Portal)",
   consulta: "Consulta (integrador)",
+  salvamento: "Salvamento (conector)",
 };
 
 export const NIVEL_EVENTO: Record<NivelEvento3dx, { label: string; variante: VarianteBadge }> = {

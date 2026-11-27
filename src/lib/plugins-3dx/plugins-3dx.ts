@@ -75,6 +75,11 @@ export const PARAMETROS_PLUGIN: Record<
     maxBytes: { tipo: "numero", label: "Resposta maior que isso passa direto (bytes)", min: 100000, max: 500000000 },
     amostrasPorDia: { tipo: "numero", label: "Amostras do formato por dia", min: 0, max: 100 },
   },
+  "ief-checkin": {
+    resumoMinutos: { tipo: "numero", label: "Intervalo do resumo (min)", min: 5, max: 1440 },
+    registrarFalhas: { tipo: "booleano", label: "Registrar salvamento com erro" },
+    maxFalhasPorHora: { tipo: "numero", label: "Máximo de erros registrados por hora", min: 1, max: 1000 },
+  },
 };
 
 function ehChaveDuplicada(erro: unknown): boolean {

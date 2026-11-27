@@ -25,8 +25,11 @@ export type StatusExecucao3dx =
  */
 export type FiltroStatusExecucao3dx = StatusExecucao3dx | "barrada";
 
-/* consulta: o plugin maturity-state achou estado divergente na busca/estrutura que o integrador lê. */
-export type GatilhoExecucao3dx = "liberacao" | "duplicacao" | "noturna" | "manual" | "consulta";
+/*
+ * consulta: o plugin maturity-state achou estado divergente na busca/estrutura que o integrador lê.
+ * salvamento: o plugin ief-checkin registrou um salvamento pelo conector CAD que terminou com erro no servidor.
+ */
+export type GatilhoExecucao3dx = "liberacao" | "duplicacao" | "noturna" | "manual" | "consulta" | "salvamento";
 
 export type NivelEvento3dx = "info" | "aviso" | "erro";
 
@@ -230,6 +233,14 @@ export const EVENTOS_AVISO_3DX: Record<
     plugins: ["duplicate-title", "replace-revision", "drawing-config-link", "maturity-state"],
     label: "Falha do plugin",
     descricao: "Execução terminou em falha ou parcial (algum objeto não foi tratado).",
+  },
+  /* ief-checkin: não é falha do plugin, é salvamento de usuário derrubado -- aviso à parte, em resumo. */
+  salvamento_conector: {
+    plugins: ["ief-checkin"],
+    label: "Salvamento derrubado ou com erro (conector CAD)",
+    descricao:
+      "Resumo a cada 2 minutos: timer órfão ou verificação de cliente antiga de um salvamento cancelado derrubou a " +
+      'sessão de um usuário (caixa em branco ou "Map.get … null" ao salvar), ou salvamento com erro no servidor.',
   },
   ambiente_3dx: {
     plugins: [],

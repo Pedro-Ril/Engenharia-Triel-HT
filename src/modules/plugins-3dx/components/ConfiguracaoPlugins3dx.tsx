@@ -73,6 +73,11 @@ const CAMPOS: Record<string, CampoParametro[]> = {
     { nome: "amostrasPorDia", tipo: "numero", label: "Amostras do formato por dia", dica: "Primeiras respostas do dia com o formato completo no registro" },
     { nome: "papel", tipo: "texto", label: "Contexto de segurança (leitura)", dica: "ctx::papel.organização.projeto", largo: true },
   ],
+  "ief-checkin": [
+    { nome: "resumoMinutos", tipo: "numero", label: "Intervalo do resumo (min)", dica: "Salvamentos e timers no registro de eventos" },
+    { nome: "maxFalhasPorHora", tipo: "numero", label: "Máximo de erros registrados por hora", dica: "Acima disso só entram no resumo" },
+    { nome: "registrarFalhas", tipo: "booleano", label: "Registrar salvamento com erro como execução" },
+  ],
 };
 
 export function ConfiguracaoPlugins3dx({ ambiente, usuarios, onFeedback }: ConfiguracaoProps) {

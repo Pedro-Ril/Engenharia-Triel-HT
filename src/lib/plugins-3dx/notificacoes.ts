@@ -10,7 +10,10 @@ import { montarEmailHtml } from "@/lib/smtp/template-email";
  * A cada 2 minutos olha as execuções que terminaram e ainda não foram "tratadas" (notificado_em nulo):
  *  - revisao_trocada: plugin replace-revision em ATIVO que trocou instância ou obsoletou revisão -> e-mail-resumo
  *    para a lista do evento;
- *  - falha: qualquer plugin que terminou em falha/parcial -> e-mail para a lista do evento "falha".
+ *  - falha: qualquer plugin que terminou em falha/parcial -> e-mail para a lista do evento "falha";
+ *  - salvamento_conector: execuções do ief-checkin com gatilho "salvamento" (timer órfão derrubou a sessão de um
+ *    usuário, ou salvamento com erro no servidor). Não são falha do plugin: vão num único e-mail-resumo por
+ *    ambiente a cada rodada, para a lista do evento "salvamento_conector" (nunca para "falha").
  * Toda execução terminada recebe notificado_em (com ou sem e-mail): é o que impede aviso repetido.
  * Uma vez por dia apaga o que passou do prazo (eventos e execuções ignoradas: 90 dias; o resto: 1 ano).
  */
@@ -30,6 +33,7 @@ interface ExecucaoParaAviso {
   plugin_nome: string;
   modo: string;
   status: string;
+  gatilho: string;
   objeto_nome: string | null;
   objeto_revisao: string | null;
   objeto_titulo: string | null;
@@ -216,10 +220,54 @@ async function avisoFalha(execucao: ExecucaoParaAviso, itens: ItemAviso[]): Prom
   await enviar(execucao, "falha", assunto, html);
 }
 
+function ehSalvamentoConector(execucao: ExecucaoParaAviso): boolean {
+  return execucao.plugin_chave === "ief-checkin" && execucao.gatilho === "salvamento";
+}
+
+/* Um e-mail por ambiente com todos os salvamentos derrubados/com erro da rodada (não um por ocorrência). */
+async function avisoSalvamentosConector(execucoes: ExecucaoParaAviso[]): Promise<void> {
+  const porAmbiente = new Map<string, ExecucaoParaAviso[]>();
+  for (const e of execucoes) porAmbiente.set(e.ambiente, [...(porAmbiente.get(e.ambiente) ?? []), e]);
+
+  for (const [ambiente, lista] of porAmbiente) {
+    const emails = await destinatarios("ief-checkin", "salvamento_conector", ambiente);
+    if (emails.length === 0) continue;
+    const usuarios = [...new Set(lista.map((e) => e.ator_nome ?? e.ator_login ?? "—"))];
+    const assuntoBase = `3DEXPERIENCE: ${lista.length} salvamento(s) derrubado(s) ou com erro pelo conector — ${usuarios.join(", ")}`;
+    const assunto = ambiente === "TESTE" ? `[TESTE] ${assuntoBase}` : assuntoBase;
+    const html = `
+      <p style="margin: 0 0 12px;">O plugin <strong>Correção do salvamento pelo conector CAD</strong> registrou
+        ${lista.length} ocorrência(s). Depois de um salvamento cancelado, a Dassault deixa vivos um <strong>timer</strong>
+        e uma <strong>verificação de cliente</strong> daquele salvamento: eles podem abortar o salvamento seguinte do mesmo
+        usuário (caixa de erro em branco ou "Map.get … null") até ele fechar o SOLIDWORKS. Em <strong>Ativo</strong> a
+        correção encerra os dois.</p>
+      ${tabela(
+        ["Quando", "Usuário", "Modo", "O que aconteceu"],
+        lista.map((e) => [
+          escaparHtml(
+            e.finalizado_em ? new Date(e.finalizado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—"
+          ),
+          escaparHtml(e.ator_nome ?? e.ator_login ?? "—"),
+          escaparHtml(e.modo),
+          escaparHtml(e.resumo),
+        ])
+      )}
+      <p style="margin: 0; color: #6b7280; font-size: 12px;">Detalhes em Administração → Plugins 3DX → Execuções.</p>`;
+    let erro: string | null = null;
+    try {
+      await enviarEmail({ destinatario: emails, assunto, corpoHtml: montarEmailHtml(html) });
+    } catch (e) {
+      erro = e instanceof Error ? e.message : "Erro desconhecido";
+      console.error("Erro ao enviar aviso de Plugins 3DX (salvamento_conector):", e);
+    }
+    for (const e of lista) await registrarEnvio(e.id, "salvamento_conector", emails, assunto, erro);
+  }
+}
+
 export async function processarAvisos(): Promise<number> {
   const pool = await getSqlServerPool();
   const pendentes = await pool.request().input("lote", sql.Int, LOTE).query<ExecucaoParaAviso>(`
-    SELECT TOP (@lote) CONVERT(VARCHAR(36), e.[id]) AS [id], e.[plugin_chave], e.[ambiente], p.[nome] AS [plugin_nome], e.[modo], e.[status],
+    SELECT TOP (@lote) CONVERT(VARCHAR(36), e.[id]) AS [id], e.[plugin_chave], e.[ambiente], p.[nome] AS [plugin_nome], e.[modo], e.[status], e.[gatilho],
       e.[objeto_nome], e.[objeto_revisao], e.[objeto_titulo], e.[ator_login], u.[nome_exibicao] AS [ator_nome],
       e.[resumo], e.[erro], CONVERT(VARCHAR(33), e.[finalizado_em], 126) AS [finalizado_em]
     FROM dbo.portal_3dx_plugins_execucoes e
@@ -229,7 +277,12 @@ export async function processarAvisos(): Promise<number> {
     ORDER BY e.[finalizado_em];
   `);
 
+  const salvamentosConector: ExecucaoParaAviso[] = [];
   for (const execucao of pendentes.recordset) {
+    if (ehSalvamentoConector(execucao)) {
+      /* notificado_em vai junto com as demais; o e-mail-resumo sai depois do laço */
+      salvamentosConector.push(execucao);
+    }
     try {
       const precisaItens =
         execucao.status === "falha" ||
@@ -255,7 +308,7 @@ export async function processarAvisos(): Promise<number> {
       ) {
         await avisoRevisaoTrocada(execucao, itens);
       }
-      if (execucao.status === "falha" || execucao.status === "parcial") {
+      if ((execucao.status === "falha" || execucao.status === "parcial") && !ehSalvamentoConector(execucao)) {
         await avisoFalha(execucao, itens);
       }
     } catch (erro) {
@@ -265,6 +318,13 @@ export async function processarAvisos(): Promise<number> {
       .request()
       .input("id", sql.UniqueIdentifier, execucao.id)
       .query("UPDATE dbo.portal_3dx_plugins_execucoes SET [notificado_em] = SYSDATETIME() WHERE [id] = @id;");
+  }
+  if (salvamentosConector.length > 0) {
+    try {
+      await avisoSalvamentosConector(salvamentosConector);
+    } catch (erro) {
+      console.error("Erro ao preparar aviso de salvamentos do conector:", erro);
+    }
   }
   return pendentes.recordset.length;
 }
