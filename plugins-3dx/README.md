@@ -170,10 +170,15 @@ assíncrona, comprimida, acima de `maxBytes` ou fora do formato: sai como veio. 
 | `GET /webapps/TrielAdvancedDuplicate/evento?v=&m=` | Falha vista no navegador → evento "aviso" no Portal (até 3 por janela, 50 por dia por nó) |
 
 - Em `/webapps/*` o `BypassAuthFilter` da Dassault repassa o pedido com `forward`; por isso o mapeamento do `web-fragment.xml` tem `FORWARD`.
-- O `AdvancedView.js` fica em cache por 7 dias (`StaticContentCachingFilter2` no web.xml, navegador e proxy do 3DDashboard). O carregador
-  não decide nada: quem decide é o `miniatura.js`, sem cache. Então ligar/desligar pelo Portal vale na hora, mas o carregador só chega a
-  cada navegador quando o cache dele renovar (até 7 dias, ou Ctrl+F5). Para todos de uma vez: trocar `uwp.widgetCompiler.cache.version`
-  no `uwp-config.properties` do 3DDashboard (reinício do 3DDashboard; vale para todos os widgets).
+- O `AdvancedView.js` fica em cache por 7 dias no **navegador** de cada usuário (`StaticContentCachingFilter2` no web.xml).
+  O carregador não decide nada: quem decide é o `miniatura.js`, sem cache. Ligar/desligar pelo Portal vale na hora, mas o
+  carregador só chega a cada navegador quando a cópia dele vencer (até 7 dias). Ctrl+F5 não adianta (o arquivo só é
+  carregado quando a janela abre). O proxy do 3DDashboard busca o arquivo de novo várias vezes por dia e não segura.
+- **Não** adianta trocar `uwp.widgetCompiler.cache.version`: a data no caminho dos widgets é a versão do próprio
+  3DDashboard (`app_version.txt`, `dsVersion`), conferido no dev-plm em 27/11/2026.
+- Para um navegador específico na hora: de dentro de um widget do 3DSpace no 3DDashboard, buscar
+  `require.toUrl('DS/AdvancedView/AdvancedView.js')` com `fetch(..., {cache: 'reload'})`; isso atualiza o cache do navegador
+  e o do proxy. Ou limpar "Imagens e arquivos armazenados em cache" do navegador.
 - O balão roda dentro de try/catch: qualquer erro esconde o balão e a janela segue a da Dassault. Só age na grade
   `.assemblyTreeListContainer` com `wux-identifier="duplicate"`, coluna 0 (Título), e acha o item por `getCellInfosFromHtmlElement`
   (`nodeModel.options.physicalId`). Endereço do 3DSpace via `i3DXCompassServices`.
