@@ -10,6 +10,7 @@ administrar fica em **Administração → Plugins 3DX**.
 | `TrielReplaceRevision.jar` | `triel-replace-revision/` | `replace-revision`: atualização da revisão nos conjuntos liberados e obsolescência das revisões anteriores |
 | `TrielDrawingConfigLink.jar` | `triel-drawing-config-link/` | `drawing-config-link`: desenho ligado a todas as configurações da peça SOLIDWORKS (liberação, rotina noturna e ação manual) |
 | `TrielMaturityState.jar` | `triel-maturity-state/` | `maturity-state`: filtro web (próprio `web-fragment.xml`) na busca `dseng:EngItem/search` e na estrutura `cvservlet/zonequeries` que o integrador do SOLIDWORKS lê: o estado de maturidade de cada objeto é conferido no **banco** (o índice de busca atrasa até ~1,5 min) e, em Ativo, só esse campo é trocado. Em Simulação só registra divergências e custo; qualquer problema devolve a resposta como veio |
+| `TrielIefCheckin.jar` + `WEB-INF/classes` | `triel-ief-checkin/` | `ief-checkin`: correção do salvamento pelo conector CAD. A classe da Dassault `ENOIEFCheckinHandler` corrigida (gerada do `ENOIEFCmdHandlers.jar` pelo `build.sh`) e o `IefCheckinGuard` ficam em `WEB-INF/classes`; o jar só traz o modo do Portal, o resumo, o registro dos salvamentos com erro e o autoteste. Ver a seção própria abaixo |
 
 `triel-visualizacao/` é outra coisa: o script que aplica o padrão de visualização do "Abrir com" (3DPlay/3D Navigate). Não é plugin.
 
@@ -69,7 +70,7 @@ Toda mudança em um jar sobe a versão **dele**: a constante `VERSION` do módul
 
 Ao mudar um jar: suba `VERSION` **e** acrescente a linha correspondente em `releases()`/`RELEASES`. Texto com acento, uma ou duas frases, do ponto de vista de quem usa.
 
-Versões atuais: núcleo 1.4.0, título (`duplicate-title`) 6.2.1, revisão (`replace-revision`) 7.2.1, desenho (`drawing-config-link`) 3.2.1, estado pelo banco (`maturity-state`) 1.3.0. Documentação completa: "Documentação Técnica - Plugins e melhorias do 3DEXPERIENCE" (pasta Portal Triel-HT).
+Versões atuais: núcleo 1.4.0, título (`duplicate-title`) 6.2.1, revisão (`replace-revision`) 7.2.1, desenho (`drawing-config-link`) 3.2.1, estado pelo banco (`maturity-state`) 1.3.0, salvamento do conector (`ief-checkin`) 1.3.1. Documentação completa: "Documentação Técnica - Plugins e melhorias do 3DEXPERIENCE" (pasta Portal Triel-HT).
 
 ## Depois de um hotfix ou atualização do 3DEXPERIENCE
 
@@ -91,12 +92,12 @@ No servidor (precisa do JDK do 3DSpace):
 sh build.sh /App/Tomee/Tomee3DSpace/webapps/3dspace/WEB-INF/lib /App/Tomee/Tomee3DSpace/lib
 ```
 
-Gera `out/` com os 4 jars.
+Gera `out/` com os jars e `TrielIefCheckin-classes.tar.gz` (classe corrigida para `WEB-INF/classes`). O ief-checkin só é gerado se o `ENOIEFCmdHandlers.jar` tiver o md5 conhecido.
 
 ## Instalar (por nó)
 
 1. Copiar para `webapps/3dspace/WEB-INF/lib`:
-   - os 4 jars;
+   - os jars (o ief-checkin tem também a parte de `WEB-INF/classes`, ver a seção dele);
    - o driver `mssql-jdbc-12.x.jre11.jar` (o 3DSpace não tem driver JDBC de SQL Server).
 2. Remover os jars antigos com o mesmo nome. As versões anteriores tinham uma classe de entrada própria cada uma; agora a entrada é só o núcleo.
 3. Reiniciar o nó pelo `systemctl`.
@@ -105,3 +106,47 @@ Gera `out/` com os 4 jars.
 **Na atualização (hotfix/upgrade) da plataforma:**
 - confira se os 5 jars continuam no `WEB-INF/lib`, porque a Dassault pode recriar a pasta;
 - refaça os testes de cada plugin no `dev-plm` antes da produção.
+
+## ief-checkin: correção do salvamento pelo conector CAD
+
+**O defeito (Dassault, `ENOIEFCmdHandlers.jar`):** a cada salvamento pelo conector do SOLIDWORKS, o `ENOIEFCheckinHandler.execute()` liga um timer
+(`Executors.newScheduledThreadPool(1)`, conferência de cancelamento a cada 2 s), guarda num campo **estático** e só o encerra no cancelamento, e aí
+encerra o do último salvamento de qualquer pessoa. Cada salvamento deixa uma thread viva até o reinício; o timer de um salvamento cancelado fica limpando
+o cache da sessão do usuário e quebra os salvamentos seguintes (NPE em `ENOIEFCommitHandler.run:143`, o erro "null"/`Map.get` ao salvar).
+
+**A correção:** o `build.sh` gera a classe corrigida a partir do jar instalado (`tool/PatchCheckinHandler.java`, ASM interno do JDK 21): o
+`execute()` original vira `triel$execute()` sem nenhuma outra mudança, e o novo `execute()` chama `IefCheckinGuard.enter()`, o original e
+`exit()` (ou `failed()` no erro); a 1.1.0 passa o handler em `enter(this)`. O `newScheduledThreadPool` vira `IefCheckinGuard.newScheduler` (threads `triel-ief-checkin-N`). O
+`IefCheckinGuard` (`classes-src/`) não depende do núcleo: sem o jar do plugin, o salvamento segue o original.
+
+| Modo | Comportamento |
+|---|---|
+| `DESLIGADO` | Exatamente o original da Dassault, sem contar nada |
+| `SIMULACAO` | Original, mas conta salvamentos, timers deixados vivos e cancelamentos (resumo no registro de eventos) |
+| `ATIVO` | Encerra o timer de cada salvamento no fim dele |
+
+- **Timer órfão (1.1.0):** cada timer sabe de qual salvamento é e se ele já terminou. Quando a Dassault desliga um timer a partir do timer ou do salvamento de **outro** usuário/salvamento, o guard avisa: *órfão nasceu* (cancelamento durante o salvamento desligou o timer de outro; vira evento) ou *órfão agiu* (o timer de um salvamento cancelado e já terminado detectou o cancelamento de novo: limpou o cache da sessão, abortou o salvamento em andamento e desligou o timer de outro; vira **execução em falha** com o usuário afetado). Reproduzido no dev-plm em 26/11/2026: cancelar um salvamento e salvar de novo em seguida, sem fechar o SOLIDWORKS, leva ao erro "Map.get … null" (`ENOIEFCommitHandler.run:143`) nos salvamentos seguintes.
+- **Ativo (1.2.0):** ao entrar em Ativo (e a cada 15 s), os timers de salvamentos já terminados que sobraram da Simulação, órfãos inclusive, são encerrados na hora, sem reinício. E quando a Dassault manda desligar o timer de um salvamento em andamento por causa do cancelamento de **outro**, a correção desliga o timer do salvamento cancelado (o que ela pretendia) e mantém o do outro.
+- **Verificação de cliente antiga (1.3.0):** a Dassault cria, a cada operação, uma verificação "o SOLIDWORKS ainda existe?" (`ENOIEFClientExistanceVerifier`, um `java.util.Timer` de 30 s, guardado na sessão em `MCAD_CLIENT_CHECK_TIMER`) e o cliente só avisa a mais recente. A de um salvamento cancelado não é encerrada: ~60 s depois ela conclui que o cliente sumiu, aborta o salvamento em andamento (caixa de erro em branco), limpa o cache da sessão e marca a operação como cancelada (o que reativa os timers órfãos). A classe interna `ENOIEFClientExistanceVerifier$ENOIEFExistanceVerifier` corrigida (gerada do `ENOIEFCmdManagers.jar` por `tool/PatchVerifier.java`, md5 em `IefCheckinModule.DASSAULT_MANAGERS_JAR_MD5`) chama `IefCheckinGuard.verifierTick` no início de `run()`: verificação que já não é a atual da sessão (outra a substituiu, ou a chave foi removida no fim normal de um salvamento posterior), em Ativo, se encerra sem agir; em Simulação, registra quando vai agir. A externa continua no jar (mesmo carregador: o autoteste confere o *nest host*).
+- **Aviso próprio (1.2.0):** as execuções com gatilho `salvamento` não entram em "Falha do plugin": vão para o evento `salvamento_conector` ("Salvamento derrubado ou com erro"), num e-mail-resumo por ambiente a cada rodada do agendador.
+- **Resumo:** evento a cada `resumoMinutos`.
+- **Salvamento com erro no servidor:** vira execução em falha (gatilho `salvamento`, até `maxFalhasPorHora`), que entra no aviso "Falha do plugin".
+- **Autoteste:** confere se a classe corrigida está carregada (`triel$execute`) e se o `ENOIEFCmdHandlers.jar` é o mesmo de onde ela foi gerada
+  (md5 em `IefCheckinModule.DASSAULT_JAR_MD5`). Se um hotfix trocar o jar, o autoteste falha e o Portal avisa: nossa classe estaria por cima da
+  nova. Nesse caso, remover a classe corrigida (abaixo) ou refazer a análise e gerar de novo no dev-plm.
+- **Testes:** `tool/GuardTest.java` (modos, erro, cancelamento, aninhamento) e `tool/VerifyLoad.java` (verificação completa do bytecode, rodada pelo `build.sh`).
+
+**Instalar (por nó, com reinício):**
+
+```sh
+W=/App/Tomee/Tomee3DSpace/webapps/3dspace/WEB-INF    # em produção: Tomee3DSpaceNode1 / Node2
+tar xzf out/TrielIefCheckin-classes.tar.gz -C $W/classes --no-same-owner --no-overwrite-dir
+cp out/TrielIefCheckin.jar $W/lib/
+chown -R admintriel:admintriel $W/classes/br $W/classes/com/dassault_systems/MCADIntegration/server/handler/ENOIEFCheckinHandler.class \
+  "$W/classes/com/dassault_systems/MCADIntegration/server/manager/ENOIEFClientExistanceVerifier\$ENOIEFExistanceVerifier.class" $W/lib/TrielIefCheckin.jar
+```
+
+**Remover (volta ao original da Dassault, com reinício):** apagar `$W/classes/com/dassault_systems/MCADIntegration/server/handler/ENOIEFCheckinHandler.class`, `$W/classes/com/dassault_systems/MCADIntegration/server/manager/ENOIEFClientExistanceVerifier$ENOIEFExistanceVerifier.class`,
+`$W/classes/br/com/trielht/plm/ief/` e `$W/lib/TrielIefCheckin.jar`. Trocar o modo pelo Portal não precisa de reinício.
+
+Migração `db/schema/0180_plugins_3dx_ief_checkin.sql` (TESTE nasce em Simulação, PRODUCAO em Desligado; gatilho `salvamento`).
