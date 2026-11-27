@@ -53,8 +53,8 @@ import { copiarParaAreaDeTransferencia } from "@/lib/utils/copiar-para-area-tran
 import { exportarPlanilha, nomeComData } from "@/lib/utils/exportar-planilha";
 import {
     validarEstruturaNoErp,
+    type DivergenciaNo,
     type ResultadoValidacaoEstrutura,
-    type TipoDivergencia,
 } from "@/modules/cadastro-roteiro/services/validacaoEstrutura.service";
 import { ModoAberturaProvider } from "@/modules/cadastro-roteiro/components/ModoAberturaArquivos";
 import { formatarTempo } from "@/modules/cadastro-roteiro/utils/tempo";
@@ -667,9 +667,29 @@ const CABECALHO_EXPORTACAO = [
     "Observação",
 ];
 
+/* Texto curto da divergência com o ERP: o da badge e o da coluna Situação da exportação. */
+function rotuloDivergenciaErp(divergencia: DivergenciaNo): string {
+    if (divergencia.tipo === "quantidade") {
+        return `${divergencia.qtde3dx} no 3DX · ${divergencia.qtdeErp} no ERP`;
+    }
+    return divergencia.tipo === "vencida" ? "Vencido no ERP" : "Não tem no ERP";
+}
+
+function tituloDivergenciaErp(divergencia: DivergenciaNo): string {
+    if (divergencia.tipo === "quantidade") {
+        return (
+            `Quantidade diferente do ERP: debaixo deste pai o 3DX tem ${divergencia.qtde3dx} ` +
+            `e a estrutura do ERP tem ${divergencia.qtdeErp}.`
+        );
+    }
+    return divergencia.tipo === "vencida"
+        ? "A ligação com o item pai existe no ERP, mas está fora da validade."
+        : "A ligação com o item pai não existe na estrutura do ERP.";
+}
+
 function montarLinhasExportacao(
     raiz: RoteiroTreeNode,
-    divergencias: ReadonlyMap<string, TipoDivergencia>
+    divergencias: ReadonlyMap<string, DivergenciaNo>
 ): (string | number)[][] {
     const linhas: (string | number)[][] = [];
 
@@ -701,7 +721,7 @@ function montarLinhasExportacao(
             if (itemComAtencao(instancia)) situacoes.add("Com atenção");
 
             const divergencia = divergencias.get(instancia.id);
-            if (divergencia) situacoes.add(divergencia === "vencida" ? "Vencido no ERP" : "Não tem no ERP");
+            if (divergencia) situacoes.add(rotuloDivergenciaErp(divergencia));
         }
 
         const base = [
@@ -1081,7 +1101,7 @@ type EstadoValidacaoErp =
     | { estado: "pronto"; resultado: ResultadoValidacaoEstrutura }
     | { estado: "erro"; mensagem: string };
 
-const SEM_DIVERGENCIAS: ReadonlyMap<string, TipoDivergencia> = new Map();
+const SEM_DIVERGENCIAS: ReadonlyMap<string, DivergenciaNo> = new Map();
 
 /*
  * Conferência com o ERP como um botão compacto no cabeçalho da árvore,
@@ -1156,6 +1176,9 @@ function ConferenciaErp({
               ? styles.conferenciaErpDivergente
               : styles.conferenciaErpOk;
 
+    const deQuantidade = divergencias.filter((d) => d.tipo === "quantidade").length;
+    const foraDoErp = divergencias.length - deQuantidade;
+
     const rotulo =
         validacao.estado === "erro"
             ? "Não foi possível conferir"
@@ -1163,9 +1186,15 @@ function ConferenciaErp({
               ? "Nada a conferir no ERP"
               : divergencias.length === 0
                 ? "Estrutura confere com o ERP"
-                : divergencias.length === 1
-                  ? "1 item fora do ERP"
-                  : `${divergencias.length} itens fora do ERP`;
+                : deQuantidade === 0
+                  ? foraDoErp === 1
+                      ? "1 item fora do ERP"
+                      : `${foraDoErp} itens fora do ERP`
+                  : foraDoErp === 0
+                    ? deQuantidade === 1
+                        ? "1 quantidade diferente do ERP"
+                        : `${deQuantidade} quantidades diferentes do ERP`
+                    : `${divergencias.length} divergências com o ERP`;
 
     return (
         <div className={styles.paisErp} ref={caixaRef}>
@@ -1248,7 +1277,11 @@ function ConferenciaErp({
                                             {d.codigoPai} › {d.codigoFilho}
                                         </strong>
                                         {d.descricaoFilho && <span>{d.descricaoFilho}</span>}
-                                        {(d.tipo === "vencida" || d.instancias > 1) && (
+                                        {d.tipo === "quantidade" ? (
+                                            <small className={styles.conferenciaErpQtde}>
+                                                Quantidade: {d.qtde3dx} no 3DX · {d.qtdeErp} no ERP
+                                            </small>
+                                        ) : (d.tipo === "vencida" || d.instancias > 1) && (
                                             <small className={styles.paisErpDetalhe}>
                                                 {[
                                                     d.tipo === "vencida" ? "vencido no ERP" : "",
@@ -1267,6 +1300,8 @@ function ConferenciaErp({
                     {validacao.estado === "pronto" && (
                         <p className={styles.paisErpDetalhe}>
                             Só são conferidos os filhos de itens fabricados: item comprado não tem estrutura no ERP.
+                            Além de a ligação existir, a quantidade de cada filho tem que bater com a do ERP (cada
+                            instância no 3DX conta uma peça).
                         </p>
                     )}
                 </div>
@@ -1305,7 +1340,7 @@ function TreeNode({
     onAlternarExpandido: (id: string) => void;
     onAlternarDetalhes: (id: string) => void;
     /* id do nó -> divergência com o ERP. Vazio enquanto não conferiu. */
-    divergenciasErp: ReadonlyMap<string, TipoDivergencia>;
+    divergenciasErp: ReadonlyMap<string, DivergenciaNo>;
     onCreateRoteiro: (item: RoteiroTreeNode) => void;
     onEditRoteiro: (item: RoteiroTreeNode, roteiro: RoteiroItem) => void;
     onDeleteRoteiro: (item: RoteiroTreeNode, roteiro: RoteiroItem) => void;
@@ -1423,14 +1458,12 @@ function TreeNode({
 
                             {divergenciaErp && (
                                 <span
-                                    className={styles.badgeErp}
-                                    title={
-                                        divergenciaErp === "vencida"
-                                            ? "A ligação com o item pai existe no ERP, mas está fora da validade."
-                                            : "A ligação com o item pai não existe na estrutura do ERP."
+                                    className={
+                                        divergenciaErp.tipo === "quantidade" ? styles.badgeErpQtde : styles.badgeErp
                                     }
+                                    title={tituloDivergenciaErp(divergenciaErp)}
                                 >
-                                    {divergenciaErp === "vencida" ? "Vencido no ERP" : "Não tem no ERP"}
+                                    {rotuloDivergenciaErp(divergenciaErp)}
                                 </span>
                             )}
 
@@ -3129,6 +3162,12 @@ export default function CadastroRoteiro({
 
                             <dt><span className={styles.badgeErp}>Não tem no ERP</span></dt>
                             <dd>O item não está, ou está vencido, na estrutura do ERP debaixo deste pai.</dd>
+
+                            <dt><span className={styles.badgeErpQtde}>3 no 3DX · 1 no ERP</span></dt>
+                            <dd>
+                                O item está no ERP debaixo deste pai, mas com outra quantidade: cada instância no 3DX
+                                conta uma peça.
+                            </dd>
                         </dl>
                     </section>
 
