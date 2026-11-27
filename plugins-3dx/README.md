@@ -11,6 +11,7 @@ administrar fica em **Administração → Plugins 3DX**.
 | `TrielDrawingConfigLink.jar` | `triel-drawing-config-link/` | `drawing-config-link`: desenho ligado a todas as configurações da peça SOLIDWORKS (liberação, rotina noturna e ação manual) |
 | `TrielMaturityState.jar` | `triel-maturity-state/` | `maturity-state`: filtro web (próprio `web-fragment.xml`) na busca `dseng:EngItem/search` e na estrutura `cvservlet/zonequeries` que o integrador do SOLIDWORKS lê: o estado de maturidade de cada objeto é conferido no **banco** (o índice de busca atrasa até ~1,5 min) e, em Ativo, só esse campo é trocado. Em Simulação só registra divergências e custo; qualquer problema devolve a resposta como veio |
 | `TrielIefCheckin.jar` + `WEB-INF/classes` | `triel-ief-checkin/` | `ief-checkin`: correção do salvamento pelo conector CAD. A classe da Dassault `ENOIEFCheckinHandler` corrigida (gerada do `ENOIEFCmdHandlers.jar` pelo `build.sh`) e o `IefCheckinGuard` ficam em `WEB-INF/classes`; o jar só traz o modo do Portal, o resumo, o registro dos salvamentos com erro e o autoteste. Ver a seção própria abaixo |
+| `TrielAdvancedDuplicate.jar` | `triel-advanced-duplicate/` | `advanced-duplicate`: janela de Duplicação avançada. Filtro web na estrutura (`lifecycle/expand/federated`): o item principal já vem como "Duplicar com Desenhos" e os demais como "Reutilizar". Miniatura do item ao passar o mouse no título (0.3.0). Ver a seção própria abaixo |
 
 `triel-visualizacao/` é outra coisa: o script que aplica o padrão de visualização do "Abrir com" (3DPlay/3D Navigate). Não é plugin.
 
@@ -150,3 +151,34 @@ chown -R admintriel:admintriel $W/classes/br $W/classes/com/dassault_systems/MCA
 `$W/classes/br/com/trielht/plm/ief/` e `$W/lib/TrielIefCheckin.jar`. Trocar o modo pelo Portal não precisa de reinício.
 
 Migração `db/schema/0180_plugins_3dx_ief_checkin.sql` (TESTE nasce em Simulação, PRODUCAO em Desligado; gatilho `salvamento`).
+
+## advanced-duplicate: Duplicação avançada
+
+**Ação inicial (0.2.0).** O filtro lê a resposta de `POST /resources/lifecycle/expand/federated` só quando o pedido é de duplicação
+(`"command":"duplicate"`) e ajusta o atributo `expand::defaultAction` de cada objeto, que a janela (`AdvancedView.js`) usa como ação inicial
+da linha: principal → `acaoPrincipal` (padrão `duplicar_com_desenhos`, só para SOLIDWORKS/CATIA V5 com Duplicar entre as capacidades), demais →
+`acaoFilhos` (padrão `reutilizar`, só se a capacidade existir e o objeto não "seguir o pai"). Simulação registra o que mudaria. Resposta
+assíncrona, comprimida, acima de `maxBytes` ou fora do formato: sai como veio. Teste: `tool/RewriterTest.java`.
+
+**Miniatura (0.3.0).** Passando o mouse no **Título** de uma linha aparece a imagem do item, a mesma do Comparador
+(`/resources/compare/thumbnailUrl/{physicalId}`, da Dassault). Três endereços no filtro (`ThumbnailUi`), todos parados em Desligado:
+
+| Endereço | O que o filtro faz |
+|---|---|
+| `GET /webapps/AdvancedView/AdvancedView.js` | Sai como veio + um carregador fixo de ~400 bytes no fim (ETag com `-trielN`, sem 304/Range para emendar) |
+| `GET /webapps/TrielAdvancedDuplicate/miniatura.js` | Sem cache. Em Ativo com `miniatura` marcado: o código do balão (`resources/META-INF/triel-advanced-duplicate/miniatura.js`); senão, script vazio |
+| `GET /webapps/TrielAdvancedDuplicate/evento?v=&m=` | Falha vista no navegador → evento "aviso" no Portal (até 3 por janela, 50 por dia por nó) |
+
+- Em `/webapps/*` o `BypassAuthFilter` da Dassault repassa o pedido com `forward`; por isso o mapeamento do `web-fragment.xml` tem `FORWARD`.
+- O `AdvancedView.js` fica em cache por 7 dias (`StaticContentCachingFilter2` no web.xml, navegador e proxy do 3DDashboard). O carregador
+  não decide nada: quem decide é o `miniatura.js`, sem cache. Então ligar/desligar pelo Portal vale na hora, mas o carregador só chega a
+  cada navegador quando o cache dele renovar (até 7 dias, ou Ctrl+F5). Para todos de uma vez: trocar `uwp.widgetCompiler.cache.version`
+  no `uwp-config.properties` do 3DDashboard (reinício do 3DDashboard; vale para todos os widgets).
+- O balão roda dentro de try/catch: qualquer erro esconde o balão e a janela segue a da Dassault. Só age na grade
+  `.assemblyTreeListContainer` com `wux-identifier="duplicate"`, coluna 0 (Título), e acha o item por `getCellInfosFromHtmlElement`
+  (`nodeModel.options.physicalId`). Endereço do 3DSpace via `i3DXCompassServices`.
+- Parâmetros: `miniatura` (padrão **desmarcado**), `miniaturaAtrasoMs` (350), `miniaturaLargura` (200 px), `miniaturaTimeoutMs` (5000).
+- Autoteste: `ExpandResponse#fromResultAsJSON`, `INode#getDefaultAction`, `CompareWebService#fetchThumbnailUrl` e os trechos do
+  `AdvancedView.js` (`UI_MARKERS` para a ação inicial, `THUMB_MARKERS` para a miniatura; faltando, só a parte afetada fica de fora).
+
+Migração `db/schema/0181_plugins_3dx_advanced_duplicate.sql` (TESTE nasce em Simulação, PRODUCAO em Desligado).

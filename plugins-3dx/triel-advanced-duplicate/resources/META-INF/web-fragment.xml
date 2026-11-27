@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Duplicacao avancada (plugin "advanced-duplicate"): o filtro so age nestas URLs (a estrutura da janela de Duplicacao
+  avancada e, para a miniatura, o AdvancedView.js e /webapps/TrielAdvancedDuplicate/*); qualquer outra passa direto. Ordenado depois dos fragmentos da Dassault, para ficar o mais perto
+  possivel do servlet (ja com a autenticacao feita e a resposta ainda sem compressao).
+-->
+<web-fragment xmlns="https://jakarta.ee/xml/ns/jakartaee"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-fragment_5_0.xsd"
+              version="5.0" metadata-complete="true">
+    <name>TrielAdvancedDuplicate</name>
+    <ordering>
+        <after>
+            <others/>
+        </after>
+    </ordering>
+    <filter>
+        <filter-name>TrielAdvancedDuplicateFilter</filter-name>
+        <filter-class>br.com.trielht.plm.duplicacao.AdvancedDuplicateFilter</filter-class>
+        <async-supported>true</async-supported>
+    </filter>
+    <filter-mapping>
+        <filter-name>TrielAdvancedDuplicateFilter</filter-name>
+        <url-pattern>/resources/lifecycle/expand/federated</url-pattern>
+    </filter-mapping>
+    <!--
+      Miniatura ao passar o mouse (0.3.0): a janela, o codigo do balao e o registro de falhas do navegador. Em /webapps/*
+      o BypassAuthFilter da Dassault (web.xml) repassa o pedido com forward, por isso o FORWARD; so um dos dois chega aqui.
+    -->
+    <filter-mapping>
+        <filter-name>TrielAdvancedDuplicateFilter</filter-name>
+        <url-pattern>/webapps/AdvancedView/AdvancedView.js</url-pattern>
+        <url-pattern>/webapps/TrielAdvancedDuplicate/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+        <dispatcher>FORWARD</dispatcher>
+    </filter-mapping>
+</web-fragment>

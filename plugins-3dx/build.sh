@@ -37,6 +37,7 @@ build triel-duplicate-title TrielDuplicateTitle ":$OUT/triel-3dx-core.jar"
 build triel-replace-revision TrielReplaceRevision ":$OUT/triel-3dx-core.jar"
 build triel-drawing-config-link TrielDrawingConfigLink ":$OUT/triel-3dx-core.jar"
 build triel-maturity-state TrielMaturityState ":$OUT/triel-3dx-core.jar"
+build triel-advanced-duplicate TrielAdvancedDuplicate ":$OUT/triel-3dx-core.jar"
 
 # ---------------------------------------------------------------------------------------------------------------
 # ief-checkin: correcao do salvamento pelo conector CAD. Alem do jar (modulo do plugin), gera a classe da Dassault
