@@ -78,6 +78,16 @@ const CAMPOS: Record<string, CampoParametro[]> = {
     { nome: "maxFalhasPorHora", tipo: "numero", label: "Máximo de erros registrados por hora", dica: "Acima disso só entram no resumo" },
     { nome: "registrarFalhas", tipo: "booleano", label: "Registrar salvamento com erro como execução" },
   ],
+  "advanced-duplicate": [
+    { nome: "acaoPrincipal", tipo: "texto", label: "Ação inicial do item principal", dica: "duplicar_com_desenhos, duplicar ou padrao (o que o 3DX mandar)" },
+    { nome: "acaoFilhos", tipo: "texto", label: "Ação inicial dos demais itens", dica: "reutilizar, duplicar ou padrao (o que o 3DX mandar)" },
+    { nome: "amostrasPorDia", tipo: "numero", label: "Amostras registradas por dia", dica: "Pedido e resposta da janela no registro de eventos" },
+    { nome: "maxBytes", tipo: "numero", label: "Resposta maior que isso passa direto (bytes)" },
+    { nome: "miniatura", tipo: "booleano", label: "Miniatura ao passar o mouse no título (só em Ativo; padrão desligada)" },
+    { nome: "miniaturaAtrasoMs", tipo: "numero", label: "Espera antes de mostrar a miniatura (ms)" },
+    { nome: "miniaturaLargura", tipo: "numero", label: "Largura máxima da miniatura (px)" },
+    { nome: "miniaturaTimeoutMs", tipo: "numero", label: "Tempo máximo do serviço de miniatura (ms)" },
+  ],
 };
 
 export function ConfiguracaoPlugins3dx({ ambiente, usuarios, onFeedback }: ConfiguracaoProps) {

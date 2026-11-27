@@ -80,6 +80,16 @@ export const PARAMETROS_PLUGIN: Record<
     registrarFalhas: { tipo: "booleano", label: "Registrar salvamento com erro" },
     maxFalhasPorHora: { tipo: "numero", label: "Máximo de erros registrados por hora", min: 1, max: 1000 },
   },
+  "advanced-duplicate": {
+    acaoPrincipal: { tipo: "texto", label: "Ação inicial do item principal" },
+    acaoFilhos: { tipo: "texto", label: "Ação inicial dos demais itens" },
+    maxBytes: { tipo: "numero", label: "Resposta maior que isso passa direto (bytes)", min: 100000, max: 500000000 },
+    amostrasPorDia: { tipo: "numero", label: "Amostras registradas por dia", min: 0, max: 200 },
+    miniatura: { tipo: "booleano", label: "Miniatura ao passar o mouse no título" },
+    miniaturaAtrasoMs: { tipo: "numero", label: "Espera antes de mostrar a miniatura (ms)", min: 0, max: 3000 },
+    miniaturaLargura: { tipo: "numero", label: "Largura máxima da miniatura (px)", min: 80, max: 600 },
+    miniaturaTimeoutMs: { tipo: "numero", label: "Tempo máximo do serviço de miniatura (ms)", min: 500, max: 30000 },
+  },
 };
 
 function ehChaveDuplicada(erro: unknown): boolean {

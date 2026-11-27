@@ -57,6 +57,7 @@ export const NOME_CURTO_PLUGIN: Record<string, string> = {
   "drawing-config-link": "Desenho por configuração",
   "maturity-state": "Estado pelo banco",
   "ief-checkin": "Salvamento do conector",
+  "advanced-duplicate": "Duplicação avançada",
 };
 
 export function nomeCurtoPlugin(chave: string): string {
